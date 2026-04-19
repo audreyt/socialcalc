@@ -1,10 +1,17 @@
 declare namespace SocialCalc {
 
+   // Shape of {def, val} used by EncodeCellAttributes / DecodeCellAttributes etc.
+   interface AttribValue {
+      def: boolean;
+      val: string;
+   }
+   type AttribSet = { [name: string]: AttribValue };
+
    const Callbacks: {
-      expand_wiki: any;
-      expand_markup: (displayvalue: any, sheetobj: any, linkstyle: any) => any;
-      MakePageLink: any;
-      NormalizeSheetName: any;
+      expand_wiki: ((displayvalue: string, sheetobj: Sheet, linkstyle: unknown, valueformat: string) => string) | null;
+      expand_markup: (displayvalue: string, sheetobj: Sheet, linkstyle: unknown) => string;
+      MakePageLink: ((pagename: string, workspacename: string, linkstyle: unknown, valueformat: string) => string) | null;
+      NormalizeSheetName: ((name: string) => string) | null;
       [key: string]: any;
    };
 
@@ -15,15 +22,19 @@ declare namespace SocialCalc {
       constructor(coord: string);
 
       coord: string;
-      datavalue: any;
-      datatype: string;
+      datavalue: string | number;
+      datatype: "v" | "t" | "f" | "c" | null;
       formula: string;
+      /**
+       * First char is main type: b=blank, n=numeric, t=text, e=error.
+       * Following chars are sub-types (e.g. "n$", "nl", "nt", "ndt", "th", "tl").
+       */
       valuetype: string;
       readonly: boolean;
 
-      errors: any;
+      errors: string;
       comment: string;
-      displayvalue: any;
+      displayvalue: string;
       parseinfo: any;
 
       bt: number;
@@ -95,8 +106,8 @@ declare namespace SocialCalc {
       cellformathash: { [key: string]: number };
       valueformats: string[];
       valueformathash: { [key: string]: number };
-      matched_cells: any[];
-      selected_search_cell: any;
+      matched_cells: string[];
+      selected_search_cell: string | undefined;
       copiedfrom: string;
       changes: UndoStack;
       renderneeded: boolean;
@@ -106,7 +117,7 @@ declare namespace SocialCalc {
       sci: SheetCommandInfo;
       ioEventTree: { [key: string]: any };
       ioParameterList: { [key: string]: any };
-      statuscallback: any;
+      statuscallback: ((data: any, status: string, arg: any, params: any) => void) | null;
       statuscallbackparams: any;
       xlt: any;
 
@@ -120,16 +131,16 @@ declare namespace SocialCalc {
       CreateSheetSave(range?: string, canonicalize?: boolean): string;
       CellToString(cell: Cell): string;
       CanonicalizeSheet(full?: boolean): void;
-      EncodeCellAttributes(coord: string): any;
-      EncodeSheetAttributes(): any;
-      DecodeCellAttributes(coord: string, attribs: any, range?: string): string;
-      DecodeSheetAttributes(attribs: any): string;
+      EncodeCellAttributes(coord: string): AttribSet;
+      EncodeSheetAttributes(): AttribSet;
+      DecodeCellAttributes(coord: string, attribs: AttribSet, range?: string): string | null;
+      DecodeSheetAttributes(attribs: AttribSet): string | null;
       ScheduleSheetCommands(cmd: string, saveundo?: boolean): void;
       SheetUndo(): void;
       SheetRedo(): void;
       CreateAuditString(): string;
       GetStyleNum(atype: string, style: string): number;
-      GetStyleString(atype: string, num: number): string;
+      GetStyleString(atype: string, num: number): string | null;
       RecalcSheet(): void;
 
       [key: string]: any;
@@ -148,21 +159,21 @@ declare namespace SocialCalc {
    function CreateSheetSave(sheetobj: Sheet, range?: string, canonicalize?: boolean): string;
    function CellToString(sheet: Sheet, cell: Cell): string;
    function CanonicalizeSheet(sheetobj: Sheet, full?: boolean): void;
-   function EncodeCellAttributes(sheet: Sheet, coord: string): any;
-   function EncodeSheetAttributes(sheet: Sheet): any;
-   function DecodeCellAttributes(sheet: Sheet, coord: string, newattribs: any, range?: string): string;
-   function DecodeSheetAttributes(sheet: Sheet, newattribs: any): string;
+   function EncodeCellAttributes(sheet: Sheet, coord: string): AttribSet;
+   function EncodeSheetAttributes(sheet: Sheet): AttribSet;
+   function DecodeCellAttributes(sheet: Sheet, coord: string, newattribs: AttribSet, range?: string): string | null;
+   function DecodeSheetAttributes(sheet: Sheet, newattribs: AttribSet): string | null;
 
    class SheetCommandInfo {
       constructor(sheetobj: Sheet);
 
       sheetobj: Sheet;
-      timerobj: any;
+      timerobj: ReturnType<typeof setTimeout> | null;
       firsttimerdelay: number;
       timerdelay: number;
       maxtimeslice: number;
       saveundo: boolean;
-      CmdExtensionCallbacks: { [name: string]: { func: any; data: any } };
+      CmdExtensionCallbacks: { [name: string]: { func: (cmdname: string, data: any, sheet: Sheet, parseobj: Parse, saveundo: boolean) => void; data: any } };
 
       [key: string]: any;
    }
@@ -175,19 +186,19 @@ declare namespace SocialCalc {
    function SheetRedo(sheet: Sheet): void;
    function CreateAuditString(sheet: Sheet): string;
    function GetStyleNum(sheet: Sheet, atype: string, style: string): number;
-   function GetStyleString(sheet: Sheet, atype: string, num: number): string;
+   function GetStyleString(sheet: Sheet, atype: string, num: number): string | null;
    function OffsetFormulaCoords(formula: string, coloffset: number, rowoffset: number): string;
    function AdjustFormulaCoords(formula: string, col: number, coloffset: number, row: number, rowoffset: number): string;
-   function ReplaceFormulaCoords(formula: string, movedto: any): string;
+   function ReplaceFormulaCoords(formula: string, movedto: { [coord: string]: string }): string;
 
    const RecalcInfo: {
-      sheet: Sheet;
+      sheet: Sheet | null;
       currentState: number;
       state: { idle: number; start_calc: number; order: number; calc: number; start_wait: number; done_wait: number };
-      recalctimer: any;
+      recalctimer: ReturnType<typeof setTimeout> | null;
       maxtimeslice: number;
       timeslicedelay: number;
-      starttime: any;
+      starttime: number | Date;
       queue: Sheet[];
       LoadSheet: (sheetname: string) => boolean;
       [key: string]: any;
@@ -199,11 +210,11 @@ declare namespace SocialCalc {
       inrecalc: boolean;
       celllist: string[];
       celllistitem: number;
-      calclist: any;
+      calclist: { [coord: string]: string } | null;
       calclistlength: number;
-      firstcalc: string;
-      lastcalc: string;
-      nextcalc: string;
+      firstcalc: string | null;
+      lastcalc: string | null;
+      nextcalc: string | null;
       count: number;
       checkinfo: { [coord: string]: RecalcCheckInfo | true };
 
@@ -213,18 +224,18 @@ declare namespace SocialCalc {
    class RecalcCheckInfo {
       constructor();
 
-      oldcoord: string;
+      oldcoord: string | null;
       parsepos: number;
       inrange: boolean;
       inrangestart: boolean;
-      cr1: any;
-      cr2: any;
-      c1: number;
-      c2: number;
-      r1: number;
-      r2: number;
-      c: number;
-      r: number;
+      cr1: { row: number; col: number } | null;
+      cr2: { row: number; col: number } | null;
+      c1: number | null;
+      c2: number | null;
+      r1: number | null;
+      r2: number | null;
+      c: number | null;
+      r: number | null;
 
       [key: string]: any;
    }
@@ -232,9 +243,9 @@ declare namespace SocialCalc {
    function RecalcSheet(sheet: Sheet): void;
    function RecalcSetTimeout(): void;
    function RecalcClearTimeout(): void;
-   function RecalcLoadedSheet(sheetname: string, str: string, recalcneeded: boolean, live?: boolean): any;
+   function RecalcLoadedSheet(sheetname: string | null, str: string, recalcneeded: boolean, live?: boolean): void;
    function RecalcTimerRoutine(): void;
-   function RecalcCheckCell(sheet: Sheet, startcoord: string): any;
+   function RecalcCheckCell(sheet: Sheet, startcoord: string): string;
 
    class Parse {
       constructor(str: string);
@@ -262,8 +273,8 @@ declare namespace SocialCalc {
       maxUndo: number;
 
       PushChange(type: string): void;
-      AddDo(...args: any[]): void;
-      AddUndo(...args: any[]): void;
+      AddDo(...args: Array<string | number | null | undefined>): void;
+      AddUndo(...args: Array<string | number | null | undefined>): void;
       TOS(): { command: string[]; type: string; undo: string[] } | null;
       Undo(): boolean;
       Redo(): boolean;
@@ -283,22 +294,22 @@ declare namespace SocialCalc {
       hideRowsCols: boolean;
       showGrid: boolean;
       showRCHeaders: boolean;
-      rownamewidth: any;
-      pixelsPerRow: any;
+      rownamewidth: number | string;
+      pixelsPerRow: number;
 
-      cellskip: any;
+      cellskip: { [coord: string]: string } | null;
       coordToCR: { [coord: string]: { row: number; col: number } };
-      colwidth: any[];
-      rowheight: any[];
+      colwidth: string[];
+      rowheight: string[];
       totalwidth: number;
       totalheight: number;
 
       rowpanes: Array<{ first: number; last: number }>;
       colpanes: Array<{ first: number; last: number }>;
-      colunhideleft: any[];
-      colunhideright: any[];
-      rowunhidetop: any[];
-      rowunhidebottom: any[];
+      colunhideleft: HTMLElement[];
+      colunhideright: HTMLElement[];
+      rowunhidetop: HTMLElement[];
+      rowunhidebottom: HTMLElement[];
       maxcol: number;
       maxrow: number;
 
@@ -307,15 +318,15 @@ declare namespace SocialCalc {
       highlightTypes: { [key: string]: { style: string; className: string } };
 
       cellIDprefix: string;
-      defaultlinkstyle: any;
+      defaultlinkstyle: unknown;
       defaultHTMLlinkstyle: { type: string };
 
       defaultfontstyle: string;
       defaultfontsize: string;
       defaultfontfamily: string;
       defaultlayout: string;
-      defaultpanedividerwidth: any;
-      defaultpanedividerheight: any;
+      defaultpanedividerwidth: number | string;
+      defaultpanedividerheight: number | string;
 
       gridCSS: string;
       commentClassName: string;
@@ -348,29 +359,35 @@ declare namespace SocialCalc {
       SetColPaneFirstLast(panenum: number, first: number, last: number): void;
       CoordInPane(coord: string, rowpane: number, colpane: number): boolean;
       CellInPane(row: number, col: number, rowpane: number, colpane: number): boolean;
-      InitializeTable(tableobj: any): void;
-      RenderSheet(oldtable: any, linkstyle?: any): any;
-      RenderColGroup(): any;
-      RenderColHeaders(): any;
-      RenderSizingRow(): any;
-      RenderRow(rownum: number, rowpane: number, linkstyle?: any): any;
-      RenderSpacingRow(): any;
-      RenderCell(rownum: number, colnum: number, rowpane: number, colpane: number, noElement?: boolean, linkstyle?: any): any;
+      InitializeTable(tableobj: HTMLTableElement): void;
+      RenderSheet(oldtable: HTMLTableElement | null, linkstyle?: unknown): HTMLTableElement;
+      RenderColGroup(): HTMLElement;
+      RenderColHeaders(): HTMLElement | null;
+      RenderSizingRow(): HTMLElement;
+      RenderRow(rownum: number, rowpane: number, linkstyle?: unknown): HTMLElement;
+      RenderSpacingRow(): HTMLElement;
+      RenderCell(rownum: number, colnum: number, rowpane: number, colpane: number, noElement?: boolean, linkstyle?: unknown): HTMLElement | PseudoElement | null;
 
       [key: string]: any;
+   }
+
+   interface PseudoElement {
+      style: { cssText: string };
+      innerHTML: string;
+      className: string;
    }
 
    function PrecomputeSheetFontsAndLayouts(context: RenderContext): void;
    function CalculateCellSkipData(context: RenderContext): void;
    function CalculateColWidthData(context: RenderContext): void;
    function CalculateRowHeightData(context: RenderContext): void;
-   function InitializeTable(context: RenderContext, tableobj: any): void;
-   function RenderSheet(context: RenderContext, oldtable: any, linkstyle?: any): any;
-   function RenderRow(context: RenderContext, rownum: number, rowpane: number, linkstyle?: any): any;
-   function RenderSpacingRow(context: RenderContext): any;
-   function RenderColHeaders(context: RenderContext): any;
-   function RenderColGroup(context: RenderContext): any;
-   function RenderSizingRow(context: RenderContext): any;
+   function InitializeTable(context: RenderContext, tableobj: HTMLTableElement): void;
+   function RenderSheet(context: RenderContext, oldtable: HTMLTableElement | null, linkstyle?: unknown): HTMLTableElement;
+   function RenderRow(context: RenderContext, rownum: number, rowpane: number, linkstyle?: unknown): HTMLElement;
+   function RenderSpacingRow(context: RenderContext): HTMLElement;
+   function RenderColHeaders(context: RenderContext): HTMLElement | null;
+   function RenderColGroup(context: RenderContext): HTMLElement;
+   function RenderSizingRow(context: RenderContext): HTMLElement;
    function RenderCell(
       context: RenderContext,
       rownum: number,
@@ -378,12 +395,12 @@ declare namespace SocialCalc {
       rowpane: number,
       colpane: number,
       noElement?: boolean,
-      linkstyle?: any
-   ): any;
+      linkstyle?: unknown
+   ): HTMLElement | PseudoElement | null;
 
    function CoordInPane(context: RenderContext, coord: string, rowpane: number, colpane: number): boolean;
    function CellInPane(context: RenderContext, row: number, col: number, rowpane: number, colpane: number): boolean;
-   function CreatePseudoElement(): { style: { cssText: string }; innerHTML: string; className: string };
+   function CreatePseudoElement(): PseudoElement;
 
    function rcColname(c: number): string;
    const letters: string[];
@@ -398,38 +415,38 @@ declare namespace SocialCalc {
    function encodeForSave(s: string): string;
    function special_chars(string: string): string;
 
-   function Lookup(value: any, list: any[]): number;
-   function setStyles(element: any, cssText: string): void;
+   function Lookup(value: number, list: number[]): number | null;
+   function setStyles(element: HTMLElement, cssText: string): void;
 
    function GetViewportInfo(): { width: number; height: number; horizontalScroll: number; verticalScroll: number };
-   function GetElementPosition(element: any): { left: number; top: number };
-   function GetElementPositionWithScroll(element: any): { left: number; right: number; top: number; bottom: number; width: number; height: number };
-   function GetElementFixedParent(element: any): any;
-   function GetComputedStyle(element: any, style: string): any;
-   function LookupElement(element: any, array: any[]): any;
-   function AssignID(obj: any, element: any, id: string): void;
+   function GetElementPosition(element: HTMLElement): { left: number; top: number };
+   function GetElementPositionWithScroll(element: HTMLElement): { left: number; right: number; top: number; bottom: number; width: number; height: number };
+   function GetElementFixedParent(element: HTMLElement): HTMLElement | false;
+   function GetComputedStyle(element: HTMLElement, style: string): string;
+   function LookupElement<T extends { element: unknown }>(element: unknown, array: T[]): T | null;
+   function AssignID(obj: { idPrefix?: string }, element: HTMLElement, id: string): void;
 
    function GetCellContents(sheetobj: Sheet, coord: string): string;
-   function FormatValueForDisplay(sheetobj: Sheet, value: any, cr: string, linkstyle?: any): string;
+   function FormatValueForDisplay(sheetobj: Sheet, value: string | number, cr: string, linkstyle?: unknown): string;
    function format_text_for_display(
-      rawvalue: any,
+      rawvalue: string | number,
       valuetype: string,
       valueformat: string,
       sheetobj: Sheet,
-      linkstyle?: any,
-      nontextvalueformat?: any
+      linkstyle?: unknown,
+      nontextvalueformat?: number | string
    ): string;
-   function format_number_for_display(rawvalue: any, valuetype: string, valueformat: string): string;
-   function DetermineValueType(rawvalue: any): { value: any; type: string };
+   function format_number_for_display(rawvalue: string | number, valuetype: string, valueformat: string): string;
+   function DetermineValueType(rawvalue: string | number): { value: string | number; type: string };
 
    const InputConstants: { [key: string]: string };
 
-   function default_expand_markup(displayvalue: any, sheetobj: Sheet, linkstyle?: any): string;
-   function expand_text_link(displayvalue: any, sheetobj: Sheet, linkstyle: any, valueformat: string): string;
+   function default_expand_markup(displayvalue: string, sheetobj: Sheet, linkstyle?: unknown): string;
+   function expand_text_link(displayvalue: string, sheetobj: Sheet, linkstyle: unknown, valueformat: string): string;
    function ParseCellLinkText(str: string): { url: string; desc: string; newwin: boolean; pagename: string; workspace: string };
 
    function ConvertSaveToOtherFormat(savestr: string, outputformat: string, dorecalc?: boolean): string;
    function ConvertOtherFormatToSave(inputstr: string, inputformat: string): string;
-   function SetConvertedCell(sheet: Sheet, cr: string, rawvalue: any): void;
+   function SetConvertedCell(sheet: Sheet, cr: string, rawvalue: string | number): void;
 
 }

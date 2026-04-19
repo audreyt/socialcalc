@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictPropertyInitialization": true,
+    "checkJs": false,
+    "allowJs": false
+  },
+  "include": ["build.ts"],
+  "exclude": ["js/**/*.js", "node_modules", "dist"]
+}

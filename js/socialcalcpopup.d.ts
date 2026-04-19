@@ -2,10 +2,12 @@ declare namespace SocialCalc {
 
    namespace Popup {
 
+      type PopupControlValue = string | number | { def: boolean; val: any };
+
       interface PopupTypeHandler {
-         Create?: (type: string, id: string, attribs?: any) => any;
+         Create?: (type: string, id: string, attribs?: PopupAttribs) => void;
          Initialize?: (type: string, id: string, data: any) => void;
-         SetValue?: (type: string, id: string, value: any) => void;
+         SetValue?: (type: string, id: string, value: PopupControlValue) => void;
          GetValue?: (type: string, id: string) => any;
          SetDisabled?: (type: string, id: string, disabled: boolean) => void;
          Show?: (type: string, id: string) => void;
@@ -19,7 +21,7 @@ declare namespace SocialCalc {
          type: string;
          value: any;
          display?: string;
-         data: any;
+         data: { [k: string]: any };
          [k: string]: any;
       }
 
@@ -33,7 +35,7 @@ declare namespace SocialCalc {
          moveable?: boolean;
          width?: string;
          ensureWithin?: HTMLElement | null;
-         changedcallback?: (attribs: any, id: string, newvalue: any) => void;
+         changedcallback?: (attribs: PopupAttribs & { panelobj?: any }, id: string, newvalue: any) => void;
          sampleWidth?: string;
          sampleHeight?: string;
          backgroundImage?: string;
@@ -65,19 +67,19 @@ declare namespace SocialCalc {
 
       function LocalizeString(str: string): string;
 
-      function Create(type: string, id: string, attribs?: PopupAttribs): void;
-      function SetValue(id: string, value: any): void;
+      function Create(type: "List" | "ColorChooser" | string, id: string, attribs?: PopupAttribs): void;
+      function SetValue(id: string, value: PopupControlValue): void;
       function SetDisabled(id: string, disabled: boolean): void;
       function GetValue(id: string): any;
       function Initialize(id: string, data: any): void;
-      function Reset(type: string): void;
+      function Reset(type: "List" | "ColorChooser" | string): void;
       function CClick(id: string): void;
       function Close(): void;
       function Cancel(): void;
 
       function CreatePopupDiv(id: string, attribs: PopupAttribs): HTMLElement;
       function EnsurePosition(id: string, container: HTMLElement): void;
-      function DestroyPopupDiv(ele: HTMLElement | null, dragregistered: any): void;
+      function DestroyPopupDiv(ele: HTMLElement | null, dragregistered: HTMLElement | null): void;
 
       function RGBToHex(val: string): string;
       function ToHex(num: number): string;
@@ -90,7 +92,7 @@ declare namespace SocialCalc {
 
          const List: PopupTypeHandler & {
             Create: (type: string, id: string, attribs?: PopupAttribs) => void;
-            SetValue: (type: string, id: string, value: any) => void;
+            SetValue: (type: string, id: string, value: PopupControlValue) => void;
             SetDisabled: (type: string, id: string, disabled: boolean) => void;
             GetValue: (type: string, id: string) => any;
             Initialize: (type: string, id: string, data: any) => void;
@@ -108,7 +110,7 @@ declare namespace SocialCalc {
 
          const ColorChooser: PopupTypeHandler & {
             Create: (type: string, id: string, attribs?: PopupAttribs) => void;
-            SetValue: (type: string, id: string, value: any) => void;
+            SetValue: (type: string, id: string, value: PopupControlValue) => void;
             SetDisabled: (type: string, id: string, disabled: boolean) => void;
             GetValue: (type: string, id: string) => any;
             Initialize: (type: string, id: string, data: any) => void;
@@ -122,14 +124,14 @@ declare namespace SocialCalc {
             CustomToGrid: (id: string) => void;
             CustomOK: (id: string) => void;
             CreateGrid: (type: string, id: string) => HTMLElement;
-            gridToG: (grid: any, row: number, col: number) => any;
+            gridToG: (grid: HTMLElement, row: number, col: number) => any;
             DetermineColors: (id: string) => void;
             SetColors: (id: string) => void;
-            GridMouseDown: (e: Event) => void;
+            GridMouseDown: (e: MouseEvent | Event) => void;
             ControlClicked: (id: string) => void;
-            DefaultClicked: (e: Event) => void;
-            CustomClicked: (e: Event) => void;
-            CloseOK: (e?: Event) => void;
+            DefaultClicked: (e: MouseEvent | Event) => void;
+            CustomClicked: (e: MouseEvent | Event) => void;
+            CloseOK: (e?: MouseEvent | Event) => void;
          };
 
       }

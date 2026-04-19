@@ -1,71 +1,71 @@
 declare namespace SocialCalc {
 
-   var CurrentSpreadsheetViewerObject: any;
+   var CurrentSpreadsheetViewerObject: SpreadsheetViewer | null;
 
-   var LocalizeStringList: { [key: string]: any };
+   var LocalizeStringList: { [key: string]: string };
 
    class SpreadsheetViewer {
       constructor(idPrefix?: string);
 
-      parentNode: any;
-      spreadsheetDiv: any;
-      requestedHeight: any;
-      requestedWidth: any;
-      requestedSpaceBelow: any;
-      height: any;
-      width: any;
-      viewheight: any;
+      parentNode: HTMLElement | null;
+      spreadsheetDiv: HTMLElement | null;
+      requestedHeight: number;
+      requestedWidth: number;
+      requestedSpaceBelow: number;
+      height: number;
+      width: number;
+      viewheight: number;
 
       sheet: any;
       context: any;
       editor: any;
 
-      editorDiv: any;
-      statuslineDiv: any;
+      editorDiv: HTMLElement | null;
+      statuslineDiv: HTMLElement | null;
 
-      sortrange: any;
+      sortrange: string;
 
       idPrefix: string;
-      imagePrefix: any;
+      imagePrefix: string;
 
-      statuslineheight: any;
-      statuslineCSS: any;
+      statuslineheight: number;
+      statuslineCSS: string;
 
-      hasStatusLine: any;
-      statuslineHTML: any;
-      statuslineFull: any;
-      noRecalc: any;
-      nonviewheight: any;
+      hasStatusLine: boolean;
+      statuslineHTML: string;
+      statuslineFull: boolean;
+      noRecalc: boolean;
+      nonviewheight: number;
 
-      repeatingMacroTimer: any;
-      repeatingMacroInterval: any;
-      repeatingMacroCommands: any;
+      repeatingMacroTimer: number | null;
+      repeatingMacroInterval: number;
+      repeatingMacroCommands: string;
 
-      formDataViewer: any;
+      formDataViewer: SpreadsheetViewer | null;
 
-      InitializeSpreadsheetViewer(node: any, height?: any, width?: any, spacebelow?: any): any;
-      LoadSave(str: any): any;
-      DoOnResize(): any;
-      SizeSSDiv(): any;
-      DecodeSpreadsheetSave(str: any): any;
-      ParseSheetSave(str: any): any;
+      InitializeSpreadsheetViewer(node: HTMLElement | string, height?: number, width?: number, spacebelow?: number): void;
+      LoadSave(str: string): void;
+      DoOnResize(): void;
+      SizeSSDiv(): boolean;
+      DecodeSpreadsheetSave(str: string): { [key: string]: { start: number; end: number } };
+      ParseSheetSave(str: string): any;
 
       [key: string]: any;
    }
 
-   function InitializeSpreadsheetViewer(spreadsheet: any, node: any, height?: any, width?: any, spacebelow?: any): any;
-   function SpreadsheetViewerLoadSave(spreadsheet: any, savestr: any): any;
-   function SpreadsheetViewerDoRepeatingMacro(): any;
-   function SpreadsheetViewerRepeatMacroCommand(name: any, data: any, sheet: any, cmd: any, saveundo: any): any;
-   function SpreadsheetViewerStopRepeatingMacro(): any;
-   function SpreadsheetViewerDoButtonCmd(e: any, buttoninfo: any, bobj: any): any;
-   function LocalizeString(str: any): any;
-   function LocalizeSubstrings(str: any): any;
-   function GetSpreadsheetViewerObject(): any;
-   function DoOnResize(spreadsheet: any): any;
-   function SizeSSDiv(spreadsheet: any): any;
-   function SpreadsheetViewerStatuslineCallback(editor: any, status: any, arg: any, params: any): any;
-   function CmdGotFocus(obj: any): any;
-   function SpreadsheetViewerCreateSheetHTML(spreadsheet: any): any;
-   function SpreadsheetViewerDecodeSpreadsheetSave(spreadsheet: any, str: any): any;
+   function InitializeSpreadsheetViewer(spreadsheet: SpreadsheetViewer, node: HTMLElement | string, height?: number, width?: number, spacebelow?: number): void;
+   function SpreadsheetViewerLoadSave(spreadsheet: SpreadsheetViewer, savestr: string): void;
+   function SpreadsheetViewerDoRepeatingMacro(): void;
+   function SpreadsheetViewerRepeatMacroCommand(name: string, data: any, sheet: any, cmd: any, saveundo: any): void;
+   function SpreadsheetViewerStopRepeatingMacro(): void;
+   function SpreadsheetViewerDoButtonCmd(e: Event, buttoninfo: any, bobj: { element: HTMLElement; functionobj: { command: string; [k: string]: any }; [k: string]: any }): void;
+   function LocalizeString(str: string): string;
+   function LocalizeSubstrings(str: string): string;
+   function GetSpreadsheetViewerObject(): SpreadsheetViewer;
+   function DoOnResize(spreadsheet: SpreadsheetViewer): void;
+   function SizeSSDiv(spreadsheet: SpreadsheetViewer): boolean;
+   function SpreadsheetViewerStatuslineCallback(editor: any, status: string, arg: any, params: { spreadsheetobj?: SpreadsheetViewer; [k: string]: any }): void;
+   function CmdGotFocus(obj: HTMLElement | boolean | null): void;
+   function SpreadsheetViewerCreateSheetHTML(spreadsheet: SpreadsheetViewer): string;
+   function SpreadsheetViewerDecodeSpreadsheetSave(spreadsheet: SpreadsheetViewer, str: string): { [key: string]: { start: number; end: number } };
 }

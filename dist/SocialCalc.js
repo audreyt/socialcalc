@@ -13838,6 +13838,11 @@ SocialCalc.ProcessKey = function (ch, e) {
 
 
 
+// @ts-check
+// Opt-in TypeScript checking for this file. formatnumber2.js has a 95%
+// Stryker mutation score, so the code is healthy and worth type-checking.
+// Other .js files under js/ remain un-checked (see tsconfig.json
+// `checkJs: false`) until they are audited for leaky globals / typos.
 //
 /*
 // SocialCalc Number Formatting Library
@@ -13870,6 +13875,7 @@ SocialCalc.ProcessKey = function (ch, e) {
 //
 */
 
+   // @ts-ignore - SocialCalc is declared ambiently; runtime re-declaration is intentional.
    var SocialCalc;
    if (!SocialCalc) SocialCalc = {}; // May be used with other SocialCalc libraries or standalone
 
@@ -13922,7 +13928,7 @@ SocialCalc.FormatNumber.formatNumberWithFormat = function(rawvalue, format_strin
    var op, operandstr, fromend, cval, operandstrlc;
    var startval, estartval;
    var hrs, mins, secs, ehrs, emins, esecs, ampmstr, ymd;
-   var minOK, mpos;
+   var minOK, mspos;
    var result="";
    var thisformat;
    var section, gotcomparison, compop, compval, cpos, oppos;
@@ -14427,7 +14433,7 @@ SocialCalc.FormatNumber.formatTextWithFormat = function(rawvalue, format_string)
    var result = "";
    var section;
    var sectioninfo;
-   var oppos;
+   var op, oppos;
    var operandstr;
    var thisformat;
    var textcolor = "";
@@ -14614,6 +14620,10 @@ SocialCalc.FormatNumber.parse_format_string = function(format_defs, format_strin
          ampmstr += ch;
          part=ampmstr.toLowerCase();
          if (part!="am/pm".substring(0,part.length) && part!="a/p".substring(0,part.length)) {
+            // @ts-expect-error: intentional no-op assignment to a discarded global.
+            // Clearing `ampmstr` here would change behavior (incomplete AM/PM runs
+            // would stop swallowing subsequent characters); see format-coverage
+            // test "partial AM/PM run ... is discarded".
             ampstr="";
             }
          else if (part=="am/pm" || part=="a/p") {

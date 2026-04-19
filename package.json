@@ -9,6 +9,7 @@
     "build": "bun run build.ts",
     "build:min": "bun run build.ts --minify",
     "typecheck": "tsgo --noEmit",
+    "typecheck:strict": "tsgo --noEmit -p tsconfig.strict.json",
     "test": "bun run build.ts && bun test",
     "test:coverage": "bun run build.ts && bun test --coverage --coverage-reporter=text --coverage-reporter=lcov",
     "mutate": "stryker run",
