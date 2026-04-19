@@ -3317,7 +3317,7 @@ SocialCalc.SpreadsheetControlCreateSpreadsheetSave = function(spreadsheet, other
 
 SocialCalc.SpreadsheetControlDecodeSpreadsheetSave = function(spreadsheet, str) {
 
-   var pos1, mpregex, searchinfo, boundary, boundaryregex, blanklineregex, start, ending, lines, i, lines, p, pnun;
+   var pos1, mpregex, searchinfo, boundary, boundaryregex, blanklineregex, start, ending, lines, i, line, p, pnum;
    var parts = {};
    var partlist = [];
 

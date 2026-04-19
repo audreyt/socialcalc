@@ -589,6 +589,7 @@ SocialCalc.FormatNumber.formatTextWithFormat = function(rawvalue, format_string)
    var sectioninfo;
    var oppos;
    var operandstr;
+   var thisformat;
    var textcolor = "";
    var textstyle = "";
 
@@ -669,7 +670,7 @@ SocialCalc.FormatNumber.parse_format_string = function(format_defs, format_strin
 
    var scfn = SocialCalc.FormatNumber;
 
-   var thisformat, section, sectionfinfo;
+   var thisformat, section, sectioninfo;
    var integerpart = 1; // start out in integer part
    var lastwasinteger; // last char was an integer placeholder
    var lastwasslash; // last char was a backslash - escaping following character
