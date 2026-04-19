@@ -20,14 +20,33 @@ This package also works in node.js. You don't need to callc `InitializeSpreadshe
 
 ## Build from sources
 
-SocialCalc uses npm and gulp, to get the dependencies, use:
+SocialCalc builds with [Bun](https://bun.sh) and type-checks with
+[tsgo](https://github.com/microsoft/typescript-go) (the native TypeScript 7.0
+compiler). Install the dependencies:
 ```bash
-npm install
+bun install
 ```
-You can now compile the project using
+Build `dist/SocialCalc.js` and `dist/socialcalc.css`:
 ```bash
-npm run build
+bun run build
 ```
+Optional minified bundle (`dist/SocialCalc.min.js`):
+```bash
+bun run build:min
+```
+Type-check in strict mode:
+```bash
+bun run typecheck
+```
+Run the smoke tests (parse, recalc, formula coverage, strict-mode global-leak
+guard):
+```bash
+bun test
+```
+
+The bundle loads cleanly under `"use strict"` and keeps the existing UMD entry
+points (browser global `SocialCalc`, AMD `define`, and CommonJS
+`module.exports`) so downstream callers don't need to change.
 
 ## Licensing
 ### Common Public Attribution License (Socialtext Inc.)
