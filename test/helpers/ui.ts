@@ -1,0 +1,641 @@
+// UI test helper: extends the FakeDocument / FakeElement shim in socialcalc.ts
+// with a minimal HTML-to-DOM parser on innerHTML set, a getBoundingClientRect
+// implementation, a no-op blur/focus, and a jQuery-like `$` stub sufficient
+// for SpreadsheetControl initialization.
+//
+// Do NOT modify test/helpers/socialcalc.ts; this helper augments globals after
+// installBrowserShim() has been called.
+//
+// It also exposes `loadSocialCalcFresh()` which re-evaluates the bundled
+// SocialCalc.js source in the current context so the module-wrapper-bottom
+// no-op guard (`typeof document === "undefined"`) does not leave DOM
+// functions stubbed out after a non-browser load from another test file.
+// Bun caches ESM dynamic imports aggressively even with a nonce query
+// string, so `await import(bundle + "?nonce=" + n)` does NOT reload the
+// module — we evaluate the source string directly instead.
+
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+
+type AnyRec = Record<string, unknown>;
+
+function tokenize(html: string): Array<{ type: "open" | "close" | "void" | "text"; tag?: string; attrs?: Record<string, string>; text?: string; selfClose?: boolean }> {
+    const out: Array<{ type: "open" | "close" | "void" | "text"; tag?: string; attrs?: Record<string, string>; text?: string; selfClose?: boolean }> = [];
+    const voidEls = new Set(["br", "hr", "img", "input", "meta", "link", "source", "area", "base", "col", "embed", "param", "track", "wbr"]);
+    let i = 0;
+    while (i < html.length) {
+        const lt = html.indexOf("<", i);
+        if (lt === -1) {
+            const text = html.slice(i);
+            if (text.length) out.push({ type: "text", text });
+            break;
+        }
+        if (lt > i) {
+            out.push({ type: "text", text: html.slice(i, lt) });
+        }
+        const gt = html.indexOf(">", lt + 1);
+        if (gt === -1) {
+            // malformed — treat remainder as text
+            out.push({ type: "text", text: html.slice(lt) });
+            break;
+        }
+        const raw = html.slice(lt + 1, gt).trim();
+        if (raw.startsWith("!--")) {
+            // comment
+            i = gt + 1;
+            continue;
+        }
+        if (raw.startsWith("!")) {
+            // doctype/etc - ignore
+            i = gt + 1;
+            continue;
+        }
+        if (raw.startsWith("/")) {
+            out.push({ type: "close", tag: raw.slice(1).trim().toLowerCase() });
+            i = gt + 1;
+            continue;
+        }
+        // opening or self-closing
+        const selfClose = raw.endsWith("/");
+        const body = selfClose ? raw.slice(0, -1).trim() : raw;
+        const spaceIdx = body.search(/\s/);
+        const tag = (spaceIdx === -1 ? body : body.slice(0, spaceIdx)).toLowerCase();
+        const attrs: Record<string, string> = {};
+        if (spaceIdx !== -1) {
+            const attrStr = body.slice(spaceIdx + 1);
+            // parse attrs: name="val" or name='val' or name=val or name
+            const re = /([A-Za-z_:][-A-Za-z0-9_:.]*)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
+            let m: RegExpExecArray | null;
+            while ((m = re.exec(attrStr)) !== null) {
+                const name = m[1];
+                const value = m[2] ?? m[3] ?? m[4] ?? "";
+                attrs[name] = value;
+            }
+        }
+        const isVoid = voidEls.has(tag) || selfClose;
+        out.push({ type: isVoid ? "void" : "open", tag, attrs, selfClose });
+        i = gt + 1;
+    }
+    return out;
+}
+
+function decodeEntities(text: string): string {
+    return text
+        .replace(/&nbsp;/g, "\u00A0")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'");
+}
+
+function applyAttrs(el: AnyRec, attrs: Record<string, string>) {
+    const setAttribute = (el as any).setAttribute?.bind(el);
+    for (const [name, value] of Object.entries(attrs)) {
+        if (!setAttribute) continue;
+        setAttribute(name, value);
+        // Common ones we also mirror as properties so the SocialCalc code
+        // reading element.src / element.title / element.value etc works.
+        const lname = name.toLowerCase();
+        if (lname === "id") {
+            (el as any).id = value;
+        } else if (lname === "class") {
+            (el as any).className = value;
+        } else if (lname === "src" || lname === "href" || lname === "title" || lname === "alt" || lname === "name" || lname === "type" || lname === "value" || lname === "placeholder") {
+            (el as any)[lname] = value;
+        } else if (lname === "cellspacing" || lname === "cellpadding") {
+            (el as any)[lname === "cellspacing" ? "cellSpacing" : "cellPadding"] = value;
+        } else if (lname === "style") {
+            // split by ; and set style.prop = val
+            const parts = value.split(";");
+            for (const part of parts) {
+                const colon = part.indexOf(":");
+                if (colon === -1) continue;
+                const k = part.slice(0, colon).trim();
+                const v = part.slice(colon + 1).trim();
+                if (!k) continue;
+                // camelCase CSS property names for simplicity
+                const camel = k.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+                ((el as any).style as any)[camel] = v;
+                ((el as any).style as any)[k] = v;
+            }
+            ((el as any).style as any).cssText = value;
+        } else if (lname === "selected" || lname === "checked" || lname === "disabled") {
+            (el as any)[lname] = true;
+        }
+    }
+}
+
+function buildFromTokens(ownerDoc: any, tokens: ReturnType<typeof tokenize>): any[] {
+    // Build a flat list of top-level nodes
+    const roots: any[] = [];
+    const stack: any[] = [];
+    const pushChild = (node: any) => {
+        if (stack.length) {
+            const parent = stack[stack.length - 1];
+            parent.appendChild(node);
+        } else {
+            roots.push(node);
+        }
+    };
+    const ensureTbody = () => {
+        // If immediate parent is <table> and we're inserting a <tr>, insert
+        // an implicit <tbody> wrapper, matching real browser behavior.
+        if (stack.length === 0) return;
+        const top = stack[stack.length - 1];
+        if ((top.tagName || "").toLowerCase() === "table") {
+            const tbody = ownerDoc.createElement("tbody");
+            top.appendChild(tbody);
+            stack.push(tbody);
+        }
+    };
+    for (const t of tokens) {
+        if (t.type === "text") {
+            const text = decodeEntities(t.text ?? "");
+            if (!text) continue;
+            if (stack.length === 0 && /^\s*$/.test(text)) continue;
+            const textNode = ownerDoc.createTextNode(text);
+            pushChild(textNode);
+        } else if (t.type === "open") {
+            if (t.tag === "tr") ensureTbody();
+            const el = ownerDoc.createElement(t.tag ?? "div");
+            if (t.attrs) applyAttrs(el, t.attrs);
+            pushChild(el);
+            stack.push(el);
+        } else if (t.type === "void") {
+            const el = ownerDoc.createElement(t.tag ?? "br");
+            if (t.attrs) applyAttrs(el, t.attrs);
+            pushChild(el);
+        } else if (t.type === "close") {
+            // pop matching (and any implicit wrappers between)
+            for (let i = stack.length - 1; i >= 0; i--) {
+                if ((stack[i].tagName || "").toLowerCase() === t.tag) {
+                    stack.length = i;
+                    break;
+                }
+            }
+        }
+    }
+    return roots;
+}
+
+/**
+ * Install the extensions. Safe to call multiple times per bun-test run; we
+ * reset state but don't re-wire descriptors if already wired on the same
+ * FakeElement prototype.
+ */
+export function installUiShim(): void {
+    const doc = (globalThis as any).document;
+    const bodyProto = Object.getPrototypeOf(doc.body);
+
+    // Always (re)patch createElement / style handling on the current
+    // document. loadSocialCalc re-installs the browser shim between test
+    // files, replacing doc + body; we must re-decorate each time.
+    if (!(doc as any).__createElementPatched) {
+        const enhanceElement = (el: any) => {
+            delete el.innerHTML;
+            // Wrap the .style object so `style.cssText = "..."` parses into
+            // individual properties.
+            const base = el.style;
+            const expand = (k: string, v: string, target: Record<string, string>) => {
+                const camel = k.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+                target[k] = v;
+                target[camel] = v;
+                // Expand common shorthands so `style.paddingTop.slice(...)` works.
+                if (k === "padding" || k === "margin") {
+                    const tokens = v.trim().split(/\s+/);
+                    let top = "0px",
+                        right = "0px",
+                        bottom = "0px",
+                        left = "0px";
+                    if (tokens.length === 1) {
+                        top = right = bottom = left = tokens[0];
+                    } else if (tokens.length === 2) {
+                        top = bottom = tokens[0];
+                        right = left = tokens[1];
+                    } else if (tokens.length === 3) {
+                        top = tokens[0];
+                        right = left = tokens[1];
+                        bottom = tokens[2];
+                    } else if (tokens.length >= 4) {
+                        top = tokens[0];
+                        right = tokens[1];
+                        bottom = tokens[2];
+                        left = tokens[3];
+                    }
+                    target[`${k}Top`] = top;
+                    target[`${k}Right`] = right;
+                    target[`${k}Bottom`] = bottom;
+                    target[`${k}Left`] = left;
+                    target[`${k}-top`] = top;
+                    target[`${k}-right`] = right;
+                    target[`${k}-bottom`] = bottom;
+                    target[`${k}-left`] = left;
+                }
+            };
+            const styleProxy = new Proxy(base, {
+                set(target, prop, value) {
+                    if (prop === "cssText" && typeof value === "string") {
+                        // Parse and set each declaration.
+                        target.cssText = value;
+                        const parts = value.split(";");
+                        for (const p of parts) {
+                            const colon = p.indexOf(":");
+                            if (colon === -1) continue;
+                            const k = p.slice(0, colon).trim();
+                            const v = p.slice(colon + 1).trim();
+                            if (!k) continue;
+                            expand(k, v, target as Record<string, string>);
+                        }
+                        return true;
+                    }
+                    target[prop as any] = value;
+                    // Mirror camel <-> kebab simple mappings so getters from either side work.
+                    if (typeof prop === "string" && /[A-Z]/.test(prop)) {
+                        const kebab = prop.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+                        target[kebab] = value;
+                    }
+                    return true;
+                },
+                get(target, prop) {
+                    const v = target[prop as any];
+                    if (v !== undefined) return v;
+                    // For padding/margin sub-properties, default to "0px" so
+                    // code like `style.paddingTop.slice(0,-2)` doesn't crash.
+                    if (
+                        typeof prop === "string" &&
+                        /^(padding|margin)(Top|Right|Bottom|Left)$/.test(prop)
+                    ) {
+                        return "0px";
+                    }
+                    return v;
+                },
+            });
+            Object.defineProperty(el, "style", {
+                value: styleProxy,
+                configurable: true,
+                writable: false,
+            });
+            return el;
+        };
+        const origCreate = doc.createElement.bind(doc);
+        doc.createElement = function (tagName: string) {
+            return enhanceElement(origCreate(tagName));
+        };
+        const origCreateText = doc.createTextNode.bind(doc);
+        doc.createTextNode = function (text: string) {
+            const el: any = origCreateText(text);
+            // Text nodes still have innerHTML own property from base ctor.
+            delete el.innerHTML;
+            return el;
+        };
+        // Also enhance body/documentElement.
+        enhanceElement(doc.body);
+        enhanceElement(doc.documentElement);
+        (doc as any).__createElementPatched = true;
+    }
+
+    if (!bodyProto.__uiShimInstalled) {
+        const innerDesc = Object.getOwnPropertyDescriptor(bodyProto, "innerHTML");
+        // The shim stores innerHTML directly as instance property.
+        // We redefine the accessor on the prototype so sets parse HTML.
+        Object.defineProperty(bodyProto, "innerHTML", {
+            configurable: true,
+            get(this: any) {
+                return this.__html ?? "";
+            },
+            set(this: any, value: string) {
+                this.__html = String(value);
+                // Clear children.
+                while (this.childNodes.length) {
+                    this.removeChild(this.childNodes[this.childNodes.length - 1]);
+                }
+                // Parse and build.
+                const tokens = tokenize(String(value));
+                const roots = buildFromTokens(this.ownerDocument, tokens);
+                for (const root of roots) this.appendChild(root);
+            },
+        });
+
+        // Provide getBoundingClientRect for position calculations.
+        bodyProto.getBoundingClientRect = function () {
+            return {
+                left: this.offsetLeft ?? 0,
+                right: (this.offsetLeft ?? 0) + (this.offsetWidth ?? 0),
+                top: this.offsetTop ?? 0,
+                bottom: (this.offsetTop ?? 0) + (this.offsetHeight ?? 0),
+                width: this.offsetWidth ?? 0,
+                height: this.offsetHeight ?? 0,
+            };
+        };
+
+        // querySelector / querySelectorAll minimal (supports #id and tag)
+        bodyProto.querySelector = function (sel: string) {
+            if (sel.startsWith("#")) {
+                return this.ownerDocument.getElementById(sel.slice(1));
+            }
+            const all = this.getElementsByTagName(sel);
+            return all[0] ?? null;
+        };
+        bodyProto.querySelectorAll = function (sel: string) {
+            if (sel.startsWith("#")) {
+                const el = this.ownerDocument.getElementById(sel.slice(1));
+                return el ? [el] : [];
+            }
+            return this.getElementsByTagName(sel);
+        };
+
+        // scrollIntoView and contains no-ops
+        bodyProto.scrollIntoView = function () {};
+        bodyProto.contains = function (other: any) {
+            let cur = other;
+            while (cur) {
+                if (cur === this) return true;
+                cur = cur.parentNode;
+            }
+            return false;
+        };
+
+        // attachEvent / dispatchEvent minimal so code paths touching them work
+        if (!bodyProto.attachEvent) {
+            bodyProto.attachEvent = function () {};
+            bodyProto.detachEvent = function () {};
+        }
+        bodyProto.dispatchEvent = function () {
+            return true;
+        };
+        bodyProto.click = function () {};
+        bodyProto.select = function () {};
+
+        // Options setter shim for HTMLSelectElement-like behavior used by DoCmd
+        // e.g. clele.options[i] = new Option(...); clele.length = 0;
+        if (!bodyProto.__selectShim) {
+            Object.defineProperty(bodyProto, "options", {
+                configurable: true,
+                get(this: any) {
+                    if (!this.__options) {
+                        this.__options = [];
+                    }
+                    return this.__options;
+                },
+                set(this: any, val: any) {
+                    this.__options = val;
+                },
+            });
+            Object.defineProperty(bodyProto, "length", {
+                configurable: true,
+                get(this: any) {
+                    return this.__options ? this.__options.length : 0;
+                },
+                set(this: any, val: number) {
+                    if (!this.__options) this.__options = [];
+                    this.__options.length = val;
+                },
+            });
+            Object.defineProperty(bodyProto, "selectedIndex", {
+                configurable: true,
+                get(this: any) {
+                    return this.__selectedIndex ?? 0;
+                },
+                set(this: any, val: number) {
+                    this.__selectedIndex = val;
+                },
+            });
+            bodyProto.__selectShim = true;
+        }
+
+        bodyProto.__uiShimInstalled = true;
+        // Ensure consistent listener tracking for synthetic events (optional).
+        const origAdd = bodyProto.addEventListener;
+        bodyProto.addEventListener = function (type: string, fn: any) {
+            if (!this.__listeners) this.__listeners = {};
+            if (!this.__listeners[type]) this.__listeners[type] = [];
+            this.__listeners[type].push(fn);
+            return origAdd?.call(this, type, fn);
+        };
+        // Suppress spurious argument by accepting them.
+        void innerDesc;
+    }
+
+    const win: any = (globalThis as any).window;
+    // Provide Option constructor used in SpreadsheetCmdTable fills.
+    if (!(globalThis as any).Option) {
+        (globalThis as any).Option = function (this: any, text: string, value?: string) {
+            this.text = text;
+            this.value = value ?? text;
+            this.selected = false;
+        };
+    }
+    // jQuery-like stub: supports $("<html>"), $("#id"), .append, .on, .keyup, .text, [0].
+    if (!(globalThis as any).$) {
+        (globalThis as any).$ = makeJqStub();
+    }
+    // The UMD wrapper binds its inner `window` to `globalThis`, but SocialCalc
+    // expects that object to behave like a browser window. Copy a few members
+    // from our shim windowObject onto globalThis so `window.focus()`,
+    // `window.setTimeout`, `window.innerWidth` etc. do not crash.
+    const mirror = [
+        "focus",
+        "blur",
+        "scrollTo",
+        "setTimeout",
+        "clearTimeout",
+        "getComputedStyle",
+        "alert",
+        "innerWidth",
+        "innerHeight",
+        "pageXOffset",
+        "pageYOffset",
+    ];
+    for (const key of mirror) {
+        if ((globalThis as any)[key] === undefined && win?.[key] !== undefined) {
+            (globalThis as any)[key] = win[key];
+        }
+    }
+    if (typeof (globalThis as any).focus !== "function") {
+        (globalThis as any).focus = () => {};
+    }
+    if (typeof (globalThis as any).blur !== "function") {
+        (globalThis as any).blur = () => {};
+    }
+    if (typeof (globalThis as any).scrollTo !== "function") {
+        (globalThis as any).scrollTo = () => {};
+    }
+}
+
+// Re-evaluate the SocialCalc bundle source in the current global context.
+// Call this AFTER installBrowserShim() / installUiShim() so the
+// module-wrapper-bottom no-op guard does not stub out DOM functions.
+// Returns the newly-constructed SocialCalc object.
+let cachedSource: string | null = null;
+
+export function loadSocialCalcFresh(): any {
+    if (!cachedSource) {
+        const p = join(import.meta.dir, "..", "..", "dist", "SocialCalc.js");
+        let source = readFileSync(p, "utf8");
+        // The bundled source contains `"use strict"` directives inside the
+        // UMD factory. A few functions in the legacy source assign to
+        // undeclared variables (e.g. `colpane = 0` without `var`), which
+        // throws under strict mode. Bun's ESM loader apparently runs the
+        // module without enforcing the inner-factory "use strict" for
+        // implicit globals; to match that behavior when we evaluate via
+        // `new Function`, strip the "use strict" directives.
+        source = source.replace(/"use strict";/g, "");
+        cachedSource = source;
+    }
+    // Create a throwaway module object so the UMD wrapper picks the
+    // `module.exports = factory.call(root, root)` branch and returns the
+    // fresh SocialCalc object to us.
+    const fakeModule: any = { exports: {} };
+    const fn = new Function("module", "exports", cachedSource);
+    fn.call(globalThis, fakeModule, fakeModule.exports);
+    return fakeModule.exports;
+}
+
+// Alternate loader: ensures a fresh SocialCalc module is imported via Bun's
+// module system (so Bun coverage instrumentation applies) by writing the
+// bundle source to a *different* path each call and dynamically importing
+// from there. Bun caches by URL, so each unique path yields a fresh module
+// evaluation. We only need one extra path for our tests; reuse it across
+// calls.
+let mirroredPath: string | null = null;
+
+export async function loadSocialCalcMirrored(): Promise<any> {
+    const src = (() => {
+        if (cachedSource) return cachedSource;
+        const p = join(import.meta.dir, "..", "..", "dist", "SocialCalc.js");
+        let source = readFileSync(p, "utf8");
+        source = source.replace(/"use strict";/g, "");
+        cachedSource = source;
+        return source;
+    })();
+    if (!mirroredPath) {
+        // Written alongside the main bundle so Bun's coverage reporter treats
+        // it as a peer file. We don't ship this — it's a test-only artifact.
+        mirroredPath = join(import.meta.dir, "..", "..", "dist", "SocialCalc.ui.mirror.js");
+    }
+    // Always write; the source may have changed since a previous run. The
+    // write is cheap (~1 MB) and keeps the mirror in sync with the current
+    // build.
+    writeFileSync(mirroredPath, src);
+    // Guard: background setTimeout callbacks scheduled by SocialCalc may fire
+    // after sibling test files cleared the browser shim, leading to
+    // `document is not defined` errors. Capture the current shim document so
+    // wrapped callbacks can restore it before running.
+    if (!(globalThis as any).__uiShimResilientSetTimeout) {
+        const origSetTimeout = globalThis.setTimeout.bind(globalThis);
+        const savedDoc = (globalThis as any).document;
+        const savedWin = (globalThis as any).window;
+        (globalThis as any).setTimeout = function (cb: any, ms?: number, ...rest: any[]) {
+            return origSetTimeout(
+                () => {
+                    if (typeof (globalThis as any).document === "undefined") {
+                        (globalThis as any).document = savedDoc;
+                        (globalThis as any).window = savedWin;
+                        (globalThis as any).self = savedWin;
+                    }
+                    try {
+                        cb(...rest);
+                    } catch {
+                        // Swallow — the callback is a stale render tick
+                        // whose originating test has already ended.
+                    }
+                },
+                ms,
+            );
+        };
+        (globalThis as any).__uiShimResilientSetTimeout = true;
+    }
+    const url = pathToFileURL(mirroredPath).href;
+    const mod = await import(url);
+    return (mod as any).default ?? mod;
+}
+
+function makeJqStub() {
+    function q(selOrHtml: string | any) {
+        const doc = (globalThis as any).document;
+        if (selOrHtml && typeof selOrHtml === "object" && selOrHtml.nodeType) {
+            return wrap([selOrHtml]);
+        }
+        if (typeof selOrHtml === "string") {
+            const trimmed = selOrHtml.trim();
+            if (trimmed.startsWith("<")) {
+                // Create element from HTML string by parsing via a detached div.
+                const div = doc.createElement("div");
+                div.innerHTML = trimmed;
+                const children = [...div.childNodes];
+                return wrap(children);
+            }
+            if (trimmed.startsWith("#")) {
+                const el = doc.getElementById(trimmed.slice(1));
+                return wrap(el ? [el] : []);
+            }
+            // tag selector
+            const els = doc.getElementsByTagName(trimmed);
+            return wrap(els as any[]);
+        }
+        return wrap([]);
+    }
+    function wrap(nodes: any[]) {
+        const obj: any = Object.assign(Object.create(null), {
+            0: nodes[0],
+            length: nodes.length,
+            append(child: any) {
+                if (!nodes.length) return obj;
+                const parent = nodes[0];
+                if (typeof child === "string") {
+                    const doc = (globalThis as any).document;
+                    const div = doc.createElement("div");
+                    div.innerHTML = child;
+                    for (const n of [...div.childNodes]) parent.appendChild(n);
+                } else if (child && child.length !== undefined) {
+                    for (let i = 0; i < child.length; i++) parent.appendChild(child[i]);
+                } else if (child) {
+                    parent.appendChild(child);
+                }
+                return obj;
+            },
+            on() {
+                return obj;
+            },
+            off() {
+                return obj;
+            },
+            keyup() {
+                return obj;
+            },
+            focus() {
+                return obj;
+            },
+            blur() {
+                return obj;
+            },
+            text(val: string) {
+                if (val === undefined) return nodes[0]?.textContent ?? "";
+                for (const n of nodes) n.textContent = val;
+                return obj;
+            },
+            val(val: string) {
+                if (val === undefined) return nodes[0]?.value ?? "";
+                for (const n of nodes) n.value = val;
+                return obj;
+            },
+            addClass() {
+                return obj;
+            },
+            removeClass() {
+                return obj;
+            },
+            attr(name: string, value?: string) {
+                if (value === undefined) return nodes[0]?.getAttribute(name);
+                for (const n of nodes) n.setAttribute(name, value);
+                return obj;
+            },
+        });
+        // iterable positions
+        for (let i = 0; i < nodes.length; i++) obj[i] = nodes[i];
+        return obj;
+    }
+    return q;
+}
