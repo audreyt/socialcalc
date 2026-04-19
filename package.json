@@ -8,7 +8,8 @@
     "build": "bun run build.ts",
     "build:min": "bun run build.ts --minify",
     "typecheck": "tsgo --noEmit",
-    "test": "bun run build.ts && bun test"
+    "test": "bun run build.ts && bun test",
+    "test:coverage": "bun run build.ts && bun test --coverage --coverage-reporter=text --coverage-reporter=lcov"
   },
   "repository": {
     "type": "git",
