@@ -3,9 +3,12 @@
   "version": "2.3.0",
   "description": "Collaborative spreadsheet editor",
   "main": "dist/SocialCalc.js",
+  "type": "module",
   "scripts": {
-    "build": "gulp",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "bun run build.ts",
+    "build:min": "bun run build.ts --minify",
+    "typecheck": "tsgo --noEmit",
+    "test": "bun run build.ts && bun test"
   },
   "repository": {
     "type": "git",
@@ -31,12 +34,7 @@
   },
   "homepage": "https://github.com/marcelklehr/socialcalc#readme",
   "devDependencies": {
-    "gulp": "^3.9.1",
-    "gulp-jshint": "^2.0.4",
-    "jshint": "^2.9.5",
-    "jshint-stylish": "^2.2.1",
-    "gulp-uglify": "^3.0.0",
-    "gulp-concat": "^2.6.1",
-    "files-exist": "^1.0.2"
+    "@typescript/native-preview": "^7.0.0-dev.20260419.1",
+    "@types/bun": "latest"
   }
 }

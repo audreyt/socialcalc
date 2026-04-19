@@ -6266,11 +6266,7 @@ SocialCalc.ConvertSaveToOtherFormat = function(savestr, outputformat, dorecalc) 
       div = document.createElement("div");
       ele = context.RenderSheet(null, context.defaultHTMLlinkstyle);
       div.appendChild(ele);
-      delete context;
-      delete sheet;
       result = div.innerHTML;
-      delete ele;
-      delete div;
       return result;
       }
 

@@ -2,19 +2,21 @@
 // (c) by The UMD contributors
 // MIT License: https://github.com/umdjs/umd/blob/master/LICENSE.md
 (function (root, factory) {
+    "use strict";
     if (typeof define === 'function' && define.amd) {
         // AMD. Register as an anonymous module.
-        define([], factory.bind(root, this));
+        define([], factory.bind(root, root));
     } else if (typeof module === 'object' && module.exports) {
         // Node. Does not work with strict CommonJS, but
         // only CommonJS-like environments that support module.exports,
         // like Node.
-        module.exports = factory.call(root, this);
+        module.exports = factory.call(root, root);
     } else {
         // Browser globals (root is window)
-        root.SocialCalc = factory.call(root, this);
+        root.SocialCalc = factory.call(root, root);
   }
-}(this, function (window) {
+}(typeof globalThis !== 'undefined' ? globalThis : this, function (window) {
+"use strict";
 
 //
 /*
@@ -7170,11 +7172,7 @@ SocialCalc.ConvertSaveToOtherFormat = function(savestr, outputformat, dorecalc) 
       div = document.createElement("div");
       ele = context.RenderSheet(null, context.defaultHTMLlinkstyle);
       div.appendChild(ele);
-      delete context;
-      delete sheet;
       result = div.innerHTML;
-      delete ele;
-      delete div;
       return result;
       }
 
@@ -15492,7 +15490,7 @@ SocialCalc.Formula.EvaluatePolish = function(parseinfo, revpolish, sheet, allowr
    var operand = [];
    var PushOperand = function(t, v) {operand.push({type: t, value: v});};
 
-   var i, rii, prii, ttype, ttext, value1, value2, tostype, tostype2, resulttype, valuetype, cond, vmatch, smatch;
+   var i, rii, prii, ttype, ttext, value, value1, value2, tostype, tostype2, resulttype, valuetype, cond, vmatch, smatch;
 
    if (!parseinfo.length || (! (revpolish instanceof Array))) {
       return ({value: "", type: "e#VALUE!", error: (typeof revpolish == "string" ? revpolish : "")});
@@ -19534,7 +19532,7 @@ SocialCalc.Formula.FunctionList["SYD"] = [SocialCalc.Formula.SYDFunction, 4, "cs
 
 SocialCalc.Formula.InterestFunctions = function(fname, operand, foperand, sheet) {
 
-   var resulttype, result, dval, eval, fval;
+   var resulttype, result, dval, eval_, fval;
    var pv, fv, rate, n, payment, paytype, guess, part1, part2, part3, part4, part5;
    var olddelta, maxloop, tries, deltaepsilon, rate, oldrate, m;
 
@@ -19550,8 +19548,8 @@ SocialCalc.Formula.InterestFunctions = function(fname, operand, foperand, sheet)
       dval = scf.OperandAsNumber(sheet, foperand);
       resulttype = scf.LookupResultType(resulttype, dval.type, scf.TypeLookupTable.twoargnumeric);
       if (foperand.length) { // optional arguments
-         eval = scf.OperandAsNumber(sheet, foperand);
-         resulttype = scf.LookupResultType(resulttype, eval.type, scf.TypeLookupTable.twoargnumeric);
+         eval_ = scf.OperandAsNumber(sheet, foperand);
+         resulttype = scf.LookupResultType(resulttype, eval_.type, scf.TypeLookupTable.twoargnumeric);
          if (foperand.length) { // optional arguments
             if (fname != "RATE") { // only rate has 6 possible args
                scf.FunctionArgsError(fname, operand);
@@ -19570,7 +19568,7 @@ SocialCalc.Formula.InterestFunctions = function(fname, operand, foperand, sheet)
             n = bval.value;
             payment = cval.value;
             pv = dval!=null ? dval.value : 0; // get value if present, or use default
-            paytype = eval!=null ? (eval.value ? 1 : 0) : 0;
+            paytype = eval_!=null ? (eval_.value ? 1 : 0) : 0;
             if (rate == 0) { // simple calculation if no interest
                fv = -pv - (payment * n);
                }
@@ -19586,7 +19584,7 @@ SocialCalc.Formula.InterestFunctions = function(fname, operand, foperand, sheet)
             payment = bval.value;
             pv = cval.value;
             fv = dval!=null ? dval.value : 0;
-            paytype = eval!=null ? (eval.value ? 1 : 0) : 0;
+            paytype = eval_!=null ? (eval_.value ? 1 : 0) : 0;
             if (rate == 0) { // simple calculation if no interest
                if (payment == 0) {
                   scf.PushOperand(operand, "e#NUM!", 0);
@@ -19619,7 +19617,7 @@ SocialCalc.Formula.InterestFunctions = function(fname, operand, foperand, sheet)
             n = bval.value;
             pv = cval.value;
             fv = dval!=null ? dval.value : 0;
-            paytype = eval!=null ? (eval.value ? 1 : 0) : 0;
+            paytype = eval_!=null ? (eval_.value ? 1 : 0) : 0;
             if (n == 0) {
                scf.PushOperand(operand, "e#NUM!", 0);
                return;
@@ -19639,7 +19637,7 @@ SocialCalc.Formula.InterestFunctions = function(fname, operand, foperand, sheet)
             n = bval.value;
             payment = cval.value;
             fv = dval!=null ? dval.value : 0;
-            paytype = eval!=null ? (eval.value ? 1 : 0) : 0;
+            paytype = eval_!=null ? (eval_.value ? 1 : 0) : 0;
             if (rate == -1) {
                scf.PushOperand(operand, "e#DIV/0!", 0);
                return;
@@ -19659,7 +19657,7 @@ SocialCalc.Formula.InterestFunctions = function(fname, operand, foperand, sheet)
                payment = bval.value;
                pv = cval.value;
                fv = dval!=null ? dval.value : 0;
-               paytype = eval!=null ? (eval.value ? 1 : 0) : 0;
+               paytype = eval_!=null ? (eval_.value ? 1 : 0) : 0;
                guess = fval!=null ? fval.value : 0.1;
 
                // rate is calculated by repeated approximations
@@ -25141,10 +25139,7 @@ SocialCalc.SpreadsheetControlCreateSheetHTML = function(spreadsheet) {
    div = document.createElement("div");
    ele = context.RenderSheet(null, {type: "html"});
    div.appendChild(ele);
-   delete context;
    result = div.innerHTML;
-   delete ele;
-   delete div;
    return result;
 
    }
@@ -27538,10 +27533,7 @@ SocialCalc.SpreadsheetViewerCreateSheetHTML = function(spreadsheet) {
    div = document.createElement("div");
    ele = context.RenderSheet(null, {type: "html"});
    div.appendChild(ele);
-   delete context;
    result = div.innerHTML;
-   delete ele;
-   delete div;
    return result;
 
    }

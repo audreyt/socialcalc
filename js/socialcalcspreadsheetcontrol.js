@@ -2125,10 +2125,7 @@ SocialCalc.SpreadsheetControlCreateSheetHTML = function(spreadsheet) {
    div = document.createElement("div");
    ele = context.RenderSheet(null, {type: "html"});
    div.appendChild(ele);
-   delete context;
    result = div.innerHTML;
-   delete ele;
-   delete div;
    return result;
 
    }
