@@ -1,21 +1,31 @@
 // Stryker mutation-testing config.
 //
-// Strategy: mutate the individual js/*.js source files, rebuild the bundle,
-// then run bun test. Each surviving mutant points at a behaviour the test
-// suite does not pin down — that becomes a line to add a meaningful test for.
+// Two modes:
 //
-// Note on scale: this codebase is ~27k legacy lines. A single full run can
-// produce thousands of mutants and take hours. Use `bun run mutate:file
-// js/formatnumber2.js` to iterate on one module at a time during development,
-// then `bun run mutate` for a full pass when closing in on 100%.
+// 1. Full sandbox run (`bun run mutate`) — Stryker copies the project into
+//    parallel sandboxes and mutates everything in the `mutate` list. Slow
+//    but isolated; run it once overall coverage/mutation scores look good.
+//
+// 2. In-place single-file iteration (`bun run mutate:file <path>`) — the
+//    helper sets MUTATE_TESTS to the subset of test files that exercise the
+//    target module, flips Stryker to inPlace mode, and uses concurrency=1.
+//    This is the fast loop you run during development.
+//
+// Speed math: a filtered test run is ~20 ms vs ~12 s for the full suite.
+// With a ~400 ms rebuild per mutant, inPlace iteration on formatnumber2.js
+// (~93 mutants in a 50-line slice) finishes in well under a minute.
+
+const testsFilter = process.env.MUTATE_TESTS?.trim();
+const inPlace = process.env.MUTATE_IN_PLACE === "1";
+
+const testCommand = testsFilter
+    ? `bun test ${testsFilter}`
+    : "bun test";
 
 /** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 export default {
-    // Stryker drives the run via Node; Bun handles the build and the tests.
     packageManager: "npm",
 
-    // What we mutate. Wrapper fragments don't parse in isolation, and the
-    // constants file is pure data — no branches to mutate.
     mutate: [
         "js/formatnumber2.js",
         "js/formula1.js",
@@ -26,51 +36,38 @@ export default {
         "js/socialcalcviewer.js",
     ],
 
-    // We don't have a Stryker plugin for Bun, so run the tests via a generic
-    // command. The build step re-concatenates the mutated source into
-    // dist/SocialCalc.js before the test runner loads it.
     testRunner: "command",
     commandRunner: {
-        command: "bun run build.ts && bun test",
+        command: `bun run build.ts && ${testCommand}`,
     },
-
-    // 'off' is required with the command runner — per-test coverage data is
-    // only produced by the native test-runner plugins.
     coverageAnalysis: "off",
 
-    // Reports.
+    // inPlace mode skips the per-mutant sandbox copy (node_modules + all
+    // assets). Required for fast iteration. Safe because the helper reverts
+    // source files after each mutant and we don't leak state across test
+    // processes.
+    inPlace,
+
+    // With inPlace there's only one working copy, so concurrency must be 1.
+    concurrency: inPlace ? 1 : 4,
+
     reporters: ["clear-text", "progress", "html", "json"],
     htmlReporter: { fileName: "reports/mutation/index.html" },
     jsonReporter: { fileName: "reports/mutation/mutation.json" },
 
-    // Pass/fail thresholds. `break: null` means the run never exits non-zero
-    // on score alone; CI should look at the score itself.
     thresholds: { high: 90, low: 70, break: null },
 
-    // Run several bun-test processes in parallel. Bun tests are fast; the
-    // bottleneck is the sandbox copy. Tune to taste.
-    concurrency: 4,
-
-    // Stryker's built-in timeout-factor + timeout-ms. A few functions in
-    // formula1.js (RATE solver) can take a few hundred ms, so give headroom.
+    // Formula RATE solver can take a few hundred ms, so keep headroom.
     timeoutMS: 60000,
     timeoutFactor: 2,
 
-    // Incremental mode remembers per-mutant outcomes between runs, so after
-    // you add a killing test you only re-run the mutants whose status could
-    // have changed.
     incremental: true,
     incrementalFile: ".stryker-tmp/incremental.json",
-
     tempDirName: ".stryker-tmp",
 
-    // Stryker prints one line per mutant with `clear-text`; keep the console
-    // readable by hiding the per-file detail until the end.
     logLevel: "info",
     fileLogLevel: "trace",
 
-    // Ignore everything the sandbox doesn't need so each mutant run copies
-    // less data.
     ignorePatterns: [
         "node_modules",
         "dist",
@@ -81,18 +78,12 @@ export default {
         ".git",
     ],
 
-    // Don't let Stryker mutate the test suite itself.
-    ignoredByWatchPlugin: ["test"],
-
-    // Default mutators are fine for plain JS; opt out of a few that churn out
-    // mutants with low signal for this codebase.
     mutator: {
         excludedMutations: [
-            // "StringLiteral" would flip every user-facing label; we're not
-            // testing display strings exhaustively.
+            // User-facing strings churn with no behavioural signal.
             "StringLiteral",
-            // "Regex" churns a lot of date/format regex variants that all
-            // produce equivalent behaviour on our test inputs.
+            // Date/format regex mutants generate near-equivalent behaviours
+            // on our inputs; leave the regex path alone.
             "Regex",
         ],
     },

@@ -9,7 +9,12 @@
     "build:min": "bun run build.ts --minify",
     "typecheck": "tsgo --noEmit",
     "test": "bun run build.ts && bun test",
-    "test:coverage": "bun run build.ts && bun test --coverage --coverage-reporter=text --coverage-reporter=lcov"
+    "test:coverage": "bun run build.ts && bun test --coverage --coverage-reporter=text --coverage-reporter=lcov",
+    "mutate": "stryker run",
+    "mutate:file": "bun run stryker-file.mjs",
+    "mutate:format": "bun run stryker-file.mjs js/formatnumber2.js",
+    "mutate:sheet": "bun run stryker-file.mjs js/socialcalc-3.js",
+    "mutate:formula": "bun run stryker-file.mjs js/formula1.js"
   },
   "repository": {
     "type": "git",
@@ -35,7 +40,9 @@
   },
   "homepage": "https://github.com/marcelklehr/socialcalc#readme",
   "devDependencies": {
+    "@stryker-mutator/core": "^9.6.1",
+    "@types/bun": "latest",
     "@typescript/native-preview": "^7.0.0-dev.20260419.1",
-    "@types/bun": "latest"
+    "typescript": "^6.0.3"
   }
 }
