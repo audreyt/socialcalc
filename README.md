@@ -48,6 +48,39 @@ The bundle loads cleanly under `"use strict"` and keeps the existing UMD entry
 points (browser global `SocialCalc`, AMD `define`, and CommonJS
 `module.exports`) so downstream callers don't need to change.
 
+## Mutation testing
+
+Line coverage is a floor, not a ceiling. We use [Stryker](https://stryker-mutator.io)
+to check that the tests meaningfully pin behaviour — every mutant that
+survives is a behavior the tests do not actually exercise.
+
+`stryker.config.mjs` drives Stryker through a generic `command` runner
+(`bun run build.ts && bun test`) so we don't need a Bun-specific plugin.
+Two modes:
+
+- **Fast per-file iteration** — `bun run mutate:file js/<source>.js [startLine-endLine]`
+  flips Stryker to in-place mode and filters the test command to only the
+  test files that exercise that module (see the mapping in
+  `stryker-file.mjs`). Also available: `bun run mutate:format`,
+  `bun run mutate:sheet`, `bun run mutate:formula`.
+- **Full sandbox run** — `bun run mutate` copies the project into parallel
+  sandboxes and mutates every source in the `mutate` list. Slower but
+  useful before tagging a release.
+
+Reports are emitted to `reports/mutation/index.html` (Stryker's interactive
+viewer) and `reports/mutation/mutation.json` (the raw data). Incremental
+mode is enabled, so iterating after adding killing tests only re-checks the
+previously-surviving mutants.
+
+Current mutation scores:
+
+| Module | Score | Status |
+|---|---|---|
+| `formatnumber2.js` | 95.20% | Remaining 54 survivors classified as equivalent mutants |
+| `formula1.js` | — | Parser/evaluator run in progress |
+| `socialcalc-3.js` | — | Not yet measured |
+| UI modules | — | Not yet measured (heavily DOM-coupled) |
+
 ## Licensing
 ### Common Public Attribution License (Socialtext Inc.)
 * socialcalcspreadsheetcontrol.js
