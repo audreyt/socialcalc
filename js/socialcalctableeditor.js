@@ -1276,17 +1276,8 @@ SocialCalc.EditorMouseRegister = function(editor) {
       mouseinfo.registeredElements.push({element: element, editor: editor});
       }
 
-   if (element.addEventListener) { // DOM Level 2 -- Firefox, et al
-      element.addEventListener("mousedown", SocialCalc.ProcessEditorMouseDown, false);
-      element.addEventListener("dblclick", SocialCalc.ProcessEditorDblClick, false);
-      }
-   else if (element.attachEvent) { // IE 5+
-      element.attachEvent("onmousedown", SocialCalc.ProcessEditorMouseDown);
-      element.attachEvent("ondblclick", SocialCalc.ProcessEditorDblClick);
-      }
-   else { // don't handle this
-      throw "Browser not supported";
-      }
+   element.addEventListener("mousedown", SocialCalc.ProcessEditorMouseDown, false);
+   element.addEventListener("dblclick", SocialCalc.ProcessEditorDblClick, false);
 
    mouseinfo.ignore = false; // just in case
 
@@ -1313,14 +1304,8 @@ SocialCalc.EditorMouseUnregister = function(editor) {
 
    if (i<mouseinfo.registeredElements.length) {
       oldelement = mouseinfo.registeredElements[i].element; // remove old handlers
-      if (oldelement.removeEventListener) { // DOM Level 2
-         oldelement.removeEventListener("mousedown", SocialCalc.ProcessEditorMouseDown, false);
-         oldelement.removeEventListener("dblclick", SocialCalc.ProcessEditorDblClick, false);
-         }
-      else if (oldelement.detachEvent) { // IE
-         oldelement.detachEvent("onmousedown", SocialCalc.ProcessEditorMouseDown);
-         oldelement.detachEvent("ondblclick", SocialCalc.ProcessEditorDblClick);
-         }
+      oldelement.removeEventListener("mousedown", SocialCalc.ProcessEditorMouseDown, false);
+      oldelement.removeEventListener("dblclick", SocialCalc.ProcessEditorDblClick, false);
       mouseinfo.registeredElements.splice(i, 1);
       }
 
@@ -1339,32 +1324,16 @@ SocialCalc.StopPropagation = function(event) {
 /** @param {any} move @param {any} up @param {any} element @param {any} event */
 SocialCalc.SetMouseMoveUp = function(move, up, element, event) {
        // Event code from JavaScript, Flanagan, 5th Edition, pg. 422
-   if (document.addEventListener) { // DOM Level 2 -- Firefox, et al
-      document.addEventListener("mousemove", move, true); // capture everywhere
-      document.addEventListener("mouseup", up, true); // capture everywhere
-      }
-   else if (element.attachEvent) { // IE 5+
-      element.setCapture();
-      element.attachEvent("onmousemove", move);
-      element.attachEvent("onmouseup", up);
-      element.attachEvent("onlosecapture", up);
-   }
+   document.addEventListener("mousemove", move, true); // capture everywhere
+   document.addEventListener("mouseup", up, true); // capture everywhere
     SocialCalc.StopPropagation(event);
 }
 
 /** @param {any} move @param {any} up @param {any} element @param {any} event */
 SocialCalc.RemoveMouseMoveUp = function(move, up, element, event) {
     SocialCalc.StopPropagation(event);
-    if (document.removeEventListener) { // DOM Level 2
-	document.removeEventListener("mousemove", move, true);
-	document.removeEventListener("mouseup", up, true);
-    }
-    else if (element.detachEvent) { // IE
-	element.detachEvent("onlosecapture", up);
-	element.detachEvent("onmouseup", up);
-	element.detachEvent("onmousemove", move);
-	element.releaseCapture();
-    }
+    document.removeEventListener("mousemove", move, true);
+    document.removeEventListener("mouseup", up, true);
 }
 
 /** @param {any} e */
@@ -4247,19 +4216,11 @@ SocialCalc.InputEchoHeartbeat = function() {
 
 /** @param {any} e */
 SocialCalc.InputEchoMouseDown = function(e) {
-      var event = e || window.event;
-
       var editor = SocialCalc.Keyboard.focusTable; // get TableEditor doing keyboard stuff
       if (!editor) return true; // we're not handling it -- let browser do default
 
-//      if (event.stopPropagation) event.stopPropagation(); // DOM Level 2
-//      else event.cancelBubble = true; // IE 5+
-//      if (event.preventDefault) event.preventDefault(); // DOM Level 2
-//      else event.returnValue = false; // IE 5+
-
       editor.inputBox.element.focus();
       return undefined;
-//      return false;
       };
 
 
@@ -4292,9 +4253,6 @@ SocialCalc.CellHandles = function(editor) {
    SocialCalc.AssignID(editor, this.draghandle, "draghandle");
 
    var imagetype = "png";
-   if (navigator.userAgent.match(/MSIE 6\.0/)) {
-      imagetype = "gif";
-      }
 
    this.dragpalette = document.createElement("div");
    SocialCalc.setStyles(this.dragpalette, "display:none;position:absolute;zIndex:8;width:90px;height:90px;fontSize:1px;textAlign:center;cursor:default;"+
@@ -4315,19 +4273,9 @@ SocialCalc.CellHandles = function(editor) {
    editor.toplevel.appendChild(this.fillinghandle);
    SocialCalc.AssignID(editor, this.fillinghandle, "fillinghandle");
 
-   if (this.draghandle.addEventListener) { // DOM Level 2 -- Firefox, et al
-      this.draghandle.addEventListener("mousemove", SocialCalc.CellHandlesMouseMoveOnHandle, false);
-      this.dragpalette.addEventListener("mousedown", SocialCalc.CellHandlesMouseDown, false);
-      this.dragpalette.addEventListener("mousemove", SocialCalc.CellHandlesMouseMoveOnHandle, false);
-      }
-   else if (this.draghandle.attachEvent) { // IE 5+
-      this.draghandle.attachEvent("onmousemove", SocialCalc.CellHandlesMouseMoveOnHandle);
-      this.dragpalette.attachEvent("onmousedown", SocialCalc.CellHandlesMouseDown);
-      this.dragpalette.attachEvent("onmousemove", SocialCalc.CellHandlesMouseMoveOnHandle);
-      }
-   else { // don't handle this
-      throw "Browser not supported";
-      }
+   this.draghandle.addEventListener("mousemove", SocialCalc.CellHandlesMouseMoveOnHandle, false);
+   this.dragpalette.addEventListener("mousedown", SocialCalc.CellHandlesMouseDown, false);
+   this.dragpalette.addEventListener("mousemove", SocialCalc.CellHandlesMouseMoveOnHandle, false);
 
    }
 
@@ -4704,16 +4652,8 @@ SocialCalc.CellHandlesMouseDown = function(e) {
 
    SocialCalc.KeyboardSetFocus(editor);
 
-   if (document.addEventListener) { // DOM Level 2 -- Firefox, et al
-      document.addEventListener("mousemove", SocialCalc.CellHandlesMouseMove, true); // capture everywhere
-      document.addEventListener("mouseup", SocialCalc.CellHandlesMouseUp, true); // capture everywhere
-      }
-   else if (cellhandles.draghandle.attachEvent) { // IE 5+
-      cellhandles.draghandle.setCapture();
-      cellhandles.draghandle.attachEvent("onmousemove", SocialCalc.CellHandlesMouseMove);
-      cellhandles.draghandle.attachEvent("onmouseup", SocialCalc.CellHandlesMouseUp);
-      cellhandles.draghandle.attachEvent("onlosecapture", SocialCalc.CellHandlesMouseUp);
-     }
+   document.addEventListener("mousemove", SocialCalc.CellHandlesMouseMove, true); // capture everywhere
+   document.addEventListener("mouseup", SocialCalc.CellHandlesMouseUp, true); // capture everywhere
    SocialCalc.StopPropagation(event);
    return;
 
@@ -5829,15 +5769,7 @@ SocialCalc.DragRegister = function(element, vertical, horizontal, functionobj, p
       {element: element, vertical: vertical, horizontal: horizontal, functionobj: functionobj, parent: parent}
       );
 
-   if (element.addEventListener) { // DOM Level 2 -- Firefox, et al
-      element.addEventListener("mousedown", SocialCalc.DragMouseDown, false);
-      }
-   else if (element.attachEvent) { // IE 5+
-      element.attachEvent("onmousedown", SocialCalc.DragMouseDown);
-      }
-   else { // don't handle this
-      throw SocialCalc.Constants.s_BrowserNotSupported;
-      }
+   element.addEventListener("mousedown", SocialCalc.DragMouseDown, false);
 
    }
 
@@ -5857,12 +5789,7 @@ SocialCalc.DragUnregister = function(element) {
    for (i=0; i<draginfo.registeredElements.length; i++) {
       if (draginfo.registeredElements[i].element == element) {
          draginfo.registeredElements.splice(i,1);
-         if (element.removeEventListener) { // DOM Level 2 -- Firefox, et al
-            element.removeEventListener("mousedown", SocialCalc.DragMouseDown, false);
-            }
-         else { // IE 5+
-            element.detachEvent("onmousedown", SocialCalc.DragMouseDown);
-            }
+         element.removeEventListener("mousedown", SocialCalc.DragMouseDown, false);
          return;
          }
       }
@@ -6040,19 +5967,9 @@ SocialCalc.ButtonRegister = function(editor, element, paramobj, functionobj) {
        repeatwait: paramobj.repeatwait, repeatinterval: paramobj.repeatinterval, functionobj: functionobj}
       );
 
-   if (element.addEventListener) { // DOM Level 2 -- Firefox, et al
-      element.addEventListener("mousedown", SocialCalc.ButtonMouseDown, false);
-      element.addEventListener("mouseover", SocialCalc.ButtonMouseOver, false);
-      element.addEventListener("mouseout", SocialCalc.ButtonMouseOut, false);
-      }
-   else if (element.attachEvent) { // IE 5+
-      element.attachEvent("onmousedown", SocialCalc.ButtonMouseDown);
-      element.attachEvent("onmouseover", SocialCalc.ButtonMouseOver);
-      element.attachEvent("onmouseout", SocialCalc.ButtonMouseOut);
-      }
-   else { // don't handle this
-      throw SocialCalc.Constants.s_BrowserNotSupported;
-      }
+   element.addEventListener("mousedown", SocialCalc.ButtonMouseDown, false);
+   element.addEventListener("mouseover", SocialCalc.ButtonMouseOver, false);
+   element.addEventListener("mouseout", SocialCalc.ButtonMouseOut, false);
 
    return;
    }
@@ -6157,14 +6074,7 @@ SocialCalc.ButtonMouseDown = function(event) {
    // Register event handler for mouse up
 
    // Event code from JavaScript, Flanagan, 5th Edition, pg. 422
-   if (document.addEventListener) { // DOM Level 2 -- Firefox, et al
-      document.addEventListener("mouseup", SocialCalc.ButtonMouseUp, true); // capture everywhere
-      }
-   else if (bobj.element.attachEvent) { // IE 5+
-      bobj.element.setCapture();
-      bobj.element.attachEvent("onmouseup", SocialCalc.ButtonMouseUp);
-      bobj.element.attachEvent("onlosecapture", SocialCalc.ButtonMouseUp);
-      }
+   document.addEventListener("mouseup", SocialCalc.ButtonMouseUp, true); // capture everywhere
    SocialCalc.StopPropagation(e);
    buttoninfo.relativeOffset = SocialCalc.GetElementPositionWithScroll(bobj.editor.toplevel);
    buttoninfo.clientX = e.clientX - buttoninfo.relativeOffset.left;
@@ -6197,16 +6107,9 @@ SocialCalc.ButtonMouseUp = function(event) {
       buttoninfo.timer = null;
       }
 
-   if (!buttoninfo.buttonDown) return; // already did this (e.g., in IE, releaseCapture fires losecapture)
+   if (!buttoninfo.buttonDown) return; // already did this
    SocialCalc.StopPropagation(e);
-   if (document.removeEventListener) { // DOM Level 2
-      document.removeEventListener("mouseup", SocialCalc.ButtonMouseUp, true);
-      }
-   else if (/** @type {any} */ (document).detachEvent) { // IE
-      bobj.element.detachEvent("onlosecapture", SocialCalc.ButtonMouseUp);
-      bobj.element.detachEvent("onmouseup", SocialCalc.ButtonMouseUp);
-      bobj.element.releaseCapture();
-      }
+   document.removeEventListener("mouseup", SocialCalc.ButtonMouseUp, true);
 
    if (buttoninfo.buttonElement.downstyle) {
       if (buttoninfo.doingHover)
@@ -6270,16 +6173,8 @@ SocialCalc.MouseWheelRegister = function(element, functionobj) {
       {element: element, functionobj: functionobj}
       );
 
-   if (element.addEventListener) { // DOM Level 2 -- Firefox, et al
-      element.addEventListener("DOMMouseScroll", SocialCalc.ProcessMouseWheel, false);
-      element.addEventListener("mousewheel", SocialCalc.ProcessMouseWheel, false); // Opera needs this
-      }
-   else if (element.attachEvent) { // IE 5+
-      element.attachEvent("onmousewheel", SocialCalc.ProcessMouseWheel);
-      }
-   else { // don't handle this
-      throw SocialCalc.Constants.s_BrowserNotSupported;
-      }
+   element.addEventListener("DOMMouseScroll", SocialCalc.ProcessMouseWheel, false);
+   element.addEventListener("mousewheel", SocialCalc.ProcessMouseWheel, false); // Opera needs this
 
    return;
 
@@ -6326,12 +6221,6 @@ SocialCalc.ProcessMouseWheel = function(e) {
 SocialCalc.keyboardTables = {
 
    specialKeysCommon: {
-      8: "[backspace]", 9: "[tab]", 13: "[enter]", 25: "[tab]", 27: "[esc]", 33: "[pgup]", 34: "[pgdn]",
-      35: "[end]", 36: "[home]", 37: "[aleft]", 38: "[aup]", 39: "[aright]", 40: "[adown]", 45: "[ins]",
-      46: "[del]", 113: "[f2]"
-      },
-
-   specialKeysIE: {
       8: "[backspace]", 9: "[tab]", 13: "[enter]", 25: "[tab]", 27: "[esc]", 33: "[pgup]", 34: "[pgdn]",
       35: "[end]", 36: "[home]", 37: "[aleft]", 38: "[aup]", 39: "[aright]", 40: "[adown]", 45: "[ins]",
       46: "[del]", 113: "[f2]"
@@ -6396,13 +6285,6 @@ SocialCalc.keyboardTables = {
       118: "[ctrl-v]",
       120: "[ctrl-x]",
       122: "[ctrl-z]"
-      },
-
-   ignoreKeysFirefox: {
-      16: "[shift]", 17: "[ctrl]", 18: "[alt]", 20: "[capslock]", 19: "[pause]", 44: "[printscreen]",
-      91: "[windows]", 92: "[windows]", 112: "[f1]", 114: "[f3]", 115: "[f4]", 116: "[f5]",
-      117: "[f6]", 118: "[f7]", 119: "[f8]", 120: "[f9]", 121: "[f10]", 122: "[f11]", 123: "[f12]",
-      144: "[numlock]", 145: "[scrolllock]", 224: "[cmd]"
       }
    }
 

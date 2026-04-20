@@ -369,7 +369,6 @@ declare namespace SocialCalc {
 
    const keyboardTables: {
       specialKeysCommon: { [key: number]: string };
-      specialKeysIE: { [key: number]: string };
       controlKeysIE: { [key: number]: string };
       specialKeysOpera: { [key: number]: string };
       controlKeysOpera: { [key: number]: string };
@@ -378,7 +377,6 @@ declare namespace SocialCalc {
       ignoreKeysSafari: { [key: number]: string };
       specialKeysFirefox: { [key: number]: string };
       controlKeysFirefox: { [key: number]: string };
-      ignoreKeysFirefox: { [key: number]: string };
       didProcessKey?: boolean;
       statusFromProcessKey?: boolean;
       repeatingKeyPress?: boolean;

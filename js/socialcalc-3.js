@@ -5792,10 +5792,7 @@ SocialCalc.GetComputedStyle = function (element, style) {
 
    /** @type {any} */
    var computedStyle;
-   if (typeof element.currentStyle != 'undefined') { // IE
-      computedStyle = element.currentStyle;
-      }
-   else if (document.defaultView) {
+   if (document.defaultView) {
       computedStyle = document.defaultView.getComputedStyle(element, null);
       }
    else {
@@ -6348,11 +6345,6 @@ SocialCalc.default_expand_markup = function(displayvalue, sheetobj, linkstyle) {
    result = result.replace(/\n/g, "<br>"); // keep line breaks
 
    return result; // do very little by default
-
-   result = result.replace(/('*)'''(.*?)'''/g, "$1<b>$2<\/b>"); // Wiki-style bold/italics
-   result = result.replace(/''(.*?)''/g, "<i>$1<\/i>");
-
-   return result;
 
    }
 

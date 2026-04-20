@@ -1404,24 +1404,6 @@ SocialCalc.Popup.Types.ColorChooser.CustomToList = function(id) {
 
 
 /**
- * @param {string} id
- */
-SocialCalc.Popup.Types.ColorChooser.CustomOK = function(id) {
-
-   var i, c;
-   var sp = SocialCalc.Popup;
-   var spt = sp.Types;
-   var spc = sp.Controls;
-   var spcdata = spc[id].data;
-
-   sp.SetValue(id, spcdata.customele.value);
-
-   sp.Close();
-   
-   }
-
-
-/**
  * @param {string} type
  * @param {string} id
  */

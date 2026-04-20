@@ -3605,9 +3605,6 @@ SocialCalc.Formula.ExactFunction = function(fname, operand, foperand, sheet) {
          result = value2.value;
          resulttype = value2.type;
          }
-      else {
-         result = 0;
-         }
       }
    else if (v1type == "n") {
       if (v2type == "n") {
@@ -3623,9 +3620,6 @@ SocialCalc.Formula.ExactFunction = function(fname, operand, foperand, sheet) {
          result = value2.value;
          resulttype = value2.type;
          }
-      else {
-         result = 0;
-         }
       }
    else if (v1type == "b") {
       if (v2type == "t") {
@@ -3640,9 +3634,6 @@ SocialCalc.Formula.ExactFunction = function(fname, operand, foperand, sheet) {
       else if (v2type == "e") {
          result = value2.value;
          resulttype = value2.type;
-         }
-      else {
-         result = 0;
          }
       }
    else if (v1type == "e") {
@@ -6844,13 +6835,8 @@ SocialCalc.Formula.TestCriteria = function(value, type, criteria) {
          }
          basestring = "^" + basestring + "$";
       } else {
-          comparitor = criteria.substring(0,2);
-          if (comparitor == "<=" || comparitor == "<>" || comparitor == ">=") {
-             basestring = criteria.substring(2);
-          } else {
-             comparitor = "none";
-             basestring = criteria;
-          }
+          comparitor = "none";
+          basestring = criteria;
       }
    }
 
@@ -6861,11 +6847,6 @@ SocialCalc.Formula.TestCriteria = function(value, type, criteria) {
          }
       if (type.charAt(0) == "b") { // comparing to empty cell
          if (comparitor == "=") { // empty equals empty
-            return true;
-            }
-         }
-      else {
-         if (comparitor == "<>") { // "something" does not equal empty
             return true;
             }
          }
@@ -6890,25 +6871,13 @@ SocialCalc.Formula.TestCriteria = function(value, type, criteria) {
             cond = value < basevalue.value;
             break;
 
-         case "<=":
-            cond = value <= basevalue.value;
-            break;
-
          case "=":
          case "none":
             cond = value == basevalue.value;
             break;
 
-         case ">=":
-            cond = value >= basevalue.value;
-            break;
-
          case ">":
             cond = value > basevalue.value;
-            break;
-
-         case "<>":
-            cond = value != basevalue.value;
             break;
          }
       }
@@ -6937,10 +6906,6 @@ SocialCalc.Formula.TestCriteria = function(value, type, criteria) {
             cond = value < basevalue.value;
             break;
 
-         case "<=":
-            cond = value <= basevalue.value;
-            break;
-
          case "=":
             cond = value == basevalue.value;
             break;
@@ -6949,16 +6914,8 @@ SocialCalc.Formula.TestCriteria = function(value, type, criteria) {
             cond = value.substring(0, basevalue.value.length) == basevalue.value;
             break;
 
-         case ">=":
-            cond = value >= basevalue.value;
-            break;
-
          case ">":
             cond = value > basevalue.value;
-            break;
-
-         case "<>":
-            cond = value != basevalue.value;
             break;
 
          case "regex":
