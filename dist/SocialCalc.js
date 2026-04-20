@@ -4682,10 +4682,7 @@ SocialCalc.AdjustFormulaCoords = function(formula, col, coloffset, row, rowoffse
          ttext = newcr;
          }
       else if (ttype == token_string) {
-         if (ttext.indexOf('"') >= 0) { // quotes to double
-            ttext = '"' + ttext.replace(/"/, '""') + '"';
-            }
-         else ttext = '"' + ttext + '"';
+         ttext = '"' + (ttext.indexOf('"') >= 0 ? ttext.replace(/"/, '""') : ttext) + '"';
          }
       updatedformula += ttext;
       }
@@ -4755,10 +4752,7 @@ SocialCalc.ReplaceFormulaCoords = function(formula, movedto) {
             }
          }
       else if (ttype == token_string) {
-         if (ttext.indexOf('"') >= 0) { // quotes to double
-            ttext = '"' + ttext.replace(/"/, '""') + '"';
-            }
-         else ttext = '"' + ttext + '"';
+         ttext = '"' + (ttext.indexOf('"') >= 0 ? ttext.replace(/"/, '""') : ttext) + '"';
          }
       updatedformula += ttext;
       }

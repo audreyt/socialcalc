@@ -875,6 +875,17 @@ test("RenderCell handles error cells, error valuetype, custom value formats", as
     expect(typeof pseudo.style).toBe("object");
 });
 
+test("OffsetFormulaCoords handles string tokens with embedded double quotes", async () => {
+    const SC = await loadSocialCalc();
+    // A formula containing a string literal with an embedded quote.
+    // Parser stores the token text with doubled "" quotes unescaped; the
+    // offset routine rebuilds with re-escaped quotes.
+    const formula = 'CONCATENATE("a""b",A1)';
+    const result = SC.OffsetFormulaCoords(formula, 1, 0);
+    expect(result).toContain('B1');
+    expect(result).toContain('""');
+});
+
 test("FormatValueForDisplay widget path renders cell HTML with parameters/html/css substitution", async () => {
     const SC = await loadSocialCalc();
     const sheet = new SC.Sheet();

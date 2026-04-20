@@ -529,7 +529,8 @@ test("ProcessEditorMouseDown: SocialCalc._app=true takes CmdGotFocus branch", as
     const prevApp = SC._app;
     SC._app = true;
     try {
-        const ev = fakeEvent({ clientX: 100, clientY: 60, target });
+        // clientY=70 lands squarely in body rows (not the 30-50 header band).
+        const ev = fakeEvent({ clientX: 100, clientY: 70, target });
         SC.ProcessEditorMouseDown(ev);
     } catch {}
     SC._app = prevApp;
