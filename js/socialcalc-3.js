@@ -1779,6 +1779,11 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
    var name, v1, v2;
    var cmdextension;
    var col, row, editor, undoNum, trackLine;
+   // Declared here so assignments in the paste/quash/sort branches below
+   // don't become implicit globals in strict-mode runtimes (workerd et al).
+   var sourceColname, colWidth, colHide, sourceRow, rowHide;
+   var quashedCellCoord, quashedCell;
+   var slast, tb;
 
    var attribs = sheet.attribs;
    var changes = sheet.changes;
@@ -4623,7 +4628,7 @@ SocialCalc.CalculateCellSkipData = function(context) {
 
 SocialCalc.CalculateColWidthData = function(context) {
 
-   var colnum, colname, colwidth, totalwidth;
+   var colnum, colname, colwidth, totalwidth, colpane;
 
    var sheetobj=context.sheetobj;
    var sheetcolattribs=sheetobj.colattribs;
@@ -4650,7 +4655,7 @@ SocialCalc.CalculateColWidthData = function(context) {
    }
 
 SocialCalc.CalculateRowHeightData = function(context) {
-  var rownum, rowheight, totalheight;
+  var rownum, rowheight, totalheight, rowpane;
   var sheetobj = context.sheetobj;
 
   // Calculate row height data
@@ -4716,7 +4721,7 @@ code does this (e.g., use table-layout:fixed).
 
 SocialCalc.RenderSheet = function(context, oldtable, linkstyle) {
 
-   var newrow, rowpane;
+   var newrow, rowpane, rownum;
    var tableobj, colgroupobj, tbodyobj, parentnode;
 
    // do precompute stuff if necessary
@@ -5037,6 +5042,7 @@ SocialCalc.RenderCell = function(context, rownum, colnum, rowpane, colpane, noEl
 
    var num, t, result, span, stylename, cell, endcell, sheetattribs, scdefaults;
    var stylestr="";
+   var scc;
 
    rownum = rownum-0; // make sure a number
    colnum = colnum-0;
@@ -5615,7 +5621,7 @@ SocialCalc.GetCellContents = function(sheetobj, coord) {
 SocialCalc.FormatValueForDisplay = function(sheetobj, value, cr, linkstyle) {
 
    var valueformat, has_parens, has_commas, valuetype, valuesubtype;
-   var displayvalue;
+   var displayvalue, valueinputwidget;
 
    var sheetattribs=sheetobj.attribs;
    var scc=SocialCalc.Constants;

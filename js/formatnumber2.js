@@ -1,3 +1,8 @@
+// @ts-check
+// Opt-in TypeScript checking for this file. formatnumber2.js has a 95%
+// Stryker mutation score, so the code is healthy and worth type-checking.
+// Other .js files under js/ remain un-checked (see tsconfig.json
+// `checkJs: false`) until they are audited for leaky globals / typos.
 //
 /*
 // SocialCalc Number Formatting Library
@@ -30,6 +35,8 @@
 //
 */
 
+   /** @type {any} */
+   // @ts-ignore - SocialCalc is declared ambiently; runtime re-declaration is intentional.
    var SocialCalc;
    if (!SocialCalc) SocialCalc = {}; // May be used with other SocialCalc libraries or standalone
 
@@ -74,6 +81,12 @@ SocialCalc.FormatNumber.datevalues = {julian_offset: 2415019, seconds_in_a_day: 
 
 ************************* */
 
+/**
+ * @param {*} rawvalue - number or string; coerced to number internally
+ * @param {string} format_string
+ * @param {string} [currency_char]
+ * @returns {string}
+ */
 SocialCalc.FormatNumber.formatNumberWithFormat = function(rawvalue, format_string, currency_char) {
 
    var scc = SocialCalc.Constants;
@@ -81,8 +94,13 @@ SocialCalc.FormatNumber.formatNumberWithFormat = function(rawvalue, format_strin
 
    var op, operandstr, fromend, cval, operandstrlc;
    var startval, estartval;
-   var hrs, mins, secs, ehrs, emins, esecs, ampmstr, ymd;
-   var minOK, mpos;
+   // Initialize date/time components to 0 so TypeScript can narrow them to `number`.
+   // These are only read inside `op == scfn.commands.date` branches, which are only
+   // populated by parse_format_string when the format contains date placeholders —
+   // at which point the `if (sectioninfo.hasdate)` block above reassigns them.
+   var hrs = 0, mins = 0, secs = 0, ehrs = 0, emins = 0, esecs = 0;
+   var ampmstr, ymd;
+   var minOK, mspos;
    var result="";
    var thisformat;
    var section, gotcomparison, compop, compval, cpos, oppos;
@@ -432,6 +450,7 @@ SocialCalc.FormatNumber.formatNumberWithFormat = function(rawvalue, format_strin
             continue;
             }
          strparts=strvalue.match(/^\+{0,1}(\d*)(?:\.(\d*)){0,1}$/); // get integer and fraction parts
+         if (!strparts) { result += strvalue; continue; } // defensive: shouldn't happen for finite non-exponential numbers
          integervalue = strparts[1];
          if (!integervalue || integervalue=="0") integervalue="";
          fractionvalue = strparts[2];
@@ -579,6 +598,11 @@ SocialCalc.FormatNumber.formatNumberWithFormat = function(rawvalue, format_strin
 
 ************************* */
 
+/**
+ * @param {any} rawvalue
+ * @param {string} format_string
+ * @returns {string}
+ */
 SocialCalc.FormatNumber.formatTextWithFormat = function(rawvalue, format_string) {
 
    var scc = SocialCalc.Constants;
@@ -587,8 +611,9 @@ SocialCalc.FormatNumber.formatTextWithFormat = function(rawvalue, format_string)
    var result = "";
    var section;
    var sectioninfo;
-   var oppos;
+   var op, oppos;
    var operandstr;
+   var thisformat;
    var textcolor = "";
    var textstyle = "";
 
@@ -665,18 +690,27 @@ SocialCalc.FormatNumber.formatTextWithFormat = function(rawvalue, format_string)
 
 ************************* */
 
+/**
+ * @param {{ [format_string: string]: any }} format_defs
+ * @param {string} format_string
+ * @returns {void}
+ */
 SocialCalc.FormatNumber.parse_format_string = function(format_defs, format_string) {
 
    var scfn = SocialCalc.FormatNumber;
 
-   var thisformat, section, sectionfinfo;
+   /** @type {{ operators: number[], operands: string[], sectioninfo: Array<{ [key: string]: any }>, hascomparison?: number, [key: string]: any }} */
+   var thisformat;
+   var section;
+   /** @type {{ [key: string]: any }} */
+   var sectioninfo;
    var integerpart = 1; // start out in integer part
    var lastwasinteger; // last char was an integer placeholder
    var lastwasslash; // last char was a backslash - escaping following character
    var lastwasasterisk; // repeat next char
    var lastwasunderscore; // last char was _ which picks up following char for width
-   var inquote, quotestr; // processing a quoted string
-   var inbracket, bracketstr, bracketdata; // processing a bracketed string
+   var inquote, quotestr = ""; // processing a quoted string
+   var inbracket, bracketstr = "", bracketdata; // processing a bracketed string
    var ingeneral, gpos; // checks for characters "General"
    var ampmstr, part; // checks for characters "A/P" and "AM/PM"
    var indate; // keeps track of date/time placeholders
@@ -773,6 +807,10 @@ SocialCalc.FormatNumber.parse_format_string = function(format_defs, format_strin
          ampmstr += ch;
          part=ampmstr.toLowerCase();
          if (part!="am/pm".substring(0,part.length) && part!="a/p".substring(0,part.length)) {
+            // @ts-expect-error: intentional no-op assignment to a discarded global.
+            // Clearing `ampmstr` here would change behavior (incomplete AM/PM runs
+            // would stop swallowing subsequent characters); see format-coverage
+            // test "partial AM/PM run ... is discarded".
             ampstr="";
             }
          else if (part=="am/pm" || part=="a/p") {
@@ -903,6 +941,10 @@ SocialCalc.FormatNumber.parse_format_string = function(format_defs, format_strin
 
 ************************* */
 
+/**
+ * @param {string} bracketstr
+ * @returns {{ operator: number, operand: string, [key: string]: any }}
+ */
 SocialCalc.FormatNumber.parse_format_bracket = function(bracketstr) {
 
    var scfn = SocialCalc.FormatNumber;
@@ -944,7 +986,7 @@ SocialCalc.FormatNumber.parse_format_bracket = function(bracketstr) {
    else if (parts=bracketstr.match(/^[<>=]/)) { // comparison operator
       parts=bracketstr.match(/^([<>=]+)(.+)$/); // split operator and value
       bracketdata.operator = scfn.commands.comparison;
-      bracketdata.operand = parts[1]+":"+parts[2];
+      bracketdata.operand = (parts ? parts[1]+":"+parts[2] : bracketstr);
       }
    else { // unknown bracket
       bracketdata.operator = scfn.commands.copy;
@@ -972,6 +1014,12 @@ C
 
 ************************* */
 
+/**
+ * @param {number} year
+ * @param {number} month
+ * @param {number} day
+ * @returns {number}
+ */
 SocialCalc.FormatNumber.convert_date_gregorian_to_julian = function(year, month, day) {
 
    var juliandate;
@@ -1000,6 +1048,10 @@ SocialCalc.FormatNumber.convert_date_gregorian_to_julian = function(year, month,
 
 ************************* */
 
+/**
+ * @param {number} juliandate
+ * @returns {{ year: number, month: number, day: number }}
+ */
 SocialCalc.FormatNumber.convert_date_julian_to_gregorian = function(juliandate) {
 
    var L, N, I, J, K;
@@ -1019,6 +1071,10 @@ SocialCalc.FormatNumber.convert_date_julian_to_gregorian = function(juliandate) 
 
    }
 
+/**
+ * @param {number} n
+ * @returns {number}
+ */
 SocialCalc.intFunc = function(n) {
    if (n < 0) {
       return -Math.floor(-n);

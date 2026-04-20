@@ -26,7 +26,12 @@
 
     "types": ["bun"]
   },
-  "include": ["build.ts", "js/**/*.js"],
+  "include": [
+    "build.ts",
+    "js/**/*.js",
+    "test/types.smoke.test.ts",
+    "dist/SocialCalc.d.ts"
+  ],
   "exclude": [
     "node_modules",
     "dist",
