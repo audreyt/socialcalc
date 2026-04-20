@@ -6,25 +6,15 @@ import {
     recalcSheet,
     scheduleCommands,
 } from "./helpers/socialcalc";
-import { installUiShim, loadSocialCalcMirrored } from "./helpers/ui";
+import { installUiShim } from "./helpers/ui";
 
-// Bun caches dynamic ESM imports by URL and ignores the `?nonce=` query
-// string that the `loadSocialCalc` helper appends. If a sibling test file
-// loaded the SocialCalc bundle without a browser shim first, Bun returns
-// that cached instance (with DOM functions stubbed to no-ops by the
-// module-wrapper-bottom guard) forever.
-//
-// To work around that, when we detect a stubbed module we mirror the bundle
-// to a different file path (`dist/SocialCalc.ui.mirror.js`) and import that
-// URL — Bun evaluates the mirror freshly with our browser shim in place,
-// and its coverage instrumentation attributes coverage to the mirror file.
+// The module-wrapper-bottom DOM guard now dispatches at call time instead
+// of permanently stomping render methods at load time, so the cached
+// SocialCalc module works whether or not the first load saw a DOM. We just
+// need to install the shim before calling any UI method.
 async function loadSocialCalc(options: { browser?: boolean } = {}) {
     const SC = await _loadSocialCalc({ ...options, browser: true });
     installUiShim();
-    const len = (SC.EditorRenderSheet?.toString?.() ?? "").length;
-    if (len < 50) {
-        return loadSocialCalcMirrored();
-    }
     return SC;
 }
 

@@ -7,16 +7,12 @@
 // installBrowserShim() has been called.
 //
 // It also exposes `loadSocialCalcFresh()` which re-evaluates the bundled
-// SocialCalc.js source in the current context so the module-wrapper-bottom
-// no-op guard (`typeof document === "undefined"`) does not leave DOM
-// functions stubbed out after a non-browser load from another test file.
-// Bun caches ESM dynamic imports aggressively even with a nonce query
-// string, so `await import(bundle + "?nonce=" + n)` does NOT reload the
-// module — we evaluate the source string directly instead.
+// SocialCalc.js source in the current context. Unlike `await import(url)`
+// (which Bun caches by URL even with a nonce query string), this guarantees
+// a fresh evaluation — useful when a test needs a clean SocialCalc state.
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
 
 type AnyRec = Record<string, unknown>;
 
@@ -491,65 +487,6 @@ export function loadSocialCalcFresh(): any {
     const fn = new Function("module", "exports", cachedSource);
     fn.call(globalThis, fakeModule, fakeModule.exports);
     return fakeModule.exports;
-}
-
-// Alternate loader: ensures a fresh SocialCalc module is imported via Bun's
-// module system (so Bun coverage instrumentation applies) by writing the
-// bundle source to a *different* path each call and dynamically importing
-// from there. Bun caches by URL, so each unique path yields a fresh module
-// evaluation. We only need one extra path for our tests; reuse it across
-// calls.
-let mirroredPath: string | null = null;
-
-export async function loadSocialCalcMirrored(): Promise<any> {
-    const src = (() => {
-        if (cachedSource) return cachedSource;
-        const p = join(import.meta.dir, "..", "..", "dist", "SocialCalc.js");
-        let source = readFileSync(p, "utf8");
-        source = source.replace(/"use strict";/g, "");
-        cachedSource = source;
-        return source;
-    })();
-    if (!mirroredPath) {
-        // Written alongside the main bundle so Bun's coverage reporter treats
-        // it as a peer file. We don't ship this — it's a test-only artifact.
-        mirroredPath = join(import.meta.dir, "..", "..", "dist", "SocialCalc.ui.mirror.js");
-    }
-    // Always write; the source may have changed since a previous run. The
-    // write is cheap (~1 MB) and keeps the mirror in sync with the current
-    // build.
-    writeFileSync(mirroredPath, src);
-    // Guard: background setTimeout callbacks scheduled by SocialCalc may fire
-    // after sibling test files cleared the browser shim, leading to
-    // `document is not defined` errors. Capture the current shim document so
-    // wrapped callbacks can restore it before running.
-    if (!(globalThis as any).__uiShimResilientSetTimeout) {
-        const origSetTimeout = globalThis.setTimeout.bind(globalThis);
-        const savedDoc = (globalThis as any).document;
-        const savedWin = (globalThis as any).window;
-        (globalThis as any).setTimeout = function (cb: any, ms?: number, ...rest: any[]) {
-            return origSetTimeout(
-                () => {
-                    if (typeof (globalThis as any).document === "undefined") {
-                        (globalThis as any).document = savedDoc;
-                        (globalThis as any).window = savedWin;
-                        (globalThis as any).self = savedWin;
-                    }
-                    try {
-                        cb(...rest);
-                    } catch {
-                        // Swallow — the callback is a stale render tick
-                        // whose originating test has already ended.
-                    }
-                },
-                ms,
-            );
-        };
-        (globalThis as any).__uiShimResilientSetTimeout = true;
-    }
-    const url = pathToFileURL(mirroredPath).href;
-    const mod = await import(url);
-    return (mod as any).default ?? mod;
 }
 
 function makeJqStub() {
