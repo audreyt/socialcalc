@@ -91,10 +91,9 @@ More comments yet to come...
 */
 
 
-/** @type {any} */
-// @ts-expect-error: redeclaration of SocialCalc (also declared as namespace in .d.ts)
-var SocialCalc;
-if (!SocialCalc) SocialCalc = {};
+// SocialCalc is always defined by socialcalcconstants.js (which concatenates
+// before this file in the UMD bundle). Redundant `if (!SocialCalc)` guard
+// removed.
 
 // *************************************
 //
@@ -3637,9 +3636,8 @@ SocialCalc.OffsetFormulaCoords = function(formula, coloffset, rowoffset) {
    var parseinfo, ttext, ttype, i, cr, newcr;
    var updatedformula = "";
    var scf = SocialCalc.Formula;
-   if (!scf) {
-      return "Need SocialCalc.Formula";
-      }
+   // The !scf defensive guard was removed — formula1.js is always
+   // concatenated into the bundle, so SocialCalc.Formula is guaranteed.
    var tokentype = scf.TokenType;
    var token_op = tokentype.op;
    var token_string = tokentype.string;
@@ -3704,9 +3702,8 @@ SocialCalc.AdjustFormulaCoords = function(formula, col, coloffset, row, rowoffse
    var updatedformula = "";
    var sheetref = false;
    var scf = SocialCalc.Formula;
-   if (!scf) {
-      return "Need SocialCalc.Formula";
-      }
+   // The !scf defensive guard was removed — formula1.js is always
+   // concatenated into the bundle, so SocialCalc.Formula is guaranteed.
    var tokentype = scf.TokenType;
    var token_op = tokentype.op;
    var token_string = tokentype.string;
@@ -3789,9 +3786,8 @@ SocialCalc.ReplaceFormulaCoords = function(formula, movedto) {
    var updatedformula = "";
    var sheetref = false;
    var scf = SocialCalc.Formula;
-   if (!scf) {
-      return "Need SocialCalc.Formula";
-      }
+   // The !scf defensive guard was removed — formula1.js is always
+   // concatenated into the bundle, so SocialCalc.Formula is guaranteed.
    var tokentype = scf.TokenType;
    var token_op = tokentype.op;
    var token_string = tokentype.string;
@@ -4031,9 +4027,7 @@ SocialCalc.RecalcTimerRoutine = function() {
    var starttime = new Date();
    var count = 0;
    var scf = SocialCalc.Formula;
-   if (!scf) {
-      return "Need SocialCalc.Formula";
-      }
+   // !scf defensive guard removed — always present in the bundled build.
    var scri = SocialCalc.RecalcInfo;
    var sheet = scri.sheet;
    if (!sheet) {
@@ -4205,9 +4199,8 @@ SocialCalc.RecalcCheckCell = function(sheet, startcoord) {
 
    var parseinfo, ttext, ttype, i, rangecoord, circref, value, pos, pos2, cell, coordvals;
    var scf = SocialCalc.Formula;
-   if (!scf) {
-      return "Need SocialCalc.Formula";
-      }
+   // The !scf defensive guard was removed — formula1.js is always
+   // concatenated into the bundle, so SocialCalc.Formula is guaranteed.
    var tokentype = scf.TokenType;
    var token_op = tokentype.op;
    var token_name = tokentype.name;

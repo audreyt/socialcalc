@@ -8,18 +8,18 @@
 // MIT License: https://github.com/umdjs/umd/blob/master/LICENSE.md
 (function (root, factory) {
     "use strict";
-    if (typeof define === 'function' && define.amd) {
-        // AMD. Register as an anonymous module.
-        define([], factory.bind(root, root));
-    } else if (typeof module === 'object' && module.exports) {
-        // Node. Does not work with strict CommonJS, but
-        // only CommonJS-like environments that support module.exports,
-        // like Node.
-        module.exports = factory.call(root, root);
-    } else {
-        // Browser globals (root is window)
-        root.SocialCalc = factory.call(root, root);
-  }
+    // Evaluate once and fan out to both deliveries:
+    //   * browser / globalThis (root.SocialCalc) — always set
+    //   * CommonJS / Node (module.exports) — when present
+    // AMD was dropped from this wrapper: the npm package is its
+    // canonical entry point today, and AMD loaders (RequireJS, Dojo
+    // legacy) have been unmaintained for years. Anyone still wiring
+    // AMD can wrap the CommonJS module themselves.
+    var exported = factory.call(root, root);
+    root.SocialCalc = exported;
+    if (typeof module === 'object' && module && module.exports) {
+        module.exports = exported;
+    }
 }(typeof globalThis !== 'undefined' ? globalThis : this, function (window) {
 "use strict";
 
@@ -1014,10 +1014,9 @@ More comments yet to come...
 */
 
 
-/** @type {any} */
-// @ts-expect-error: redeclaration of SocialCalc (also declared as namespace in .d.ts)
-var SocialCalc;
-if (!SocialCalc) SocialCalc = {};
+// SocialCalc is always defined by socialcalcconstants.js (which concatenates
+// before this file in the UMD bundle). Redundant `if (!SocialCalc)` guard
+// removed.
 
 // *************************************
 //
@@ -4560,9 +4559,8 @@ SocialCalc.OffsetFormulaCoords = function(formula, coloffset, rowoffset) {
    var parseinfo, ttext, ttype, i, cr, newcr;
    var updatedformula = "";
    var scf = SocialCalc.Formula;
-   if (!scf) {
-      return "Need SocialCalc.Formula";
-      }
+   // The !scf defensive guard was removed — formula1.js is always
+   // concatenated into the bundle, so SocialCalc.Formula is guaranteed.
    var tokentype = scf.TokenType;
    var token_op = tokentype.op;
    var token_string = tokentype.string;
@@ -4627,9 +4625,8 @@ SocialCalc.AdjustFormulaCoords = function(formula, col, coloffset, row, rowoffse
    var updatedformula = "";
    var sheetref = false;
    var scf = SocialCalc.Formula;
-   if (!scf) {
-      return "Need SocialCalc.Formula";
-      }
+   // The !scf defensive guard was removed — formula1.js is always
+   // concatenated into the bundle, so SocialCalc.Formula is guaranteed.
    var tokentype = scf.TokenType;
    var token_op = tokentype.op;
    var token_string = tokentype.string;
@@ -4712,9 +4709,8 @@ SocialCalc.ReplaceFormulaCoords = function(formula, movedto) {
    var updatedformula = "";
    var sheetref = false;
    var scf = SocialCalc.Formula;
-   if (!scf) {
-      return "Need SocialCalc.Formula";
-      }
+   // The !scf defensive guard was removed — formula1.js is always
+   // concatenated into the bundle, so SocialCalc.Formula is guaranteed.
    var tokentype = scf.TokenType;
    var token_op = tokentype.op;
    var token_string = tokentype.string;
@@ -4954,9 +4950,7 @@ SocialCalc.RecalcTimerRoutine = function() {
    var starttime = new Date();
    var count = 0;
    var scf = SocialCalc.Formula;
-   if (!scf) {
-      return "Need SocialCalc.Formula";
-      }
+   // !scf defensive guard removed — always present in the bundled build.
    var scri = SocialCalc.RecalcInfo;
    var sheet = scri.sheet;
    if (!sheet) {
@@ -5128,9 +5122,8 @@ SocialCalc.RecalcCheckCell = function(sheet, startcoord) {
 
    var parseinfo, ttext, ttype, i, rangecoord, circref, value, pos, pos2, cell, coordvals;
    var scf = SocialCalc.Formula;
-   if (!scf) {
-      return "Need SocialCalc.Formula";
-      }
+   // The !scf defensive guard was removed — formula1.js is always
+   // concatenated into the bundle, so SocialCalc.Formula is guaranteed.
    var tokentype = scf.TokenType;
    var token_op = tokentype.op;
    var token_name = tokentype.name;
@@ -7815,12 +7808,8 @@ See the comments in the main SocialCalc code module file of the SocialCalc packa
 
 */
 
-   /** @type {any} */
-   // @ts-ignore - SocialCalc is declared ambiently; runtime re-declaration is intentional.
-   var SocialCalc;
-   if (!SocialCalc) { // created here, too, in case load order is wrong, but main routines are required
-      SocialCalc = {};
-      }
+   // Module-top SocialCalc-presence guard removed — socialcalc-3.js
+   // always precedes this file in the concatenated bundle.
 
 // *************************************
 //
@@ -14241,10 +14230,8 @@ SocialCalc.ProcessKey = function (ch, e) {
 //
 */
 
-   /** @type {any} */
-   // @ts-ignore - SocialCalc is declared ambiently; runtime re-declaration is intentional.
-   var SocialCalc;
-   if (!SocialCalc) SocialCalc = {}; // May be used with other SocialCalc libraries or standalone
+   // Redundant `if (!SocialCalc)` guard removed — SocialCalc is defined by
+   // socialcalcconstants.js earlier in the concatenated UMD bundle.
 
 SocialCalc.FormatNumber = {};
 
@@ -15325,10 +15312,8 @@ SocialCalc.intFunc = function(n) {
 //
 */
 
-   // @ts-ignore - SocialCalc is declared ambiently as a namespace; runtime re-declaration is intentional.
-   var SocialCalc;
-   if (!SocialCalc) SocialCalc = {}; // May be used with other SocialCalc libraries or standalone
-                                     // In any case, requires SocialCalc.Constants.
+   // Redundant `if (!SocialCalc)` guard removed — SocialCalc is defined by
+   // socialcalcconstants.js earlier in the concatenated UMD bundle.
 
 SocialCalc.Formula = {};
 SocialCalc.TriggerIoAction = {}; // eddy
@@ -22246,12 +22231,8 @@ SocialCalc.Formula.TestCriteria = function(value, type, criteria) {
 //
 */
 
-   /** @type {any} */
-   // @ts-ignore - SocialCalc is declared ambiently; runtime re-declaration is intentional.
-   var SocialCalc;
-   if (!SocialCalc) {
-      SocialCalc = {};
-      }
+   // Module-load guards removed — in the concatenated UMD bundle, SocialCalc
+   // is always defined by the time this file runs.
 
    // The main Popup data -- there is only one set
 

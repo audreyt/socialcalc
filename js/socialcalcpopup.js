@@ -19,12 +19,8 @@
 //
 */
 
-   /** @type {any} */
-   // @ts-ignore - SocialCalc is declared ambiently; runtime re-declaration is intentional.
-   var SocialCalc;
-   if (!SocialCalc) {
-      SocialCalc = {};
-      }
+   // Module-load guards removed — in the concatenated UMD bundle, SocialCalc
+   // is always defined by the time this file runs.
 
    // The main Popup data -- there is only one set
 

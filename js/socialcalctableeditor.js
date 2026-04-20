@@ -95,12 +95,8 @@ See the comments in the main SocialCalc code module file of the SocialCalc packa
 
 */
 
-   /** @type {any} */
-   // @ts-ignore - SocialCalc is declared ambiently; runtime re-declaration is intentional.
-   var SocialCalc;
-   if (!SocialCalc) { // created here, too, in case load order is wrong, but main routines are required
-      SocialCalc = {};
-      }
+   // Module-top SocialCalc-presence guard removed — socialcalc-3.js
+   // always precedes this file in the concatenated bundle.
 
 // *************************************
 //

@@ -35,10 +35,8 @@
 //
 */
 
-   /** @type {any} */
-   // @ts-ignore - SocialCalc is declared ambiently; runtime re-declaration is intentional.
-   var SocialCalc;
-   if (!SocialCalc) SocialCalc = {}; // May be used with other SocialCalc libraries or standalone
+   // Redundant `if (!SocialCalc)` guard removed — SocialCalc is defined by
+   // socialcalcconstants.js earlier in the concatenated UMD bundle.
 
 SocialCalc.FormatNumber = {};
 

@@ -32,10 +32,8 @@
 //
 */
 
-   // @ts-ignore - SocialCalc is declared ambiently as a namespace; runtime re-declaration is intentional.
-   var SocialCalc;
-   if (!SocialCalc) SocialCalc = {}; // May be used with other SocialCalc libraries or standalone
-                                     // In any case, requires SocialCalc.Constants.
+   // Redundant `if (!SocialCalc)` guard removed — SocialCalc is defined by
+   // socialcalcconstants.js earlier in the concatenated UMD bundle.
 
 SocialCalc.Formula = {};
 SocialCalc.TriggerIoAction = {}; // eddy

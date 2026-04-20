@@ -8,17 +8,17 @@
 // MIT License: https://github.com/umdjs/umd/blob/master/LICENSE.md
 (function (root, factory) {
     "use strict";
-    if (typeof define === 'function' && define.amd) {
-        // AMD. Register as an anonymous module.
-        define([], factory.bind(root, root));
-    } else if (typeof module === 'object' && module.exports) {
-        // Node. Does not work with strict CommonJS, but
-        // only CommonJS-like environments that support module.exports,
-        // like Node.
-        module.exports = factory.call(root, root);
-    } else {
-        // Browser globals (root is window)
-        root.SocialCalc = factory.call(root, root);
-  }
+    // Evaluate once and fan out to both deliveries:
+    //   * browser / globalThis (root.SocialCalc) — always set
+    //   * CommonJS / Node (module.exports) — when present
+    // AMD was dropped from this wrapper: the npm package is its
+    // canonical entry point today, and AMD loaders (RequireJS, Dojo
+    // legacy) have been unmaintained for years. Anyone still wiring
+    // AMD can wrap the CommonJS module themselves.
+    var exported = factory.call(root, root);
+    root.SocialCalc = exported;
+    if (typeof module === 'object' && module && module.exports) {
+        module.exports = exported;
+    }
 }(typeof globalThis !== 'undefined' ? globalThis : this, function (window) {
 "use strict";

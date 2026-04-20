@@ -735,6 +735,12 @@ test("CSV/TSV import and export - including quoted newlines, commas, double quot
         '"q\"uote"\t"line\nbreak"\t3\n';
     const saveTab = SC.ConvertOtherFormatToSave(tab, "tab");
     expect(saveTab).toContain('cell:A1:t:a');
+    // Plain TSV with trailing newline — hits the empty-last-line `break` in
+    // the tab parser loop.
+    const plainTab = "x\ty\tz\n1\t2\t3\n";
+    const savePlain = SC.ConvertOtherFormatToSave(plainTab, "tab");
+    expect(savePlain).toContain("cell:A1:t:x");
+    expect(savePlain).toContain("cell:A2:v:1");
     expect(SC.ConvertOtherFormatToSave("just,text", "scsave")).toBe("just,text");
     // Empty string returns empty.
     expect(SC.ConvertSaveToOtherFormat("", "csv")).toBe("");
@@ -867,6 +873,90 @@ test("RenderCell handles error cells, error valuetype, custom value formats", as
     // RenderCell with noElement=true returns a pseudo-element.
     const pseudo = context.RenderCell(1, 1, 0, 0, true, context.defaultHTMLlinkstyle);
     expect(typeof pseudo.style).toBe("object");
+});
+
+test("FormatValueForDisplay formula/forcetext valueformats show raw formula source", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    // Register valueformats "formula" and "forcetext" on the sheet.
+    sheet.valueformats[1] = "formula";
+    sheet.valueformats[2] = "forcetext";
+    // Give the sheet cells with datatype "f" (formula) and "c" (constant
+    // with expression) and "v" (plain value), all with valuetype "t" (text)
+    // and textvalueformat that maps to "formula".
+    const cellTextF = sheet.GetAssuredCell("A1");
+    cellTextF.datatype = "f";
+    cellTextF.formula = "FOO()";
+    cellTextF.valuetype = "t";
+    cellTextF.datavalue = "hi";
+    cellTextF.textvalueformat = 1;
+
+    const cellTextC = sheet.GetAssuredCell("A2");
+    cellTextC.datatype = "c";
+    cellTextC.formula = "hello";
+    cellTextC.valuetype = "t";
+    cellTextC.datavalue = "hi";
+    cellTextC.textvalueformat = 1;
+
+    const cellTextV = sheet.GetAssuredCell("A3");
+    cellTextV.datatype = "v";
+    cellTextV.valuetype = "t";
+    cellTextV.datavalue = "bare";
+    cellTextV.textvalueformat = 1;
+
+    // Same trio for numeric cells with nontextvalueformat = "formula".
+    const cellNumF = sheet.GetAssuredCell("B1");
+    cellNumF.datatype = "f";
+    cellNumF.formula = "1+2";
+    cellNumF.valuetype = "n";
+    cellNumF.datavalue = 3;
+    cellNumF.nontextvalueformat = 1;
+
+    const cellNumC = sheet.GetAssuredCell("B2");
+    cellNumC.datatype = "c";
+    cellNumC.formula = "42";
+    cellNumC.valuetype = "n";
+    cellNumC.datavalue = 42;
+    cellNumC.nontextvalueformat = 1;
+
+    const cellNumV = sheet.GetAssuredCell("B3");
+    cellNumV.datatype = "v";
+    cellNumV.valuetype = "n";
+    cellNumV.datavalue = 7;
+    cellNumV.nontextvalueformat = 1;
+
+    // And numeric cells with nontextvalueformat = "forcetext".
+    const cellForceF = sheet.GetAssuredCell("C1");
+    cellForceF.datatype = "f";
+    cellForceF.formula = "1+2";
+    cellForceF.valuetype = "n";
+    cellForceF.datavalue = 3;
+    cellForceF.nontextvalueformat = 2;
+
+    const cellForceC = sheet.GetAssuredCell("C2");
+    cellForceC.datatype = "c";
+    cellForceC.formula = "hello";
+    cellForceC.valuetype = "n";
+    cellForceC.datavalue = 0;
+    cellForceC.nontextvalueformat = 2;
+
+    const cellForceV = sheet.GetAssuredCell("C3");
+    cellForceV.datatype = "v";
+    cellForceV.valuetype = "n";
+    cellForceV.datavalue = 9;
+    cellForceV.nontextvalueformat = 2;
+
+    expect(SC.FormatValueForDisplay(sheet, "hi", "A1", "")).toContain("=FOO()");
+    expect(SC.FormatValueForDisplay(sheet, "hi", "A2", "")).toContain("'hello");
+    expect(SC.FormatValueForDisplay(sheet, "bare", "A3", "")).toContain("'bare");
+
+    expect(SC.FormatValueForDisplay(sheet, 3, "B1", "")).toContain("=1+2");
+    expect(SC.FormatValueForDisplay(sheet, 42, "B2", "")).toContain("'42");
+    expect(SC.FormatValueForDisplay(sheet, 7, "B3", "")).toContain("7");
+
+    expect(String(SC.FormatValueForDisplay(sheet, 3, "C1", ""))).toContain("=1+2");
+    expect(String(SC.FormatValueForDisplay(sheet, 0, "C2", ""))).toContain("hello");
+    expect(String(SC.FormatValueForDisplay(sheet, 9, "C3", ""))).toContain("9");
 });
 
 test("format_text_for_display covers text-url, text-image, text-custom, custom, hidden, and nontextvalueformat fallback", async () => {
