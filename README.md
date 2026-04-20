@@ -41,7 +41,7 @@ bun run typecheck
 Run the smoke tests (parse, recalc, formula coverage, strict-mode global-leak
 guard):
 ```bash
-bun test
+bun run test
 ```
 
 The bundle loads cleanly under `"use strict"` and keeps the existing UMD entry
