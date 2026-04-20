@@ -1790,17 +1790,45 @@ test("Ctrl-A/C/V/X/Z/S flows via ctrlkeyFunction", async () => {
     editor.ctrlkeyFunction(editor, "[ctrl-z]");
 
     // Ctrl-S: depends on AllowCtrlS constant — exercise the flag.
+    // The prompt call is inside a setTimeout callback, and the UMD factory
+    // binds `window` = globalThis, so we must mock globalThis.prompt (not
+    // globalThis.window.prompt) and capture the setTimeout callback to
+    // invoke it synchronously while the mock is active.
     SC.Constants.AllowCtrlS = true;
-    const savedPrompt = (window as any).prompt;
-    (window as any).prompt = (_m: string, _d: string) => "General";
+    const savedPrompt = (globalThis as any).prompt;
+    const origST = (globalThis as any).setTimeout;
+    let captured: Function | null = null;
+    const captureST = (fn: Function) => { captured = fn; return 0; };
+
+    (globalThis as any).prompt = (_m: string, _d: string) => "General";
+    captured = null;
+    (globalThis as any).setTimeout = captureST;
     editor.ctrlkeyFunction(editor, "[ctrl-s]");
-    (window as any).prompt = (_m: string, _d: string) => "cmd:recalc";
+    (globalThis as any).setTimeout = origST;
+    if (captured) { try { (captured as Function)(); } catch {} }
+
+    (globalThis as any).prompt = (_m: string, _d: string) => "cmd:recalc";
+    captured = null;
+    (globalThis as any).setTimeout = captureST;
     editor.ctrlkeyFunction(editor, "[ctrl-s]");
-    (window as any).prompt = (_m: string, _d: string) => "edit:foo";
+    (globalThis as any).setTimeout = origST;
+    if (captured) { try { (captured as Function)(); } catch {} }
+
+    (globalThis as any).prompt = (_m: string, _d: string) => "edit:foo";
+    captured = null;
+    (globalThis as any).setTimeout = captureST;
     editor.ctrlkeyFunction(editor, "[ctrl-s]");
-    (window as any).prompt = (_m: string, _d: string) => null;
+    (globalThis as any).setTimeout = origST;
+    if (captured) { try { (captured as Function)(); } catch {} }
+
+    (globalThis as any).prompt = (_m: string, _d: string) => null;
+    captured = null;
+    (globalThis as any).setTimeout = captureST;
     editor.ctrlkeyFunction(editor, "[ctrl-s]");
-    (window as any).prompt = savedPrompt;
+    (globalThis as any).setTimeout = origST;
+    if (captured) { try { (captured as Function)(); } catch {} }
+
+    (globalThis as any).prompt = savedPrompt;
     SC.Constants.AllowCtrlS = false;
     const rc2 = editor.ctrlkeyFunction(editor, "[ctrl-s]");
     expect(rc2 === true || rc2 === false).toBe(true);
@@ -1809,7 +1837,7 @@ test("Ctrl-A/C/V/X/Z/S flows via ctrlkeyFunction", async () => {
     const rc3 = editor.ctrlkeyFunction(editor, "[ctrl-q]");
     expect(rc3).toBe(true);
 
-    // Clean up any timeouts left by Ctrl-C/Ctrl-V/Ctrl-S.
+    // Clean up any timeouts left by Ctrl-C/Ctrl-V.
     await new Promise((r) => setTimeout(r, 300));
 });
 
