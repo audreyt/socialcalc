@@ -4513,7 +4513,7 @@ SocialCalc.Formula.CeilingFloorFunctions = function(fname, operand, foperand, sh
 
    if (foperand.length == 1) {
       sig = scf.OperandValueAndType(sheet, foperand);
-      t = val.type.charAt(0);
+      t = sig.type.charAt(0);
       if (t != "n") {
          PushOperand("e#VALUE!", 0);
          return;

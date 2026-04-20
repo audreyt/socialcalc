@@ -39,14 +39,6 @@
     }
 }());
 
-// Compatibility with webworker-threads
-if (typeof self !== 'undefined' && self.thread) {
-    window.setTimeout = function (cb, ms) {
-        if (ms <= 1) { self.thread.nextTick(cb); }
-    };
-    window.clearTimeout = function () {};
-}
-
     // Just return a value to define the module export.
     return SocialCalc;
 }));

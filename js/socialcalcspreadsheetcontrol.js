@@ -86,16 +86,9 @@ See the comments in the main SocialCalc code module file of the SocialCalc packa
 
 */
 
-   /** @type {any} */
-   // @ts-ignore - SocialCalc is declared ambiently; runtime re-declaration is intentional.
-   var SocialCalc;
-   if (!SocialCalc) {
-      alert("Main SocialCalc code module needed");
-      SocialCalc = {};
-      }
-   if (!SocialCalc.TableEditor) {
-      alert("SocialCalc TableEditor code module needed");
-      }
+   // Module-load guards removed — in the concatenated UMD bundle, SocialCalc
+   // and SocialCalc.TableEditor are always defined by the time this file
+   // runs.
 
 
 // *************************************
@@ -1279,55 +1272,10 @@ SocialCalc.CalculateSheetNonViewHeight = function(spreadsheet) {
 // would look for SocialCalc.Constants.s_loc_a_X_b.
 //
 
-/** @param {string} str */
-SocialCalc.LocalizeString = function(str) {
-   var cstr = SocialCalc.LocalizeStringList[str]; // found already this session?
-   if (!cstr) { // no - look up
-      cstr = SocialCalc.Constants["s_loc_"+str.toLowerCase().replace(/\s/g, "_").replace(/\W/g, "X")] || str;
-      SocialCalc.LocalizeStringList[str] = cstr;
-      }
-   return cstr;
-   }
-
-
-
-SocialCalc.LocalizeStringList = {}; // a list of strings to localize accumulated by the routine
-
-//
-// outstr = SocialCalc.LocalizeSubstrings(str)
-//
-// SocialCalc function to make localization easier using %loc and %scc.
-//
-// Replaces sections of str with:
-//    %loc!Text to localize!
-// with SocialCalc.Constants.s_loc_text_to_localize if
-// it exists, or else with just "Text to localize".
-// Note that spaces are replaced with "_" and other special
-// chars with "X" in the name of the constant (e.g., %loc!A & B!
-// would look for SocialCalc.Constants.s_loc_a_X_b.
-// Uses SocialCalc.LocalizeString for this.
-//
-// Replaces sections of str with:
-//    %ssc!constant-name!
-// with SocialCalc.Constants.constant-name.
-// If the constant doesn't exist, throws and alert.
-//
-
-/** @param {string} str */
-SocialCalc.LocalizeSubstrings = function(str) {
-
-   var SCLoc = SocialCalc.LocalizeString;
-
-   return str.replace(/%(loc|ssc)!(.*?)!/g, function(a, t, c) {
-      if (t=="ssc") {
-         return SocialCalc.Constants[c] || alert("Missing constant: "+c);
-         }
-      else {
-         return SCLoc(c);
-         }
-      });
-
-   }
+// SocialCalc.LocalizeString / LocalizeSubstrings were duplicated here and in
+// socialcalcviewer.js. Viewer is concatenated after this file in the UMD
+// bundle, so viewer's versions always won at runtime — the control-local
+// copies were permanently dead code. The viewer copies remain authoritative.
 
 //
 // obj = GetSpreadsheetControlObject()

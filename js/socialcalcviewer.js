@@ -85,16 +85,9 @@ See the comments in the main SocialCalc code module file of the SocialCalc packa
 
 */
 
-   /** @type {any} */
-   // @ts-ignore - SocialCalc is declared ambiently; runtime re-declaration is intentional.
-   var SocialCalc;
-   if (!SocialCalc) {
-      alert("Main SocialCalc code module needed");
-      SocialCalc = {};
-      }
-   if (!SocialCalc.TableEditor) {
-      alert("SocialCalc TableEditor code module needed");
-      }
+   // Module-load guards removed — in the concatenated UMD bundle, SocialCalc
+   // and SocialCalc.TableEditor are always defined by the time this file
+   // runs (socialcalc-3.js and socialcalctableeditor.js precede it).
 
 // *************************************
 //

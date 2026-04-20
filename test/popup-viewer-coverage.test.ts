@@ -1007,12 +1007,12 @@ test("Viewer: LoadSave with only sheet part and recalc=off", async () => {
     viewer2.noRecalc = false;
     viewer2.editor.context.sheetobj.attribs.recalc = "";
     const origSched = viewer2.editor.EditorScheduleSheetCommands;
-    let scheduled: string | null = null;
+    let scheduled = null as string | null;
     viewer2.editor.EditorScheduleSheetCommands = function (cmd: string) {
         scheduled = cmd;
     };
     viewer2.LoadSave(parts);
-    expect(scheduled).toBe("recalc");
+    expect(scheduled as string | null).toBe("recalc");
     viewer2.editor.EditorScheduleSheetCommands = origSched;
 });
 

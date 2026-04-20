@@ -960,16 +960,16 @@ test("Popup.EnsurePosition exercises layout priorities", async () => {
         m: { top: number; left: number; w: number; h: number },
         p: { w: number; h: number },
     ) => {
-        container.offsetTop = c.top;
-        container.offsetLeft = c.left;
-        container.offsetWidth = c.w;
-        container.offsetHeight = c.h;
-        main.offsetTop = m.top;
-        main.offsetLeft = m.left;
-        main.offsetWidth = m.w;
-        main.offsetHeight = m.h;
-        popup.offsetWidth = p.w;
-        popup.offsetHeight = p.h;
+        (container as any).offsetTop = c.top;
+        (container as any).offsetLeft = c.left;
+        (container as any).offsetWidth = c.w;
+        (container as any).offsetHeight = c.h;
+        (main as any).offsetTop = m.top;
+        (main as any).offsetLeft = m.left;
+        (main as any).offsetWidth = m.w;
+        (main as any).offsetHeight = m.h;
+        (popup as any).offsetWidth = p.w;
+        (popup as any).offsetHeight = p.h;
     };
 
     // case 2: room on top and right
