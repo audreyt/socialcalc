@@ -795,6 +795,13 @@ test("EditorSaveEdit: text/formula/constant/text-prefix/empty paths", async () =
     editor.context.sheetobj.ioParameterList = {
         G1: { function_name: "EMAILONEDIT" },
     };
+    // Also: call EditorSaveEdit on G1 with ioEventTree already set so the
+    // trailing `if (typeof ioEventTree[ecoord] !== 'undefined')` branch
+    // fires from EditorSaveEdit directly.
+    editor.workingvalues.ecoord = "G1";
+    try {
+        editor.EditorSaveEdit("triggered");
+    } catch {}
     try {
         SC.EditedTriggerCell({ G1: true }, "G1", editor, editor.context.sheetobj);
     } catch {}

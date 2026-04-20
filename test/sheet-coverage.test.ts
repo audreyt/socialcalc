@@ -875,6 +875,72 @@ test("RenderCell handles error cells, error valuetype, custom value formats", as
     expect(typeof pseudo.style).toBe("object");
 });
 
+test("FormatValueForDisplay widget path renders cell HTML with parameters/html/css substitution", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    // A numeric-widget cell with formula, valuetype "niBUTTON" (ni + widget name).
+    const cell = sheet.GetAssuredCell("A1");
+    cell.valuetype = "niBUTTON";
+    cell.datatype = "f";
+    cell.formula = 'BUTTON("X","Y")';
+    cell.datavalue = 0;
+
+    // Another cell supplies a coord-lookup value for one of the parameters.
+    const refCell = sheet.GetAssuredCell("B1");
+    refCell.valuetype = "t";
+    refCell.datatype = "t";
+    refCell.datavalue = "hello";
+
+    // Parameter list: one coord-typed param referring to B1, one literal
+    // value param. Additional html[0] and css strings exercise those
+    // replacement blocks too.
+    const params: any = [
+        { type: "coord", value: "B1" },
+        { type: "value", value: "literal-value" },
+    ];
+    params.html = ["<em>h0</em>"];
+    params.css = "margin: 4px;";
+    sheet.ioParameterList = { A1: params };
+
+    // Install a FunctionList template with %= placeholders the renderer
+    // replaces. [5] is the HTML cell template.
+    const prevFL = SC.Formula.FunctionList["BUTTON"];
+    const fakeTemplate =
+        "<button data-coord='<%=cell_reference%>' data-d='<%=display_value%>' data-f='<%=formated_value%>' data-chk='<%=checked%>' data-p0='<%=parameter0_value%>' data-p1='<%=parameter1_value%>' data-h='<%=html0_value%>'>ok</button>";
+    SC.Formula.FunctionList["BUTTON"] = [
+        prevFL ? prevFL[0] : function () {},
+        prevFL ? prevFL[1] : -1,
+        prevFL ? prevFL[2] : "",
+        prevFL ? prevFL[3] : "",
+        prevFL ? prevFL[4] : "",
+        fakeTemplate,
+    ];
+    try {
+        const out = String(SC.FormatValueForDisplay(sheet, 0, "A1", ""));
+        expect(out).toContain("data-coord='A1'");
+        expect(out).toContain("data-p0='hello'");
+        expect(out).toContain("data-p1='literal-value'");
+        expect(out).toContain("data-h='<em>h0</em>'");
+        expect(out).toContain("style='margin: 4px;'");
+    } finally {
+        SC.Formula.FunctionList["BUTTON"] = prevFL;
+    }
+});
+
+test("FormatValueForDisplay widget path with missing template returns error marker", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    const cell = sheet.GetAssuredCell("C1");
+    cell.valuetype = "niNOSUCH";
+    cell.datatype = "f";
+    cell.formula = 'NOSUCH("x")';
+    cell.datavalue = 0;
+    sheet.ioParameterList = { C1: [] };
+    expect(String(SC.FormatValueForDisplay(sheet, 0, "C1", ""))).toContain(
+        "error:Widget HTML missing",
+    );
+});
+
 test("FormatValueForDisplay formula/forcetext valueformats show raw formula source", async () => {
     const SC = await loadSocialCalc();
     const sheet = new SC.Sheet();
@@ -1711,6 +1777,103 @@ test("Recalc with maxtimeslice=0 trips order/step slicing in RecalcTimerRoutine"
         expect(sheet.cells.A20.datavalue).toBe(20);
     } finally {
         SC.RecalcInfo.maxtimeslice = prev;
+    }
+});
+
+test("RecalcTimerRoutine start_wait transitions to done_wait, with and without LoadSheet", async () => {
+    const SC = await loadSocialCalc();
+    const scri = SC.RecalcInfo;
+    const prevState = scri.currentState;
+    const prevSheet = scri.sheet;
+    const prevLoad = scri.LoadSheet;
+    const prevWait = SC.Formula.SheetCache.waitingForLoading;
+    try {
+        // Arrange minimal recalc state so RecalcTimerRoutine finds a sheet.
+        const sheet = new SC.Sheet();
+        scri.sheet = sheet;
+        SC.Formula.SheetCache.waitingForLoading = "other";
+
+        // (a) LoadSheet returning truthy: start_wait returns before calling
+        // RecalcLoadedSheet (covers the `return;` branch).
+        scri.currentState = scri.state.start_wait;
+        scri.LoadSheet = () => true;
+        SC.RecalcTimerRoutine();
+        expect(scri.currentState).toBe(scri.state.done_wait);
+
+        // (b) LoadSheet absent: falls through to RecalcLoadedSheet(null,"",false).
+        scri.currentState = scri.state.start_wait;
+        scri.LoadSheet = null;
+        SC.Formula.SheetCache.waitingForLoading = "other2";
+        expect(() => SC.RecalcTimerRoutine()).not.toThrow();
+
+        // (c) done_wait branch: transitions to calc state.
+        scri.sheet = sheet;
+        scri.currentState = scri.state.done_wait;
+        SC.RecalcTimerRoutine();
+        expect(scri.currentState).toBe(scri.state.calc);
+    } finally {
+        scri.currentState = prevState;
+        scri.sheet = prevSheet;
+        scri.LoadSheet = prevLoad;
+        SC.Formula.SheetCache.waitingForLoading = prevWait;
+        scri.queue = [];
+    }
+});
+
+test("RecalcTimerRoutine chains previousrecalcsheet and surfaces waitingForServer", async () => {
+    const SC = await loadSocialCalc();
+    const scri = SC.RecalcInfo;
+    const prevState = scri.currentState;
+    const prevSheet = scri.sheet;
+    const prevRemote = SC.Formula.RemoteFunctionInfo.waitingForServer;
+    try {
+        // (d) Chain-back: when a recalc finishes and sheet.previousrecalcsheet
+        // is set, scri.sheet is reassigned and currentState → calc.
+        const innerSheet = new SC.Sheet();
+        const outerSheet = new SC.Sheet();
+        // Build up an inner sheet that is mid-recalc, chain into outer.
+        innerSheet.recalcdata = {
+            nextcalc: null,
+            calclist: {},
+            celllist: {},
+            calclistlength: 0,
+            count: 0,
+            inrecalc: true,
+        };
+        innerSheet.previousrecalcsheet = outerSheet;
+        innerSheet.attribs.needsrecalc = true;
+        scri.sheet = innerSheet;
+        scri.currentState = scri.state.calc;
+        // Drain — the empty calclist exits the while-loop immediately and then
+        // triggers the chain-back branch.
+        SC.RecalcTimerRoutine();
+        expect(scri.sheet).toBe(outerSheet);
+        expect(scri.currentState).toBe(scri.state.calc);
+
+        // (e) waitingForServer during calc: evaluate_parsed_formula runs, the
+        // inner loop notices RemoteFunctionInfo.waitingForServer is set, and
+        // bails out via the calcserverfunc status callback.
+        const srvSheet = new SC.Sheet();
+        await scheduleCommands(SC, srvSheet, ["set A1 value n 1", "set A2 formula A1+1"]);
+        const SpyCallbacks: string[] = [];
+        srvSheet.statuscallback = (_i: unknown, status: string) => {
+            if (status === "calccheckdone") {
+                // Inject the wait right before the calc loop starts.
+                SC.Formula.RemoteFunctionInfo.waitingForServer = "mock";
+            }
+            SpyCallbacks.push(status);
+        };
+        SC.RecalcSheet(srvSheet);
+        // Let the one-shot timer fire — multiple slices may occur.
+        for (let i = 0; i < 6 && !SpyCallbacks.includes("calcserverfunc"); i++) {
+            await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        expect(SpyCallbacks).toContain("calcserverfunc");
+    } finally {
+        SC.Formula.RemoteFunctionInfo.waitingForServer = prevRemote;
+        scri.currentState = prevState;
+        scri.sheet = prevSheet;
+        scri.queue = [];
     }
 });
 

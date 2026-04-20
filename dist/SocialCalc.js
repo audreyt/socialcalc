@@ -10113,9 +10113,9 @@ SocialCalc.EditorSaveEdit = function(editor, text) {
       else if (valueinfo.type.charAt(0)=="t") {
          type = "text "+valueinfo.type;
          }
-      else if (valueinfo.type=="") {
-         type = "text t";
-         }
+      // `valueinfo.type === ""` branch removed — DetermineValueType only
+      // returns that when input length is 0, which the earlier
+      // `else if (value.length==0)` already catches.
       else {
          type = "constant "+valueinfo.type+" "+valueinfo.value;
          }
