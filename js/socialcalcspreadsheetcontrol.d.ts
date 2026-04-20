@@ -1,3 +1,5 @@
+declare var $: any;
+
 declare namespace SocialCalc {
 
    var CurrentSpreadsheetControlObject: SpreadsheetControl | null;
@@ -38,9 +40,17 @@ declare namespace SocialCalc {
       editor: any;
 
       editorDiv: HTMLElement | null;
+      statuslineDiv: HTMLElement | null;
+      formulabarDiv: HTMLElement | null;
+      nonviewheight: number;
 
       sortrange: string;
       moverange: string;
+
+      formDataViewer: any;
+      editorprefix?: string;
+      tabbarDiv?: HTMLElement | null;
+      toolbarDiv?: HTMLElement | null;
 
       idPrefix: string;
       multipartBoundary: string;
