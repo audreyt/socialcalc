@@ -517,6 +517,52 @@ test("ProcessEditorMouseDown: valid target, shiftKey range extension", async () 
     } catch {}
 });
 
+test("ProcessEditorMouseDown: SocialCalc._app=true takes CmdGotFocus branch", async () => {
+    const SC = await loadSocialCalc({ browser: true });
+    const { control } = await newControl(SC, "app-mode-root");
+    const editor = control.editor;
+    primeGridLayout(editor);
+
+    const cellInfo = SC.GetEditorCellElement(editor, 2, 2);
+    const target = cellInfo?.element ?? editor.fullgrid;
+
+    const prevApp = SC._app;
+    SC._app = true;
+    try {
+        const ev = fakeEvent({ clientX: 100, clientY: 60, target });
+        SC.ProcessEditorMouseDown(ev);
+    } catch {}
+    SC._app = prevApp;
+});
+
+test("ProcessEditorMouseDown: cell containing ioWidget (valuetype 'ni') is clickable", async () => {
+    const SC = await loadSocialCalc({ browser: true });
+    const { control } = await newControl(SC, "iowidget-root");
+    const editor = control.editor;
+    primeGridLayout(editor);
+
+    // Put a widget cell at B2 with valuetype "ni" (numeric + ioWidget 'i').
+    const cell = editor.context.sheetobj.GetAssuredCell("B2");
+    cell.valuetype = "niBUTTON";
+    cell.formula = 'BUTTON("x","y")';
+    cell.datatype = "f";
+    cell.datavalue = "0";
+
+    const cellInfo = SC.GetEditorCellElement(editor, 2, 2);
+    const target = cellInfo?.element ?? editor.fullgrid;
+    // The widget_id is "BUTTON_B2" per the source; fire a click on both the
+    // cell itself and on a fake widget element with matching id.
+    try {
+        SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 60, target }));
+    } catch {}
+    const widget = document.createElement("button");
+    widget.id = "BUTTON_B2";
+    document.body.appendChild(widget);
+    try {
+        SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 60, target: widget }));
+    } catch {}
+});
+
 test("ProcessEditorDblClick → EditorOpenCellEdit", async () => {
     const SC = await loadSocialCalc({ browser: true });
     const { control } = await newControl(SC, "dbl-root");

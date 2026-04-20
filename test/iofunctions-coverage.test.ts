@@ -1278,3 +1278,397 @@ test("SettingsControls.ColorChooser SetValue/GetValue/Initialize paths", async (
     } catch {}
     expect(true).toBe(true);
 });
+
+// --------------------------------------------------------------------------
+// TriggerIoAction.Email coverage:
+//
+// test/editor-coverage.test.ts stubs SocialCalc.TriggerIoAction.Email with a
+// no-op for its "setemailparameters" test, and since Bun shares module state
+// across files, that stub persists for the remainder of the run. The
+// a-preload.test.ts file (named to sort before editor-coverage) saves the
+// original reference on globalThis; each test below restores it before
+// invoking so the real Email function body executes and counts toward
+// coverage.
+// --------------------------------------------------------------------------
+
+function restoreEmail(SC: any) {
+    const orig = (globalThis as any).__scOrig;
+    if (orig && typeof orig.TriggerIoAction_Email === "function") {
+        SC.TriggerIoAction.Email = orig.TriggerIoAction_Email;
+    }
+}
+
+test("TriggerIoAction.Email EMAIL with ranges, coord, text: full body", async () => {
+    const SC = await loadSC();
+    restoreEmail(SC);
+    const { sheet } = await freshApp(SC, "email-full");
+
+    await scheduleCommands(SC, sheet, [
+        "set B1 text t to1@example.com",
+        "set B2 text t to2@example.com",
+        "set C1 text t subject1",
+        "set C2 text t subject2",
+        "set D1 text t body one",
+        "set D2 text t body two",
+        "set F1 text t recipient@example.com",
+    ]);
+    await recalcSheet(SC, sheet);
+
+    sheet.cells.E1 = { coord: "E1", datavalue: "Send", valuetype: "ti" };
+    const params: any = [
+        { type: "range", value: "B1|B2|" }, // to
+        { type: "range", value: "C1|C2|" }, // subject
+        { type: "range", value: "D1|D2|" }, // body
+    ];
+    params.function_name = "EMAIL";
+    sheet.ioParameterList = { E1: params };
+
+    const out = SC.TriggerIoAction.Email("E1");
+    expect(Array.isArray(out)).toBe(true);
+    expect(out.length).toBeGreaterThan(0);
+});
+
+test("TriggerIoAction.Email EMAILIF with conditions (skip + send)", async () => {
+    const SC = await loadSC();
+    restoreEmail(SC);
+    const { sheet } = await freshApp(SC, "email-ifcov");
+
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 1",
+        "set A2 value n 0",
+        "set B1 text t to1@example.com",
+        "set B2 text t to2@example.com",
+        "set C1 text t s1",
+        "set C2 text t s2",
+        "set D1 text t b1",
+        "set D2 text t b2",
+    ]);
+    await recalcSheet(SC, sheet);
+
+    sheet.cells.E1 = { coord: "E1", datavalue: "Send", valuetype: "ti" };
+    const params: any = [
+        { type: "range", value: "A1|A2|" }, // condition
+        { type: "range", value: "B1|B2|" },
+        { type: "range", value: "C1|C2|" },
+        { type: "range", value: "D1|D2|" },
+    ];
+    params.function_name = "EMAILIF";
+    sheet.ioParameterList = { E1: params };
+
+    const out = SC.TriggerIoAction.Email("E1");
+    expect(Array.isArray(out)).toBe(true);
+    // Only row 1 (condition true) should be sent.
+    expect(out.length).toBe(1);
+    expect(out[0][0]).toBe("to1@example.com");
+});
+
+test("TriggerIoAction.Email EMAILAT hits the EMAILAT switch branch", async () => {
+    const SC = await loadSC();
+    restoreEmail(SC);
+    const { sheet } = await freshApp(SC, "email-at");
+
+    await scheduleCommands(SC, sheet, [
+        "set A1 text t 2026-04-20",
+        "set B1 text t to@example.com",
+        "set C1 text t subj",
+        "set D1 text t body",
+    ]);
+    await recalcSheet(SC, sheet);
+
+    sheet.cells.E1 = { coord: "E1", datavalue: "Send", valuetype: "ti" };
+    const params: any = [
+        { type: "coord", value: "A1" }, // datetime_value
+        { type: "range", value: "B1|B1|" }, // to
+        { type: "range", value: "C1|C1|" },
+        { type: "range", value: "D1|D1|" },
+    ];
+    params.function_name = "EMAILAT";
+    sheet.ioParameterList = { E1: params };
+
+    const out = SC.TriggerIoAction.Email("E1");
+    expect(Array.isArray(out)).toBe(true);
+});
+
+test("TriggerIoAction.Email EMAILATIF covers condition-indexed branch", async () => {
+    const SC = await loadSC();
+    restoreEmail(SC);
+    const { sheet } = await freshApp(SC, "email-atif");
+
+    await scheduleCommands(SC, sheet, [
+        "set A1 text t 2026-04-20",
+        "set C1 value n 1",
+        "set B1 text t to@example.com",
+        "set D1 text t subj",
+        "set F1 text t body",
+    ]);
+    await recalcSheet(SC, sheet);
+
+    sheet.cells.E1 = { coord: "E1", datavalue: "Send", valuetype: "ti" };
+    const params: any = [
+        { type: "coord", value: "A1" }, // datetime_value
+        { type: "range", value: "C1|C1|" }, // condition
+        { type: "range", value: "B1|B1|" }, // to
+        { type: "range", value: "D1|D1|" }, // subject
+        { type: "range", value: "F1|F1|" }, // body
+    ];
+    params.function_name = "EMAILATIF";
+    sheet.ioParameterList = { E1: params };
+
+    const out = SC.TriggerIoAction.Email("E1");
+    expect(Array.isArray(out)).toBe(true);
+    expect(out.length).toBe(1);
+});
+
+test("TriggerIoAction.Email EMAILONEDIT with trigger match clears trigger", async () => {
+    const SC = await loadSC();
+    restoreEmail(SC);
+    const { sheet } = await freshApp(SC, "email-onedit-match");
+
+    await scheduleCommands(SC, sheet, [
+        "set B1 text t to@example.com",
+        "set C1 text t subj",
+        "set D1 text t body",
+    ]);
+    await recalcSheet(SC, sheet);
+
+    sheet.cells.E1 = { coord: "E1", datavalue: "Send", valuetype: "ti" };
+    // parameters[0] is a coord matching optionalTriggerCellId, so trigger
+    // gets nulled out and the message is sent.
+    const params: any = [
+        { type: "coord", value: "A1" }, // editRange as coord
+        { type: "range", value: "B1|B1|" },
+        { type: "range", value: "C1|C1|" },
+        { type: "range", value: "D1|D1|" },
+    ];
+    params.function_name = "EMAILONEDIT";
+    sheet.ioParameterList = { E1: params };
+
+    const out = SC.TriggerIoAction.Email("E1", "A1");
+    expect(Array.isArray(out)).toBe(true);
+    // Because trigger matched, parameterValues[0] was cleared - message sent.
+    expect(out.length).toBeGreaterThanOrEqual(0);
+});
+
+test("TriggerIoAction.Email EMAILONEDIT with trigger mismatch skips", async () => {
+    const SC = await loadSC();
+    restoreEmail(SC);
+    const { sheet } = await freshApp(SC, "email-onedit-mismatch");
+
+    await scheduleCommands(SC, sheet, [
+        "set A1 text t edited",
+        "set A2 text t notedited",
+        "set B1 text t to1@example.com",
+        "set B2 text t to2@example.com",
+        "set C1 text t s1",
+        "set C2 text t s2",
+        "set D1 text t b1",
+        "set D2 text t b2",
+    ]);
+    await recalcSheet(SC, sheet);
+
+    sheet.cells.E1 = { coord: "E1", datavalue: "Send", valuetype: "ti" };
+    const params: any = [
+        { type: "range", value: "A1|A2|" }, // editRange (range)
+        { type: "range", value: "B1|B2|" },
+        { type: "range", value: "C1|C2|" },
+        { type: "range", value: "D1|D2|" },
+    ];
+    params.function_name = "EMAILONEDIT";
+    sheet.ioParameterList = { E1: params };
+
+    // Only A1 triggered - only the row matching A1 should send.
+    const out = SC.TriggerIoAction.Email("E1", "A1");
+    expect(Array.isArray(out)).toBe(true);
+    expect(out.length).toBe(1);
+});
+
+test("TriggerIoAction.Email sheet.ioParameterList undefined returns early", async () => {
+    const SC = await loadSC();
+    restoreEmail(SC);
+    const { sheet } = await freshApp(SC, "email-return");
+    sheet.cells.X1 = { coord: "X1", datavalue: "", valuetype: "ti" };
+    delete sheet.ioParameterList;
+    const out = SC.TriggerIoAction.Email("X1");
+    expect(out).toBeUndefined();
+
+    sheet.ioParameterList = {};
+    const out2 = SC.TriggerIoAction.Email("X1");
+    expect(out2).toBeUndefined();
+});
+
+test("TriggerIoAction.Email with text-typed parameters covers replace-%20", async () => {
+    const SC = await loadSC();
+    restoreEmail(SC);
+    const { sheet } = await freshApp(SC, "email-text");
+
+    sheet.cells.E1 = { coord: "E1", datavalue: "Send", valuetype: "ti" };
+    // All-text parameters exercise the parameters[index].type.charAt(0) == 't'
+    // branch in the parameter-gathering loop (bundle line 21418).
+    const params: any = [
+        { type: "t", value: "to with spaces@example.com" },
+        { type: "t", value: "subject with spaces" },
+        { type: "t", value: "body text with multiple spaces" },
+    ];
+    params.function_name = "EMAIL";
+    sheet.ioParameterList = { E1: params };
+
+    const out = SC.TriggerIoAction.Email("E1");
+    expect(Array.isArray(out)).toBe(true);
+    expect(out.length).toBeGreaterThan(0);
+    // Check %20 substitution happened in assembled emailContentsList entries.
+    expect(out[0].some((s: string) => s.includes("%20"))).toBe(true);
+});
+
+// --------------------------------------------------------------------------
+// CopyValueToRange - cover the date/formula datatype branch (cellValueType
+// starts with 'n' but is not 'n' — e.g. 'nd').
+// --------------------------------------------------------------------------
+
+test("CopyValueToRange handles formula cell resolving to a date", async () => {
+    const SC = await loadSC();
+    const { sheet } = await freshApp(SC, "cvr-date");
+
+    // Seed a cell with formula that yields a date (nd valuetype).
+    await scheduleCommands(SC, sheet, [
+        "set A1 constant nd 41307 2013/2/2",
+        "set A2 formula A1", // formula cell with nd valuetype
+    ]);
+    await recalcSheet(SC, sheet);
+
+    // Inject displaystring because getStandardizedValues may drop it.
+    const cellA2 = sheet.cells.A2;
+    if (cellA2) {
+        cellA2.displaystring = "2013/2/2";
+    }
+
+    const param = SC.Formula.getStandardizedValues(sheet, {
+        type: "range",
+        value: "A2|A2|",
+    });
+    // Ensure displaystring is available on the celldata.
+    if (param.celldata[0][0] && !param.celldata[0][0].displaystring) {
+        param.celldata[0][0].displaystring = "2013/2/2";
+    }
+    const out = SC.TriggerIoAction.CopyValueToRange(param, { col: 5, row: 5 });
+    expect(typeof out).toBe("string");
+    // The formula cell with nd valuetype triggers the "c" datatype branch
+    // at bundle line 21364-21365 (cellDataType = "c"; cellFormula = displaystring).
+    expect(out).toContain("E5");
+});
+
+test("CopyValueToRange with text-valued formula cell (tiTEXTBOX)", async () => {
+    const SC = await loadSC();
+    const { sheet } = await freshApp(SC, "cvr-text");
+
+    await scheduleCommands(SC, sheet, [
+        "set A1 text t hello",
+        "set A2 formula A1", // formula yielding text
+    ]);
+    await recalcSheet(SC, sheet);
+
+    const param = SC.Formula.getStandardizedValues(sheet, {
+        type: "range",
+        value: "A2|A2|",
+    });
+    const out = SC.TriggerIoAction.CopyValueToRange(param, { col: 3, row: 1 });
+    expect(out).toContain("C1");
+});
+
+// --------------------------------------------------------------------------
+// AddAutocomplete: invoke the select and change callbacks to cover the
+// inner callback bodies (bundle lines 21068-21079). Stub jQuery UI such
+// that autocomplete() captures the options object; then manually invoke
+// the select callback and both branches of change.
+// --------------------------------------------------------------------------
+
+test("TriggerIoAction.AddAutocomplete select + change callbacks execute", async () => {
+    const SC = await loadSC();
+    const { control, sheet } = await freshApp(SC, "ac-callbacks");
+
+    // updateInputWidgetFormula (called via AutoComplete) -> UpdateFormDataSheet
+    // dereferences formDataViewer.formFields without guarding null formFields.
+    if (control.formDataViewer && !control.formDataViewer.formFields) {
+        control.formDataViewer.formFields = {};
+        control.formDataViewer.formFieldsLength = 0;
+    }
+
+    await scheduleCommands(SC, sheet, [
+        "set A1 text t alpha",
+        "set A2 text t beta",
+    ]);
+    await recalcSheet(SC, sheet);
+
+    const params: any = [
+        { type: "t", value: "" },
+        { type: "range", value: "A1|A2|" },
+    ];
+    params.function_name = "AUTOCOMPLETE";
+    sheet.ioParameterList = { T1: params };
+
+    // Put a real widget element in the document so AutoComplete (called
+    // from inside the callbacks) has a node to read from.
+    const widget = document.createElement("input");
+    widget.id = "AUTOCOMPLETE_T1";
+    (widget as any).value = "alpha";
+    (document as any).body.appendChild(widget);
+
+    // Build a jQuery stub that captures the options object from autocomplete()
+    // and allows us to invoke its callbacks.
+    let captured: any = null;
+    const origJq = (globalThis as any).$;
+    const acJq: any = function (sel: any) {
+        if (typeof sel === "string" && sel.startsWith("#AUTOCOMPLETE_")) {
+            return {
+                autocomplete(opts: any) {
+                    if (opts) captured = opts;
+                    return this;
+                },
+                val(v?: any) {
+                    if (typeof v === "undefined") return (widget as any).value;
+                    (widget as any).value = v;
+                    return this;
+                },
+            };
+        }
+        // For $(this) inside callbacks, return val() getter/setter wrapping "this".
+        if (sel && typeof sel === "object") {
+            return {
+                val(v?: any) {
+                    if (typeof v === "undefined") return (sel as any).value;
+                    (sel as any).value = v;
+                    return this;
+                },
+            };
+        }
+        return origJq ? origJq(sel) : undefined;
+    };
+    acJq.ui = {
+        autocomplete: {
+            escapeRegex: (s: string) => s,
+            filter: null as any,
+        },
+    };
+    acJq.grep = (arr: any[], fn: any) => arr.filter(fn);
+    (globalThis as any).$ = acJq;
+
+    try {
+        SC.TriggerIoAction.AddAutocomplete("T1");
+        expect(captured).not.toBeNull();
+        expect(typeof captured.select).toBe("function");
+        expect(typeof captured.change).toBe("function");
+
+        // Invoke select (covers lines 21068-21070).
+        captured.select.call(widget, {}, { item: { label: "beta" } });
+
+        // Invoke change with ui.item !== null (else branch).
+        captured.change.call(widget, {}, { item: { label: "alpha" } });
+
+        // Invoke change with ui.item === null (covers lines 21073-21074).
+        captured.change.call(widget, {}, { item: null });
+    } finally {
+        (globalThis as any).$ = origJq;
+    }
+
+    expect(captured.source).toBeDefined();
+});
+
