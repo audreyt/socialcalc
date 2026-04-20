@@ -1,4 +1,5 @@
-//
+// @ts-check
+// Opts this module into strict TypeScript checking; sibling .d.ts provides types.
 //
 /*
 // SocialCalc Spreadsheet Formula Library
@@ -31,6 +32,7 @@
 //
 */
 
+   // @ts-ignore - SocialCalc is declared ambiently as a namespace; runtime re-declaration is intentional.
    var SocialCalc;
    if (!SocialCalc) SocialCalc = {}; // May be used with other SocialCalc libraries or standalone
                                      // In any case, requires SocialCalc.Constants.
@@ -149,9 +151,10 @@ SocialCalc.TriggerIoAction = {}; // eddy
 
 ************************* */
 
+/** @param {string} line */
 SocialCalc.Formula.ParseFormulaIntoTokens = function(line) {
 
-   var i, ch, cclass, haddecimal, last_token, last_token_type, last_token_text, t;
+   var i, ch, cclass, last_token, last_token_type, last_token_text, t;
 
    var scf = SocialCalc.Formula;
    var scc = SocialCalc.Constants;
@@ -163,6 +166,7 @@ SocialCalc.Formula.ParseFormulaIntoTokens = function(line) {
    var pushtoken = scf.ParsePushToken;
    var coordregex = /^\$?[A-Z]{1,2}\$?[1-9]\d*$/i;
 
+   /** @type {any[]} */
    var parseinfo = [];
    var str = "";
    var state = 0;
@@ -430,6 +434,12 @@ SocialCalc.Formula.ParseFormulaIntoTokens = function(line) {
 
    }
 
+/**
+ * @param {any[]} parseinfo
+ * @param {string} ttext
+ * @param {any} ttype
+ * @param {any} topcode
+ */
 SocialCalc.Formula.ParsePushToken = function(parseinfo, ttext, ttype, topcode) {
 
    parseinfo.push({text: ttext, type: ttype, opcode: topcode});
@@ -447,6 +457,11 @@ SocialCalc.Formula.ParsePushToken = function(parseinfo, ttext, ttype, topcode) {
 
 ************************* */
 
+/**
+ * @param {any[]} parseinfo
+ * @param {any} sheet
+ * @param {boolean | number} [allowrangereturn]
+ */
 SocialCalc.Formula.evaluate_parsed_formula = function(parseinfo, sheet, allowrangereturn) {
 
    var result;
@@ -479,6 +494,7 @@ SocialCalc.Formula.evaluate_parsed_formula = function(parseinfo, sheet, allowran
 // and then enhanced for additional spreadsheet things
 //
 
+/** @param {any[]} parseinfo */
 SocialCalc.Formula.ConvertInfixToPolish = function(parseinfo) {
 
    var scf = SocialCalc.Formula;
@@ -586,7 +602,8 @@ SocialCalc.Formula.ConvertInfixToPolish = function(parseinfo) {
 // display logged objects in the audit tab of the spreadsheet control
 if(typeof SocialCalc.debug_log === 'undefined') SocialCalc.debug_log = [];
 
-SocialCalc.DebugLog = function(logObject) {	
+/** @param {any} logObject */
+SocialCalc.DebugLog = function(logObject) {
 //	SocialCalc.debug_log.push(logObject);
 }
 
@@ -605,6 +622,12 @@ SocialCalc.DebugLog = function(logObject) {
 // The number starts as a null string ("A1|B3|")
 //
 
+/**
+ * @param {any[]} parseinfo
+ * @param {number[] | string} revpolish
+ * @param {any} sheet
+ * @param {boolean | number} [allowrangereturn]
+ */
 SocialCalc.Formula.EvaluatePolish = function(parseinfo, revpolish, sheet, allowrangereturn) {
 
    var scf = SocialCalc.Formula;
@@ -616,14 +639,15 @@ SocialCalc.Formula.EvaluatePolish = function(parseinfo, revpolish, sheet, allowr
    var operand_as_text = scf.OperandAsText;
    var operand_value_and_type = scf.OperandValueAndType;
    var operands_as_coord_on_sheet = scf.OperandsAsCoordOnSheet;
-   var format_number_for_display = SocialCalc.format_number_for_display || function(v, t, f) {return v+"";};
+   var format_number_for_display = SocialCalc.format_number_for_display || function(/** @type {any} */ v, /** @type {any} */ t, /** @type {any} */ f) {return v+"";};
 
    var errortext = "";
    var function_start = -1;
    var missingOperandError = {value: "", type: "e#VALUE!", error: scc.s_parseerrmissingoperand};
 
+   /** @type {any[]} */
    var operand = [];
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
+   var PushOperand = function(/** @type {any} */ t, /** @type {any} */ v) {operand.push({type: t, value: v});};
 
    var i, rii, prii, ttype, ttext, value, value1, value2, tostype, tostype2, resulttype, valuetype, cond, vmatch, smatch;
 
@@ -843,7 +867,7 @@ SocialCalc.Formula.EvaluatePolish = function(parseinfo, revpolish, sheet, allowr
       else if (ttype == tokentype.name) {
 	  
 //         errortext = scf.CalculateFunction(ttext, operand, sheet);
-         errortext = scf.CalculateFunction(ttext, operand, sheet, parseinfo.coord); // eddy also pass the cell id
+         errortext = scf.CalculateFunction(ttext, operand, sheet, /** @type {any} */(parseinfo).coord); // eddy also pass the cell id
 		 
          if (errortext) break;
 		 
@@ -936,6 +960,11 @@ SocialCalc.Formula.EvaluatePolish = function(parseinfo, revpolish, sheet, allowr
 #
 */
 
+/**
+ * @param {any} type1
+ * @param {any} type2
+ * @param {{ [subtype: string]: string }} typelookup
+ */
 SocialCalc.Formula.LookupResultType = function(type1, type2, typelookup) {
 
    var pos1, pos2, result;
@@ -979,11 +1008,16 @@ SocialCalc.Formula.LookupResultType = function(type1, type2, typelookup) {
 #
 */
 
+/**
+ * @param {any} sheet
+ * @param {any[]} operand
+ */
 SocialCalc.Formula.TopOfStackValueAndType = function(sheet, operand) {
 
    var cellvtype, cell, pos, coordsheet;
    var scf = SocialCalc.Formula;
 
+   /** @type {{ type: string, value: any, error?: string }} */
    var result = {type: "", value: ""};
 
    var stacklen = operand.length;
@@ -1016,6 +1050,10 @@ SocialCalc.Formula.TopOfStackValueAndType = function(sheet, operand) {
 #
 */
 
+/**
+ * @param {any} sheet
+ * @param {any[]} operand
+ */
 SocialCalc.Formula.OperandAsNumber = function(sheet, operand) {
 
    var t, valueinfo;
@@ -1059,6 +1097,10 @@ SocialCalc.Formula.OperandAsNumber = function(sheet, operand) {
 #
 */
 
+/**
+ * @param {any} sheet
+ * @param {any[]} operand
+ */
 SocialCalc.Formula.OperandAsText = function(sheet, operand) {
 
    var t, valueinfo;
@@ -1083,8 +1125,8 @@ SocialCalc.Formula.OperandAsText = function(sheet, operand) {
       operandinfo.value = "";
       }
    else {
-      operand.value = operandinfo.value + "";
-      operand.type = "t";
+      operandinfo.value = operandinfo.value + "";
+      operandinfo.type = "t";
       }
 
    return operandinfo;
@@ -1102,11 +1144,16 @@ SocialCalc.Formula.OperandAsText = function(sheet, operand) {
 #
 */
 
+/**
+ * @param {any} sheet
+ * @param {any[]} operand
+ */
 SocialCalc.Formula.OperandValueAndType = function(sheet, operand) {
 
    var cellvtype, cell, pos, coordsheet;
    var scf = SocialCalc.Formula;
 
+   /** @type {{ type: string, value: any, error?: string }} */
    var result = {type: "", value: ""};
 
    var stacklen = operand.length;
@@ -1176,6 +1223,10 @@ SocialCalc.Formula.OperandValueAndType = function(sheet, operand) {
 */
 
 
+/**
+ * @param {any} sheet
+ * @param {any[]} operand
+ */
 SocialCalc.Formula.OperandAsCoord = function(sheet, operand) {
 	return SocialCalc.Formula.OperandAsType(sheet, operand, "coord");
 }
@@ -1190,6 +1241,10 @@ SocialCalc.Formula.OperandAsCoord = function(sheet, operand) {
 #
 */
 
+/**
+ * @param {any} sheet
+ * @param {any[]} operand
+ */
 SocialCalc.Formula.OperandAsRange = function(sheet, operand) {
 	return SocialCalc.Formula.OperandAsType(sheet, operand, "range");
 }
@@ -1202,10 +1257,16 @@ SocialCalc.Formula.OperandAsRange = function(sheet, operand) {
 # Returns operandtype value. All others are treated as an error.
 #
 */
+/**
+ * @param {any} sheet
+ * @param {any[]} operand
+ * @param {any} operandtype
+ */
 SocialCalc.Formula.OperandAsType = function(sheet, operand, operandtype) {
 
    var scf = SocialCalc.Formula;
 
+   /** @type {{ type: string, value: any, error?: string }} */
    var result = {type: "", value: ""};
 
    var stacklen = operand.length;
@@ -1238,10 +1299,16 @@ SocialCalc.Formula.OperandAsType = function(sheet, operand, operandtype) {
 #
 */
 
+/**
+ * @param {any} sheet
+ * @param {any[]} operand
+ */
 SocialCalc.Formula.OperandsAsCoordOnSheet = function(sheet, operand) {
 
    var sheetname, othersheet, pos1, pos2;
+   /** @type {any} */
    var value1 = {};
+   /** @type {any} */
    var result = {};
    var scf = SocialCalc.Formula;
 
@@ -1295,9 +1362,14 @@ SocialCalc.Formula.OperandsAsCoordOnSheet = function(sheet, operand) {
 #
 */
 
+/**
+ * @param {any} sheet
+ * @param {any[]} operand
+ */
 SocialCalc.Formula.OperandsAsRangeOnSheet = function(sheet, operand) {
 
    var value1, othersheet, pos1, pos2;
+   /** @type {any} */
    var value2 = {};
    var scf = SocialCalc.Formula;
    var scc = SocialCalc.Constants;
@@ -1346,12 +1418,17 @@ SocialCalc.Formula.OperandsAsRangeOnSheet = function(sheet, operand) {
 #
 */
 
+/**
+ * @param {any} sheet
+ * @param {any[]} operand
+ */
 SocialCalc.Formula.OperandAsSheetName = function(sheet, operand) {
 
    var nvalue, cell;
 
    var scf = SocialCalc.Formula;
 
+   /** @type {{ type: string, value: any, error?: string }} */
    var result = {type: "", value: ""};
 
    var stacklen = operand.length;
@@ -1398,10 +1475,16 @@ SocialCalc.Formula.OperandAsSheetName = function(sheet, operand) {
 // Note: The range must not have sheet names ("!") in them.
 //
 
+/**
+ * @param {any} sheet
+ * @param {string} name
+ * @param {string | boolean} [isEnd]
+ */
 SocialCalc.Formula.LookupName = function(sheet, name, isEnd) {
 
    var pos, specialc, parseinfo;
    var names = sheet.names;
+   /** @type {any} */
    var value = {};
    var startedwalk = false;
 
@@ -1476,6 +1559,10 @@ SocialCalc.Formula.LookupName = function(sheet, name, isEnd) {
 #
 */
 
+/**
+ * @param {any[]} operand
+ * @param {string} rangevalue
+ */
 SocialCalc.Formula.StepThroughRangeDown = function(operand, rangevalue) {
 
    var value1, value2, sequence, pos1, pos2, sheet1, rp, c, r, count;
@@ -1485,7 +1572,7 @@ SocialCalc.Formula.StepThroughRangeDown = function(operand, rangevalue) {
    pos2 = rangevalue.indexOf("|", pos1+1);
    value1 = rangevalue.substring(0, pos1);
    value2 = rangevalue.substring(pos1+1, pos2);
-   sequence = rangevalue.substring(pos2+1) - 0;
+   sequence = /** @type {any} */(rangevalue.substring(pos2+1)) - 0;
 
    pos1 = value1.indexOf("!");
    if (pos1 != -1) {
@@ -1514,6 +1601,7 @@ SocialCalc.Formula.StepThroughRangeDown = function(operand, rangevalue) {
             }
          }
       }
+   return undefined;
    }
 
 /*
@@ -1530,6 +1618,10 @@ SocialCalc.Formula.StepThroughRangeDown = function(operand, rangevalue) {
 #
 */
 
+/**
+ * @param {any} sheetdata
+ * @param {string} range
+ */
 SocialCalc.Formula.DecodeRangeParts = function(sheetdata, range) {
 
    var value1, value2, pos1, pos2, sheet1, coordsheetdata, rp;
@@ -1627,7 +1719,15 @@ SocialCalc.Formula.DecodeRangeParts = function(sheetdata, range) {
 #
 */
 // eddy StoreIoEventFormula
+/**
+ * @param {string} function_name
+ * @param {string} coord
+ * @param {any[]} operand_reverse
+ * @param {any} sheet
+ * @param {string} io_parameters
+ */
 SocialCalc.Formula.StoreIoEventFormula = function(function_name, coord, operand_reverse, sheet, io_parameters) {
+	/** @type {any[]} */
 	var operand = [];
 	SocialCalc.Formula.Clone(operand,operand_reverse);
     operand.reverse(); // normal parameter order
@@ -1661,7 +1761,7 @@ SocialCalc.Formula.StoreIoEventFormula = function(function_name, coord, operand_
   // send trigger times to server if changed
   if(io_parameters == "TimeTrigger") { // timer trigger formula exists   
     // function to push cell time into array
-    var PushTriggerTime = function(list, coordA1, sheetData) {
+    var PushTriggerTime = function(/** @type {any[]} */ list, /** @type {string} */ coordA1, /** @type {any} */ sheetData) {
       var cell = sheetData.cells[coordA1];   
       if (typeof cell !== 'undefined' && cell.valuetype.charAt(0) == "n") { // if not blank and is number
         list.push(cell.datavalue);
@@ -1669,10 +1769,11 @@ SocialCalc.Formula.StoreIoEventFormula = function(function_name, coord, operand_
     };
 
     var triggerTimeCellId = SocialCalc.Formula.PlainCoord(operand[0].value); // strip dollar signs
-    
+
+    /** @type {any[]} */
     var currentTriggerTimeList = [];
-    
-    if(operand[0].type == "range" )  {      
+
+    if(operand[0].type == "range" )  {
       var rangeinfo = SocialCalc.Formula.DecodeRangeParts(sheet, triggerTimeCellId);
       for (var i=0; i<rangeinfo.ncols; i++) {
         for (var j=0; j<rangeinfo.nrows; j++) {
@@ -1707,7 +1808,7 @@ SocialCalc.Formula.StoreIoEventFormula = function(function_name, coord, operand_
   if(io_parameters == "EventTree"	&& (operand[0].type == "coord" || operand[0].type == "range")) { // trigger cell exists   
   	// create a list of action formulas for each trigger cell  
     var triggerCellId = operand[0].value.replace(/\$/g,''); // strip dollar signs
-    var PushTriggerCord = function(list, index, v) {
+    var PushTriggerCord = function(/** @type {any} */ list, /** @type {string} */ index, /** @type {string} */ v) {
         if(typeof list[index] === 'undefined') list[index] = {};
         list[index][v] = v;
     };
@@ -1775,6 +1876,10 @@ SocialCalc.Formula.StoreIoEventFormula = function(function_name, coord, operand_
  * Warning - nested vales are NOT tested.
  * returns true if both arrays contain the same values
  */    
+/**
+ * @param {any[]} a
+ * @param {any[]} b
+ */
 SocialCalc.Formula.ArrayValuesEqual = function(a, b) {
   var i = a.length;
   if (i != b.length) return false;
@@ -1784,6 +1889,10 @@ SocialCalc.Formula.ArrayValuesEqual = function(a, b) {
   return true;
 };
 
+/**
+ * @param {any} destination
+ * @param {any} source
+ */
 SocialCalc.Formula.Clone =   function(destination, source) {
         for (var property in source) {
             if (typeof source[property] === "object" && source[property] !== null && destination[property]) { 
@@ -1843,9 +1952,17 @@ SocialCalc.Formula.LoadFormFields =   function() {
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any} sheet
+ * @param {string} [coord]
+ */
 SocialCalc.Formula.CalculateFunction = function(fname, operand, sheet, coord) {
 
-   var fobj, foperand, ffunc, argnum, ttext;
+   var fobj, ffunc, argnum, ttext;
+   /** @type {any[]} */
+   var foperand;
    var scf = SocialCalc.Formula;
    var ok = 1;
    var errortext = "";
@@ -1911,6 +2028,11 @@ SocialCalc.Formula.CalculateFunction = function(fname, operand, sheet, coord) {
 // Pushes the type and value onto the operand stack
 //
 
+/**
+ * @param {any[]} operand
+ * @param {any} t
+ * @param {any} v
+ */
 SocialCalc.Formula.PushOperand = function(operand, t, v) {
 
    operand.push({type: t, value: v});
@@ -1924,9 +2046,13 @@ SocialCalc.Formula.PushOperand = function(operand, t, v) {
 // reversing order in the process.
 //
 
+/**
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ */
 SocialCalc.Formula.CopyFunctionArgs = function(operand, foperand) {
 
-   var fobj, foperand, ffunc, argnum;
+   var fobj, ffunc, argnum;
    var scf = SocialCalc.Formula;
    var ok = 1;
    var errortext = null;
@@ -1946,6 +2072,10 @@ SocialCalc.Formula.CopyFunctionArgs = function(operand, foperand) {
 // Pushes appropriate error on operand stack and returns errortext, including fname
 //
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ */
 SocialCalc.Formula.FunctionArgsError = function(fname, operand) {
 
    var errortext = SocialCalc.Constants.s_calcerrincorrectargstofunction+" " + fname + ". ";
@@ -1962,6 +2092,12 @@ SocialCalc.Formula.FunctionArgsError = function(fname, operand) {
 // Pushes specified error and text on operand stack.
 //
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any} errortype
+ * @param {string} errortext
+ */
 SocialCalc.Formula.FunctionSpecificError = function(fname, operand, errortype, errortext) {
 
    SocialCalc.Formula.PushOperand(operand, errortype, errortext);
@@ -1976,6 +2112,10 @@ SocialCalc.Formula.FunctionSpecificError = function(fname, operand, errortype, e
 // If v.type is an error, push it on operand stack and return true, otherwise return false.
 //
 
+/**
+ * @param {any[]} operand
+ * @param {any} v
+ */
 SocialCalc.Formula.CheckForErrorValue = function(operand, v) {
 
    if (v.type.charAt(0) == "e") {
@@ -2051,6 +2191,7 @@ SocialCalc.Formula.FillFunctionInfo = function() {
 // Returns a string representing the arguments to function fname.
 //
 
+/** @param {string} fname */
 SocialCalc.Formula.FunctionArgString = function(fname) {
 
    var scf = SocialCalc.Formula;
@@ -2121,6 +2262,12 @@ SocialCalc.Formula.FunctionArgString = function(fname) {
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.SeriesFunctions = function(fname, operand, foperand, sheet) {
 
    var value1, t, v1;
@@ -2130,7 +2277,7 @@ SocialCalc.Formula.SeriesFunctions = function(fname, operand, foperand, sheet) {
    var lookup_result_type = scf.LookupResultType;
    var typelookupplus = scf.TypeLookupTable.plus;
 
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
+   var PushOperand = function(/** @type {any} */ t, /** @type {any} */ v) {operand.push({type: t, value: v});};
 
 
    var concat = "";
@@ -2142,7 +2289,7 @@ SocialCalc.Formula.SeriesFunctions = function(fname, operand, foperand, sheet) {
    var product = 1;
    var maxval;
    var minval;
-   var mk, sk, mk1, sk1; // For variance, etc.: M sub k, k-1, and S sub k-1
+   var mk = 0, sk = 0, mk1 = 0, sk1 = 0; // For variance, etc.: M sub k, k-1, and S sub k-1
                          // as per Knuth "The Art of Computer Programming" Vol. 2 3rd edition, page 232
 
    while (foperand.length > 0) {
@@ -2290,13 +2437,22 @@ SocialCalc.Formula.FunctionList["VARP"] = [SocialCalc.Formula.SeriesFunctions, -
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.SumProductFunction = function(fname, operand, foperand, sheet) {
-  
-   var range, products = [], sum = 0;
+
+   var range, sum = 0;
+   /** @type {any[]} */
+   var products = [];
    var scf = SocialCalc.Formula;
    var ncols = 0, nrows = 0;
+   var rangeinfo, i, j, k, cellcr, cell, value;
 
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
+   var PushOperand = function(/** @type {any} */ t, /** @type {any} */ v) {operand.push({type: t, value: v});};
 
    while (foperand.length > 0) {
       range = scf.TopOfStackValueAndType(sheet, foperand);
@@ -2305,6 +2461,10 @@ SocialCalc.Formula.SumProductFunction = function(fname, operand, foperand, sheet
          return;
          }
       rangeinfo = scf.DecodeRangeParts(sheet, range.value);
+      if (!rangeinfo) {
+         PushOperand("e#REF!", 0);
+         return;
+         }
       if (!ncols) ncols = rangeinfo.ncols;
       else if (ncols != rangeinfo.ncols) {
          PushOperand("e#VALUE!", 0);
@@ -2356,20 +2516,27 @@ SocialCalc.Formula.FunctionList["SUMPRODUCT"] = [SocialCalc.Formula.SumProductFu
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.DSeriesFunctions = function(fname, operand, foperand, sheet) {
 
-   var value1, tostype, cr, dbrange, fieldname, criteriarange, dbinfo, criteriainfo;
-   var fieldasnum, targetcol, i, j, k, cell, criteriafieldnums;
+   var tostype, cr, dbrange, fieldname, criteriarange, dbinfo, criteriainfo;
+   var fieldasnum, targetcol, i, j, k, cell, criteriafieldnums, criterianum;
    var testok, criteriacr, criteria, testcol, testcr;
-   var t;
+   var t, v1;
 
    var scf = SocialCalc.Formula;
    var operand_value_and_type = scf.OperandValueAndType;
    var lookup_result_type = scf.LookupResultType;
    var typelookupplus = scf.TypeLookupTable.plus;
 
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
+   var PushOperand = function(/** @type {any} */ t, /** @type {any} */ v) {operand.push({type: t, value: v});};
 
+   /** @type {any} */
    var value1 = {};
 
    var sum = 0;
@@ -2377,11 +2544,11 @@ SocialCalc.Formula.DSeriesFunctions = function(fname, operand, foperand, sheet) 
    var count = 0;
    var counta = 0;
    var countblank = 0;
-   var countmatches = 0;   
+   var countmatches = 0;
    var product = 1;
    var maxval;
    var minval;
-   var mk, sk, mk1, sk1; // For variance, etc.: M sub k, k-1, and S sub k-1
+   var mk = 0, sk = 0, mk1 = 0, sk1 = 0; // For variance, etc.: M sub k, k-1, and S sub k-1
                          // as per Knuth "The Art of Computer Programming" Vol. 2 3rd edition, page 232
 
    dbrange = scf.TopOfStackValueAndType(sheet, foperand); // get a range
@@ -2590,6 +2757,14 @@ SocialCalc.Formula.FunctionList["DVARP"] = [SocialCalc.Formula.DSeriesFunctions,
 #
 */
 
+/**
+ * @param {any} sheet
+ * @param {number} col1num
+ * @param {number} ncols
+ * @param {number} row1num
+ * @param {any} fieldname
+ * @param {any} fieldtype
+ */
 SocialCalc.Formula.FieldToColnum = function(sheet, col1num, ncols, row1num, fieldname, fieldtype) {
 
    var colnum, cell, value;
@@ -2629,17 +2804,28 @@ SocialCalc.Formula.FieldToColnum = function(sheet, col1num, ncols, row1num, fiel
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.LookupFunctions = function(fname, operand, foperand, sheet) {
 
-   var lookupvalue, range, offset, rangelookup, offsetvalue, rangeinfo;
-   var c, r, cincr, rincr, previousOK, csave, rsave, cell, value, valuetype, cr, lookupvalue;
+   var lookupvalue, range, offset, rangelookup, rangeinfo;
+   /** @type {any} */
+   var offsetvalue = 0;
+   /** @type {number} */
+   var c = 0, r = 0, csave = 0, rsave = 0;
+   var cincr, rincr;
+   var previousOK, cell, value, valuetype, cr;
 
    var scf = SocialCalc.Formula;
    var operand_value_and_type = scf.OperandValueAndType;
    var lookup_result_type = scf.LookupResultType;
    var typelookupplus = scf.TypeLookupTable.plus;
 
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
+   var PushOperand = function(/** @type {any} */ t, /** @type {any} */ v) {operand.push({type: t, value: v});};
 
    lookupvalue = operand_value_and_type(sheet, foperand);
    if (typeof lookupvalue.value == "string") {
@@ -2839,13 +3025,19 @@ SocialCalc.Formula.FunctionList["VLOOKUP"] = [SocialCalc.Formula.LookupFunctions
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.IndexFunction = function(fname, operand, foperand, sheet) {
 
    var range, sheetname, indexinfo, rowindex, colindex, result, resulttype;
 
    var scf = SocialCalc.Formula;
 
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
+   var PushOperand = function(/** @type {any} */ t, /** @type {any} */ v) {operand.push({type: t, value: v});};
 
    range = scf.TopOfStackValueAndType(sheet, foperand); // get range
    if (range.type != "range") {
@@ -2953,6 +3145,12 @@ SocialCalc.Formula.FunctionList["INDEX"] = [SocialCalc.Formula.IndexFunction, -1
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.CountifSumifFunctions = function(fname, operand, foperand, sheet) {
 
    var range, criteria, sumrange, f2operand, result, resulttype, value1, value2;
@@ -2965,7 +3163,7 @@ SocialCalc.Formula.CountifSumifFunctions = function(fname, operand, foperand, sh
    var lookup_result_type = scf.LookupResultType;
    var typelookupplus = scf.TypeLookupTable.plus;
 
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
+   var PushOperand = function(/** @type {any} */ t, /** @type {any} */ v) {operand.push({type: t, value: v});};
 
    range = scf.TopOfStackValueAndType(sheet, foperand); // get range or coord
    criteria = scf.OperandAsText(sheet, foperand); // get criteria
@@ -3049,6 +3247,12 @@ SocialCalc.Formula.FunctionList["SUMIF"] = [SocialCalc.Formula.CountifSumifFunct
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.SumifsFunction = function(fname, operand, foperand, sheet) {
    var range, criteria, sumrange, f2operand, result, resulttype, value1, value2;
    var sum = 0;
@@ -3060,7 +3264,7 @@ SocialCalc.Formula.SumifsFunction = function(fname, operand, foperand, sheet) {
    var lookup_result_type = scf.LookupResultType;
    var typelookupplus = scf.TypeLookupTable.plus;
 
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
+   var PushOperand = function(/** @type {any} */ t, /** @type {any} */ v) {operand.push({type: t, value: v});};
 
    sumrange = scf.TopOfStackValueAndType(sheet, foperand);
    if (sumrange.type != "coord" && sumrange.type != "range") {
@@ -3129,6 +3333,12 @@ SocialCalc.Formula.FunctionList["SUMIFS"] = [SocialCalc.Formula.SumifsFunction, 
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.IfFunction = function(fname, operand, foperand, sheet) {
 
    var cond, t;
@@ -3169,6 +3379,12 @@ SocialCalc.Formula.FunctionList["IF"] = [SocialCalc.Formula.IfFunction, -2, "iff
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.DateFunction = function(fname, operand, foperand, sheet) {
 
    var scf = SocialCalc.Formula;
@@ -3197,6 +3413,12 @@ SocialCalc.Formula.FunctionList["DATE"] = [SocialCalc.Formula.DateFunction, 3, "
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.TimeFunction = function(fname, operand, foperand, sheet) {
 
    var scf = SocialCalc.Formula;
@@ -3226,6 +3448,12 @@ SocialCalc.Formula.FunctionList["TIME"] = [SocialCalc.Formula.TimeFunction, 3, "
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.DMYFunctions = function(fname, operand, foperand, sheet) {
 
    var ymd, dtype, doffset;
@@ -3291,6 +3519,12 @@ SocialCalc.Formula.FunctionList["WEEKDAY"] = [SocialCalc.Formula.DMYFunctions, -
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.HMSFunctions = function(fname, operand, foperand, sheet) {
 
    var hours, minutes, seconds, fraction;
@@ -3340,6 +3574,12 @@ SocialCalc.Formula.FunctionList["SECOND"] = [SocialCalc.Formula.HMSFunctions, 1,
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.ExactFunction = function(fname, operand, foperand, sheet) {
 
    var scf = SocialCalc.Formula;
@@ -3456,10 +3696,18 @@ SocialCalc.Formula.ArgList = {
                 UPPER: [1]
                };
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.StringFunctions = function(fname, operand, foperand, sheet) {
 
    var i, value, offset, len, start, count;
+   var fulltext, oldtext, newtext, which, oldpos, pos;
    var scf = SocialCalc.Formula;
+   /** @type {any} */
    var result = 0;
    var resulttype = "e#VALUE!";
 
@@ -3542,8 +3790,8 @@ SocialCalc.Formula.StringFunctions = function(fname, operand, foperand, sheet) {
          break;
 
       case "PROPER":
-         result = operand_value[1].replace(/\b\w+\b/g, function(word) {
-                     return word.substring(0,1).toUpperCase() + 
+         result = operand_value[1].replace(/\b\w+\b/g, function(/** @type {string} */ word) {
+                     return word.substring(0,1).toUpperCase() +
                         word.substring(1);
                      }); // uppercase first character of words (see JavaScript, Flanagan, 5th edition, page 704)
          resulttype = "t";
@@ -3691,6 +3939,12 @@ SocialCalc.Formula.FunctionList["UPPER"] = [SocialCalc.Formula.StringFunctions, 
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.IsFunctions = function(fname, operand, foperand, sheet) {
 
    var scf = SocialCalc.Formula;
@@ -3760,9 +4014,16 @@ SocialCalc.Formula.FunctionList["ISTEXT"] = [SocialCalc.Formula.IsFunctions, 1, 
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.NTVFunctions = function(fname, operand, foperand, sheet) {
 
    var scf = SocialCalc.Formula;
+   /** @type {any} */
    var result = 0;
    var resulttype = "e#VALUE!";
 
@@ -3836,9 +4097,16 @@ SocialCalc.Formula.FunctionList["VALUE"] = [SocialCalc.Formula.NTVFunctions, 1, 
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.Math1Functions = function(fname, operand, foperand, sheet) {
 
    var v1, value, f;
+   /** @type {any} */
    var result = {};
 
    var scf = SocialCalc.Formula;
@@ -4002,9 +4270,16 @@ SocialCalc.Formula.FunctionList["TAN"] = [SocialCalc.Formula.Math1Functions, 1, 
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.Math2Functions = function(fname, operand, foperand, sheet) {
 
    var xval, yval, value, quotient, decimalscale, i;
+   /** @type {any} */
    var result = {};
 
    var scf = SocialCalc.Formula;
@@ -4084,9 +4359,16 @@ SocialCalc.Formula.FunctionList["TRUNC"] = [SocialCalc.Formula.Math2Functions, 2
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.LogFunction = function(fname, operand, foperand, sheet) {
 
    var value, value2;
+   /** @type {any} */
    var result = {};
 
    var scf = SocialCalc.Formula;
@@ -4133,6 +4415,12 @@ SocialCalc.Formula.FunctionList["LOG"] = [SocialCalc.Formula.LogFunction, -1, "l
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.RoundFunction = function(fname, operand, foperand, sheet) {
 
    var value2, decimalscale, scaledvalue, i;
@@ -4142,7 +4430,7 @@ SocialCalc.Formula.RoundFunction = function(fname, operand, foperand, sheet) {
    var resulttype = "e#VALUE!";
 
    var value = scf.OperandValueAndType(sheet, foperand);
-   var resulttype = scf.LookupResultType(value.type, value.type, scf.TypeLookupTable.oneargnumeric);
+   resulttype = scf.LookupResultType(value.type, value.type, scf.TypeLookupTable.oneargnumeric);
 
    if (foperand.length == 1) {
       value2 = scf.OperandValueAndType(sheet, foperand);
@@ -4199,12 +4487,18 @@ SocialCalc.Formula.FunctionList["ROUND"] = [SocialCalc.Formula.RoundFunction, -1
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.CeilingFloorFunctions = function(fname, operand, foperand, sheet) {
 
    var scf = SocialCalc.Formula;
    var val, sig, t;
 
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
+   var PushOperand = function(/** @type {any} */ t, /** @type {any} */ v) {operand.push({type: t, value: v});};
 
    val = scf.OperandValueAndType(sheet, foperand);
    t = val.type.charAt(0);
@@ -4264,6 +4558,12 @@ SocialCalc.Formula.FunctionList["FLOOR"] = [SocialCalc.Formula.CeilingFloorFunct
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.AndOrFunctions = function(fname, operand, foperand, sheet) {
 
    var value1, result;
@@ -4314,6 +4614,12 @@ SocialCalc.Formula.FunctionList["OR"] = [SocialCalc.Formula.AndOrFunctions, -1, 
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.NotFunction = function(fname, operand, foperand, sheet) {
 
    var result = 0;
@@ -4343,6 +4649,12 @@ SocialCalc.Formula.FunctionList["NOT"] = [SocialCalc.Formula.NotFunction, 1, "v"
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.ChooseFunction = function(fname, operand, foperand, sheet) {
 
    var resulttype, count, value1;
@@ -4386,6 +4698,12 @@ SocialCalc.Formula.FunctionList["CHOOSE"] = [SocialCalc.Formula.ChooseFunction, 
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.ColumnsRowsFunctions = function(fname, operand, foperand, sheet) {
 
    var resulttype, rangeinfo;
@@ -4436,9 +4754,16 @@ SocialCalc.Formula.FunctionList["ROWS"] = [SocialCalc.Formula.ColumnsRowsFunctio
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.ZeroArgFunctions = function(fname, operand, foperand, sheet) {
 
    var startval, tzoffset, start_1_1_1970, seconds_in_a_day, nowdays;
+   /** @type {{ type?: string, value: any }} */
    var result = {value: 0};
    
    switch (fname) {
@@ -4522,6 +4847,12 @@ SocialCalc.Formula.FunctionList["TRUE"] = [SocialCalc.Formula.ZeroArgFunctions, 
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.DDBFunction = function(fname, operand, foperand, sheet) {
 
    var method, depreciation, accumulateddepreciation, i;
@@ -4580,6 +4911,12 @@ SocialCalc.Formula.FunctionList["DDB"] = [SocialCalc.Formula.DDBFunction, -4, "d
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.SLNFunction = function(fname, operand, foperand, sheet) {
 
    var depreciation;
@@ -4616,6 +4953,12 @@ SocialCalc.Formula.FunctionList["SLN"] = [SocialCalc.Formula.SLNFunction, 3, "cs
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.SYDFunction = function(fname, operand, foperand, sheet) {
 
    var depreciation, sumperiods;
@@ -4665,11 +5008,17 @@ SocialCalc.Formula.FunctionList["SYD"] = [SocialCalc.Formula.SYDFunction, 4, "cs
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.InterestFunctions = function(fname, operand, foperand, sheet) {
 
    var resulttype, result, dval, eval_, fval;
    var pv, fv, rate, n, payment, paytype, guess, part1, part2, part3, part4, part5;
-   var olddelta, maxloop, tries, deltaepsilon, rate, oldrate, m;
+   var olddelta, maxloop, tries, delta, epsilon, oldrate, m;
 
    var scf = SocialCalc.Formula;
 
@@ -4846,6 +5195,12 @@ SocialCalc.Formula.FunctionList["RATE"] = [SocialCalc.Formula.InterestFunctions,
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.NPVFunction = function(fname, operand, foperand, sheet) {
 
    var resulttypenpv, rate, sum, factor, value1;
@@ -4894,6 +5249,12 @@ SocialCalc.Formula.FunctionList["NPV"] = [SocialCalc.Formula.NPVFunction, -2, "n
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.IRRFunction = function(fname, operand, foperand, sheet) {
 
    var value1, guess, oldsum, maxloop, tries, epsilon, rate, oldrate, m, sum, factor, i;
@@ -5011,6 +5372,13 @@ SocialCalc.Formula.FunctionList["IRR"] = [SocialCalc.Formula.IRRFunction, -1, "i
 */
 
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ * @param {string} [coord]
+ */
 SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord) {
 
   
@@ -5036,6 +5404,7 @@ SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord
 
 
 
+   /** @type {{ [key: string]: number[] }} */
    var argList = {
 				 BUTTON: [2]
         ,IMAGEBUTTON: [2]
@@ -5053,27 +5422,32 @@ SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord
         ,RADIOBUTTON: [2, 2]
 				,COPYVALUE: [4, 12, 15]
 				,COPYFORMULA: [4, 12, 12]
-        ,INSERT: [4, 8, -12, -15]  // change code to allow unlimited 
+        ,INSERT: [4, 8, -12, -15]  // change code to allow unlimited
         ,DELETEIF: [4,7,8]
         ,COMMAND: [4, 14]
         ,COMMANDIF: [4, 13, 14]
-        ,PANEL:[15, -12] // # PANEL(indices_or_csv, panel1_range [, panel2_range , ...])  
+        ,PANEL:[15, -12] // # PANEL(indices_or_csv, panel1_range [, panel2_range , ...])
         ,SPLASH:[12]  // SPLASH(splash_panel_range)  // shows splash screen (range)
-        ,STYLE:[6] // # STYLE(css)  
+        ,STYLE:[6] // # STYLE(css)
    };
    
-   var i, parameter, offset, len, start, count;
+   /** @type {number} */
+   var i;
+   var parameter, offset, len, start, count;
    var scf = SocialCalc.Formula;
+   /** @type {any} */
    var result = 0;
    var resulttype = "e#VALUE!";
 
    var numargs = foperand.length;
    var argdef = argList[fname];
+   /** @type {any[]} */
    var operand_value = [];
+   /** @type {any[]} */
    var operand_type = [];
 
    var repeatCount = -1;  // number of repeated parameters
-   var repeatIndex;  // index of begining of repeated parameters
+   var repeatIndex = 0;  // index of begining of repeated parameters
    var wantedType;
    
    for (i=1; i <= numargs; i++) { // go through each arg, get value and type, and check for errors
@@ -5163,8 +5537,8 @@ SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord
 
    
    switch (fname) {
-     case "STYLE":  
-       var parameters = sheet.ioParameterList[coord];
+     case "STYLE":
+       var parameters = sheet.ioParameterList[/** @type {string} */(coord)];
        if(parameters) {
          var css = SocialCalc.Formula.getStandardizedList(sheet, {value: operand_value[1], type: operand_type[1]});
          if(css.length > 0 ) {
@@ -5172,11 +5546,11 @@ SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord
            parameters.cssParameter = (operand_type[1] == "t") ? '"'+operand_value[1]+'"' : operand_value[1];
          }
          result = ""; // ensure return value does not get changed by style - will add this empty string to number or string
-         resulttype = "ni"; // important - allows widgets to keep type - use: TEXTBOX("")+STYLE(css)  - must add style to widget 
+         resulttype = "ni"; // important - allows widgets to keep type - use: TEXTBOX("")+STYLE(css)  - must add style to widget
        }
        break;
      case "SELECT":  // # SELECT(string, range [,size [,multiple]])
-         var parameters = sheet.ioParameterList[coord];
+         var parameters = sheet.ioParameterList[/** @type {string} */(coord)];
          var optionSource = SocialCalc.Formula.getStandardizedList(sheet, parameters[1]);
          
          parameters.html = [];        
@@ -5192,12 +5566,15 @@ SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord
          break;
      case "SUBMIT":
        result = "Submit";
+       if (numargs>0) result = operand_value[1];
+       resulttype = "ti"+fname;
+       break;
      case "BUTTON":
      case "IMAGEBUTTON":
      case "TEXTBOX":
      case "AUTOCOMPLETE":
          if (numargs>0) result = operand_value[1];
-         resulttype = "ti"+fname; // (t)ext value with (i)nterface (BUTTON,IMAGEBUTTON,TEXTBOX,AUTOCOMPLETE, SELECT) 
+         resulttype = "ti"+fname; // (t)ext value with (i)nterface (BUTTON,IMAGEBUTTON,TEXTBOX,AUTOCOMPLETE, SELECT)
          break;
 
       case "EMAIL":
@@ -5296,12 +5673,12 @@ SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord
             }
           }   //  --- END FOR
           
-          var spreadsheet =  window.spreadsheet;
-          if (spreadsheet == null) spreadsheet = window.ss
+          var spreadsheet =  /** @type {any} */(window).spreadsheet;
+          if (spreadsheet == null) spreadsheet = /** @type {any} */(window).ss
 
           var forceRender = false;
           var lastShowDimension = 0;
-          var showGridDimension =  function(sheet, lastIndex, sheetHideList, showList, getIndexOf) {
+          var showGridDimension =  function(/** @type {any} */ sheet, /** @type {number} */ lastIndex, /** @type {any} */ sheetHideList, /** @type {any} */ showList, /** @type {(arg: number) => any} */ getIndexOf) {
             //  --- hide all rows/col    up to sheet.attribs.lastrow/col         
             //  --- FOR each row/col -- create function to do the loop          
             for(var arrayIndex = 1; arrayIndex <= lastIndex; arrayIndex ++ ) { // start at col/row 1
@@ -5330,7 +5707,7 @@ SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord
           };
 
           
-          var getRowIndex = function(row) { return row };
+          var getRowIndex = function(/** @type {any} */ row) { return row };
           showGridDimension(sheet,  sheet.attribs.lastrow,  sheet.rowattribs.hide, showrows, getRowIndex);
           lastShowDimension = 0;
           showGridDimension(sheet,  sheet.attribs.lastcol,  sheet.colattribs.hide, showcols, SocialCalc.rcColname );
@@ -5393,9 +5770,10 @@ SocialCalc.Formula.FunctionList["SPLASH"] = [SocialCalc.Formula.IoFunctions, -1,
 SocialCalc.Formula.FunctionList["STYLE"] = [SocialCalc.Formula.IoFunctions, -1, "css", "", "gui", ""];
 
 // on enter input box refresh the auto complete list
+/** @param {string} triggerCellId */
 SocialCalc.TriggerIoAction.AddAutocomplete = function(triggerCellId) {
-  var spreadsheet =  window.spreadsheet;
-  if (spreadsheet == null) spreadsheet = window.ss
+  var spreadsheet =  /** @type {any} */(window).spreadsheet;
+  if (spreadsheet == null) spreadsheet = /** @type {any} */(window).ss
   var sheet = spreadsheet.sheet;
   var scf = SocialCalc.Formula; 
   
@@ -5405,10 +5783,10 @@ SocialCalc.TriggerIoAction.AddAutocomplete = function(triggerCellId) {
   var autocompleteSource = SocialCalc.Formula.getStandardizedList(sheet, parameters[1])
 
   //Overrides the default autocomplete filter function to search only from the beginning of the string
-  $.ui.autocomplete.filter = function (array, term) {
+  $.ui.autocomplete.filter = function (/** @type {any[]} */ array, /** @type {string} */ term) {
     // * RegEx Unit Test - https://regex101.com/r/kO6eC4/1
     var matcher = new RegExp("\\b" + $.ui.autocomplete.escapeRegex(term), "i");
-    return $.grep(array, function (value) {
+    return $.grep(array, function (/** @type {any} */ value) {
         return matcher.test(value.label || value.value || value);
     });
   };
@@ -5418,11 +5796,11 @@ SocialCalc.TriggerIoAction.AddAutocomplete = function(triggerCellId) {
     source: autocompleteSource,
     minLength: 1,
     autoFocus: true,
-    select: function(event, ui) {
+    select: function(/** @type {any} */ event, /** @type {any} */ ui) {
       $(this).val(ui.item.label);
       SocialCalc.TriggerIoAction.AutoComplete(triggerCellId);
     },
-    change: function (event, ui) {
+    change: function (/** @type {any} */ event, /** @type {any} */ ui) {
       if (ui.item === null) {
           $(this).val('');
       }
@@ -5432,9 +5810,10 @@ SocialCalc.TriggerIoAction.AddAutocomplete = function(triggerCellId) {
 }
 // Event triggered, e.g. button/imagebutton clicked. - call linked action formulas 
 // eddy TriggerIoAction {
+/** @param {string} triggerCellId */
 SocialCalc.TriggerIoAction.Button = function(triggerCellId) {
- var spreadsheet =  window.spreadsheet;
- if (spreadsheet == null) spreadsheet = window.ss
+ var spreadsheet =  /** @type {any} */(window).spreadsheet;
+ if (spreadsheet == null) spreadsheet = /** @type {any} */(window).ss
  var sheet = spreadsheet.sheet;
  var scf = SocialCalc.Formula; 
  //spreadsheet.editor.EditorScheduleSheetCommands('set A2 value n 10',  true, false);
@@ -5468,18 +5847,18 @@ SocialCalc.TriggerIoAction.Button = function(triggerCellId) {
       // get row and col of dest cell
       var destcr = SocialCalc.coordToCr(parameters[1].value);
       
-      var sheetCommandList = SocialCalc.TriggerIoAction.CopyFormulaToRange(parameterdata, destcr);
-        
+      sheetCommandList = SocialCalc.TriggerIoAction.CopyFormulaToRange(parameterdata, destcr);
+
       spreadsheet.editor.EditorScheduleSheetCommands(sheetCommandList,  true, false);
       break;
-    case "INSERT" :  
+    case "INSERT" :
       //       # INSERT(trigger_cell, destination_range ,formula_range,value_range,formula_range, ...) // 
       //       insertrow A1      
       //       insertcol A1
       var parameterdata = SocialCalc.Formula.getStandardizedValues(sheet, parameters[1]); // destination_range
       if(parameterdata.type != "range") break; // invalid insert, requires range
       var insertCommand;
-      var colOffset, rowOffset;
+      var colOffset = 0, rowOffset = 0;
       if (parameterdata.ncols > 1) {  // insert column
         colOffset = 1;
         rowOffset = 0;
@@ -5491,13 +5870,13 @@ SocialCalc.TriggerIoAction.Button = function(triggerCellId) {
         insertCommand = "insertrow";
       }
       var insertcellCoord = parameterdata.cellcoord[colOffset][rowOffset];
-      var sheetCommandList = insertCommand + " " + insertcellCoord;
+      sheetCommandList = insertCommand + " " + insertcellCoord;
       var destcr = SocialCalc.coordToCr(insertcellCoord);
       var sourceDataIndex = 2; 
       while(sourceDataIndex < parameters.length ) {
         
         if(parameters[sourceDataIndex].type == "range" || parameters[sourceDataIndex].type == "coord" || sourceDataIndex % 2 == 1) {
-          copyCellRange = SocialCalc.Formula.getStandardizedValues(sheet, parameters[sourceDataIndex]); // formulas to insert
+          var copyCellRange = SocialCalc.Formula.getStandardizedValues(sheet, parameters[sourceDataIndex]); // formulas to insert
           
           if (sourceDataIndex % 2 == 0) {
             sheetCommandList = sheetCommandList + "\n" + SocialCalc.TriggerIoAction.CopyFormulaToRange(copyCellRange, destcr);
@@ -5519,9 +5898,9 @@ SocialCalc.TriggerIoAction.Button = function(triggerCellId) {
       var testRangeParameter = SocialCalc.Formula.getStandardizedValues(sheet, parameters[2]); // test_range - ignore first and last, as it would produce ref error
 
       // set command list to empty
-      var sheetCommandList = "";
+      sheetCommandList = "";
 
-      var colOffset, rowOffset, deleteCommand;
+      var colOffset = 0, rowOffset = 0, deleteCommand;
       if (testRangeParameter.ncols > 1 && testRangeParameter.nrows > 1) return; // error invalid range, only one cell wide/high
       if (testRangeParameter.ncols > 1) {  // delete column
         colOffset = 1;
@@ -5552,14 +5931,15 @@ SocialCalc.TriggerIoAction.Button = function(triggerCellId) {
       if (sheetCommandList != "" ) spreadsheet.editor.EditorScheduleSheetCommands(sheetCommandList,  true, false);        
       
       break;
-    case "COMMANDIF" :  //    # COMMANDIF(trigger_cell, condition, commands) 
-      conditionsParameter = SocialCalc.Formula.getStandardizedValues(sheet, parameters[1]); // commands 
+    // @ts-ignore COMMANDIF intentionally falls through to COMMAND after capturing condition.
+    case "COMMANDIF" :  //    # COMMANDIF(trigger_cell, condition, commands)
+      conditionsParameter = SocialCalc.Formula.getStandardizedValues(sheet, parameters[1]); // commands
 
-      
-    case "COMMAND" :  // COMMAND(trigger_cell, commands) 
+
+    case "COMMAND" :  // COMMAND(trigger_cell, commands)
       var commandsParameter;
       // set command list to empty
-      var sheetCommandList = "";
+      sheetCommandList = "";
       if( conditionsParameter != null) {
         var commandsParameter = SocialCalc.Formula.getStandardizedValues(sheet, parameters[2]); // commands 
         if (conditionsParameter.ncols != commandsParameter.ncols || conditionsParameter.nrows != commandsParameter.nrows) break;
@@ -5613,6 +5993,10 @@ SocialCalc.TriggerIoAction.Button = function(triggerCellId) {
  *  set B3  formula TEXTBOX("")             ... coord: "B3", datavalue: "william", datatype: "f", formula: "TEXTBOX("william")", valuetype: "tiTEXTBOX"
  */
 
+/**
+ * @param {any} formulaData
+ * @param {{col: number, row: number, [key: string]: any}} destcr
+ */
 SocialCalc.TriggerIoAction.CopyFormulaToRange = function(formulaData, destcr) {
 
   // set command list to empty
@@ -5667,6 +6051,10 @@ SocialCalc.TriggerIoAction.CopyFormulaToRange = function(formulaData, destcr) {
  * @return commands to execute to do the copy.  - String of sheet commands, \n between each command -  
  *   
  ******************************/
+/**
+ * @param {any} sourceData
+ * @param {{col: number, row: number, [key: string]: any}} destcr
+ */
 SocialCalc.TriggerIoAction.CopyValueToRange = function(sourceData, destcr) {
 
 
@@ -5730,11 +6118,15 @@ SocialCalc.TriggerIoAction.CopyValueToRange = function(sourceData, destcr) {
 
 // optionalTriggerCellId - edited cell - used by EMAILONEDIT and EMAILONEDITIF
 //onClick=EMAIL 
+/**
+ * @param {string} emailFormulaCellId
+ * @param {string | null} [optionalTriggerCellId]
+ */
 SocialCalc.TriggerIoAction.Email = function(emailFormulaCellId, optionalTriggerCellId) {
      optionalTriggerCellId = typeof optionalTriggerCellId !== 'undefined' ? optionalTriggerCellId : null;
 	 var scf = SocialCalc.Formula;	
-	 var spreadsheet =  window.spreadsheet;
-	 if (spreadsheet == null) spreadsheet = window.ss
+	 var spreadsheet =  /** @type {any} */(window).spreadsheet;
+	 if (spreadsheet == null) spreadsheet = /** @type {any} */(window).ss
 
 	 var sheet = spreadsheet.sheet;
 	 var cell = sheet.cells[emailFormulaCellId];
@@ -5745,9 +6137,11 @@ SocialCalc.TriggerIoAction.Email = function(emailFormulaCellId, optionalTriggerC
    if(typeof parameters === 'undefined') return;
    //var debugLog = "debug TriggerIoAction.Email\n"; //eddy
 
-	 //spreadsheet.editor.EditorScheduleSheetCommands('sendemail to eddy.nihon',  false, false); 
-	 // grab array for TO, SUBJECT and BODY 
+	 //spreadsheet.editor.EditorScheduleSheetCommands('sendemail to eddy.nihon',  false, false);
+	 // grab array for TO, SUBJECT and BODY
+	 /** @type {any[]} */
 	 var parameterValues = [];
+	 /** @type {any[]} */
 	 var parameterCellRefs = []; // OnEdit uses to workout what row/col was edited
 	 var maxRangeSize = 1;
 	 for(var index=0; index < parameters.length; index ++) {
@@ -5784,6 +6178,8 @@ SocialCalc.TriggerIoAction.Email = function(emailFormulaCellId, optionalTriggerC
 
       case "EMAILIF":
     	  conditionIndex = 0;
+    	  toAddressParamOffset = 1;
+    	  break;
       case "EMAILAT":
       case "EMAILONEDIT":
     	  toAddressParamOffset = 1;
@@ -5817,7 +6213,7 @@ SocialCalc.TriggerIoAction.Email = function(emailFormulaCellId, optionalTriggerC
 		 // if email formula is conditional && condition is false then skip 
 		 if(conditionIndex != -1) {
 			 var conditionRangeIndex = (rangeIndex >= parameterValues[conditionIndex].length) ? 0 : rangeIndex;
-			 if(parameterValues[conditionIndex][conditionRangeIndex] == false) continue;			 
+			 if(parameterValues[conditionIndex][conditionRangeIndex] == false) continue;
 		 }
 
 		 if(optionalTriggerCellId && optionalTriggerCellId != parameterCellRefs[0][rangeIndex]) continue;
@@ -5845,6 +6241,7 @@ SocialCalc.TriggerIoAction.Email = function(emailFormulaCellId, optionalTriggerC
  * creates command on form: submitform \rtimestamp\rB2value\rC2value ...
  */
 
+/** @param {string} triggerCellId */
 SocialCalc.TriggerIoAction.Submit = function(triggerCellId) {
   var formDataViewer = (SocialCalc.CurrentSpreadsheetControlObject != null) 
   ? SocialCalc.CurrentSpreadsheetControlObject.formDataViewer 
@@ -5852,8 +6249,8 @@ SocialCalc.TriggerIoAction.Submit = function(triggerCellId) {
 
   if(formDataViewer != null && formDataViewer.loaded == true) {
 
-    var spreadsheet =  window.spreadsheet;
-    if (spreadsheet == null) spreadsheet = window.ss
+    var spreadsheet =  /** @type {any} */(window).spreadsheet;
+    if (spreadsheet == null) spreadsheet = /** @type {any} */(window).ss
     var sheet = spreadsheet.sheet;
     
     
@@ -5871,29 +6268,33 @@ SocialCalc.TriggerIoAction.Submit = function(triggerCellId) {
 }
 
 //onChange=select tag (combobox) 
+/** @param {string} selectListCellId */
 SocialCalc.TriggerIoAction.SelectList = function(selectListCellId) {
-  var getHTMLselectListCellValue = function( selectListWidget ) { return selectListWidget.value; };
+  var getHTMLselectListCellValue = function(/** @type {any} */ selectListWidget ) { return selectListWidget.value; };
   var function_name = "SELECT";
   SocialCalc.TriggerIoAction.updateInputWidgetFormula(function_name, selectListCellId, getHTMLselectListCellValue );
 }
 
 //onKeyUp=AutoComplete
+/** @param {string} autoCompleteCellId */
 SocialCalc.TriggerIoAction.AutoComplete = function(autoCompleteCellId) {
-  var getHTMLAutoCompleteCellValue = function( autoCompleteWidget ) { return autoCompleteWidget.value; };
+  var getHTMLAutoCompleteCellValue = function(/** @type {any} */ autoCompleteWidget ) { return autoCompleteWidget.value; };
   var function_name = "AUTOCOMPLETE";
   SocialCalc.TriggerIoAction.updateInputWidgetFormula(function_name, autoCompleteCellId, getHTMLAutoCompleteCellValue );
 }
 
 // onKeyUp=TextBox 
+/** @param {string} textBoxCellId */
 SocialCalc.TriggerIoAction.TextBox = function(textBoxCellId) {
-  var getHTMLTextBoxCellValue = function( textBoxWidget ) { return textBoxWidget.value; };
+  var getHTMLTextBoxCellValue = function(/** @type {any} */ textBoxWidget ) { return textBoxWidget.value; };
   var function_name = "TEXTBOX";
   SocialCalc.TriggerIoAction.updateInputWidgetFormula(function_name, textBoxCellId, getHTMLTextBoxCellValue );
 }
 
 //onKeyUp=CheckBox 
+/** @param {string} checkBoxCellId */
 SocialCalc.TriggerIoAction.CheckBox = function(checkBoxCellId) {
-  var getHTMLCheckBoxCellValue = function( checkBoxWidget ) { return (checkBoxWidget.checked ? "TRUE" : "FALSE") };
+  var getHTMLCheckBoxCellValue = function(/** @type {any} */ checkBoxWidget ) { return (checkBoxWidget.checked ? "TRUE" : "FALSE") };
   var function_name = "CHECKBOX"
   SocialCalc.TriggerIoAction.updateInputWidgetFormula(function_name, checkBoxCellId, getHTMLCheckBoxCellValue );
 }
@@ -5901,8 +6302,9 @@ SocialCalc.TriggerIoAction.CheckBox = function(checkBoxCellId) {
 //Radio Button state changed
 // onclick when selected
 // update true/false in formula param
+/** @param {string} radioButtonGroupName */
 SocialCalc.TriggerIoAction.RadioButton = function(radioButtonGroupName) {
-  var getHTMLRadioButtonValue = function( radioButtonWidget ) { return (radioButtonWidget.checked ? "TRUE" : "FALSE") };
+  var getHTMLRadioButtonValue = function(/** @type {any} */ radioButtonWidget ) { return (radioButtonWidget.checked ? "TRUE" : "FALSE") };
   var function_name = "RADIOBUTTON"
   // for each radio button in group
   $('input[name="'+radioButtonGroupName+'"]').each(function () {
@@ -5911,10 +6313,15 @@ SocialCalc.TriggerIoAction.RadioButton = function(radioButtonGroupName) {
 }
 
 
+/**
+ * @param {string} function_name
+ * @param {string} widgetCellId
+ * @param {(widget: any) => string} getHTMLWidgetCellValue
+ */
 SocialCalc.TriggerIoAction.updateInputWidgetFormula = function(function_name, widgetCellId, getHTMLWidgetCellValue ) {
 
- var spreadsheet =  window.spreadsheet;
- if (spreadsheet == null) spreadsheet = window.ss
+ var spreadsheet =  /** @type {any} */(window).spreadsheet;
+ if (spreadsheet == null) spreadsheet = /** @type {any} */(window).ss
  var sheet = spreadsheet.sheet;
  var cell = sheet.cells[widgetCellId];
  var parameters = sheet.ioParameterList[widgetCellId];
@@ -5961,6 +6368,11 @@ SocialCalc.TriggerIoAction.updateInputWidgetFormula = function(function_name, wi
 }
 
 // On edit of Form Input widget - Update form data sheet 
+/**
+ * @param {string} function_name
+ * @param {string} formCellId
+ * @param {string} inputValue
+ */
 SocialCalc.TriggerIoAction.UpdateFormDataSheet = function(function_name, formCellId, inputValue) {
   var formDataViewer = (SocialCalc.CurrentSpreadsheetControlObject != null) 
        ? SocialCalc.CurrentSpreadsheetControlObject.formDataViewer 
@@ -5979,6 +6391,10 @@ SocialCalc.TriggerIoAction.UpdateFormDataSheet = function(function_name, formCel
 //getStandardizedValues(parameterData)  
 // gets cell data of range/coord OR param value as cell data - also get coord data as cell.coord is invalid when rows deleted
 // CALL getProcessedParameter  with request for values 
+/**
+ * @param {any} sheet
+ * @param {any} parameterData
+ */
 SocialCalc.Formula.getStandardizedValues = function(sheet, parameterData) {
   return SocialCalc.Formula.getStandardizedParameter(sheet, parameterData, true, true);
 }  
@@ -5986,6 +6402,10 @@ SocialCalc.Formula.getStandardizedValues = function(sheet, parameterData) {
 
 // getStandardizedCoords(parameterData)  // gets coord(s) of range/coord
 // CALL getProcessedParameter  with request for coord info
+/**
+ * @param {any} sheet
+ * @param {any} parameterData
+ */
 SocialCalc.Formula.getStandardizedCoords = function(sheet, parameterData) {
   return SocialCalc.Formula.getStandardizedParameter(sheet, parameterData, true, false);
 }  
@@ -5996,6 +6416,10 @@ SocialCalc.Formula.getStandardizedCoords = function(sheet, parameterData) {
  * @listParameter csv or array or single value - convert into single array
  * @return array of values - one dimension
  ****************/
+/**
+ * @param {any} sheet
+ * @param {any} listParameter
+ */
 SocialCalc.Formula.getStandardizedList = function(sheet, listParameter) {
   
   var listValues = [];
@@ -6046,10 +6470,17 @@ SocialCalc.Formula.getStandardizedList = function(sheet, listParameter) {
  *
  *
  *******************************/
+/**
+ * @param {any} sheet
+ * @param {any} parameterData
+ * @param {boolean} [includeCellCoord]
+ * @param {boolean} [includeCellData]
+ */
 SocialCalc.Formula.getStandardizedParameter = function(sheet, parameterData, includeCellCoord, includeCellData) {
-  
+
   //SET result = {}
   //SET store param values in result (.value .type)
+  /** @type {any} */
   var result = { type: parameterData.type, value:parameterData.value};
   if(includeCellData) result.celldata = [];
            
@@ -6187,6 +6618,7 @@ SocialCalc.Formula.SheetCache = {
 // Loading is handled elsewhere, e.g., in the recalc loop.
 //
 
+/** @param {string} sheetname */
 SocialCalc.Formula.FindInSheetCache = function(sheetname) {
 
    var str;
@@ -6220,6 +6652,11 @@ alert("Using SocialCalc.Formula.SheetCache.loadsheet - deprecated");
 // Returns the sheet object filled out with the str (a saved sheet).
 //
 
+/**
+ * @param {string} sheetname
+ * @param {string} str
+ * @param {boolean} [live]
+ */
 SocialCalc.Formula.AddSheetToCache = function(sheetname, str, live) {
 
    var newsheet = null;
@@ -6244,6 +6681,7 @@ SocialCalc.Formula.AddSheetToCache = function(sheetname, str, live) {
 // nsheet = SocialCalc.Formula.NormalizeSheetName(sheetname)
 //
 
+/** @param {string} sheetname */
 SocialCalc.Formula.NormalizeSheetName = function(sheetname) {
 
    if (SocialCalc.Callbacks.NormalizeSheetName) {
@@ -6326,6 +6764,7 @@ SocialCalc.Formula.FreshnessInfoReset = function() {
 // Returns: coord without any $'s
 //
 
+/** @param {string} coord */
 SocialCalc.Formula.PlainCoord = function(coord) {
 
    if (coord.indexOf("$") == -1) return coord;
@@ -6340,9 +6779,14 @@ SocialCalc.Formula.PlainCoord = function(coord) {
 // Returns: {c1: col, r1: row, c2: col, r2 = row} with c1/r1 upper left
 //
 
+/**
+ * @param {string} coord1
+ * @param {string} coord2
+ */
 SocialCalc.Formula.OrderRangeParts = function(coord1, coord2) {
 
    var cr1, cr2;
+   /** @type {{ c1?: number, r1?: number, c2?: number, r2?: number }} */
    var result = {};
 
    cr1 = SocialCalc.coordToCr(coord1);
@@ -6366,6 +6810,11 @@ SocialCalc.Formula.OrderRangeParts = function(coord1, coord2) {
 // Returns true or false
 //
 
+/**
+ * @param {any} value
+ * @param {any} type
+ * @param {any} criteria
+ */
 SocialCalc.Formula.TestCriteria = function(value, type, criteria) {
 
    var comparitor, basestring, basevalue, cond, testvalue;

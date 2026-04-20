@@ -1,4 +1,5 @@
-//
+// Opt this module into TypeScript strict checking via the r2scout config.
+// @ts-check
 /*
 // The module of the SocialCalc package for the optional popup menus in socialcalcspreadsheetcontrol.js
 //
@@ -6,7 +7,7 @@
 // All Rights Reserved.
 //
 // The contents of this file are subject to the Artistic License 2.0; you may not
-// use this file except in compliance with the License. You may obtain a copy of 
+// use this file except in compliance with the License. You may obtain a copy of
 // the License at http://socialcalc.org/licenses/al-20/.
 //
 // Some of the other files in the SocialCalc package are licensed under
@@ -18,7 +19,9 @@
 //
 */
 
-   var SocialCalc; // All values are stored in the master SocialCalc object
+   /** @type {any} */
+   // @ts-ignore - SocialCalc is declared ambiently; runtime re-declaration is intentional.
+   var SocialCalc;
    if (!SocialCalc) {
       SocialCalc = {};
       }
@@ -64,6 +67,10 @@
 
    // Override this for localization
 
+   /**
+    * @param {string} str
+    * @returns {string}
+    */
    SocialCalc.Popup.LocalizeString = function(str) {return str;};
 
 
@@ -79,6 +86,11 @@
 // Creates a control of type "type" as the children of document element "id" using "attribs"
 //
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @param {any} [attribs]
+ */
 SocialCalc.Popup.Create = function(type, id, attribs) {
 
    var pt = SocialCalc.Popup.Types[type];
@@ -97,6 +109,10 @@ SocialCalc.Popup.Create = function(type, id, attribs) {
 // Sets the value of control.
 //
 
+/**
+ * @param {string} id
+ * @param {any} value
+ */
 SocialCalc.Popup.SetValue = function(id, value) {
 
    var sp = SocialCalc.Popup;
@@ -125,6 +141,10 @@ SocialCalc.Popup.SetValue = function(id, value) {
 // Sets whether the control is disabled (true) or not (false).
 //
 
+/**
+ * @param {string} id
+ * @param {boolean} disabled
+ */
 SocialCalc.Popup.SetDisabled = function(id, disabled) {
 
    var sp = SocialCalc.Popup;
@@ -153,6 +173,10 @@ SocialCalc.Popup.SetDisabled = function(id, disabled) {
 // Returns the value of control.
 //
 
+/**
+ * @param {string} id
+ * @returns {any}
+ */
 SocialCalc.Popup.GetValue = function(id) {
 
    var sp = SocialCalc.Popup;
@@ -179,6 +203,10 @@ SocialCalc.Popup.GetValue = function(id) {
 // Gives "data" to the appropriate initialization code.
 //
 
+/**
+ * @param {string} id
+ * @param {any} data
+ */
 SocialCalc.Popup.Initialize = function(id, data) {
 
    var sp = SocialCalc.Popup;
@@ -203,6 +231,9 @@ SocialCalc.Popup.Initialize = function(id, data) {
 // Resets Popup, such as when turning to page.
 //
 
+/**
+ * @param {string} type
+ */
 SocialCalc.Popup.Reset = function(type) {
 
    var sp = SocialCalc.Popup;
@@ -220,6 +251,9 @@ SocialCalc.Popup.Reset = function(type) {
 // Should be called when the user clicks on a control to do the popup
 //
 
+/**
+ * @param {string} id
+ */
 SocialCalc.Popup.CClick = function(id) {
 
    var sp = SocialCalc.Popup;
@@ -300,6 +334,11 @@ SocialCalc.Popup.Cancel = function() {
 // If attribs.title, create one with that text, and optionally attribs.moveable.
 //
 
+/**
+ * @param {string} id
+ * @param {any} attribs
+ * @returns {HTMLElement}
+ */
 SocialCalc.Popup.CreatePopupDiv = function(id, attribs) {
 
    var pos, ele;
@@ -315,7 +354,7 @@ SocialCalc.Popup.CreatePopupDiv = function(id, attribs) {
 
    main.style.top = (pos.top+spcdata.mainele.offsetHeight)+"px";
    main.style.left = pos.left+"px";
-   main.style.zIndex = 100;
+   main.style.zIndex = /** @type {any} */ (100);
    main.style.backgroundColor = "#FFF";
    main.style.border = "1px solid black";
 
@@ -331,9 +370,14 @@ SocialCalc.Popup.CreatePopupDiv = function(id, attribs) {
          '<td style="font-size:10px;cursor:default;color:#666;" onclick="SocialCalc.Popup.Cancel();">&nbsp;X&nbsp;</td></tr></table>';
 
       if (attribs.moveable) {
-         spcdata.dragregistered = main.firstChild.firstChild.firstChild.firstChild;
-         SocialCalc.DragRegister(spcdata.dragregistered, true, true, 
-                    {MouseDown: SocialCalc.DragFunctionStart, 
+         // The DOM tree we just assigned via innerHTML guarantees these nodes exist.
+         var tableEle = /** @type {HTMLElement} */ (main.firstChild);
+         var tbodyEle = /** @type {HTMLElement} */ (tableEle.firstChild);
+         var trEle = /** @type {HTMLElement} */ (tbodyEle.firstChild);
+         var tdEle = /** @type {HTMLElement} */ (trEle.firstChild);
+         spcdata.dragregistered = tdEle;
+         SocialCalc.DragRegister(spcdata.dragregistered, true, true,
+                    {MouseDown: SocialCalc.DragFunctionStart,
                      MouseMove: SocialCalc.DragFunctionPosition,
                      MouseUp: SocialCalc.DragFunctionPosition,
                      Disabled: null, positionobj: main},
@@ -352,6 +396,10 @@ SocialCalc.Popup.CreatePopupDiv = function(id, attribs) {
 // and appropriate with respect to the main element controlling the popup.
 //
 
+/**
+ * @param {string} id
+ * @param {HTMLElement} container
+ */
 SocialCalc.Popup.EnsurePosition = function(id, container) {
 
    var sp = SocialCalc.Popup;
@@ -362,6 +410,10 @@ SocialCalc.Popup.EnsurePosition = function(id, container) {
    if (!main) {alert("No main popup element firstChild.");return};
    var popup = spcdata.popupele;
 
+   /**
+    * @param {any} ele
+    * @returns {{top: number, left: number, height: number, width: number, bottom: number, right: number}}
+    */
    function GetLayoutValues(ele) {
       var r = SocialCalc.GetElementPosition(ele);
       r.height = ele.offsetHeight;
@@ -441,6 +493,10 @@ SocialCalc.Popup.EnsurePosition = function(id, container) {
 // Utility function to get rid of the main popup div.
 //
 
+/**
+ * @param {HTMLElement | null} ele
+ * @param {any} dragregistered
+ */
 SocialCalc.Popup.DestroyPopupDiv = function(ele, dragregistered) {
 
    if (!ele) return;
@@ -459,6 +515,10 @@ SocialCalc.Popup.DestroyPopupDiv = function(ele, dragregistered) {
 // Color Utility Functions
 //
 
+/**
+ * @param {string} val
+ * @returns {string}
+ */
 SocialCalc.Popup.RGBToHex = function(val) {
 
    var sp = SocialCalc.Popup;
@@ -468,7 +528,7 @@ SocialCalc.Popup.RGBToHex = function(val) {
       }
    var rgbvals = val.match(/(\d+)\D+(\d+)\D+(\d+)/);
    if (rgbvals) {
-      return sp.ToHex(rgbvals[1])+sp.ToHex(rgbvals[2])+sp.ToHex(rgbvals[3]);
+      return sp.ToHex(Number(rgbvals[1]))+sp.ToHex(Number(rgbvals[2]))+sp.ToHex(Number(rgbvals[3]));
       }
    else {
       return "000000";
@@ -477,6 +537,10 @@ SocialCalc.Popup.RGBToHex = function(val) {
 
 SocialCalc.Popup.HexDigits="0123456789ABCDEF";
 
+/**
+ * @param {number} num
+ * @returns {string}
+ */
 SocialCalc.Popup.ToHex = function(num) {
    var sp = SocialCalc.Popup;
    var first=Math.floor(num / 16);
@@ -484,6 +548,10 @@ SocialCalc.Popup.ToHex = function(num) {
    return sp.HexDigits.charAt(first)+sp.HexDigits.charAt(second);
    }
 
+/**
+ * @param {string} str
+ * @returns {number}
+ */
 SocialCalc.Popup.FromHex = function(str) {
 
    var sp = SocialCalc.Popup;
@@ -492,6 +560,10 @@ SocialCalc.Popup.FromHex = function(str) {
    return ((first>=0)?first:0)*16+((second>=0)?second:0);
    }
 
+/**
+ * @param {string} val
+ * @returns {string}
+ */
 SocialCalc.Popup.HexToRGB = function(val) {
 
    var sp = SocialCalc.Popup;
@@ -500,17 +572,27 @@ SocialCalc.Popup.HexToRGB = function(val) {
 
    }
 
+/**
+ * @param {number} r
+ * @param {number} g
+ * @param {number} b
+ * @returns {string}
+ */
 SocialCalc.Popup.makeRGB = function(r, g, b) {
    return "rgb("+(r>0?r:0)+","+(g>0?g:0)+","+(b>0?b:0)+")";
    }
 
+/**
+ * @param {string} rgb
+ * @returns {{r: number, g: number, b: number}}
+ */
 SocialCalc.Popup.splitRGB = function(rgb) {
    var parts = rgb.match(/(\d+)\D+(\d+)\D+(\d+)\D/);
    if (!parts) {
       return {r:0, g:0, b:0};
       }
    else {
-      return {r: parts[1]-0, g: parts[2]-0, b: parts[3]-0};
+      return {r: Number(parts[1]), g: Number(parts[2]), b: Number(parts[3])};
       }
    }
 
@@ -554,12 +636,18 @@ SocialCalc.Popup.splitRGB = function(rgb) {
 
 SocialCalc.Popup.Types.List = {};
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @param {any} [attribs]
+ */
 SocialCalc.Popup.Types.List.Create = function(type, id, attribs) {
 
    var sp = SocialCalc.Popup;
    var spt = sp.Types;
    var spc = sp.Controls;
 
+   /** @type {{type: string, value: string, display: string, data: {[k: string]: any}}} */
    var spcid = {type: type, value: "", display: "", data: {}};
    //if (spc[id]) {alert("Already created "+id); return;}
    spc[id] = spcid;
@@ -578,9 +666,14 @@ SocialCalc.Popup.Types.List.Create = function(type, id, attribs) {
 
    }
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @param {any} value
+ */
 SocialCalc.Popup.Types.List.SetValue = function(type, id, value) {
 
-   var i;
+   var i, o;
 
    var sp = SocialCalc.Popup;
    var spt = sp.Types;
@@ -614,6 +707,11 @@ SocialCalc.Popup.Types.List.SetValue = function(type, id, value) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @param {boolean} disabled
+ */
 SocialCalc.Popup.Types.List.SetDisabled = function(type, id, disabled) {
 
    var i;
@@ -632,6 +730,11 @@ SocialCalc.Popup.Types.List.SetDisabled = function(type, id, disabled) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @returns {any}
+ */
 SocialCalc.Popup.Types.List.GetValue = function(type, id) {
 
    var sp = SocialCalc.Popup;
@@ -646,6 +749,11 @@ SocialCalc.Popup.Types.List.GetValue = function(type, id) {
 
 // data is: {value: initial value, attribs: {attribs stuff}, options: [{o: option-name, v: value-to-return, a: optional-attribs}, ...]}
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @param {any} data
+ */
 SocialCalc.Popup.Types.List.Initialize = function(type, id, data) {
 
    var a;
@@ -668,6 +776,9 @@ SocialCalc.Popup.Types.List.Initialize = function(type, id, data) {
    }
 
 
+/**
+ * @param {string} type
+ */
 SocialCalc.Popup.Types.List.Reset = function(type) {
 
    var sp = SocialCalc.Popup;
@@ -682,6 +793,10 @@ SocialCalc.Popup.Types.List.Reset = function(type) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.List.Show = function(type, id) {
 
    var i, ele, o, bg;
@@ -701,7 +816,10 @@ SocialCalc.Popup.Types.List.Show = function(type, id) {
       ele = document.createElement("div");
       ele.innerHTML = '<div style="cursor:default;padding:4px;background-color:#CCC;">'+str+'</div>';
 
-      spcdata.customele = ele.firstChild.firstChild.childNodes[1];
+      // innerHTML above guarantees these chains of firstChild nodes exist.
+      var outerDiv = /** @type {HTMLElement} */ (ele.firstChild);
+      var innerDiv = /** @type {HTMLElement} */ (outerDiv.firstChild);
+      spcdata.customele = innerDiv.childNodes[1];
       spcdata.listdiv = null;
       spcdata.contentele = ele;
       }
@@ -729,6 +847,11 @@ SocialCalc.Popup.Types.List.Show = function(type, id) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @returns {string}
+ */
 SocialCalc.Popup.Types.List.MakeList = function(type, id) {
 
    var i, ele, o, bg;
@@ -774,6 +897,11 @@ SocialCalc.Popup.Types.List.MakeList = function(type, id) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @returns {string}
+ */
 SocialCalc.Popup.Types.List.MakeCustom = function(type, id) {
 
    var SPLoc = SocialCalc.Popup.LocalizeString;
@@ -804,6 +932,10 @@ SocialCalc.Popup.Types.List.MakeCustom = function(type, id) {
    }
 
 
+/**
+ * @param {string} id
+ * @param {number | string} num
+ */
 SocialCalc.Popup.Types.List.ItemClicked = function(id, num) {
 
    var oele, str, nele;
@@ -819,7 +951,10 @@ SocialCalc.Popup.Types.List.ItemClicked = function(id, num) {
       str = SocialCalc.Popup.Types.List.MakeCustom("List", id);
       nele = document.createElement("div");
       nele.innerHTML = '<div style="cursor:default;padding:4px;background-color:#CCC;">'+str+'</div>';
-      spcdata.customele = nele.firstChild.firstChild.childNodes[1];
+      // innerHTML above guarantees the nested firstChild DOM is present.
+      var outerDivIC = /** @type {HTMLElement} */ (nele.firstChild);
+      var innerDivIC = /** @type {HTMLElement} */ (outerDivIC.firstChild);
+      spcdata.customele = innerDivIC.childNodes[1];
       spcdata.listdiv = null;
       spcdata.contentele = nele;
       spcdata.popupele.replaceChild(nele, oele);
@@ -841,6 +976,9 @@ SocialCalc.Popup.Types.List.ItemClicked = function(id, num) {
    }
 
 
+/**
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.List.CustomToList = function(id) {
 
    var oele, str, nele;
@@ -864,6 +1002,9 @@ SocialCalc.Popup.Types.List.CustomToList = function(id) {
    }
 
 
+/**
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.List.CustomOK = function(id) {
 
    var i, c;
@@ -879,6 +1020,10 @@ SocialCalc.Popup.Types.List.CustomOK = function(id) {
    }
 
 
+/**
+ * @param {string} id
+ * @param {HTMLElement} ele
+ */
 SocialCalc.Popup.Types.List.MouseMove = function(id, ele) {
 
    var col, i, c;
@@ -903,6 +1048,10 @@ SocialCalc.Popup.Types.List.MouseMove = function(id, ele) {
    
    }
 
+/**
+ * @param {string} type
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.List.Hide = function(type, id) {
 
    var sp = SocialCalc.Popup;
@@ -919,6 +1068,10 @@ SocialCalc.Popup.Types.List.Hide = function(type, id) {
 
    }
 
+/**
+ * @param {string} type
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.List.Cancel = function(type, id) {
 
    SocialCalc.Popup.Types.List.Hide(type, id);
@@ -958,12 +1111,18 @@ SocialCalc.Popup.Types.List.Cancel = function(type, id) {
 
 SocialCalc.Popup.Types.ColorChooser = {};
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @param {any} [attribs]
+ */
 SocialCalc.Popup.Types.ColorChooser.Create = function(type, id, attribs) {
 
    var sp = SocialCalc.Popup;
    var spt = sp.Types;
    var spc = sp.Controls;
 
+   /** @type {{type: string, value: string, display: string, data: {[k: string]: any}}} */
    var spcid = {type: type, value: "", display: "", data: {}};
    //if (spc[id]) {alert("Already created "+id); return;}
    spc[id] = spcid;
@@ -985,6 +1144,11 @@ SocialCalc.Popup.Types.ColorChooser.Create = function(type, id, attribs) {
 
    }
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @param {any} value
+ */
 SocialCalc.Popup.Types.ColorChooser.SetValue = function(type, id, value) {
 
    var i, img, pos;
@@ -1027,9 +1191,14 @@ SocialCalc.Popup.Types.ColorChooser.SetValue = function(type, id, value) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @param {boolean} disabled
+ */
 SocialCalc.Popup.Types.ColorChooser.SetDisabled = function(type, id, disabled) {
 
-   var i;
+   var i, img, pos;
 
    var sp = SocialCalc.Popup;
    var spt = sp.Types;
@@ -1061,6 +1230,11 @@ SocialCalc.Popup.Types.ColorChooser.SetDisabled = function(type, id, disabled) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @returns {any}
+ */
 SocialCalc.Popup.Types.ColorChooser.GetValue = function(type, id) {
 
    var sp = SocialCalc.Popup;
@@ -1073,6 +1247,11 @@ SocialCalc.Popup.Types.ColorChooser.GetValue = function(type, id) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @param {any} data
+ */
 SocialCalc.Popup.Types.ColorChooser.Initialize = function(type, id, data) {
 
    var a;
@@ -1093,6 +1272,9 @@ SocialCalc.Popup.Types.ColorChooser.Initialize = function(type, id, data) {
    }
 
 
+/**
+ * @param {string} type
+ */
 SocialCalc.Popup.Types.ColorChooser.Reset = function(type) {
 
    var sp = SocialCalc.Popup;
@@ -1107,6 +1289,10 @@ SocialCalc.Popup.Types.ColorChooser.Reset = function(type) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.ColorChooser.Show = function(type, id) {
 
    var i, ele, mainele;
@@ -1128,7 +1314,10 @@ SocialCalc.Popup.Types.ColorChooser.Show = function(type, id) {
       ele = document.createElement("div");
       ele.innerHTML = '<div style="cursor:default;padding:4px;background-color:#CCC;">'+str+'</div>';
 
-      spcdata.customele = ele.firstChild.firstChild.childNodes[2];
+      // innerHTML above guarantees the nested firstChild DOM is present.
+      var ccOuter = /** @type {HTMLElement} */ (ele.firstChild);
+      var ccInner = /** @type {HTMLElement} */ (ccOuter.firstChild);
+      spcdata.customele = ccInner.childNodes[2];
       spcdata.contentele = ele;
       }
    else {
@@ -1152,6 +1341,11 @@ SocialCalc.Popup.Types.ColorChooser.Show = function(type, id) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @returns {string}
+ */
 SocialCalc.Popup.Types.ColorChooser.MakeCustom = function(type, id) {
 
    var i, ele, o, bg;
@@ -1178,6 +1372,10 @@ SocialCalc.Popup.Types.ColorChooser.MakeCustom = function(type, id) {
    }
 
 
+/**
+ * @param {string} id
+ * @param {number | string} num
+ */
 SocialCalc.Popup.Types.ColorChooser.ItemClicked = function(id, num) {
 
    var oele, str, nele;
@@ -1191,6 +1389,9 @@ SocialCalc.Popup.Types.ColorChooser.ItemClicked = function(id, num) {
    }
 
 
+/**
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.ColorChooser.CustomToList = function(id) {
 
    var oele, str, nele;
@@ -1202,6 +1403,9 @@ SocialCalc.Popup.Types.ColorChooser.CustomToList = function(id) {
    }
 
 
+/**
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.ColorChooser.CustomOK = function(id) {
 
    var i, c;
@@ -1217,6 +1421,10 @@ SocialCalc.Popup.Types.ColorChooser.CustomOK = function(id) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.ColorChooser.Hide = function(type, id) {
 
    var sp = SocialCalc.Popup;
@@ -1230,6 +1438,10 @@ SocialCalc.Popup.Types.ColorChooser.Hide = function(type, id) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.ColorChooser.Cancel = function(type, id) {
 
    var sp = SocialCalc.Popup;
@@ -1244,6 +1456,11 @@ SocialCalc.Popup.Types.ColorChooser.Cancel = function(type, id) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @returns {HTMLElement}
+ */
 SocialCalc.Popup.Types.ColorChooser.CreateGrid = function (type, id) {
 
    var ele, pos, row, rowele, col, g;
@@ -1254,15 +1471,17 @@ SocialCalc.Popup.Types.ColorChooser.CreateGrid = function (type, id) {
    var SPLoc = sp.LocalizeString;
    var spcdata = spc[id].data;
    spcdata.grid = {};
+   /** @type {any} */
    var grid = spcdata.grid;
 
    var mainele = document.createElement("div");
 
-   ele = document.createElement("table");
-   ele.cellSpacing = 0;
-   ele.cellPadding = 0;
-   ele.style.width = "100px";
-   grid.table = ele;
+   /** @type {any} */
+   var tele = document.createElement("table");
+   tele.cellSpacing = 0;
+   tele.cellPadding = 0;
+   tele.style.width = "100px";
+   grid.table = tele;
 
    ele = document.createElement("tbody");
    grid.table.appendChild(ele);
@@ -1271,7 +1490,9 @@ SocialCalc.Popup.Types.ColorChooser.CreateGrid = function (type, id) {
    for (row=0; row<16; row++) {
       rowele = document.createElement("tr");
       for (col=0; col<5; col++) {
-         g = {};
+         /** @type {any} */
+         var gEntry = {};
+         g = gEntry;
          grid[row+","+col] = g;
          ele = document.createElement("td");
          ele.style.fontSize = "1px";
@@ -1299,11 +1520,15 @@ SocialCalc.Popup.Types.ColorChooser.CreateGrid = function (type, id) {
       '<td style="width:23px;height:16px;font-size:10px;text-align:center;cursor:pointer;" title="'+SPLoc("Custom")+'">#</td>'+
       '<td style="width:60px;height:16px;font-size:10px;text-align:center;cursor:pointer;">'+SPLoc("OK")+'</td>'+
       '</tr></table>';
-   grid.defaultbox = ele.firstChild.firstChild.firstChild.childNodes[0];
+   // innerHTML above guarantees the nested firstChild DOM (table>tbody>tr with 3 td children) is present.
+   var cgTable = /** @type {HTMLElement} */ (ele.firstChild);
+   var cgTbody = /** @type {HTMLElement} */ (cgTable.firstChild);
+   var cgTr = /** @type {HTMLElement} */ (cgTbody.firstChild);
+   grid.defaultbox = cgTr.childNodes[0];
    grid.defaultbox.onclick = spt.ColorChooser.DefaultClicked;
-   grid.custom = ele.firstChild.firstChild.firstChild.childNodes[1];
+   grid.custom = cgTr.childNodes[1];
    grid.custom.onclick = spt.ColorChooser.CustomClicked;
-   grid.msg = ele.firstChild.firstChild.firstChild.childNodes[2];
+   grid.msg = cgTr.childNodes[2];
    grid.msg.onclick = spt.ColorChooser.CloseOK;
    mainele.appendChild(ele);
 
@@ -1316,12 +1541,21 @@ SocialCalc.Popup.Types.ColorChooser.CreateGrid = function (type, id) {
 
    }
 
+/**
+ * @param {any} grid
+ * @param {number} row
+ * @param {number} col
+ * @returns {any}
+ */
 SocialCalc.Popup.Types.ColorChooser.gridToG = function(grid, row, col) {
 
    return grid[row+","+col];
 
    }
 
+/**
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.ColorChooser.DetermineColors = function(id) {
 
    var sp = SocialCalc.Popup;
@@ -1367,11 +1601,14 @@ SocialCalc.Popup.Types.ColorChooser.DetermineColors = function(id) {
    var x;
    for (row=0; row<16; row++) {
       x = commonrgb[row];
-      sptc.gridToG(grid,row,col).rgb = "rgb("+steps[x.charAt(0)-0]+","+steps[x.charAt(1)-0]+","+steps[x.charAt(2)-0]+")";
+      sptc.gridToG(grid,row,col).rgb = "rgb("+steps[Number(x.charAt(0))]+","+steps[Number(x.charAt(1))]+","+steps[Number(x.charAt(2))]+")";
       }
 
    }
 
+/**
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.ColorChooser.SetColors = function(id) {
 
    var row, col, g, ele, rgb;
@@ -1419,6 +1656,9 @@ SocialCalc.Popup.Types.ColorChooser.SetColors = function(id) {
 
    }
 
+/**
+ * @param {any} e
+ */
 SocialCalc.Popup.Types.ColorChooser.GridMouseDown = function(e) {
 
    var event = e || window.event;
@@ -1484,6 +1724,9 @@ SocialCalc.Popup.Types.ColorChooser.GridMouseDown = function(e) {
    }
 
 
+/**
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.ColorChooser.ControlClicked = function(id) {
 
    var sp = SocialCalc.Popup;
@@ -1501,6 +1744,9 @@ SocialCalc.Popup.Types.ColorChooser.ControlClicked = function(id) {
 
    }
 
+/**
+ * @param {any} [e]
+ */
 SocialCalc.Popup.Types.ColorChooser.DefaultClicked = function(e) {
 
    var event = e || window.event;
@@ -1522,6 +1768,9 @@ SocialCalc.Popup.Types.ColorChooser.DefaultClicked = function(e) {
 
    }
 
+/**
+ * @param {any} [e]
+ */
 SocialCalc.Popup.Types.ColorChooser.CustomClicked = function(e) {
 
    var event = e || window.event;
@@ -1542,7 +1791,10 @@ SocialCalc.Popup.Types.ColorChooser.CustomClicked = function(e) {
    str = SocialCalc.Popup.Types.ColorChooser.MakeCustom("ColorChooser", id);
    nele = document.createElement("div");
    nele.innerHTML = '<div style="cursor:default;padding:4px;background-color:#CCC;">'+str+'</div>';
-   spcdata.customele = nele.firstChild.firstChild.childNodes[2];
+   // innerHTML above guarantees the nested firstChild DOM is present.
+   var ccOuter2 = /** @type {HTMLElement} */ (nele.firstChild);
+   var ccInner2 = /** @type {HTMLElement} */ (ccOuter2.firstChild);
+   spcdata.customele = ccInner2.childNodes[2];
    spcdata.contentele = nele;
    spcdata.popupele.replaceChild(nele, oele);
 
@@ -1556,6 +1808,9 @@ SocialCalc.Popup.Types.ColorChooser.CustomClicked = function(e) {
 
 
 
+/**
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.ColorChooser.CustomToGrid = function(id) {
 
    var oele, str, nele;
@@ -1584,6 +1839,9 @@ SocialCalc.Popup.Types.ColorChooser.CustomToGrid = function(id) {
    }
 
 
+/**
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.ColorChooser.CustomOK = function(id) {
 
    var i, c;
@@ -1598,6 +1856,9 @@ SocialCalc.Popup.Types.ColorChooser.CustomOK = function(id) {
    
    }
 
+/**
+ * @param {any} [e]
+ */
 SocialCalc.Popup.Types.ColorChooser.CloseOK = function(e) {
 
    var event = e || window.event;

@@ -18,6 +18,10 @@
 }(typeof globalThis !== 'undefined' ? globalThis : this, function (window) {
 "use strict";
 
+// Opt-in TypeScript checking for this file. socialcalcconstants.js is almost entirely
+// a single object literal of localization strings plus two tiny utility functions,
+// so it should strict-check easily against the existing .d.ts.
+// @ts-check
 //
 /*
 // The module of the SocialCalc package with customizable constants, strings, etc.
@@ -49,6 +53,8 @@
 //
 */
 
+/** @type {any} */
+// @ts-ignore - SocialCalc is declared ambiently; runtime re-declaration is intentional.
 var SocialCalc;
 if (!SocialCalc) SocialCalc = {};
 
@@ -866,6 +872,9 @@ SocialCalc.ConstantsDefaultClasses = {
 // lets you combine both.
 //
 
+/**
+ * @param {string} [prefix]
+ */
 SocialCalc.ConstantsSetClasses = function(prefix) {
 
    var defaults = SocialCalc.ConstantsDefaultClasses;
@@ -890,6 +899,9 @@ SocialCalc.ConstantsSetClasses = function(prefix) {
 
 // Set the image prefix on all images.
 
+/**
+ * @param {string} imagePrefix
+ */
 SocialCalc.ConstantsSetImagePrefix = function(imagePrefix) {
 
    var scc = SocialCalc.Constants;
@@ -904,7 +916,7 @@ SocialCalc.ConstantsSetImagePrefix = function(imagePrefix) {
    }
 
 
-//
+// @ts-check
 // The main SocialCalc code module of the SocialCalc package
 //
 /*
@@ -997,6 +1009,8 @@ More comments yet to come...
 */
 
 
+/** @type {any} */
+// @ts-expect-error: redeclaration of SocialCalc (also declared as namespace in .d.ts)
 var SocialCalc;
 if (!SocialCalc) SocialCalc = {};
 
@@ -1020,7 +1034,8 @@ SocialCalc.Callbacks = {
 
    expand_wiki: null,
 
-   expand_markup: function(displayvalue, sheetobj, linkstyle) // the old function to expand wiki text - may be replaced
+   expand_markup: /** @param {any} displayvalue @param {any} sheetobj @param {any} linkstyle */
+                  function(displayvalue, sheetobj, linkstyle) // the old function to expand wiki text - may be replaced
                    {return SocialCalc.default_expand_markup(displayvalue, sheetobj, linkstyle);},
 
    // MakePageLink is used to create the href for a link to another "page"
@@ -1084,6 +1099,7 @@ SocialCalc.Callbacks = {
 
 // Eddy - SocialCalc.Cell
 
+/** @param {any} coord */
 SocialCalc.Cell = function(coord) {
 
    this.coord = coord;
@@ -1165,6 +1181,7 @@ SocialCalc.Sheet = function() {
 // Resets (and/or initializes) sheet data values.
 //
 
+/** @param {any} sheet @param {any} reload */
 SocialCalc.ResetSheet = function(sheet, reload) {
 
    // properties:
@@ -1227,6 +1244,7 @@ SocialCalc.ResetSheet = function(sheet, reload) {
 // Methods:
 
 SocialCalc.Sheet.prototype.ResetSheet = function() {SocialCalc.ResetSheet(this);};
+/** @param {any} newcell */
 SocialCalc.Sheet.prototype.AddCell = function(newcell) {return this.cells[newcell.coord]=newcell;};
 SocialCalc.Sheet.prototype.LastCol = function() {
     var last_col = 1;
@@ -1248,24 +1266,36 @@ SocialCalc.Sheet.prototype.LastRow = function() {
     }
     return last_row;
 }
+/** @param {any} coord */
 SocialCalc.Sheet.prototype.GetAssuredCell = function(coord) {
    return this.cells[coord] || this.AddCell(new SocialCalc.Cell(coord));
    };
+/** @param {any} savedsheet */
 SocialCalc.Sheet.prototype.ParseSheetSave = function(savedsheet) {SocialCalc.ParseSheetSave(savedsheet,this);};
+/** @param {any} cell @param {any} parts @param {any} j */
 SocialCalc.Sheet.prototype.CellFromStringParts = function(cell, parts, j) {return SocialCalc.CellFromStringParts(this, cell, parts, j);};
+/** @param {any} range @param {any} canonicalize */
 SocialCalc.Sheet.prototype.CreateSheetSave = function(range, canonicalize) {return SocialCalc.CreateSheetSave(this, range, canonicalize);};
+/** @param {any} cell */
 SocialCalc.Sheet.prototype.CellToString = function(cell) {return SocialCalc.CellToString(this, cell);};
+/** @param {any} full */
 SocialCalc.Sheet.prototype.CanonicalizeSheet = function(full) {return SocialCalc.CanonicalizeSheet(this, full);};
+/** @param {any} coord */
 SocialCalc.Sheet.prototype.EncodeCellAttributes = function(coord) {return SocialCalc.EncodeCellAttributes(this, coord);};
 SocialCalc.Sheet.prototype.EncodeSheetAttributes = function() {return SocialCalc.EncodeSheetAttributes(this);};
+/** @param {any} coord @param {any} attribs @param {any} range */
 SocialCalc.Sheet.prototype.DecodeCellAttributes = function(coord, attribs, range) {return SocialCalc.DecodeCellAttributes(this, coord, attribs, range);};
+/** @param {any} attribs */
 SocialCalc.Sheet.prototype.DecodeSheetAttributes = function(attribs) {return SocialCalc.DecodeSheetAttributes(this, attribs);};
 
+/** @param {any} cmd @param {any} saveundo */
 SocialCalc.Sheet.prototype.ScheduleSheetCommands = function(cmd, saveundo) {return SocialCalc.ScheduleSheetCommands(this, cmd, saveundo);};
 SocialCalc.Sheet.prototype.SheetUndo = function() {return SocialCalc.SheetUndo(this);};
 SocialCalc.Sheet.prototype.SheetRedo = function() {return SocialCalc.SheetRedo(this);};
 SocialCalc.Sheet.prototype.CreateAuditString = function() {return SocialCalc.CreateAuditString(this);};
+/** @param {any} atype @param {any} style */
 SocialCalc.Sheet.prototype.GetStyleNum = function(atype, style) {return SocialCalc.GetStyleNum(this, atype, style);};
+/** @param {any} atype @param {any} num */
 SocialCalc.Sheet.prototype.GetStyleString = function(atype, num) {return SocialCalc.GetStyleString(this, atype, num);};
 SocialCalc.Sheet.prototype.RecalcSheet = function() {return SocialCalc.RecalcSheet(this);};
 
@@ -1350,12 +1380,21 @@ SocialCalc.Sheet.prototype.RecalcSheet = function() {return SocialCalc.RecalcShe
 
 // Functions:
 
+/** @param {any} savedsheet @param {any} sheetobj */
 SocialCalc.ParseSheetSave = function(savedsheet,sheetobj) {
 
    var lines=savedsheet.split(/\r\n|\n/);
+   /** @type {any} */
    var parts=[];
-   var line;
-   var i, j, t, v, coord, cell, attribs, name;
+   /** @type {any} */ var line;
+   /** @type {any} */ var i;
+   /** @type {any} */ var j;
+   /** @type {any} */ var t;
+   /** @type {any} */ var v;
+   /** @type {any} */ var coord;
+   /** @type {any} */ var cell;
+   /** @type {any} */ var attribs;
+   /** @type {any} */ var name;
    var scc = SocialCalc.Constants;
 
    for (i=0;i<lines.length;i++) {
@@ -1537,9 +1576,10 @@ alert(scc.s_pssUnknownLineType+" '"+parts[0]+"'");
 // and fills in cell assuming save format.
 //
 
+/** @param {any} sheet @param {any} cell @param {any} parts @param {any} j */
 SocialCalc.CellFromStringParts = function(sheet, cell, parts, j) {
 
-   var cell, t, v;
+   var t, v, ro;
 
    while (t=parts[j++]) {
       switch (t) {
@@ -1668,6 +1708,7 @@ SocialCalc.sheetfieldsxlatxlt = ["cellformat", "cellformat", "valueformat", "val
 // (as clipboard data with "copiedfrom" set).
 //
 
+/** @param {any} sheetobj @param {any} range @param {any} canonicalize */
 SocialCalc.CreateSheetSave = function(sheetobj, range, canonicalize) {
 
    var cell, cr1, cr2, row, col, coord, attrib, line, value, formula, i, t, r, b, l, name, blanklen;
@@ -1777,6 +1818,7 @@ SocialCalc.CreateSheetSave = function(sheetobj, range, canonicalize) {
 // line = SocialCalc.CellToString(sheet, cell)
 //
 
+/** @param {any} sheet @param {any} cell */
 SocialCalc.CellToString = function(sheet, cell) {
 
    var cell, line, value, formula, t, r, b, l, xlt;
@@ -1865,13 +1907,27 @@ SocialCalc.CellToString = function(sheet, cell) {
 // sheetobj.xlt should be deleted when you are finished using it
 //
 
+/** @param {any} sheetobj @param {any} full */
 SocialCalc.CanonicalizeSheet = function(sheetobj, full) {
 
-   var l, coord, cr, cell, filled, an, a, newa, newxlat, used, ahash, i, v;
+   /** @type {any} */ var l;
+   /** @type {any} */ var coord;
+   /** @type {any} */ var cr;
+   /** @type {any} */ var cell;
+   /** @type {any} */ var filled;
+   /** @type {any} */ var an;
+   /** @type {any} */ var a;
+   /** @type {any} */ var newa;
+   /** @type {any} */ var newxlat;
+   /** @type {any} */ var used;
+   /** @type {any} */ var ahash;
+   /** @type {any} */ var i;
+   /** @type {any} */ var v;
    var maxrow = 0;
    var maxcol = 0;
    var alist = ["borderstyle", "cellformat", "color", "font", "layout", "valueformat"];
 
+   /** @type {any} */
    var xlt = {};
 
    xlt.namesorder = []; // always return a sorted list
@@ -1988,7 +2044,7 @@ SocialCalc.CanonicalizeSheet = function(sheetobj, full) {
    a = {"height": 1, "hide": 1}; // look at explicit row settings
    for (v in a) {
       for (cr in sheetobj.rowattribs[v]) {
-         if (cr > maxrow) maxrow = cr;
+         if ((cr-0) > maxrow) maxrow = cr-0;
          }
       }
    a = {"hide": 1, "width": 1}; // look at explicit col settings
@@ -2037,26 +2093,32 @@ SocialCalc.CanonicalizeSheet = function(sheetobj, full) {
 //    attribname: {def: true/false, val: full-value}
 //
 
+/** @param {any} sheet @param {any} coord */
 SocialCalc.EncodeCellAttributes = function(sheet, coord) {
 
-   var value, i, b, bb;
+   var value, i, b, bb, parts;
+   /** @type {any} */
    var result = {};
 
+   /** @param {any} name */
    var InitAttrib = function(name) {
       result[name] = {def: true, val: ""};
       }
 
+   /** @param {any} namelist */
    var InitAttribs = function(namelist) {
       for (var i=0; i<namelist.length; i++) {
          InitAttrib(namelist[i]);
          }
       }
 
+   /** @param {any} name @param {any} v */
    var SetAttrib = function(name, v) {
       result[name].def = false;
       result[name].val = v || "";
       }
 
+   /** @param {any} name @param {any} v */
    var SetAttribStar = function(name, v) {
       if (v=="*") return;
       result[name].def = false;
@@ -2161,27 +2223,36 @@ SocialCalc.EncodeCellAttributes = function(sheet, coord) {
 //    attribname: {def: true/false, val: full-value}
 //
 
+/** @param {any} sheet */
 SocialCalc.EncodeSheetAttributes = function(sheet) {
 
+   /** @type {any} */
    var value;
+   /** @type {any} */
+   var parts;
    var attribs = sheet.attribs;
+   /** @type {any} */
    var result = {};
 
+   /** @param {any} name */
    var InitAttrib = function(name) {
       result[name] = {def: true, val: ""};
       }
 
+   /** @param {any} namelist */
    var InitAttribs = function(namelist) {
       for (var i=0; i<namelist.length; i++) {
          InitAttrib(namelist[i]);
          }
       }
 
+   /** @param {any} name @param {any} v */
    var SetAttrib = function(name, v) {
       result[name].def = false;
       result[name].val = v || value;
       }
 
+   /** @param {any} name @param {any} v */
    var SetAttribStar = function(name, v) {
       if (v=="*") return;
       result[name].def = false;
@@ -2292,14 +2363,16 @@ SocialCalc.EncodeSheetAttributes = function(sheet) {
 // If range is provided, the commands are executed on the whole range.
 //
 
+/** @param {any} sheet @param {any} coord @param {any} newattribs @param {any} range */
 SocialCalc.DecodeCellAttributes = function(sheet, coord, newattribs, range) {
 
-   var value, b, bb;
+   var value, b, bb, i;
 
    var cell = sheet.GetAssuredCell(coord);
 
    var changed = false;
 
+   /** @param {any} attribname @param {any} oldval @param {any} cmdname */
    var CheckChanges = function(attribname, oldval, cmdname) {
       var val;
       if (newattribs[attribname]) {
@@ -2317,6 +2390,7 @@ SocialCalc.DecodeCellAttributes = function(sheet, coord, newattribs, range) {
 
    var cmdstr = "";
 
+   /** @param {any} str */
    var DoCmd = function(str) {
       if (cmdstr) cmdstr += "\n";
       cmdstr += "set "+(range || coord)+" "+str;
@@ -2429,12 +2503,14 @@ SocialCalc.DecodeCellAttributes = function(sheet, coord, newattribs, range) {
 // Returns a non-null string if any commands were executed, null otherwise.
 //
 
+/** @param {any} sheet @param {any} newattribs */
 SocialCalc.DecodeSheetAttributes = function(sheet, newattribs) {
 
    var value;
    var attribs = sheet.attribs;
    var changed = false;
 
+   /** @param {any} attribname @param {any} oldval @param {any} cmdname */
    var CheckChanges = function(attribname, oldval, cmdname) {
       var val;
       if (newattribs[attribname]) {
@@ -2452,6 +2528,7 @@ SocialCalc.DecodeSheetAttributes = function(sheet, newattribs) {
 
    var cmdstr = "";
 
+   /** @param {any} str */
    var DoCmd = function(str) {
       if (cmdstr) cmdstr += "\n";
       cmdstr += "set sheet "+str;
@@ -2550,6 +2627,7 @@ SocialCalc.DecodeSheetAttributes = function(sheet, newattribs) {
 // SocialCalc.SheetCommandInfo - object with information used during command execution
 //
 
+/** @param {any} sheetobj */
 SocialCalc.SheetCommandInfo = function(sheetobj) {
 
    this.sheetobj = sheetobj; // sheet being operated on
@@ -2572,6 +2650,7 @@ SocialCalc.SheetCommandInfo = function(sheetobj) {
 // statuscallback is called at the beginning (cmdstart) and end (cmdend).
 //
 
+/** @param {any} sheet @param {any} cmdstr @param {any} saveundo */
 SocialCalc.ScheduleSheetCommands = function(sheet, cmdstr, saveundo) {
 
    var sci = sheet.sci;
@@ -2592,6 +2671,7 @@ SocialCalc.ScheduleSheetCommands = function(sheet, cmdstr, saveundo) {
 
    }
 
+/** @param {any} sci @param {any} parseobj @param {any} saveundo */
 SocialCalc.SheetCommandsTimerRoutine = function(sci, parseobj, saveundo) {
 
    var errortext;
@@ -2602,7 +2682,7 @@ SocialCalc.SheetCommandsTimerRoutine = function(sci, parseobj, saveundo) {
       try {
         errortext = SocialCalc.ExecuteSheetCommand(sci.sheetobj, parseobj, saveundo);
       } catch (err) {
-        errortext = err.message
+        errortext = err instanceof Error ? err.message : String(err);
       }
 
       // Error - Use  log on server   OR  alert on client
@@ -2616,7 +2696,7 @@ SocialCalc.SheetCommandsTimerRoutine = function(sci, parseobj, saveundo) {
 
       parseobj.NextLine();
 
-      if (((new Date()) - starttime) >= sci.maxtimeslice) { // if taking too long, give up CPU for a while
+      if ((Date.now() - starttime.getTime()) >= sci.maxtimeslice) { // if taking too long, give up CPU for a while
          sci.timerobj = window.setTimeout(function() {
             SocialCalc.SheetCommandsTimerRoutine(sci, parseobj, saveundo);
          }, sci.timerdelay);
@@ -2672,19 +2752,141 @@ SocialCalc.SheetCommandsTimerRoutine = function(sci, parseobj, saveundo) {
 // If saveundo is true, then undo information is saved in sheet.changes.
 //
 
+/** @param {any} sheet @param {any} cmd @param {any} saveundo */
 SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
 
-   var cmdstr, cmd1, rest, what, attrib, num, pos, pos2, errortext, undostart, val;
-   var cr1, cr2, col, row, cr, cell, newcell;
-   var fillright, rowstart, colstart, crbase, rowoffset, coloffset, basecell;
-   var clipsheet, cliprange, numcols, numrows, attribtable;
-   var colend, rowend, newcolstart, newrowstart, newcolend, newrowend, rownext, colnext, colthis, cellnext;
-   var lastrow, lastcol, rowbefore, colbefore, oldformula, oldcr;
-   var cols, dirs, lastsortcol, i, sortlist, sortcells, sortvalues, sorttypes;
-   var sortfunction, slen, valtype, originalrow, sortedcr;
-   var name, v1, v2;
+   /** @type {any} */
+   var cmdstr;
+   /** @type {any} */
+   var cmd1;
+   /** @type {any} */
+   var rest;
+   /** @type {any} */
+   var what;
+   /** @type {any} */
+   var attrib;
+   /** @type {any} */
+   var num;
+   /** @type {any} */
+   var pos;
+   /** @type {any} */
+   var pos2;
+   /** @type {any} */
+   var errortext;
+   /** @type {any} */
+   var undostart;
+   /** @type {any} */
+   var val;
+   /** @type {any} */
+   var cr1;
+   /** @type {any} */
+   var cr2;
+   /** @type {any} */
+   var col;
+   /** @type {any} */
+   var row;
+   /** @type {any} */
+   var cr;
+   /** @type {any} */
+   var cell;
+   /** @type {any} */
+   var newcell;
+   /** @type {any} */
+   var fillright;
+   /** @type {any} */
+   var rowstart;
+   /** @type {any} */
+   var colstart;
+   /** @type {any} */
+   var crbase;
+   /** @type {any} */
+   var rowoffset;
+   /** @type {any} */
+   var coloffset;
+   /** @type {any} */
+   var basecell;
+   /** @type {any} */
+   var clipsheet;
+   /** @type {any} */
+   var cliprange;
+   /** @type {any} */
+   var numcols;
+   /** @type {any} */
+   var numrows;
+   /** @type {any} */
+   var attribtable;
+   /** @type {any} */
+   var colend;
+   /** @type {any} */
+   var rowend;
+   /** @type {any} */
+   var newcolstart;
+   /** @type {any} */
+   var newrowstart;
+   /** @type {any} */
+   var newcolend;
+   /** @type {any} */
+   var newrowend;
+   /** @type {any} */
+   var rownext;
+   /** @type {any} */
+   var colnext;
+   /** @type {any} */
+   var colthis;
+   /** @type {any} */
+   var cellnext;
+   /** @type {any} */
+   var lastrow;
+   /** @type {any} */
+   var lastcol;
+   /** @type {any} */
+   var rowbefore;
+   /** @type {any} */
+   var colbefore;
+   /** @type {any} */
+   var oldformula;
+   /** @type {any} */
+   var oldcr;
+   /** @type {any} */
+   var cols;
+   /** @type {any} */
+   var dirs;
+   /** @type {any} */
+   var lastsortcol;
+   /** @type {any} */
+   var i;
+   /** @type {any} */
+   var sortlist;
+   /** @type {any} */
+   var sortcells;
+   /** @type {any} */
+   var sortvalues;
+   /** @type {any} */
+   var sorttypes;
+   /** @type {any} */
+   var sortfunction;
+   /** @type {any} */
+   var slen;
+   /** @type {any} */
+   var valtype;
+   /** @type {any} */
+   var originalrow;
+   /** @type {any} */
+   var sortedcr;
+   /** @type {any} */
+   var name;
+   /** @type {any} */
+   var v1;
+   /** @type {any} */
+   var v2;
+   /** @type {any} */
    var cmdextension;
-   var col, row, editor, undoNum, trackLine;
+   /** @type {any} */
+   var editor;
+   /** @type {any} */
+   var undoNum;
+   /** @type {any} */
+   var trackLine;
    // Declared here so assignments in the paste/quash/sort branches below
    // don't become implicit globals in strict-mode runtimes (workerd et al).
    var sourceColname, colWidth, colHide, sourceRow, rowHide;
@@ -3094,7 +3296,9 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
          what = cmd.NextToken();
          rest = cmd.RestOfString();
          ParseRange();
+         /** @param {boolean} down */
          function increment_amount(down) {
+            /** @param {string | null | undefined} type */
             function valid_datatype(type) {
 		return type == "v" || type == "c";
             }
@@ -3153,7 +3357,7 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
                if (rest == "all" || rest == "formats") {
                   for (attrib in cellProperties) {
                      if (cellProperties[attrib] == 1) continue; // copy only format attributes
-                     if (typeof basecell[attrib] === undefined || cellProperties[attrib] == 3) {
+                     if (typeof basecell[attrib] === "undefined" || cellProperties[attrib] == 3) {
                         delete cell[attrib];
                         }
                      else {
@@ -3263,7 +3467,7 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
 
                  for (attrib in cellProperties) {
                      if (cellProperties[attrib] == 1) continue; // copy only format attributes
-                     if (typeof basecell[attrib] === undefined || cellProperties[attrib] == 3) {
+                     if (typeof basecell[attrib] === "undefined" || cellProperties[attrib] == 3) {
                         delete cell[attrib];
                         }
                      else {
@@ -3350,6 +3554,7 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
                }
             }
 
+         /** @param {any} a @param {any} b */
          sortfunction = function(a, b) { // a comparison function that can handle all the type variations
             var i, a1, b1, ta, cresult;
             for (i=0; i<=lastsortcol; i++) {
@@ -3565,6 +3770,7 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
          var tempRenderContext = new SocialCalc.RenderContext(sheet)
          tempRenderContext.CalculateCellSkipData()
 
+         /** @type {any} */
          var cellsToExpand = {} // Keep track of all merge spans we've expanded
                                 // so we don't expand one twice
          for (var skipCell in tempRenderContext.cellskip) {
@@ -3725,6 +3931,7 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
          var tempRenderContext = new SocialCalc.RenderContext(sheet)
          tempRenderContext.CalculateCellSkipData()
 
+         /** @type {any} */
          var cellsToShrink = {} // Keep track of shrinked cells, so we don't do it twice
          for (var skipCell in tempRenderContext.cellskip) {
              var skipCellCR = SocialCalc.coordToCr(skipCell)
@@ -3787,7 +3994,20 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
       case "movepaste":
       case "moveinsert":
 
-         var movingcells, dest, destcr, inserthoriz, insertvert, pushamount, movedto;
+         /** @type {any} */
+         var movingcells;
+         /** @type {any} */
+         var dest;
+         /** @type {any} */
+         var destcr;
+         /** @type {any} */
+         var inserthoriz;
+         /** @type {any} */
+         var insertvert;
+         /** @type {any} */
+         var pushamount;
+         /** @type {any} */
+         var movedto;
 
          sheet.renderneeded = true;
          sheet.changedrendervalues = true;
@@ -3823,7 +4043,7 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
                movingcells[cr] = new SocialCalc.Cell(cr); // create new cell to copy
 
                for (attrib in cellProperties) { // go through each property
-                  if (typeof cell[attrib] === undefined) { // don't copy undefined things and no need to delete
+                  if (typeof cell[attrib] === "undefined") { // don't copy undefined things and no need to delete
                      continue;
                      }
                   else {
@@ -3912,7 +4132,7 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
                   if (rest == "all" || rest == "formats") {
                      for (attrib in cellProperties) {
                         if (cellProperties[attrib] == 1) continue; // copy only format attributes
-                        if (typeof basecell[attrib] === undefined || cellProperties[attrib] == 3) {
+                        if (typeof basecell[attrib] === "undefined" || cellProperties[attrib] == 3) {
                            delete cell[attrib];
                            }
                         else {
@@ -3953,7 +4173,7 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
                   if (rest == "all" || rest == "formats") {
                      for (attrib in cellProperties) {
                         if (cellProperties[attrib] == 1) continue; // copy only format attributes
-                        if (typeof basecell[attrib] === undefined || cellProperties[attrib] == 3) {
+                        if (typeof basecell[attrib] === "undefined" || cellProperties[attrib] == 3) {
                            delete cell[attrib];
                            }
                         else {
@@ -4003,7 +4223,7 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
                if (rest == "all" || rest == "formats") {
                   for (attrib in cellProperties) {
                      if (cellProperties[attrib] == 1) continue; // copy only format attributes
-                     if (typeof basecell[attrib] === undefined || cellProperties[attrib] == 3) {
+                     if (typeof basecell[attrib] === "undefined" || cellProperties[attrib] == 3) {
                         delete cell[attrib];
                         }
                      else {
@@ -4244,6 +4464,7 @@ alert(cmdstr+"|"+sheet.changes.stack.length+"--"+ustack);
 
    }
 
+/** @param {any} sheet */
 SocialCalc.SheetUndo = function(sheet) {
 
    var i;
@@ -4260,6 +4481,7 @@ SocialCalc.SheetUndo = function(sheet) {
 
    }
 
+/** @param {any} sheet */
 SocialCalc.SheetRedo = function(sheet) {
 
    var tos, i;
@@ -4279,6 +4501,7 @@ SocialCalc.SheetRedo = function(sheet) {
 
    }
 
+/** @param {any} sheet */
 SocialCalc.CreateAuditString = function(sheet) {
 
    var i, j;
@@ -4295,6 +4518,7 @@ SocialCalc.CreateAuditString = function(sheet) {
 
    }
 
+/** @param {any} sheet @param {any} atype @param {any} style */
 SocialCalc.GetStyleNum = function(sheet, atype, style) {
 
    var num;
@@ -4312,6 +4536,7 @@ SocialCalc.GetStyleNum = function(sheet, atype, style) {
 
    }
 
+/** @param {any} sheet @param {any} atype @param {any} num */
 SocialCalc.GetStyleString = function(sheet, atype, num) {
 
    if (!num) return null; // zero, null, and undefined return null
@@ -4327,6 +4552,7 @@ SocialCalc.GetStyleString = function(sheet, atype, num) {
 // If not what you want, use absolute references.
 //
 
+/** @param {any} formula @param {any} coloffset @param {any} rowoffset */
 SocialCalc.OffsetFormulaCoords = function(formula, coloffset, rowoffset) {
 
    var parseinfo, ttext, ttype, i, cr, newcr;
@@ -4392,9 +4618,10 @@ SocialCalc.OffsetFormulaCoords = function(formula, coloffset, rowoffset) {
 // Change all cell references to cells starting with col/row by offsets
 //
 
+/** @param {any} formula @param {any} col @param {any} coloffset @param {any} row @param {any} rowoffset */
 SocialCalc.AdjustFormulaCoords = function(formula, col, coloffset, row, rowoffset) {
 
-   var ttype, ttext, i, newcr;
+   var ttype, ttext, i, newcr, cr, parseinfo;
    var updatedformula = "";
    var sheetref = false;
    var scf = SocialCalc.Formula;
@@ -4476,9 +4703,10 @@ SocialCalc.AdjustFormulaCoords = function(formula, col, coloffset, row, rowoffse
 // Handle range extents specially.
 //
 
+/** @param {any} formula @param {any} movedto */
 SocialCalc.ReplaceFormulaCoords = function(formula, movedto) {
 
-   var ttype, ttext, i, newcr, coord;
+   var ttype, ttext, i, newcr, coord, cr, parseinfo;
    var updatedformula = "";
    var sheetref = false;
    var scf = SocialCalc.Formula;
@@ -4573,6 +4801,7 @@ SocialCalc.RecalcInfo = {
    // LoadSheet: a function that returns true if started a load or false if not.
    //
 
+   /** @param {any} sheetname */
    LoadSheet: function(sheetname) {return false;} // default returns not found
 
    }
@@ -4627,6 +4856,7 @@ SocialCalc.RecalcCheckInfo = function() { // initialize a RecalcCheckInfo object
 
 // Recalc the entire sheet
 
+/** @param {any} sheet */
 SocialCalc.RecalcSheet = function(sheet) {
 
    var coord, err, recalcdata;
@@ -4691,6 +4921,7 @@ SocialCalc.RecalcClearTimeout = function() {
 // If sheetname is null, then the sheetname waiting for will be used.
 //
 
+/** @param {any} sheetname @param {any} str @param {any} recalcneeded @param {any} live */
 SocialCalc.RecalcLoadedSheet = function(sheetname, str, recalcneeded, live) {
 
    var sheet;
@@ -4731,6 +4962,7 @@ SocialCalc.RecalcTimerRoutine = function() {
       }
    var recalcdata = sheet.recalcdata || (sheet.recalcdata = {});
 
+   /** @param {any} status @param {any} arg */
    var do_statuscallback = function(status, arg) { // routine to do callback if required
       if (sheet.statuscallback) {
          sheet.statuscallback(recalcdata, status, arg, sheet.statuscallbackparams);
@@ -4757,7 +4989,7 @@ SocialCalc.RecalcTimerRoutine = function() {
       while (recalcdata.celllistitem < recalcdata.celllist.length) { // check all the cells to see if they should be on the list
          coord = recalcdata.celllist[recalcdata.celllistitem++];
          err = SocialCalc.RecalcCheckCell(sheet, coord);
-         if (((new Date()) - starttime) >= scri.maxtimeslice) { // if taking too long, give up CPU for a while
+         if ((Date.now() - starttime.getTime()) >= scri.maxtimeslice) { // if taking too long, give up CPU for a while
             do_statuscallback("calcorder", {coord: coord, total: recalcdata.celllist.length, count: recalcdata.celllistitem});
             SocialCalc.RecalcSetTimeout();
             return;
@@ -4843,7 +5075,7 @@ SocialCalc.RecalcTimerRoutine = function() {
       count++;
       coord = sheet.recalcdata.calclist[coord];
 
-      if (((new Date()) - starttime) >= scri.maxtimeslice) { // if taking too long, give up CPU for a while
+      if ((Date.now() - starttime.getTime()) >= scri.maxtimeslice) { // if taking too long, give up CPU for a while
          recalcdata.nextcalc = coord; // start with next cell on chain
          recalcdata.count += count;
          do_statuscallback("calcstep", {coord: coord, total: recalcdata.calclistlength, count: recalcdata.count});
@@ -4869,13 +5101,14 @@ SocialCalc.RecalcTimerRoutine = function() {
    scf.FreshnessInfo.recalc_completed = true; // say freshness info is complete
    scri.currentState = scri.state.idle; // we are idle
 
-   do_statuscallback("calcfinished", (new Date()) - scri.starttime);
+   do_statuscallback("calcfinished", Date.now() - /** @type {Date} */ (scri.starttime).getTime());
 
    // Check queue for more sheets.
    if (scri.queue.length > 0) {
       sheet = scri.queue.shift();
       sheet.RecalcSheet();
       }
+   return;
    }
 
 
@@ -4888,6 +5121,7 @@ SocialCalc.RecalcTimerRoutine = function() {
 // If circular reference, returns non-null.
 //
 
+/** @param {any} sheet @param {any} startcoord */
 SocialCalc.RecalcCheckCell = function(sheet, startcoord) {
 
    var parseinfo, ttext, ttype, i, rangecoord, circref, value, pos, pos2, cell, coordvals;
@@ -5092,6 +5326,7 @@ mainloop:
 
 // Initialize: set string to work with
 
+/** @param {any} str */
 SocialCalc.Parse = function(str) {
 
    // properties:
@@ -5194,6 +5429,7 @@ SocialCalc.UndoStack = function() {
 
    }
 
+/** @param {any} type */
 SocialCalc.UndoStack.prototype.PushChange = function(type) { // adding a new thing to the stack
    while (this.stack.length > 0 && this.stack.length-1 > this.tos) { // pop off things not redone
       this.stack.pop();
@@ -5278,6 +5514,7 @@ SocialCalc.Clipboard = {
 //
 // *************************************
 
+/** @param {any} sheetobj */
 SocialCalc.RenderContext = function(sheetobj) {
 
    var parts, num, s;
@@ -5414,22 +5651,31 @@ SocialCalc.RenderContext.prototype.PrecomputeSheetFontsAndLayouts = function() {
 SocialCalc.RenderContext.prototype.CalculateCellSkipData = function() {SocialCalc.CalculateCellSkipData(this);};
 SocialCalc.RenderContext.prototype.CalculateColWidthData = function() {SocialCalc.CalculateColWidthData(this);};
 SocialCalc.RenderContext.prototype.CalculateRowHeightData = function() {SocialCalc.CalculateRowHeightData(this);};
+/** @param {any} panenum @param {any} first @param {any} last */
 SocialCalc.RenderContext.prototype.SetRowPaneFirstLast = function(panenum, first, last) {this.rowpanes[panenum]={first:first, last:last};};
+/** @param {any} panenum @param {any} first @param {any} last */
 SocialCalc.RenderContext.prototype.SetColPaneFirstLast = function(panenum, first, last) {this.colpanes[panenum]={first:first, last:last};};
+/** @param {any} coord @param {any} rowpane @param {any} colpane */
 SocialCalc.RenderContext.prototype.CoordInPane = function(coord, rowpane, colpane) {return SocialCalc.CoordInPane(this, coord, rowpane, colpane);};
+/** @param {any} row @param {any} col @param {any} rowpane @param {any} colpane */
 SocialCalc.RenderContext.prototype.CellInPane = function(row, col, rowpane, colpane) {return SocialCalc.CellInPane(this, row, col, rowpane, colpane);};
+/** @param {any} tableobj */
 SocialCalc.RenderContext.prototype.InitializeTable = function(tableobj) {SocialCalc.InitializeTable(this, tableobj);};
+/** @param {any} oldtable @param {any} linkstyle */
 SocialCalc.RenderContext.prototype.RenderSheet = function(oldtable, linkstyle) {return SocialCalc.RenderSheet(this, oldtable, linkstyle);};
 SocialCalc.RenderContext.prototype.RenderColGroup = function() {return SocialCalc.RenderColGroup(this);};
 SocialCalc.RenderContext.prototype.RenderColHeaders = function() {return SocialCalc.RenderColHeaders(this);};
 SocialCalc.RenderContext.prototype.RenderSizingRow = function() {return SocialCalc.RenderSizingRow(this);};
+/** @param {any} rownum @param {any} rowpane @param {any} linkstyle */
 SocialCalc.RenderContext.prototype.RenderRow = function(rownum, rowpane, linkstyle) {return SocialCalc.RenderRow(this, rownum, rowpane, linkstyle);};
 SocialCalc.RenderContext.prototype.RenderSpacingRow = function() {return SocialCalc.RenderSpacingRow(this);};
+/** @param {any} rownum @param {any} colnum @param {any} rowpane @param {any} colpane @param {any} noElement @param {any} linkstyle */
 SocialCalc.RenderContext.prototype.RenderCell = function(rownum, colnum, rowpane, colpane, noElement, linkstyle)
       {return SocialCalc.RenderCell(this, rownum, colnum, rowpane, colpane, noElement, linkstyle);};
 
 // Functions:
 
+/** @param {any} context */
 SocialCalc.PrecomputeSheetFontsAndLayouts = function(context) {
 
    var defaultfont, parts, layoutre, dparts, sparts, num, s, i;
@@ -5489,6 +5735,7 @@ SocialCalc.PrecomputeSheetFontsAndLayouts = function(context) {
 
    }
 
+/** @param {any} context */
 SocialCalc.CalculateCellSkipData = function(context) {
 
    var row, col, coord, cell, contextcell, colspan, rowspan, skiprow, skipcol, skipcoord;
@@ -5520,8 +5767,8 @@ SocialCalc.CalculateCellSkipData = function(context) {
                   else { // for other cells, flag with coord of here
                      context.cellskip[skipcoord]=coord;
                      }
-                  if (skiprow>context.maxrow) maxrow=skiprow;
-                  if (skipcol>context.maxcol) maxcol=skipcol;
+                  if (skiprow>context.maxrow) context.maxrow=skiprow;
+                  if (skipcol>context.maxcol) context.maxcol=skipcol;
                   }
                }
             }
@@ -5532,6 +5779,7 @@ SocialCalc.CalculateCellSkipData = function(context) {
 
    }
 
+/** @param {any} context */
 SocialCalc.CalculateColWidthData = function(context) {
 
    var colnum, colname, colwidth, totalwidth, colpane;
@@ -5560,6 +5808,7 @@ SocialCalc.CalculateColWidthData = function(context) {
 
    }
 
+/** @param {any} context */
 SocialCalc.CalculateRowHeightData = function(context) {
   var rownum, rowheight, totalheight, rowpane;
   var sheetobj = context.sheetobj;
@@ -5582,6 +5831,7 @@ SocialCalc.CalculateRowHeightData = function(context) {
 
 }
 
+/** @param {any} context @param {any} tableobj */
 SocialCalc.InitializeTable = function(context, tableobj) {
 
 /*
@@ -5625,6 +5875,7 @@ code does this (e.g., use table-layout:fixed).
 // and optionally an object passed on to formatting code.
 //
 
+/** @param {any} context @param {any} oldtable @param {any} linkstyle */
 SocialCalc.RenderSheet = function(context, oldtable, linkstyle) {
 
    var newrow, rowpane, rownum;
@@ -5686,6 +5937,7 @@ SocialCalc.RenderSheet = function(context, oldtable, linkstyle) {
 
    }
 
+/** @param {any} context @param {any} rownum @param {any} rowpane @param {any} linkstyle */
 SocialCalc.RenderRow = function(context, rownum, rowpane, linkstyle) {
 
    var sheetobj=context.sheetobj;
@@ -5761,6 +6013,7 @@ SocialCalc.RenderRow = function(context, rownum, rowpane, linkstyle) {
    return result;
    }
 
+/** @param {any} context */
 SocialCalc.RenderSpacingRow = function(context) {
 
    var colnum, newcol, colpane, w;
@@ -5800,12 +6053,13 @@ SocialCalc.RenderSpacingRow = function(context) {
    return result;
    }
 
+/** @param {any} context */
 SocialCalc.RenderColHeaders = function(context) {
 
    var sheetobj=context.sheetobj;
 
    var result=document.createElement("tr");
-   var colnum, newcol;
+   var colnum, newcol, colpane;
 
    if (!context.showRCHeaders) return null;
 
@@ -5871,6 +6125,7 @@ SocialCalc.RenderColHeaders = function(context) {
    return result;
    }
 
+/** @param {any} context */
 SocialCalc.RenderColGroup = function(context) {
 
    var colpane, colnum, newcol, t;
@@ -5905,6 +6160,7 @@ SocialCalc.RenderColGroup = function(context) {
    return result;
    }
 
+/** @param {any} context */
 SocialCalc.RenderSizingRow = function(context) {
 
    var colpane, colnum, newcell, t;
@@ -5942,6 +6198,7 @@ SocialCalc.RenderSizingRow = function(context) {
    return result;
    }
 
+/** @param {any} context @param {any} rownum @param {any} colnum @param {any} rowpane @param {any} colpane @param {any} noElement @param {any} linkstyle */
 SocialCalc.RenderCell = function(context, rownum, colnum, rowpane, colpane, noElement, linkstyle) {
 
    var sheetobj=context.sheetobj;
@@ -6157,6 +6414,7 @@ SocialCalc.RenderCell = function(context, rownum, colnum, rowpane, colpane, noEl
    return result;
    }
 
+/** @param {any} context @param {any} coord @param {any} rowpane @param {any} colpane */
 SocialCalc.CoordInPane = function(context, coord, rowpane, colpane) {
    var coordToCR = context.coordToCR[coord];
    if (!coordToCR || !coordToCR.row || !coordToCR.col) throw "Bad coordToCR for "+coord;
@@ -6164,6 +6422,7 @@ SocialCalc.CoordInPane = function(context, coord, rowpane, colpane) {
    }
 
 
+/** @param {any} context @param {any} row @param {any} col @param {any} rowpane @param {any} colpane */
 SocialCalc.CellInPane = function(context, row, col, rowpane, colpane) {
    var panerowlimits = context.rowpanes[rowpane];
    var panecollimits = context.colpanes[colpane];
@@ -6184,6 +6443,7 @@ SocialCalc.CreatePseudoElement = function() {
 //
 // *************************************
 
+/** @param {any} c */
 SocialCalc.rcColname = function(c) {
    if (c > 702) c = 702; // maximum number of columns - ZZ
    if (c < 1) c = 1;
@@ -6198,6 +6458,7 @@ SocialCalc.rcColname = function(c) {
 SocialCalc.letters = ["A","B","C","D","E","F","G","H","I","J","K","L","M",
                       "N","O","P","Q","R","S","T","U","V","W","X","Y","Z"];
 
+/** @param {any} c @param {any} r */
 SocialCalc.crToCoord = function(c, r) {
    var result;
    if (c < 1) c = 1;
@@ -6215,6 +6476,7 @@ SocialCalc.crToCoord = function(c, r) {
 SocialCalc.coordToCol = {}; // too expensive to set in crToCoord since that is called so many times
 SocialCalc.coordToRow = {};
 
+/** @param {any} cr */
 SocialCalc.coordToCr = function(cr) {
    var c, i, ch;
    var r = SocialCalc.coordToRow[cr];
@@ -6222,7 +6484,7 @@ SocialCalc.coordToCr = function(cr) {
    c=0;r=0;
    for (i=0; i<cr.length; i++) { // this was faster than using regexes; assumes well-formed
       ch = cr.charCodeAt(i);
-      if (ch==36) ; // skip $'s
+      if (ch==36) { /* skip $'s */ }
       else if (ch<=57) r = 10*r + ch-48;
       else if (ch>=97) c = 26*c + ch-96;
       else if (ch>=65) c = 26*c + ch-64;
@@ -6233,6 +6495,7 @@ SocialCalc.coordToCr = function(cr) {
 
    }
 
+/** @param {any} range */
 SocialCalc.ParseRange = function(range) {
    var pos, cr, cr1, cr2;
    if (!range) range = "A1:A1"; // error return, hopefully benign
@@ -6255,6 +6518,7 @@ SocialCalc.ParseRange = function(range) {
    return {cr1: cr1, cr2: cr2};
    }
 
+/** @param {any} s */
 SocialCalc.decodeFromSave = function(s) {
    if (typeof s != "string") return s;
    if (s.indexOf("\\")==-1) return s; // for performace reasons: replace nothing takes up time
@@ -6263,6 +6527,7 @@ SocialCalc.decodeFromSave = function(s) {
    return r.replace(/\\b/g,"\\");
    }
 
+/** @param {any} s */
 SocialCalc.decodeFromAjax = function(s) {
    if (typeof s != "string") return s;
    if (s.indexOf("\\")==-1) return s; // for performace reasons: replace nothing takes up time
@@ -6272,6 +6537,7 @@ SocialCalc.decodeFromAjax = function(s) {
    return r.replace(/\\b/g,"\\");
    }
 
+/** @param {any} s */
 SocialCalc.encodeForSave = function(s) {
    if (typeof s != "string") return s;
    if (s.indexOf("\\")!=-1) // for performace reasons: replace nothing takes up time
@@ -6286,6 +6552,7 @@ SocialCalc.encodeForSave = function(s) {
 //
 // Returns estring where &, <, >, " are HTML escaped
 //
+/** @param {any} string */
 SocialCalc.special_chars = function(string) {
 
    if (/[&<>"]/.test(string)) { // only do "slow" replaces if something to replace
@@ -6298,9 +6565,10 @@ SocialCalc.special_chars = function(string) {
 
    }
 
+/** @param {any} value @param {any} list */
 SocialCalc.Lookup = function(value, list) {
 
-   for (i=0; i<list.length; i++) {
+   for (var i=0; i<list.length; i++) {
       if (list[i] > value) {
          if (i>0) return i-1;
          else return null;
@@ -6318,6 +6586,7 @@ SocialCalc.Lookup = function(value, list) {
 // OK to call with null cssText.
 //
 
+/** @param {any} element @param {any} cssText */
 SocialCalc.setStyles = function (element, cssText) {
 
    var parts, part, pos, name, value;
@@ -6380,6 +6649,7 @@ SocialCalc.GetViewportInfo = function () {
 // Goodman's JavaScript & DHTML Cookbook, 2nd Edition, page 415
 //
 
+/** @param {any} element */
 SocialCalc.GetElementPosition = function (element) {
 
    var offsetLeft = 0;
@@ -6398,6 +6668,7 @@ SocialCalc.GetElementPosition = function (element) {
 // GetElementPositionWithScroll(element) - returns object with left and top position of the element in the document
 //
 
+/** @param {any} element */
 SocialCalc.GetElementPositionWithScroll = function (element) {
 
    var rect = element.getBoundingClientRect();
@@ -6416,6 +6687,7 @@ SocialCalc.GetElementPositionWithScroll = function (element) {
 // GetElementFixedParent(element) - checks whether element has a parent with position:fixed
 //
 
+/** @param {any} element */
 SocialCalc.GetElementFixedParent = function(element) {
 
    while (element) {
@@ -6433,14 +6705,19 @@ SocialCalc.GetElementFixedParent = function(element) {
 // http://blog.stchur.com/2006/06/21/css-computed-style/
 //
 
+/** @param {any} element @param {any} style */
 SocialCalc.GetComputedStyle = function (element, style) {
 
+   /** @type {any} */
    var computedStyle;
    if (typeof element.currentStyle != 'undefined') { // IE
       computedStyle = element.currentStyle;
       }
-   else {
+   else if (document.defaultView) {
       computedStyle = document.defaultView.getComputedStyle(element, null);
+      }
+   else {
+      return "";
       }
    return computedStyle[style];
 
@@ -6450,6 +6727,7 @@ SocialCalc.GetComputedStyle = function (element, style) {
 // LookupElement(element, array) - returns array element which is an object with "element" of element
 //
 
+/** @param {any} element @param {any} array */
 SocialCalc.LookupElement = function (element, array) {
 
    var i;
@@ -6464,6 +6742,7 @@ SocialCalc.LookupElement = function (element, array) {
 // AssignID(obj, element, id) - Optionally assigns an ID with a prefix to the element
 //
 
+/** @param {any} obj @param {any} element @param {any} id */
 SocialCalc.AssignID = function (obj, element, id) {
 
    if (obj.idPrefix) { // Object must have a non-empty idPrefix attribute
@@ -6479,6 +6758,7 @@ SocialCalc.AssignID = function (obj, element, id) {
 // with appropriate prefix ("'", "=", etc.)
 //
 
+/** @param {any} sheetobj @param {any} coord */
 SocialCalc.GetCellContents = function(sheetobj, coord) {
 
    var result = "";
@@ -6524,6 +6804,7 @@ SocialCalc.GetCellContents = function(sheetobj, coord) {
 // during edit than with plain HTML.
 //
 
+/** @param {any} sheetobj @param {any} value @param {any} cr @param {any} linkstyle */
 SocialCalc.FormatValueForDisplay = function(sheetobj, value, cr, linkstyle) {
 
    var valueformat, has_parens, has_commas, valuetype, valuesubtype;
@@ -6686,9 +6967,12 @@ SocialCalc.FormatValueForDisplay = function(sheetobj, value, cr, linkstyle) {
 // displayvalue = format_text_for_display(rawvalue, valuetype, valueformat, sheetobj, linkstyle, nontextvalueformat)
 //
 
+/** @param {any} rawvalue @param {any} valuetype @param {any} valueformat @param {any} sheetobj @param {any} linkstyle @param {any} nontextvalueformat */
 SocialCalc.format_text_for_display = function(rawvalue, valuetype, valueformat, sheetobj, linkstyle, nontextvalueformat) {
 
-   var valueformat, valuesubtype, dvsc, dvue, textval;
+   var valuesubtype, dvsc, dvue;
+   /** @type {any} */
+   var textval;
    var displayvalue;
 
    valuesubtype = valuetype.substring(1);
@@ -6731,12 +7015,13 @@ SocialCalc.format_text_for_display = function(rawvalue, valuetype, valueformat, 
       dvsc = dvsc.replace(/  /g, "&nbsp; "); // keep multiple spaces
       dvsc = dvsc.replace(/\n/g, "<br>");  // keep line breaks
       dvue = encodeURI(displayvalue);
+      /** @type {any} */
       textval={};
       textval.r = displayvalue;
       textval.s = dvsc;
       textval.u = dvue;
       displayvalue = valueformat.substring(12); // remove "text-custom:"
-      displayvalue = displayvalue.replace(/@(r|s|u)/g, function(a,c){return textval[c];}); // replace placeholders
+      displayvalue = displayvalue.replace(/@(r|s|u)/g, /** @param {any} a @param {any} c */ function(a,c){return textval[c];}); // replace placeholders
       }
    else if (valueformat.substring(0,6)=="custom") { // custom
       displayvalue = SocialCalc.special_chars(displayvalue); // do special chars
@@ -6766,6 +7051,7 @@ SocialCalc.format_text_for_display = function(rawvalue, valuetype, valueformat, 
 // displayvalue = format_number_for_display(rawvalue, valuetype, valueformat)
 //
 
+/** @param {any} rawvalue @param {any} valuetype @param {any} valueformat */
 SocialCalc.format_number_for_display = function(rawvalue, valuetype, valueformat) {
 
    var value, valuesubtype;
@@ -6821,11 +7107,22 @@ SocialCalc.format_number_for_display = function(rawvalue, valuetype, valueformat
 // Tries to follow the spec for spreadsheet function VALUE(v).
 //
 
+/** @param {any} rawvalue */
 SocialCalc.DetermineValueType = function(rawvalue) {
 
+   /** @type {any} */
    var value = rawvalue + "";
    var type = "t";
-   var tvalue, matches, year, hour, minute, second, denom, num, intgr, constr;
+   /** @type {any} */ var tvalue;
+   /** @type {any} */ var matches;
+   /** @type {any} */ var year;
+   /** @type {any} */ var hour;
+   /** @type {any} */ var minute;
+   /** @type {any} */ var second;
+   /** @type {any} */ var denom;
+   /** @type {any} */ var num;
+   /** @type {any} */ var intgr;
+   /** @type {any} */ var constr;
 
    tvalue = value.replace(/^\s+/, ""); // remove leading and trailing blanks
    tvalue = tvalue.replace(/\s+$/, "");
@@ -6959,6 +7256,7 @@ SocialCalc.InputConstants = { // strings that turn into constants for SocialCalc
 // Reference to here in SocialCalc.expand_markup should be replaced by application-specific routine.
 //
 
+/** @param {any} displayvalue @param {any} sheetobj @param {any} linkstyle */
 SocialCalc.default_expand_markup = function(displayvalue, sheetobj, linkstyle) {
 
    var result = displayvalue;
@@ -6983,6 +7281,7 @@ SocialCalc.default_expand_markup = function(displayvalue, sheetobj, linkstyle) {
 // Parses link text (URL, descriptions, pagenames, workspace names) and returns HTML
 //
 
+/** @param {any} displayvalue @param {any} sheetobj @param {any} linkstyle @param {any} valueformat */
 SocialCalc.expand_text_link = function(displayvalue, sheetobj, linkstyle, valueformat) {
 
    var desc, tb, str;
@@ -7051,6 +7350,7 @@ SocialCalc.expand_text_link = function(displayvalue, sheetobj, linkstyle, valuef
 // Returns: {url: url, desc: desc, newwin: t/f, pagename: pagename, workspace: workspace}
 //
 
+/** @param {any} str */
 SocialCalc.ParseCellLinkText = function(str) {
 
    var result = {url: "", desc: "", newwin: false, pagename: "", workspace: ""};
@@ -7062,6 +7362,7 @@ SocialCalc.ParseCellLinkText = function(str) {
    var lastbrkt = str.lastIndexOf("[");
    var lastbrace = str.lastIndexOf("{");
    var descend = -1;
+   var wsend = 0;
 
    if ((str.charAt(urlend) != ">" || lastlt == -1)
          && (str.charAt(urlend) != "]" || lastbrkt == -1)
@@ -7139,6 +7440,7 @@ SocialCalc.ParseCellLinkText = function(str) {
 // If dorecalc is true, performs a recalc after loading (NO: obsolete!).
 //
 
+/** @param {any} savestr @param {any} outputformat @param {any} dorecalc */
 SocialCalc.ConvertSaveToOtherFormat = function(savestr, outputformat, dorecalc) {
 
    var sheet, context, clipextents, div, ele, row, col, cr, cell, str;
@@ -7232,9 +7534,23 @@ SocialCalc.ConvertSaveToOtherFormat = function(savestr, outputformat, dorecalc) 
 // Returns a string converted from the specified format: "scsave", "csv", "tab" (tab delimited)
 //
 
+/** @param {any} inputstr @param {any} inputformat */
 SocialCalc.ConvertOtherFormatToSave = function(inputstr, inputformat) {
 
-   var sheet, context, lines, i, line, value, inquote, j, ch, values, row, col, cr, maxc;
+   /** @type {any} */ var sheet;
+   /** @type {any} */ var context;
+   /** @type {any} */ var lines;
+   /** @type {any} */ var i;
+   /** @type {any} */ var line;
+   /** @type {any} */ var value;
+   /** @type {any} */ var inquote;
+   /** @type {any} */ var j;
+   /** @type {any} */ var ch;
+   /** @type {any} */ var values;
+   /** @type {any} */ var row;
+   /** @type {any} */ var col;
+   /** @type {any} */ var cr;
+   /** @type {any} */ var maxc;
 
    var result = "";
 
@@ -7379,6 +7695,7 @@ SocialCalc.ConvertOtherFormatToSave = function(inputstr, inputformat) {
 // Sets the cell cr with a value and type determined from rawvalue
 //
 
+/** @param {any} sheet @param {any} cr @param {any} rawvalue */
 SocialCalc.SetConvertedCell = function(sheet, cr, rawvalue) {
 
    var cell, value;
@@ -7407,6 +7724,9 @@ SocialCalc.SetConvertedCell = function(sheet, cr, rawvalue) {
    }
 
 
+// @ts-check
+// Opt-in TypeScript checking for this file (DOM-heavy TableEditor).
+// See js/socialcalctableeditor.d.ts for class / global shapes.
 //
 // SocialCalcTableEditor
 //
@@ -7501,6 +7821,8 @@ See the comments in the main SocialCalc code module file of the SocialCalc packa
 
 */
 
+   /** @type {any} */
+   // @ts-ignore - SocialCalc is declared ambiently; runtime re-declaration is intentional.
    var SocialCalc;
    if (!SocialCalc) { // created here, too, in case load order is wrong, but main routines are required
       SocialCalc = {};
@@ -7514,6 +7836,7 @@ See the comments in the main SocialCalc code module file of the SocialCalc packa
 
 // Constructor:
 
+/** @param {any} context */
 SocialCalc.TableEditor = function(context) {
 
    var scc = SocialCalc.Constants;
@@ -7582,9 +7905,11 @@ SocialCalc.TableEditor = function(context) {
    // recalcFunction: if present, function(editor) {...}, called to do a recalc
    // Default (sheet.RecalcSheet) does all the right stuff.
 
+   /** @param {any} editor */
    this.recalcFunction = function(editor) {
       if (editor.context.sheetobj.RecalcSheet) {
          editor.context.sheetobj.RecalcSheet(SocialCalc.EditorSheetStatusCallback, editor);
+         return null;
          }
       else return null;
       };
@@ -7592,6 +7917,10 @@ SocialCalc.TableEditor = function(context) {
    // ctrlkeyFunction: if present, function(editor, charname) {...}, called to handle ctrl-V, etc., at top level
    // Returns true (pass through for continued processing) or false (stop processing this key).
 
+   /**
+    * @param {any} editor
+    * @param {string} charname
+    */
    this.ctrlkeyFunction = function(editor, charname) {
 
       var ta, cell, position, cmd, sel, cliptext;
@@ -7805,14 +8134,19 @@ SocialCalc.TableEditor = function(context) {
 
 // Methods:
 
+/** @param {any} width @param {any} height */
 SocialCalc.TableEditor.prototype.CreateTableEditor = function(width, height) {return SocialCalc.CreateTableEditor(this, width, height);};
+/** @param {any} width @param {any} height */
 SocialCalc.TableEditor.prototype.ResizeTableEditor = function(width, height) {return SocialCalc.ResizeTableEditor(this, width, height);};
 
 SocialCalc.TableEditor.prototype.SaveEditorSettings = function() {return SocialCalc.SaveEditorSettings(this);};
+/** @param {any} str @param {any} [flags] */
 SocialCalc.TableEditor.prototype.LoadEditorSettings = function(str, flags) {return SocialCalc.LoadEditorSettings(this, str, flags);};
 
 SocialCalc.TableEditor.prototype.EditorRenderSheet = function() {SocialCalc.EditorRenderSheet(this);};
+/** @param {any} cmdstr @param {any} saveundo @param {any} ignorebusy */
 SocialCalc.TableEditor.prototype.EditorScheduleSheetCommands = function(cmdstr, saveundo, ignorebusy) {SocialCalc.EditorScheduleSheetCommands(this, cmdstr, saveundo, ignorebusy);};
+/** @param {any} cmdstr @param {any} saveundo */
 SocialCalc.TableEditor.prototype.ScheduleSheetCommands = function(cmdstr, saveundo) {
    this.context.sheetobj.ScheduleSheetCommands(cmdstr, saveundo);
    };
@@ -7822,34 +8156,49 @@ SocialCalc.TableEditor.prototype.SheetUndo = function() {
 SocialCalc.TableEditor.prototype.SheetRedo = function() {
    this.context.sheetobj.SheetRedo();
    };
+/** @param {any} status @param {any} arg */
 SocialCalc.TableEditor.prototype.EditorStepSet = function(status, arg) {SocialCalc.EditorStepSet(this, status, arg);};
+/** @param {any} status @param {any} arg @param {any} params */
 SocialCalc.TableEditor.prototype.GetStatuslineString = function(status, arg, params) {return SocialCalc.EditorGetStatuslineString(this, status, arg, params);};
 
 SocialCalc.TableEditor.prototype.EditorMouseRegister = function() {return SocialCalc.EditorMouseRegister(this);};
 SocialCalc.TableEditor.prototype.EditorMouseUnregister = function() {return SocialCalc.EditorMouseUnregister(this);};
+/** @param {any} coord */
 SocialCalc.TableEditor.prototype.EditorMouseRange = function(coord) {return SocialCalc.EditorMouseRange(this, coord);};
 
+/** @param {any} ch @param {any} e */
 SocialCalc.TableEditor.prototype.EditorProcessKey = function(ch, e) {return SocialCalc.EditorProcessKey(this, ch, e);};
+/** @param {any} str @param {any} [prefix] */
 SocialCalc.TableEditor.prototype.EditorAddToInput = function(str, prefix) {return SocialCalc.EditorAddToInput(this, str, prefix);};
 SocialCalc.TableEditor.prototype.DisplayCellContents = function() {return SocialCalc.EditorDisplayCellContents(this);};
+/** @param {any} [text] */
 SocialCalc.TableEditor.prototype.EditorSaveEdit = function(text) {return SocialCalc.EditorSaveEdit(this, text);};
+/** @param {any} cmdline @param {any} [type] */
 SocialCalc.TableEditor.prototype.EditorApplySetCommandsToRange = function(cmdline, type) {return SocialCalc.EditorApplySetCommandsToRange(this, cmdline, type);};
 
+/** @param {any} ch */
 SocialCalc.TableEditor.prototype.MoveECellWithKey = function(ch) {return SocialCalc.MoveECellWithKey(this, ch);};
+/** @param {any} newcell */
 SocialCalc.TableEditor.prototype.MoveECell = function(newcell) { if (SocialCalc._app) return "A1"; return SocialCalc.MoveECell(this, newcell);};
+/** @param {any} cell @param {any} row @param {any} col */
 SocialCalc.TableEditor.prototype.ReplaceCell = function(cell, row, col) {SocialCalc.ReplaceCell(this, cell, row, col);};
+/** @param {any} cell @param {any} row @param {any} col */
 SocialCalc.TableEditor.prototype.UpdateCellCSS = function(cell, row, col) {SocialCalc.UpdateCellCSS(this, cell, row, col);};
+/** @param {any} selected */
 SocialCalc.TableEditor.prototype.SetECellHeaders = function(selected) {SocialCalc.SetECellHeaders(this, selected);};
 SocialCalc.TableEditor.prototype.EnsureECellVisible = function() {SocialCalc.EnsureECellVisible(this);};
+/** @param {any} [coord] */
 SocialCalc.TableEditor.prototype.ECellReadonly = function(coord) {return SocialCalc.ECellReadonly(this, coord);};
+/** @param {any} [coord] */
 SocialCalc.TableEditor.prototype.RangeAnchor = function(coord) {SocialCalc.RangeAnchor(this, coord);};
+/** @param {any} [coord] */
 SocialCalc.TableEditor.prototype.RangeExtend = function(coord) {SocialCalc.RangeExtend(this, coord);};
 SocialCalc.TableEditor.prototype.RangeRemove = function() {SocialCalc.RangeRemove(this);};
 SocialCalc.TableEditor.prototype.Range2Remove = function() {SocialCalc.Range2Remove(this);};
 
 SocialCalc.TableEditor.prototype.FitToEditTable = function() {SocialCalc.FitToEditTable(this);};
 SocialCalc.TableEditor.prototype.CalculateEditorPositions = function() {SocialCalc.CalculateEditorPositions(this);};
-SocialCalc.TableEditor.prototype.ScheduleRender = function() {this.ScheduleRender(true);};
+/** @param {any} [renderwidgets] */
 SocialCalc.TableEditor.prototype.ScheduleRender = function(renderwidgets) {
   // App widgets need focus - so only render widgets when needed, rather than the default of rendering everything.
   if(SocialCalc._app && renderwidgets == true) this.context.sheetobj.widgetsClean = false;
@@ -7858,11 +8207,16 @@ SocialCalc.TableEditor.prototype.ScheduleRender = function(renderwidgets) {
 SocialCalc.TableEditor.prototype.DoRenderStep = function() {SocialCalc.DoRenderStep(this);};
 SocialCalc.TableEditor.prototype.SchedulePositionCalculations = function() {SocialCalc.SchedulePositionCalculations(this);};
 SocialCalc.TableEditor.prototype.DoPositionCalculations = function() {SocialCalc.DoPositionCalculations(this);};
+/** @param {any} panenum @param {any} positions @param {any} sizes */
 SocialCalc.TableEditor.prototype.CalculateRowPositions = function(panenum, positions, sizes) {return SocialCalc.CalculateRowPositions(this,  panenum, positions, sizes);};
+/** @param {any} panenum @param {any} positions @param {any} sizes */
 SocialCalc.TableEditor.prototype.CalculateColPositions = function(panenum, positions, sizes) {return SocialCalc.CalculateColPositions(this,  panenum, positions, sizes);};
 
+/** @param {any} vertical @param {any} amount */
 SocialCalc.TableEditor.prototype.ScrollRelative = function(vertical, amount) {SocialCalc.ScrollRelative(this, vertical, amount);};
+/** @param {any} vamount @param {any} hamount */
 SocialCalc.TableEditor.prototype.ScrollRelativeBoth = function(vamount, hamount) {SocialCalc.ScrollRelativeBoth(this, vamount, hamount);};
+/** @param {any} vertical @param {any} direction */
 SocialCalc.TableEditor.prototype.PageRelative = function(vertical, direction) {SocialCalc.PageRelative(this, vertical, direction);};
 SocialCalc.TableEditor.prototype.LimitLastPanes = function() {SocialCalc.LimitLastPanes(this);};
 
@@ -7885,6 +8239,7 @@ SocialCalc.TableEditor.prototype.RemoveMouseMoveUp = function() {
 
 // Functions:
 
+/** @param {any} editor @param {any} width @param {any} height */
 SocialCalc.CreateTableEditor = function(editor, width, height) {
 
    var scc = SocialCalc.Constants;
@@ -7922,10 +8277,11 @@ SocialCalc.CreateTableEditor = function(editor, width, height) {
 
    var table, tbody, tr, td, img, anchor, ta;
 
-   table = document.createElement("table");
+   table = /** @type {HTMLTableElement} */ (document.createElement("table"));
    editor.layouttable = table;
-   table.cellSpacing = 0;
-   table.cellPadding = 0;
+   // Legacy attrs: assign via setAttribute to bypass TS's stricter string typing.
+   table.setAttribute("cellspacing", "0");
+   table.setAttribute("cellpadding", "0");
    AssignID(editor, table, "layouttable");
 
    tbody = document.createElement("tbody");
@@ -7961,7 +8317,8 @@ SocialCalc.CreateTableEditor = function(editor, width, height) {
    tr.appendChild(td);
    editor.logo = td;
    AssignID(editor, editor.logo, "logo");
-   td.firstChild.firstChild.title = "SocialCalc";
+   var logoImg = /** @type {HTMLImageElement | null} */ (td.firstChild && td.firstChild.firstChild);
+   if (logoImg) logoImg.title = "SocialCalc";
 
    editor.toplevel.appendChild(editor.layouttable);
 
@@ -8005,6 +8362,7 @@ SocialCalc.CreateTableEditor = function(editor, width, height) {
 
 // Special code needed for change that occurred with Safari 5 that made paste not work for some reason
 
+/** @param {Event} e */
 SocialCalc.SafariPasteFunction = function(e) {
    e.preventDefault();
    }
@@ -8015,6 +8373,7 @@ SocialCalc.SafariPasteFunction = function(e) {
 // Move things around as appropriate and resize
 //
 
+/** @param {any} editor @param {any} width @param {any} height */
 SocialCalc.ResizeTableEditor = function(editor, width, height) {
 
    var scc = SocialCalc.Constants;
@@ -8067,6 +8426,7 @@ SocialCalc.ResizeTableEditor = function(editor, width, height) {
 // without the trailing newlines.
 //
 
+/** @param {any} editor */
 SocialCalc.SaveEditorSettings = function(editor) {
 
    var i, setting;
@@ -8106,6 +8466,7 @@ SocialCalc.SaveEditorSettings = function(editor) {
 // Unrecognized lines are ignored.
 //
 
+/** @param {any} editor @param {any} str @param {any} [flags] */
 SocialCalc.LoadEditorSettings = function(editor, str, flags) {
 
    var lines=str.split(/\r\n|\n/);
@@ -8184,6 +8545,7 @@ SocialCalc.LoadEditorSettings = function(editor, str, flags) {
 // Sets event handlers.
 //
 
+/** @param {any} editor */
 SocialCalc.EditorRenderSheet = function(editor) {
 
    editor.EditorMouseUnregister();
@@ -8196,8 +8558,8 @@ SocialCalc.EditorRenderSheet = function(editor) {
        var coord = sheetobj.reRenderCellList[index];
        var valuetype = sheetobj.cells[coord].valuetype;
        if(valuetype.charAt(1) != "i" || valuetype !=  sheetobj.cells[coord].prevvaluetype) { // skip widgets - but paint when added/replaced
-         cr = SocialCalc.coordToCr(coord);
-         cell = SocialCalc.GetEditorCellElement(editor, cr.row, cr.col);
+         var cr = SocialCalc.coordToCr(coord);
+         var cell = SocialCalc.GetEditorCellElement(editor, cr.row, cr.col);
          if(cell!=null) editor.ReplaceCell(cell, cr.row, cr.col);
        }
      }
@@ -8224,6 +8586,7 @@ SocialCalc.EditorRenderSheet = function(editor) {
 // EditorScheduleSheetCommands(editor, cmdstr, saveundo, ignorebusy)
 //
 
+/** @param {any} editor @param {any} cmdstr @param {any} saveundo @param {any} ignorebusy */
 SocialCalc.EditorScheduleSheetCommands = function(editor, cmdstr, saveundo, ignorebusy) {
 
    if (editor.state!="start" && !ignorebusy) { // ignore commands if editing a cell
@@ -8273,11 +8636,13 @@ SocialCalc.EditorScheduleSheetCommands = function(editor, cmdstr, saveundo, igno
 // Called during recalc, executing commands, etc.
 //
 
+/** @param {any} recalcdata @param {any} status @param {any} arg @param {any} editor */
 SocialCalc.EditorSheetStatusCallback = function(recalcdata, status, arg, editor) {
 
    var f, cell, dcmd;
    var sheetobj = editor.context.sheetobj;
 
+   /** @param {any} s */
    var signalstatus = function(s) {
       for (f in editor.StatusCallback) {
          if (editor.StatusCallback[f].func) {
@@ -8310,7 +8675,7 @@ SocialCalc.EditorSheetStatusCallback = function(recalcdata, status, arg, editor)
 
          if (sheetobj.celldisplayneeded && !sheetobj.renderneeded) {
              if (sheetobj.cells[sheetobj.celldisplayneeded] && sheetobj.cells[sheetobj.celldisplayneeded].valuetype != "e#N/A") {
-                cr = SocialCalc.coordToCr(sheetobj.celldisplayneeded);
+                var cr = SocialCalc.coordToCr(sheetobj.celldisplayneeded);
                 cell = SocialCalc.GetEditorCellElement(editor, cr.row, cr.col);
                 editor.ReplaceCell(cell, cr.row, cr.col); // if no value set, wait for recalc and render .
                 }
@@ -8442,6 +8807,7 @@ SocialCalc.EditorSheetStatusCallback = function(recalcdata, status, arg, editor)
 // Returns string for status line.
 //
 
+/** @param {any} editor @param {any} status @param {any} arg @param {any} params */
 SocialCalc.EditorGetStatuslineString = function(editor, status, arg, params) {
 
    var scc = SocialCalc.Constants;
@@ -8613,6 +8979,7 @@ SocialCalc.EditorMouseInfo = {
 // EditorMouseRegister(editor)
 //
 
+/** @param {any} editor */
 SocialCalc.EditorMouseRegister = function(editor) {
 
    var mouseinfo = SocialCalc.EditorMouseInfo;
@@ -8657,6 +9024,7 @@ SocialCalc.EditorMouseRegister = function(editor) {
 // EditorMouseUnregister(editor)
 //
 
+/** @param {any} editor */
 SocialCalc.EditorMouseUnregister = function(editor) {
 
    var mouseinfo = SocialCalc.EditorMouseInfo;
@@ -8686,6 +9054,7 @@ SocialCalc.EditorMouseUnregister = function(editor) {
 
    }
 
+/** @param {any} event */
 SocialCalc.StopPropagation = function(event) {
     if (event.stopPropagation) event.stopPropagation(); // DOM Level 2
     else event.cancelBubble = true; // IE 5+
@@ -8693,6 +9062,7 @@ SocialCalc.StopPropagation = function(event) {
     else event.returnValue = false; // IE 5+
 }
 
+/** @param {any} move @param {any} up @param {any} element @param {any} event */
 SocialCalc.SetMouseMoveUp = function(move, up, element, event) {
        // Event code from JavaScript, Flanagan, 5th Edition, pg. 422
    if (document.addEventListener) { // DOM Level 2 -- Firefox, et al
@@ -8708,6 +9078,7 @@ SocialCalc.SetMouseMoveUp = function(move, up, element, event) {
     SocialCalc.StopPropagation(event);
 }
 
+/** @param {any} move @param {any} up @param {any} element @param {any} event */
 SocialCalc.RemoveMouseMoveUp = function(move, up, element, event) {
     SocialCalc.StopPropagation(event);
     if (document.removeEventListener) { // DOM Level 2
@@ -8722,6 +9093,7 @@ SocialCalc.RemoveMouseMoveUp = function(move, up, element, event) {
     }
 }
 
+/** @param {any} e */
 SocialCalc.ProcessEditorMouseDown = function(e) {
 
    var editor, result, coord, textarea, wval, range;
@@ -8824,6 +9196,7 @@ SocialCalc.ProcessEditorMouseDown = function(e) {
 
    }
 
+/** @param {any} editor @param {any} coord */
 SocialCalc.EditorMouseRange = function(editor, coord) {
 
    var inputtext, wval;
@@ -8870,6 +9243,7 @@ SocialCalc.EditorMouseRange = function(editor, coord) {
       }
    }
 
+/** @param {any} e */
 SocialCalc.ProcessEditorMouseMove = function(e) {
 
    var editor, element, result, coord, now, textarea, sheetobj, cellobj, wval;
@@ -8913,6 +9287,7 @@ SocialCalc.ProcessEditorMouseMove = function(e) {
    }
 
 
+/** @param {any} e */
 SocialCalc.ProcessEditorMouseUp = function(e) {
 
    var editor, element, result, coord, now, textarea, sheetobj, cellobj, wval;
@@ -8957,6 +9332,7 @@ SocialCalc.ProcessEditorMouseUp = function(e) {
    }
 
 
+/** @param {any} e @param {any} ele @param {any} result */
 SocialCalc.ProcessEditorColsizeMouseDown = function(e, ele, result) {
 
    var event = e || window.event;
@@ -8975,7 +9351,7 @@ SocialCalc.ProcessEditorColsizeMouseDown = function(e, ele, result) {
       mouseinfo.mouseresizedisplay = sizedisplay;
       sizedisplay.style.width = "auto";
       sizedisplay.style.position = "absolute";
-      sizedisplay.style.zIndex = 100;
+      sizedisplay.style.zIndex = "100";
       sizedisplay.style.top = editor.headposition.top+"px";
       sizedisplay.style.left = editor.colpositions[result.coltoresize]+"px";
       sizedisplay.innerHTML = '<table cellpadding="0" cellspacing="0"><tr><td style="height:100px;'+
@@ -8983,7 +9359,8 @@ SocialCalc.ProcessEditorColsizeMouseDown = function(e, ele, result) {
         (editor.context.colwidth[mouseinfo.mouseresizecolnum]-2) + 'px;">&nbsp;</td>'+
         '<td><div style="font-size:small;color:white;background-color:gray;padding:4px;">'+
         editor.context.colwidth[mouseinfo.mouseresizecolnum] + '</div></td></tr></table>';
-      SocialCalc.setStyles(sizedisplay.firstChild.lastChild.firstChild.childNodes[0], "filter:alpha(opacity=85);opacity:.85;"); // so no warning msg with Firefox about filter
+      var szTarget = /** @type {HTMLElement | null} */ (sizedisplay.firstChild && sizedisplay.firstChild.lastChild && sizedisplay.firstChild.lastChild.firstChild && sizedisplay.firstChild.lastChild.firstChild.childNodes[0]);
+      if (szTarget) SocialCalc.setStyles(szTarget, "filter:alpha(opacity=85);opacity:.85;"); // so no warning msg with Firefox about filter
 
       editor.toplevel.appendChild(sizedisplay);
       }
@@ -8995,6 +9372,7 @@ SocialCalc.ProcessEditorColsizeMouseDown = function(e, ele, result) {
    }
 
 
+/** @param {any} e */
 SocialCalc.ProcessEditorColsizeMouseMove = function(e) {
 
    var event = e || window.event;
@@ -9023,13 +9401,14 @@ SocialCalc.ProcessEditorColsizeMouseMove = function(e) {
    }
 
 
+/** @param {any} e */
 SocialCalc.ProcessEditorColsizeMouseUp = function(e) {
 
    var event = e || window.event;
    var mouseinfo = SocialCalc.EditorMouseInfo;
    var editor = mouseinfo.editor;
    if (!editor) return; // not us, ignore
-   element = mouseinfo.element;
+   var element = mouseinfo.element;
    var pos = SocialCalc.GetElementPositionWithScroll(editor.toplevel);
    var clientX = event.clientX - pos.left;
    SocialCalc.RemoveMouseMoveUp(
@@ -9080,15 +9459,16 @@ SocialCalc.FinishColRowSize = function() {
    }
 
 
+/** @param {any} e @param {any} ele @param {any} result */
 SocialCalc.ProcessEditorRowselectMouseDown = function(e, ele, result) {
     var event = e || window.event;
     var mouseinfo = SocialCalc.EditorMouseInfo;
     var editor = mouseinfo.editor;
     var sheet = SocialCalc.GetSpreadsheetControlObject().sheet;
-    coord1 = SocialCalc.crToCoord(1, result.row)
-    coord2 = SocialCalc.crToCoord(sheet.LastCol(),
+    var coord1 = SocialCalc.crToCoord(1, result.row)
+    var coord2 = SocialCalc.crToCoord(sheet.LastCol(),
 				  result.row)
-    coord3 = SocialCalc.crToCoord(editor.firstscrollingcol,
+    var coord3 = SocialCalc.crToCoord(editor.firstscrollingcol,
 				  result.row)
     editor.RangeAnchor(coord1);
     editor.RangeExtend(coord2);
@@ -9099,6 +9479,7 @@ SocialCalc.ProcessEditorRowselectMouseDown = function(e, ele, result) {
 			      event);
 }
 
+/** @param {any} e */
 SocialCalc.ProcessEditorRowselectMouseMove = function(e) {
     var event = e || window.event;
     var mouseinfo = SocialCalc.EditorMouseInfo;
@@ -9110,16 +9491,17 @@ SocialCalc.ProcessEditorRowselectMouseMove = function(e) {
     var pos = SocialCalc.GetElementPositionWithScroll(editor.toplevel);
     var clientX = event.clientX - pos.left;
     var clientY = event.clientY - pos.top;
-    result = SocialCalc.GridMousePosition(editor, clientX, clientY);
-    coord2 = SocialCalc.crToCoord(sheet.LastCol(),
+    var result = SocialCalc.GridMousePosition(editor, clientX, clientY);
+    var coord2 = SocialCalc.crToCoord(sheet.LastCol(),
 				  result.row)
-    coord3 = SocialCalc.crToCoord(editor.firstscrollingcol,
+    var coord3 = SocialCalc.crToCoord(editor.firstscrollingcol,
 				  result.row)
     editor.RangeExtend(coord2);
     editor.MoveECell(coord3);
     return;
 }
 
+/** @param {any} e */
 SocialCalc.ProcessEditorRowselectMouseUp = function(e) {
     var event = e || window.event;
     var mouseinfo = SocialCalc.EditorMouseInfo;
@@ -9132,16 +9514,17 @@ SocialCalc.ProcessEditorRowselectMouseUp = function(e) {
     return;
 }
 
+/** @param {any} e @param {any} ele @param {any} result */
 SocialCalc.ProcessEditorColselectMouseDown = function(e, ele, result) {
     var event = e || window.event;
     var mouseinfo = SocialCalc.EditorMouseInfo;
     var editor = mouseinfo.editor;
     var sheet = SocialCalc.GetSpreadsheetControlObject().sheet;
 
-    coord1 = SocialCalc.crToCoord(result.col, 1)
-    coord2 = SocialCalc.crToCoord(result.col,
+    var coord1 = SocialCalc.crToCoord(result.col, 1)
+    var coord2 = SocialCalc.crToCoord(result.col,
 				  sheet.LastRow())
-    coord3 = SocialCalc.crToCoord(result.col,
+    var coord3 = SocialCalc.crToCoord(result.col,
 				  editor.firstscrollingrow)
 
     editor.RangeAnchor(coord1);
@@ -9154,6 +9537,7 @@ SocialCalc.ProcessEditorColselectMouseDown = function(e, ele, result) {
 
 }
 
+/** @param {any} e */
 SocialCalc.ProcessEditorColselectMouseMove = function(e) {
     var event = e || window.event;
     var mouseinfo = SocialCalc.EditorMouseInfo;
@@ -9165,16 +9549,17 @@ SocialCalc.ProcessEditorColselectMouseMove = function(e) {
     var pos = SocialCalc.GetElementPositionWithScroll(editor.toplevel);
     var clientX = event.clientX - pos.left;
     var clientY = event.clientY - pos.top;
-    result = SocialCalc.GridMousePosition(editor, clientX, clientY);
-    coord2 = SocialCalc.crToCoord(result.col,
+    var result = SocialCalc.GridMousePosition(editor, clientX, clientY);
+    var coord2 = SocialCalc.crToCoord(result.col,
 				  sheet.LastRow())
-    coord3 = SocialCalc.crToCoord(result.col,
+    var coord3 = SocialCalc.crToCoord(result.col,
 				  editor.firstscrollingrow)
     editor.RangeExtend(coord2);
     editor.MoveECell(coord3);
     return;
 }
 
+/** @param {any} e */
 SocialCalc.ProcessEditorColselectMouseUp = function(e) {
     var event = e || window.event;
     var mouseinfo = SocialCalc.EditorMouseInfo;
@@ -9187,6 +9572,7 @@ SocialCalc.ProcessEditorColselectMouseUp = function(e) {
     return;
 }
 
+/** @param {any} e @param {any} ele @param {any} result */
 SocialCalc.ProcessEditorRowsizeMouseDown = function(e, ele, result) {
 
    var event = e || window.event;
@@ -9206,7 +9592,7 @@ SocialCalc.ProcessEditorRowsizeMouseDown = function(e, ele, result) {
     sizedisplay.style.width = editor.context.totalwidth+"px";
     sizedisplay.style.height = editor.rowpositions[result.rowtoresize]+"px";
     sizedisplay.style.position = "absolute";
-    sizedisplay.style.zIndex = 100;
+    sizedisplay.style.zIndex = "100";
     sizedisplay.style.top = editor.rowpositions[result.rowtoresize]+"px";
     sizedisplay.style.left = editor.headposition.left+"px";
     sizedisplay.innerHTML = '<table cellpadding="0" cellspacing="0"><tr><td style="width:100px' +
@@ -9214,7 +9600,8 @@ SocialCalc.ProcessEditorRowsizeMouseDown = function(e, ele, result) {
       (editor.context.rowheight[mouseinfo.mouseresizerownum]-2) + 'px;">&nbsp;</td>'+
       '<td><div style="font-size:small;color:white;background-color:gray;padding:4px;">'+
       editor.context.rowheight[mouseinfo.mouseresizerownum] + '</div></td></tr></table>';
-    SocialCalc.setStyles(sizedisplay.firstChild.lastChild.firstChild.childNodes[0], "filter:alpha(opacity=85);opacity:.5;"); // so no warning msg with Firefox about filter
+    var szTarget2 = /** @type {HTMLElement | null} */ (sizedisplay.firstChild && sizedisplay.firstChild.lastChild && sizedisplay.firstChild.lastChild.firstChild && sizedisplay.firstChild.lastChild.firstChild.childNodes[0]);
+    if (szTarget2) SocialCalc.setStyles(szTarget2, "filter:alpha(opacity=85);opacity:.5;"); // so no warning msg with Firefox about filter
 
     editor.toplevel.appendChild(sizedisplay);
   }
@@ -9226,6 +9613,7 @@ SocialCalc.ProcessEditorRowsizeMouseDown = function(e, ele, result) {
    }
 
 
+/** @param {any} e */
 SocialCalc.ProcessEditorRowsizeMouseMove = function(e) {
 
    var event = e || window.event;
@@ -9254,13 +9642,14 @@ SocialCalc.ProcessEditorRowsizeMouseMove = function(e) {
    }
 
 
+/** @param {any} e */
 SocialCalc.ProcessEditorRowsizeMouseUp = function(e) {
 
    var event = e || window.event;
    var mouseinfo = SocialCalc.EditorMouseInfo;
    var editor = mouseinfo.editor;
    if (!editor) return; // not us, ignore
-   element = mouseinfo.element;
+   var element = mouseinfo.element;
    var pos = SocialCalc.GetSpreadsheetControlObject().spreadsheetDiv.firstChild.offsetHeight;
    var clientY = event.clientY - pos;
    SocialCalc.RemoveMouseMoveUp(
@@ -9302,6 +9691,7 @@ SocialCalc.AutoRepeatInfo = {
 
 // Control auto-repeat. If mouseinfo==null, cancel.
 
+/** @param {any} editor @param {any} mouseinfo @param {any} callback */
 SocialCalc.SetDragAutoRepeat = function(editor, mouseinfo, callback) {
 
    var repeatinfo = SocialCalc.AutoRepeatInfo;
@@ -9428,9 +9818,10 @@ SocialCalc.DragAutoRepeat = function() {
 // Handling Clicking
 //
 
+/** @param {any} e */
 SocialCalc.ProcessEditorDblClick = function(e) {
 
-   var editor, result, coord, textarea, wval, range;
+   var editor, result, coord, textarea, wval, range, sheetobj;
 
    var event = e || window.event;
 
@@ -9479,6 +9870,7 @@ SocialCalc.ProcessEditorDblClick = function(e) {
    }
 
 
+/** @param {any} editor */
 SocialCalc.EditorOpenCellEdit = function(editor) {
 
    var wval;
@@ -9502,6 +9894,7 @@ SocialCalc.EditorOpenCellEdit = function(editor) {
    }
 
 
+/** @param {any} editor @param {any} ch @param {any} e */
 SocialCalc.EditorProcessKey = function(editor, ch, e) {
 
    var result, cell, cellobj, valueinfo, fch, coord, inputtext, f;
@@ -9681,6 +10074,7 @@ SocialCalc.EditorProcessKey = function(editor, ch, e) {
 
    }
 
+/** @param {any} editor @param {any} str @param {any} prefix */
 SocialCalc.EditorAddToInput = function(editor, str, prefix) {
 
    var wval = editor.workingvalues;
@@ -9721,12 +10115,14 @@ SocialCalc.EditorAddToInput = function(editor, str, prefix) {
    }
 
 
+/** @param {any} editor */
 SocialCalc.EditorDisplayCellContents = function(editor) {
 
    if (editor.inputBox) editor.inputBox.DisplayCellContents();
 
    }
 
+/** @param {any} editor @param {any} text */
 SocialCalc.EditorSaveEdit = function(editor, text) {
 
    var result, cell, valueinfo, fch, type, value, oldvalue, cmdline;
@@ -9796,6 +10192,7 @@ SocialCalc.EditorSaveEdit = function(editor, text) {
 // Eddy EditedTriggerCell {
 
 
+/** @param {any} actionFormulaCells @param {any} editedCellRef @param {any} editor @param {any} sheet */
 SocialCalc.EditedTriggerCell  = function(actionFormulaCells, editedCellRef, editor, sheet) {
 
 	 for(var actionCellId in actionFormulaCells) {
@@ -9806,7 +10203,7 @@ SocialCalc.EditedTriggerCell  = function(actionFormulaCells, editedCellRef, edit
 			switch(parameters.function_name) {
 				  case "EMAILONEDIT" :
 				  case "EMAILONEDITIF" :
-					  cmdline = "setemailparameters "+actionCellId+ " " + editedCellRef;
+					  var cmdline = "setemailparameters "+actionCellId+ " " + editedCellRef;
 					// hold off on commands until recalc done
 				      editor.deferredEmailCommands.push({cmdstr: cmdline, saveundo: false});
 //					  editor.EditorScheduleSheetCommands(cmdline, false, false);
@@ -9828,9 +10225,10 @@ SocialCalc.EditedTriggerCell  = function(actionFormulaCells, editedCellRef, edit
 // Takes ecell or range and does a "set" command with cmd.
 //
 
+/** @param {any} editor @param {any} cmd */
 SocialCalc.EditorApplySetCommandsToRange = function(editor, cmd) {
 
-   var cell, row, col, line, errortext;
+   var cell, row, col, line, errortext, coord;
 
    var sheetobj = editor.context.sheetobj;
    var ecell = editor.ecell;
@@ -9850,6 +10248,7 @@ SocialCalc.EditorApplySetCommandsToRange = function(editor, cmd) {
 
    }
 
+/** @param {any} event @param {any} delta @param {any} mousewheelinfo @param {any} wobj */
 SocialCalc.EditorProcessMouseWheel = function(event, delta, mousewheelinfo, wobj) {
 
    if (wobj.functionobj.editor.busy) return; // ignore if busy
@@ -9873,9 +10272,11 @@ SocialCalc.EditorProcessMouseWheel = function(event, delta, mousewheelinfo, wobj
 // In row/col header/footer, returns "distance" as pixels over the edge.
 //
 
+/** @param {any} editor @param {any} clientX @param {any} clientY */
 SocialCalc.GridMousePosition = function(editor, clientX, clientY) {
 
-   var row, rowpane, col, colpane, rowtoresize, coltoresize;
+   var row, rowpane, col, colpane, rowtoresize, coltoresize, unhide, pos;
+   /** @type {Record<string, any>} */
    var result = {};
 
    for (row=1; row<editor.rowpositions.length; row++) {
@@ -10023,6 +10424,7 @@ SocialCalc.GridMousePosition = function(editor, clientX, clientY) {
 // If no such element, then returns null;
 //
 
+/** @param {any} editor @param {any} row @param {any} col */
 SocialCalc.GetEditorCellElement = function(editor, row, col) {
 
   var headerColOffset = 0;
@@ -10071,6 +10473,7 @@ SocialCalc.GetEditorCellElement = function(editor, row, col) {
 // If not a movement key, returns null.
 //
 
+/** @param {any} editor @param {any} ch */
 SocialCalc.MoveECellWithKey = function(editor, ch) {
 
    var coord, row, col, cell;
@@ -10167,6 +10570,7 @@ SocialCalc.MoveECellWithKey = function(editor, ch) {
 // different if newecell is covered by a span).
 //
 
+/** @param {any} editor @param {any} newcell */
 SocialCalc.MoveECell = function(editor, newcell) {
 
    var cell, f;
@@ -10225,6 +10629,7 @@ SocialCalc.MoveECell = function(editor, newcell) {
 
    }
 
+/** @param {any} editor */
 SocialCalc.EnsureECellVisible = function(editor) {
 
    var vamount = 0;
@@ -10256,6 +10661,7 @@ SocialCalc.EnsureECellVisible = function(editor) {
 
    }
 
+/** @param {any} editor @param {any} cell @param {any} row @param {any} col */
 SocialCalc.ReplaceCell = function(editor, cell, row, col) {
 
    var newelement, a;
@@ -10274,6 +10680,7 @@ SocialCalc.ReplaceCell = function(editor, cell, row, col) {
    }
 
 
+/** @param {any} editor @param {any} cell @param {any} row @param {any} col */
 SocialCalc.UpdateCellCSS = function(editor, cell, row, col) {
 
    var newelement, a;
@@ -10290,6 +10697,7 @@ SocialCalc.UpdateCellCSS = function(editor, cell, row, col) {
    }
 
 
+/** @param {any} editor @param {any} selected */
 SocialCalc.SetECellHeaders = function(editor, selected) {
 
    // eddy SetECellHeaders {
@@ -10356,6 +10764,7 @@ SocialCalc.SetECellHeaders = function(editor, selected) {
 // Returns true if ecoord is readonly (or ecell if missing).
 //
 
+/** @param {any} editor @param {any} ecoord */
 SocialCalc.ECellReadonly = function(editor, ecoord) {
 
    if (!ecoord && editor.ecell) {
@@ -10375,6 +10784,7 @@ SocialCalc.ECellReadonly = function(editor, ecoord) {
 // Sets the anchor of a range to ecoord (or ecell if missing).
 //
 
+/** @param {any} editor @param {any} ecoord */
 SocialCalc.RangeAnchor = function(editor, ecoord) {
 
    if (editor.range.hasrange) {
@@ -10391,6 +10801,7 @@ SocialCalc.RangeAnchor = function(editor, ecoord) {
 // Sets the other corner of the range to ecoord or, if missing, ecell.
 //
 
+/** @param {any} editor @param {any} ecoord */
 SocialCalc.RangeExtend = function(editor, ecoord) {
 
    var a, cell, cr, coord, row, col, f;
@@ -10530,6 +10941,7 @@ SocialCalc.RangeExtend = function(editor, ecoord) {
 // Turns off the range.
 //
 
+/** @param {any} editor */
 SocialCalc.RangeRemove = function(editor) {
 
    var cell, cr, coord, row, col, f;
@@ -10593,6 +11005,7 @@ SocialCalc.RangeRemove = function(editor) {
 // Turns off the range2.
 //
 
+/** @param {any} editor */
 SocialCalc.Range2Remove = function(editor) {
 
    var cell, cr, coord, row, col, f;
@@ -10630,9 +11043,10 @@ SocialCalc.Range2Remove = function(editor) {
 // the editor's editing area.
 //
 
+/** @param {any} editor */
 SocialCalc.FitToEditTable = function(editor) {
 
-   var colnum, colname, colwidth, totalwidth, totalrows, rownum, rowpane, needed;
+   var colnum, colname, colwidth, totalwidth, totalrows, rownum, rowpane, needed, colpane;
 
    var context=editor.context;
    var sheetobj=context.sheetobj;
@@ -10699,6 +11113,7 @@ SocialCalc.FitToEditTable = function(editor) {
 // Note: Only call this after the grid has been rendered! You may have to wait for a timeout...
 //
 
+/** @param {any} editor */
 SocialCalc.CalculateEditorPositions = function(editor) {
 
    var rowpane, colpane, i;
@@ -10756,6 +11171,7 @@ SocialCalc.CalculateEditorPositions = function(editor) {
 // rendering by the browser, and then update editor visuals, sliders, etc.
 //
 
+/** @param {any} editor */
 SocialCalc.ScheduleRender = function(editor) {
    if(editor.ignoreRender == true) return; // formDataViewer is only used for "ExecuteSheetCommand" fumctions - so skip render
    if (editor.timeout) window.clearTimeout(editor.timeout); // in case called more than once, just use latest
@@ -10768,6 +11184,7 @@ SocialCalc.ScheduleRender = function(editor) {
 // DoRenderStep(editor)
 //
 
+/** @param {any} editor */
 SocialCalc.DoRenderStep = function(editor) {
 
    editor.timeout = null;
@@ -10786,6 +11203,7 @@ SocialCalc.DoRenderStep = function(editor) {
 // SocialCalc.SchedulePositionCalculations(editor)
 //
 
+/** @param {any} editor */
 SocialCalc.SchedulePositionCalculations = function(editor) {
 
    SocialCalc.EditorSheetStatusCallback(null, "schedposcalc", null, editor);
@@ -10801,6 +11219,7 @@ SocialCalc.SchedulePositionCalculations = function(editor) {
 // Note: Only call this after the DOM objects have been modified and rendered!
 //
 
+/** @param {any} editor */
 SocialCalc.DoPositionCalculations = function(editor) {
 
    editor.timeout = null;
@@ -10824,6 +11243,7 @@ SocialCalc.DoPositionCalculations = function(editor) {
 
    }
 
+/** @param {any} editor @param {any} panenum @param {any} positions @param {any} sizes */
 SocialCalc.CalculateRowPositions = function(editor, panenum, positions, sizes) {
 
    var toprow, rowpane, rownum, offset, trowobj, cellposition;
@@ -10863,6 +11283,7 @@ SocialCalc.CalculateRowPositions = function(editor, panenum, positions, sizes) {
 
    }
 
+/** @param {any} editor @param {any} panenum @param {any} positions @param {any} sizes */
 SocialCalc.CalculateColPositions = function(editor, panenum, positions, sizes) {
 
    var leftcol, colpane, colnum, offset, trowobj, cellposition;
@@ -10908,6 +11329,7 @@ SocialCalc.CalculateColPositions = function(editor, panenum, positions, sizes) {
 //
 // If vertical true, scrolls up(-)/down(+), else left(-)/right(+)
 
+/** @param {any} editor @param {any} vertical @param {any} amount */
 SocialCalc.ScrollRelative = function(editor, vertical, amount) {
 
    if (vertical) {
@@ -10924,6 +11346,7 @@ SocialCalc.ScrollRelative = function(editor, vertical, amount) {
 //
 // Does both with one render
 
+/** @param {any} editor @param {any} vamount @param {any} hamount */
 SocialCalc.ScrollRelativeBoth = function(editor, vamount, hamount) {
 
    var context=editor.context;
@@ -10990,6 +11413,7 @@ SocialCalc.ScrollRelativeBoth = function(editor, vamount, hamount) {
 //
 // If vertical true, pages up(direction is -)/down(+), else left(-)/right(+)
 
+/** @param {any} editor @param {any} vertical @param {any} direction */
 SocialCalc.PageRelative = function(editor, vertical, direction) {
 
    var context=editor.context;
@@ -11037,6 +11461,7 @@ SocialCalc.PageRelative = function(editor, vertical, direction) {
 // Makes sure that the "first" of the last panes isn't before the last of the previous pane
 //
 
+/** @param {any} editor */
 SocialCalc.LimitLastPanes = function(editor) {
 
    var context=editor.context;
@@ -11056,9 +11481,11 @@ SocialCalc.LimitLastPanes = function(editor) {
 
    }
 
+/** @param {any} editor */
 SocialCalc.ScrollTableUpOneRow = function(editor) {
 
-   var toprow, rowpane, rownum, colnum, colpane, cell, oldrownum, maxspan, newbottomrow, newrow, oldchild, bottomrownum;
+   var toprow, rowpane, rownum, colnum, colpane, cell, oldrownum, maxrowspan, newbottomrow, newrow, oldchild, bottomrownum, coord;
+   /** @type {Record<string, boolean>} */
    var rowneedsrefresh={};
 
    var context=editor.context;
@@ -11132,16 +11559,18 @@ SocialCalc.ScrollTableUpOneRow = function(editor) {
 
    for (rownum in rowneedsrefresh) {
       newrow=context.RenderRow(rownum, rowpane);
-      oldchild=tbodyobj.childNodes[(toprow+(rownum-context.rowpanes[rowpane].first))];
+      oldchild=tbodyobj.childNodes[(toprow+(Number(rownum)-context.rowpanes[rowpane].first))];
       tbodyobj.replaceChild(newrow,oldchild);
       }
 
    return tableobj;
    }
 
+/** @param {any} editor */
 SocialCalc.ScrollTableDownOneRow = function(editor) {
 
-   var toprow, rowpane, rownum, colnum, colpane, cell, newrownum, maxspan, newbottomrow, newrow, oldchild, bottomrownum;
+   var toprow, rowpane, rownum, colnum, colpane, cell, newrownum, maxrowspan, newbottomrow, newrow, oldchild, bottomrownum, coord;
+   /** @type {Record<string, boolean>} */
    var rowneedsrefresh={};
 
    var context=editor.context;
@@ -11216,7 +11645,7 @@ SocialCalc.ScrollTableDownOneRow = function(editor) {
 
    for (rownum in rowneedsrefresh) {
       newrow=context.RenderRow(rownum, rowpane);
-      oldchild=tbodyobj.childNodes[(toprow+(rownum-context.rowpanes[rowpane].first))];
+      oldchild=tbodyobj.childNodes[(toprow+(Number(rownum)-context.rowpanes[rowpane].first))];
       tbodyobj.replaceChild(newrow,oldchild);
       }
 
@@ -11244,6 +11673,7 @@ SocialCalc.ScrollTableDownOneRow = function(editor) {
 //
 // *************************************
 
+/** @param {any} element @param {any} editor */
 SocialCalc.InputBox = function(element, editor) {
 
    if (!element) return; // invoked without enough data to work
@@ -11256,6 +11686,7 @@ SocialCalc.InputBox = function(element, editor) {
 
    element.onmousedown = SocialCalc.InputBoxOnMouseDown;
 
+   /** @param {any} e */
    editor.MoveECellCallback.formulabar = function(e){
       if (e.state!="start") return; // if not in normal keyboard mode don't replace formula bar
       editor.inputBox.DisplayCellContents(e.ecell.coord);
@@ -11265,9 +11696,12 @@ SocialCalc.InputBox = function(element, editor) {
 
 // Methods:
 
+/** @param {any} coord */
 SocialCalc.InputBox.prototype.DisplayCellContents = function(coord) {SocialCalc.InputBoxDisplayCellContents(this, coord);};
+/** @param {any} show */
 SocialCalc.InputBox.prototype.ShowInputBox = function(show) {this.editor.inputEcho.ShowInputEcho(show);};
 SocialCalc.InputBox.prototype.GetText = function() {return this.element.value;};
+/** @param {any} newtext */
 SocialCalc.InputBox.prototype.SetText = function(newtext) {
    if (!this.element) return;
    this.element.value=newtext;
@@ -11275,14 +11709,16 @@ SocialCalc.InputBox.prototype.SetText = function(newtext) {
    };
 SocialCalc.InputBox.prototype.Focus = function() {SocialCalc.InputBoxFocus(this);};
 SocialCalc.InputBox.prototype.Blur = function() {return this.element.blur();};
+/** @param {any} t */
 SocialCalc.InputBox.prototype.Select = function(t) {
    if (!this.element) return;
+   var doc = /** @type {any} */ (document);
    switch (t) {
       case "end":
-         if (document.selection && document.selection.createRange) {
+         if (doc.selection && doc.selection.createRange) {
             /* IE 4+ - Safer than setting .selectionEnd as it also works for Textareas. */
             try {
-               var range = document.selection.createRange().duplicate();
+               var range = doc.selection.createRange().duplicate();
                range.moveToElementText(this.element);
                range.collapse(false);
                range.select();
@@ -11309,6 +11745,7 @@ SocialCalc.InputBox.prototype.Select = function(t) {
 // Sets input box to the contents of the specified cell (or ecell if null).
 //
 
+/** @param {any} inputbox @param {any} coord */
 SocialCalc.InputBoxDisplayCellContents = function(inputbox, coord) {
 
    var scc = SocialCalc.Constants;
@@ -11341,6 +11778,7 @@ SocialCalc.InputBoxDisplayCellContents = function(inputbox, coord) {
 // but still pass them off to SocialCalc.ProcessKey.
 //
 
+/** @param {any} inputbox */
 SocialCalc.InputBoxFocus = function(inputbox) {
 
    if (!inputbox) return;
@@ -11362,6 +11800,7 @@ SocialCalc.InputBoxFocus = function(inputbox) {
 // and pass them off to SocialCalc.ProcessKey, but in a different editing state.
 //
 
+/** @param {any} e */
 SocialCalc.InputBoxOnMouseDown = function(e) {
 
    var editor = SocialCalc.Keyboard.focusTable; // get TableEditor doing keyboard stuff
@@ -11388,6 +11827,7 @@ SocialCalc.InputBoxOnMouseDown = function(e) {
       case "inputboxdirect":
          break;
       }
+   return undefined;
    }
 
 
@@ -11400,6 +11840,7 @@ SocialCalc.InputBoxOnMouseDown = function(e) {
 //
 // *************************************
 
+/** @param {any} editor */
 SocialCalc.InputEcho = function(editor) {
 
    var scc = SocialCalc.Constants;
@@ -11451,11 +11892,14 @@ SocialCalc.InputEcho = function(editor) {
 
 // Methods:
 
+/** @param {any} show */
 SocialCalc.InputEcho.prototype.ShowInputEcho = function(show) {return SocialCalc.ShowInputEcho(this, show);};
+/** @param {any} str */
 SocialCalc.InputEcho.prototype.SetText = function(str) {return SocialCalc.SetInputEchoText(this, str);};
 
 // Functions:
 
+/** @param {any} inputecho @param {any} show */
 SocialCalc.ShowInputEcho = function(inputecho, show) {
 
    var cell, position;
@@ -11483,6 +11927,7 @@ SocialCalc.ShowInputEcho = function(inputecho, show) {
 
    }
 
+/** @param {any} inputecho @param {any} str */
 SocialCalc.SetInputEchoText = function(inputecho, str) {
 
    var scc = SocialCalc.Constants;
@@ -11523,9 +11968,10 @@ SocialCalc.InputEchoHeartbeat = function() {
    if (!editor) return true; // we're not handling it -- let browser do default
 
    editor.inputEcho.SetText(editor.inputBox.GetText()+"_");
-
+   return undefined;
    }
 
+/** @param {any} e */
 SocialCalc.InputEchoMouseDown = function(e) {
       var event = e || window.event;
 
@@ -11538,7 +11984,7 @@ SocialCalc.InputEchoMouseDown = function(e) {
 //      else event.returnValue = false; // IE 5+
 
       editor.inputBox.element.focus();
-
+      return undefined;
 //      return false;
       };
 
@@ -11551,6 +11997,7 @@ SocialCalc.InputEchoMouseDown = function(e) {
 //
 // *************************************
 
+/** @param {any} editor */
 SocialCalc.CellHandles = function(editor) {
 
    var scc = SocialCalc.Constants;
@@ -11612,10 +12059,12 @@ SocialCalc.CellHandles = function(editor) {
 
 // Methods:
 
+/** @param {any} show @param {any} moveshow */
 SocialCalc.CellHandles.prototype.ShowCellHandles = function(show, moveshow) {return SocialCalc.ShowCellHandles(this, show, moveshow);};
 
 // Functions:
 
+/** @param {any} cellhandles @param {any} show @param {any} moveshow */
 SocialCalc.ShowCellHandles = function(cellhandles, show, moveshow) {
 
    var cell, cell2, position, position2;
@@ -11699,6 +12148,7 @@ SocialCalc.ShowCellHandles = function(cellhandles, show, moveshow) {
 
    }
 
+/** @param {any} e */
 SocialCalc.CellHandlesMouseMoveOnHandle = function(e) {
 
    var scc = SocialCalc.Constants;
@@ -11751,6 +12201,7 @@ SocialCalc.CellHandlesMouseMoveOnHandle = function(e) {
 //  -1, -2, -3, -4 for inner quadrants, and +1...+4 for outer quadrants
 //
 
+/** @param {any} segtable @param {any} divWithMouseHit @param {any} x @param {any} y */
 SocialCalc.SegmentDivHit = function(segtable, divWithMouseHit, x, y) {
 
    var width = divWithMouseHit.offsetWidth;
@@ -11759,6 +12210,7 @@ SocialCalc.SegmentDivHit = function(segtable, divWithMouseHit, x, y) {
    var top = divWithMouseHit.offsetTop;
    var v = 0;
    var table = segtable;
+   var quadrant = "";
    var len = Math.sqrt(Math.pow(x-left-(width/2.0-.5), 2)+Math.pow(y-top-(height/2.0-.5), 2));
 
    if (table.length==2) { // type 2 segtable
@@ -11840,7 +12292,7 @@ SocialCalc.SegmentDivHit = function(segtable, divWithMouseHit, x, y) {
 
 SocialCalc.CellHandlesHoverTimeout = function() {
 
-   editor = SocialCalc.Keyboard.focusTable; // get TableEditor doing keyboard stuff
+   var editor = SocialCalc.Keyboard.focusTable; // get TableEditor doing keyboard stuff
    if (!editor) return true; // we're not handling it -- let browser do default
    var cellhandles = editor.cellhandles;
    if (cellhandles.timer) {
@@ -11848,9 +12300,10 @@ SocialCalc.CellHandlesHoverTimeout = function() {
       cellhandles.timer = null;
       }
    editor.cellhandles.ShowCellHandles(true, false); // hide move handles
-
+   return undefined;
 }
 
+/** @param {any} e */
 SocialCalc.CellHandlesMouseDown = function(e) {
 
    var scc = SocialCalc.Constants;
@@ -11992,6 +12445,7 @@ SocialCalc.CellHandlesMouseDown = function(e) {
 
    }
 
+/** @param {any} e */
 SocialCalc.CellHandlesMouseMove = function(e) {
 
    var scc = SocialCalc.Constants;
@@ -12136,6 +12590,7 @@ SocialCalc.CellHandlesMouseMove = function(e) {
    return;
    }
 
+/** @param {any} coord @param {any} direction */
 SocialCalc.CellHandlesDragAutoRepeat = function(coord, direction) {
 
    var mouseinfo = SocialCalc.EditorMouseInfo;
@@ -12227,6 +12682,7 @@ SocialCalc.CellHandlesDragAutoRepeat = function(coord, direction) {
 
    }
 
+/** @param {any} e */
 SocialCalc.CellHandlesMouseUp = function(e) {
 
    var editor, element, result, coord, now, textarea, sheetobj, cellobj, wval, cstr, cmdtype, cmdtype2;
@@ -12389,6 +12845,7 @@ SocialCalc.CellHandlesMouseUp = function(e) {
 //
 // *************************************
 
+/** @param {any} editor @param {any} vertical @param {any} size */
 SocialCalc.TableControl = function(editor, vertical, size) {
 
    var scc = SocialCalc.Constants;
@@ -12436,9 +12893,14 @@ SocialCalc.TableControl.prototype.ComputeTableControlPositions = function() {Soc
 
 // Functions:
 
+/** @param {any} control */
 SocialCalc.CreateTableControl = function(control) {
 
-   var s, functions, params;
+   var s;
+   /** @type {any} */
+   var functions;
+   /** @type {any} */
+   var params;
    var AssignID = SocialCalc.AssignID;
    var setStyles = SocialCalc.setStyles;
    var scc = SocialCalc.Constants;
@@ -12602,6 +13064,7 @@ SocialCalc.CreateTableControl = function(control) {
 // ScrollAreaClick - Button function to process pageup/down clicks
 //
 
+/** @param {any} e @param {any} buttoninfo @param {any} bobj */
 SocialCalc.ScrollAreaClick = function(e, buttoninfo, bobj) {
 
    var control = bobj.functionobj.control;
@@ -12620,6 +13083,7 @@ SocialCalc.ScrollAreaClick = function(e, buttoninfo, bobj) {
 // PositionTableControlElements
 //
 
+/** @param {any} control */
 SocialCalc.PositionTableControlElements = function(control) {
 
    var border, realend, thumbpos;
@@ -12678,6 +13142,7 @@ SocialCalc.PositionTableControlElements = function(control) {
 // the table control elements.
 //
 
+/** @param {any} control */
 SocialCalc.ComputeTableControlPositions = function(control) {
 
    var editor = control.editor;
@@ -12714,6 +13179,7 @@ SocialCalc.ComputeTableControlPositions = function(control) {
 // TableControlPaneSlider function for starting drag
 //
 
+/** @param {any} event @param {any} draginfo @param {any} dobj */
 SocialCalc.TCPSDragFunctionStart = function(event, draginfo, dobj) {
 
    var editor = dobj.functionobj.control.editor;
@@ -12731,7 +13197,7 @@ SocialCalc.TCPSDragFunctionStart = function(event, draginfo, dobj) {
    SocialCalc.setStyles(draginfo.trackingline, scc.TCPStrackinglineStyle);
 
    if (dobj.vertical) {
-      row = SocialCalc.Lookup(draginfo.clientY+dobj.functionobj.control.sliderthickness, editor.rowpositions);
+      var row = SocialCalc.Lookup(draginfo.clientY+dobj.functionobj.control.sliderthickness, editor.rowpositions);
       draginfo.trackingline.style.top = (editor.rowpositions[row] || editor.headposition.top)+"px";
       draginfo.trackingline.style.left = editor.headposition.left+"px";
       draginfo.trackingline.id = 'trackingline-vertical';
@@ -12742,7 +13208,7 @@ SocialCalc.TCPSDragFunctionStart = function(event, draginfo, dobj) {
          }
       }
    else {
-      col = SocialCalc.Lookup(draginfo.clientX+dobj.functionobj.control.sliderthickness, editor.colpositions);
+      var col = SocialCalc.Lookup(draginfo.clientX+dobj.functionobj.control.sliderthickness, editor.colpositions);
       draginfo.trackingline.style.top = editor.headposition.top+"px";
       draginfo.trackingline.style.left = (editor.colpositions[col] || editor.headposition.left)+"px";
       draginfo.trackingline.id = 'trackingline-horizon';
@@ -12761,6 +13227,7 @@ SocialCalc.TCPSDragFunctionStart = function(event, draginfo, dobj) {
 // TCPSDragFunctionMove(event, draginfo, dobj)
 //
 
+/** @param {any} event @param {any} draginfo @param {any} dobj */
 SocialCalc.TCPSDragFunctionMove = function(event, draginfo, dobj) {
 
    var row, col, max, min;
@@ -12807,6 +13274,7 @@ SocialCalc.TCPSDragFunctionMove = function(event, draginfo, dobj) {
 // TCPSDragFunctionStop(event, draginfo, dobj)
 //
 
+/** @param {any} event @param {any} draginfo @param {any} dobj */
 SocialCalc.TCPSDragFunctionStop = function(event, draginfo, dobj) {
 
    var row, col, max, min, dc;
@@ -12862,6 +13330,7 @@ SocialCalc.TCPSDragFunctionStop = function(event, draginfo, dobj) {
 // TableControlThumb function for starting drag
 //
 
+/** @param {any} event @param {any} draginfo @param {any} dobj */
 SocialCalc.TCTDragFunctionStart = function(event, draginfo, dobj) {
 
    var rowpane, colpane, row, col;
@@ -12919,6 +13388,7 @@ SocialCalc.TCTDragFunctionStart = function(event, draginfo, dobj) {
 // Render partial row
 //
 
+/** @param {any} draginfo @param {any} editor @param {any} row */
 SocialCalc.TCTDragFunctionRowSetStatus = function(draginfo, editor, row) {
 
    var scc = SocialCalc.Constants;
@@ -12938,6 +13408,7 @@ SocialCalc.TCTDragFunctionRowSetStatus = function(draginfo, editor, row) {
 // TCTDragFunctionMove(event, draginfo, dobj)
 //
 
+/** @param {any} event @param {any} draginfo @param {any} dobj */
 SocialCalc.TCTDragFunctionMove = function(event, draginfo, dobj) {
 
    var first, msg;
@@ -12991,6 +13462,7 @@ SocialCalc.TCTDragFunctionMove = function(event, draginfo, dobj) {
 // TCTDragFunctionStop(event, draginfo, dobj)
 //
 
+/** @param {any} event @param {any} draginfo @param {any} dobj */
 SocialCalc.TCTDragFunctionStop = function(event, draginfo, dobj) {
 
    var first;
@@ -13068,6 +13540,7 @@ SocialCalc.DragInfo = {
 // The functionobj defaults to moving the element contrained only by vertical and horizontal settings.
 //
 
+/** @param {any} element @param {any} vertical @param {any} horizontal @param {any} functionobj @param {any} parent */
 SocialCalc.DragRegister = function(element, vertical, horizontal, functionobj, parent) {
 
    var draginfo = SocialCalc.DragInfo;
@@ -13098,6 +13571,7 @@ SocialCalc.DragRegister = function(element, vertical, horizontal, functionobj, p
 // DragUnregister(element) - remove object from list
 //
 
+/** @param {any} element */
 SocialCalc.DragUnregister = function(element) {
 
    var draginfo = SocialCalc.DragInfo;
@@ -13127,6 +13601,7 @@ SocialCalc.DragUnregister = function(element) {
 // DragMouseDown(event)
 //
 
+/** @param {any} event */
 SocialCalc.DragMouseDown = function(event) {
 
    var e = event || window.event;
@@ -13169,6 +13644,7 @@ SocialCalc.DragMouseDown = function(event) {
 // DragMouseMove(event)
 //
 
+/** @param {any} event */
 SocialCalc.DragMouseMove = function(event) {
 
    var e = event || window.event;
@@ -13187,6 +13663,7 @@ SocialCalc.DragMouseMove = function(event) {
 // DragMouseUp(event)
 //
 
+/** @param {any} event */
 SocialCalc.DragMouseUp = function(event) {
 
    var e = event || window.event;
@@ -13211,6 +13688,7 @@ SocialCalc.DragMouseUp = function(event) {
 // DragFunctionStart(event, draginfo, dobj)
 //
 
+/** @param {any} event @param {any} draginfo @param {any} dobj */
 SocialCalc.DragFunctionStart = function(event, draginfo, dobj) {
 
    var element = dobj.functionobj.positionobj || dobj.element;
@@ -13224,6 +13702,7 @@ SocialCalc.DragFunctionStart = function(event, draginfo, dobj) {
 // DragFunctionPosition(event, draginfo, dobj)
 //
 
+/** @param {any} event @param {any} draginfo @param {any} dobj */
 SocialCalc.DragFunctionPosition = function(event, draginfo, dobj) {
 
    var element = dobj.functionobj.positionobj || dobj.element;
@@ -13274,6 +13753,7 @@ SocialCalc.ButtonInfo = {
 // The arguments (other than editor and element) may be null (meaning no change for style and no repeat)
 // The paramobj has the optional normalstyle, hoverstyle, downstyle, repeatwait, repeatinterval settings
 
+/** @param {any} editor @param {any} element @param {any} paramobj @param {any} functionobj */
 SocialCalc.ButtonRegister = function(editor, element, paramobj, functionobj) {
 
    var buttoninfo = SocialCalc.ButtonInfo;
@@ -13307,6 +13787,7 @@ SocialCalc.ButtonRegister = function(editor, element, paramobj, functionobj) {
 // ButtonMouseOver(event)
 //
 
+/** @param {any} event */
 SocialCalc.ButtonMouseOver = function(event) {
 
    var e = event || window.event;
@@ -13344,6 +13825,7 @@ SocialCalc.ButtonMouseOver = function(event) {
 // ButtonMouseOut(event)
 //
 
+/** @param {any} event */
 SocialCalc.ButtonMouseOut = function(event) {
 
    var e = event || window.event;
@@ -13374,6 +13856,7 @@ SocialCalc.ButtonMouseOut = function(event) {
 // ButtonMouseDown(event)
 //
 
+/** @param {any} event */
 SocialCalc.ButtonMouseDown = function(event) {
 
    var e = event || window.event;
@@ -13427,6 +13910,7 @@ SocialCalc.ButtonMouseDown = function(event) {
 // ButtonMouseUp(event)
 //
 
+/** @param {any} event */
 SocialCalc.ButtonMouseUp = function(event) {
 
    var e = event || window.event;
@@ -13444,7 +13928,7 @@ SocialCalc.ButtonMouseUp = function(event) {
    if (document.removeEventListener) { // DOM Level 2
       document.removeEventListener("mouseup", SocialCalc.ButtonMouseUp, true);
       }
-   else if (document.detachEvent) { // IE
+   else if (/** @type {any} */ (document).detachEvent) { // IE
       bobj.element.detachEvent("onlosecapture", SocialCalc.ButtonMouseUp);
       bobj.element.detachEvent("onmouseup", SocialCalc.ButtonMouseUp);
       bobj.element.releaseCapture();
@@ -13503,6 +13987,7 @@ SocialCalc.MouseWheelInfo = {
 // MouseWheelRegister(element, functionobj) - make element respond to mousewheel
 //
 
+/** @param {any} element @param {any} functionobj */
 SocialCalc.MouseWheelRegister = function(element, functionobj) {
 
    var mousewheelinfo = SocialCalc.MouseWheelInfo;
@@ -13526,6 +14011,7 @@ SocialCalc.MouseWheelRegister = function(element, functionobj) {
 
    }
 
+/** @param {any} e */
 SocialCalc.ProcessMouseWheel = function(e) {
 
    var event = e || window.event;
@@ -13656,6 +14142,7 @@ SocialCalc.Keyboard = {
    chForProcessKey: "" // remember so can do repeat in those cases
    };
 
+/** @param {any} editor */
 SocialCalc.KeyboardSetFocus = function(editor) {
 
    SocialCalc.Keyboard.focusTable = editor;
@@ -13681,6 +14168,7 @@ SocialCalc.KeyboardFocus = function() {
 
    }
 
+/** @param {any} e */
 SocialCalc.ProcessKeyDown = function(e) {
 
    var kt = SocialCalc.keyboardTables;
@@ -13734,6 +14222,7 @@ SocialCalc.ProcessKeyDown = function(e) {
 
    }
 
+/** @param {any} e */
 SocialCalc.ProcessKeyPress = function(e) {
 
    var kt = SocialCalc.keyboardTables;
@@ -13830,6 +14319,7 @@ SocialCalc.ProcessKeyPress = function(e) {
 // Take a key representation as a character string and dispatch to appropriate routine
 //
 
+/** @param {any} ch @param {any} e */
 SocialCalc.ProcessKey = function (ch, e) {
    var ft = SocialCalc.Keyboard.focusTable;
    if (!ft) return true; // we're not handling it -- let browser do default
@@ -14925,7 +15415,8 @@ SocialCalc.intFunc = function(n) {
    }
 
 
-//
+// @ts-check
+// Opts this module into strict TypeScript checking; sibling .d.ts provides types.
 //
 /*
 // SocialCalc Spreadsheet Formula Library
@@ -14958,6 +15449,7 @@ SocialCalc.intFunc = function(n) {
 //
 */
 
+   // @ts-ignore - SocialCalc is declared ambiently as a namespace; runtime re-declaration is intentional.
    var SocialCalc;
    if (!SocialCalc) SocialCalc = {}; // May be used with other SocialCalc libraries or standalone
                                      // In any case, requires SocialCalc.Constants.
@@ -15076,9 +15568,10 @@ SocialCalc.TriggerIoAction = {}; // eddy
 
 ************************* */
 
+/** @param {string} line */
 SocialCalc.Formula.ParseFormulaIntoTokens = function(line) {
 
-   var i, ch, cclass, haddecimal, last_token, last_token_type, last_token_text, t;
+   var i, ch, cclass, last_token, last_token_type, last_token_text, t;
 
    var scf = SocialCalc.Formula;
    var scc = SocialCalc.Constants;
@@ -15090,6 +15583,7 @@ SocialCalc.Formula.ParseFormulaIntoTokens = function(line) {
    var pushtoken = scf.ParsePushToken;
    var coordregex = /^\$?[A-Z]{1,2}\$?[1-9]\d*$/i;
 
+   /** @type {any[]} */
    var parseinfo = [];
    var str = "";
    var state = 0;
@@ -15357,6 +15851,12 @@ SocialCalc.Formula.ParseFormulaIntoTokens = function(line) {
 
    }
 
+/**
+ * @param {any[]} parseinfo
+ * @param {string} ttext
+ * @param {any} ttype
+ * @param {any} topcode
+ */
 SocialCalc.Formula.ParsePushToken = function(parseinfo, ttext, ttype, topcode) {
 
    parseinfo.push({text: ttext, type: ttype, opcode: topcode});
@@ -15374,6 +15874,11 @@ SocialCalc.Formula.ParsePushToken = function(parseinfo, ttext, ttype, topcode) {
 
 ************************* */
 
+/**
+ * @param {any[]} parseinfo
+ * @param {any} sheet
+ * @param {boolean | number} [allowrangereturn]
+ */
 SocialCalc.Formula.evaluate_parsed_formula = function(parseinfo, sheet, allowrangereturn) {
 
    var result;
@@ -15406,6 +15911,7 @@ SocialCalc.Formula.evaluate_parsed_formula = function(parseinfo, sheet, allowran
 // and then enhanced for additional spreadsheet things
 //
 
+/** @param {any[]} parseinfo */
 SocialCalc.Formula.ConvertInfixToPolish = function(parseinfo) {
 
    var scf = SocialCalc.Formula;
@@ -15513,7 +16019,8 @@ SocialCalc.Formula.ConvertInfixToPolish = function(parseinfo) {
 // display logged objects in the audit tab of the spreadsheet control
 if(typeof SocialCalc.debug_log === 'undefined') SocialCalc.debug_log = [];
 
-SocialCalc.DebugLog = function(logObject) {	
+/** @param {any} logObject */
+SocialCalc.DebugLog = function(logObject) {
 //	SocialCalc.debug_log.push(logObject);
 }
 
@@ -15532,6 +16039,12 @@ SocialCalc.DebugLog = function(logObject) {
 // The number starts as a null string ("A1|B3|")
 //
 
+/**
+ * @param {any[]} parseinfo
+ * @param {number[] | string} revpolish
+ * @param {any} sheet
+ * @param {boolean | number} [allowrangereturn]
+ */
 SocialCalc.Formula.EvaluatePolish = function(parseinfo, revpolish, sheet, allowrangereturn) {
 
    var scf = SocialCalc.Formula;
@@ -15543,14 +16056,15 @@ SocialCalc.Formula.EvaluatePolish = function(parseinfo, revpolish, sheet, allowr
    var operand_as_text = scf.OperandAsText;
    var operand_value_and_type = scf.OperandValueAndType;
    var operands_as_coord_on_sheet = scf.OperandsAsCoordOnSheet;
-   var format_number_for_display = SocialCalc.format_number_for_display || function(v, t, f) {return v+"";};
+   var format_number_for_display = SocialCalc.format_number_for_display || function(/** @type {any} */ v, /** @type {any} */ t, /** @type {any} */ f) {return v+"";};
 
    var errortext = "";
    var function_start = -1;
    var missingOperandError = {value: "", type: "e#VALUE!", error: scc.s_parseerrmissingoperand};
 
+   /** @type {any[]} */
    var operand = [];
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
+   var PushOperand = function(/** @type {any} */ t, /** @type {any} */ v) {operand.push({type: t, value: v});};
 
    var i, rii, prii, ttype, ttext, value, value1, value2, tostype, tostype2, resulttype, valuetype, cond, vmatch, smatch;
 
@@ -15770,7 +16284,7 @@ SocialCalc.Formula.EvaluatePolish = function(parseinfo, revpolish, sheet, allowr
       else if (ttype == tokentype.name) {
 	  
 //         errortext = scf.CalculateFunction(ttext, operand, sheet);
-         errortext = scf.CalculateFunction(ttext, operand, sheet, parseinfo.coord); // eddy also pass the cell id
+         errortext = scf.CalculateFunction(ttext, operand, sheet, /** @type {any} */(parseinfo).coord); // eddy also pass the cell id
 		 
          if (errortext) break;
 		 
@@ -15863,6 +16377,11 @@ SocialCalc.Formula.EvaluatePolish = function(parseinfo, revpolish, sheet, allowr
 #
 */
 
+/**
+ * @param {any} type1
+ * @param {any} type2
+ * @param {{ [subtype: string]: string }} typelookup
+ */
 SocialCalc.Formula.LookupResultType = function(type1, type2, typelookup) {
 
    var pos1, pos2, result;
@@ -15906,11 +16425,16 @@ SocialCalc.Formula.LookupResultType = function(type1, type2, typelookup) {
 #
 */
 
+/**
+ * @param {any} sheet
+ * @param {any[]} operand
+ */
 SocialCalc.Formula.TopOfStackValueAndType = function(sheet, operand) {
 
    var cellvtype, cell, pos, coordsheet;
    var scf = SocialCalc.Formula;
 
+   /** @type {{ type: string, value: any, error?: string }} */
    var result = {type: "", value: ""};
 
    var stacklen = operand.length;
@@ -15943,6 +16467,10 @@ SocialCalc.Formula.TopOfStackValueAndType = function(sheet, operand) {
 #
 */
 
+/**
+ * @param {any} sheet
+ * @param {any[]} operand
+ */
 SocialCalc.Formula.OperandAsNumber = function(sheet, operand) {
 
    var t, valueinfo;
@@ -15986,6 +16514,10 @@ SocialCalc.Formula.OperandAsNumber = function(sheet, operand) {
 #
 */
 
+/**
+ * @param {any} sheet
+ * @param {any[]} operand
+ */
 SocialCalc.Formula.OperandAsText = function(sheet, operand) {
 
    var t, valueinfo;
@@ -16010,8 +16542,8 @@ SocialCalc.Formula.OperandAsText = function(sheet, operand) {
       operandinfo.value = "";
       }
    else {
-      operand.value = operandinfo.value + "";
-      operand.type = "t";
+      operandinfo.value = operandinfo.value + "";
+      operandinfo.type = "t";
       }
 
    return operandinfo;
@@ -16029,11 +16561,16 @@ SocialCalc.Formula.OperandAsText = function(sheet, operand) {
 #
 */
 
+/**
+ * @param {any} sheet
+ * @param {any[]} operand
+ */
 SocialCalc.Formula.OperandValueAndType = function(sheet, operand) {
 
    var cellvtype, cell, pos, coordsheet;
    var scf = SocialCalc.Formula;
 
+   /** @type {{ type: string, value: any, error?: string }} */
    var result = {type: "", value: ""};
 
    var stacklen = operand.length;
@@ -16103,6 +16640,10 @@ SocialCalc.Formula.OperandValueAndType = function(sheet, operand) {
 */
 
 
+/**
+ * @param {any} sheet
+ * @param {any[]} operand
+ */
 SocialCalc.Formula.OperandAsCoord = function(sheet, operand) {
 	return SocialCalc.Formula.OperandAsType(sheet, operand, "coord");
 }
@@ -16117,6 +16658,10 @@ SocialCalc.Formula.OperandAsCoord = function(sheet, operand) {
 #
 */
 
+/**
+ * @param {any} sheet
+ * @param {any[]} operand
+ */
 SocialCalc.Formula.OperandAsRange = function(sheet, operand) {
 	return SocialCalc.Formula.OperandAsType(sheet, operand, "range");
 }
@@ -16129,10 +16674,16 @@ SocialCalc.Formula.OperandAsRange = function(sheet, operand) {
 # Returns operandtype value. All others are treated as an error.
 #
 */
+/**
+ * @param {any} sheet
+ * @param {any[]} operand
+ * @param {any} operandtype
+ */
 SocialCalc.Formula.OperandAsType = function(sheet, operand, operandtype) {
 
    var scf = SocialCalc.Formula;
 
+   /** @type {{ type: string, value: any, error?: string }} */
    var result = {type: "", value: ""};
 
    var stacklen = operand.length;
@@ -16165,10 +16716,16 @@ SocialCalc.Formula.OperandAsType = function(sheet, operand, operandtype) {
 #
 */
 
+/**
+ * @param {any} sheet
+ * @param {any[]} operand
+ */
 SocialCalc.Formula.OperandsAsCoordOnSheet = function(sheet, operand) {
 
    var sheetname, othersheet, pos1, pos2;
+   /** @type {any} */
    var value1 = {};
+   /** @type {any} */
    var result = {};
    var scf = SocialCalc.Formula;
 
@@ -16222,9 +16779,14 @@ SocialCalc.Formula.OperandsAsCoordOnSheet = function(sheet, operand) {
 #
 */
 
+/**
+ * @param {any} sheet
+ * @param {any[]} operand
+ */
 SocialCalc.Formula.OperandsAsRangeOnSheet = function(sheet, operand) {
 
    var value1, othersheet, pos1, pos2;
+   /** @type {any} */
    var value2 = {};
    var scf = SocialCalc.Formula;
    var scc = SocialCalc.Constants;
@@ -16273,12 +16835,17 @@ SocialCalc.Formula.OperandsAsRangeOnSheet = function(sheet, operand) {
 #
 */
 
+/**
+ * @param {any} sheet
+ * @param {any[]} operand
+ */
 SocialCalc.Formula.OperandAsSheetName = function(sheet, operand) {
 
    var nvalue, cell;
 
    var scf = SocialCalc.Formula;
 
+   /** @type {{ type: string, value: any, error?: string }} */
    var result = {type: "", value: ""};
 
    var stacklen = operand.length;
@@ -16325,10 +16892,16 @@ SocialCalc.Formula.OperandAsSheetName = function(sheet, operand) {
 // Note: The range must not have sheet names ("!") in them.
 //
 
+/**
+ * @param {any} sheet
+ * @param {string} name
+ * @param {string | boolean} [isEnd]
+ */
 SocialCalc.Formula.LookupName = function(sheet, name, isEnd) {
 
    var pos, specialc, parseinfo;
    var names = sheet.names;
+   /** @type {any} */
    var value = {};
    var startedwalk = false;
 
@@ -16403,6 +16976,10 @@ SocialCalc.Formula.LookupName = function(sheet, name, isEnd) {
 #
 */
 
+/**
+ * @param {any[]} operand
+ * @param {string} rangevalue
+ */
 SocialCalc.Formula.StepThroughRangeDown = function(operand, rangevalue) {
 
    var value1, value2, sequence, pos1, pos2, sheet1, rp, c, r, count;
@@ -16412,7 +16989,7 @@ SocialCalc.Formula.StepThroughRangeDown = function(operand, rangevalue) {
    pos2 = rangevalue.indexOf("|", pos1+1);
    value1 = rangevalue.substring(0, pos1);
    value2 = rangevalue.substring(pos1+1, pos2);
-   sequence = rangevalue.substring(pos2+1) - 0;
+   sequence = /** @type {any} */(rangevalue.substring(pos2+1)) - 0;
 
    pos1 = value1.indexOf("!");
    if (pos1 != -1) {
@@ -16441,6 +17018,7 @@ SocialCalc.Formula.StepThroughRangeDown = function(operand, rangevalue) {
             }
          }
       }
+   return undefined;
    }
 
 /*
@@ -16457,6 +17035,10 @@ SocialCalc.Formula.StepThroughRangeDown = function(operand, rangevalue) {
 #
 */
 
+/**
+ * @param {any} sheetdata
+ * @param {string} range
+ */
 SocialCalc.Formula.DecodeRangeParts = function(sheetdata, range) {
 
    var value1, value2, pos1, pos2, sheet1, coordsheetdata, rp;
@@ -16554,7 +17136,15 @@ SocialCalc.Formula.DecodeRangeParts = function(sheetdata, range) {
 #
 */
 // eddy StoreIoEventFormula
+/**
+ * @param {string} function_name
+ * @param {string} coord
+ * @param {any[]} operand_reverse
+ * @param {any} sheet
+ * @param {string} io_parameters
+ */
 SocialCalc.Formula.StoreIoEventFormula = function(function_name, coord, operand_reverse, sheet, io_parameters) {
+	/** @type {any[]} */
 	var operand = [];
 	SocialCalc.Formula.Clone(operand,operand_reverse);
     operand.reverse(); // normal parameter order
@@ -16588,7 +17178,7 @@ SocialCalc.Formula.StoreIoEventFormula = function(function_name, coord, operand_
   // send trigger times to server if changed
   if(io_parameters == "TimeTrigger") { // timer trigger formula exists   
     // function to push cell time into array
-    var PushTriggerTime = function(list, coordA1, sheetData) {
+    var PushTriggerTime = function(/** @type {any[]} */ list, /** @type {string} */ coordA1, /** @type {any} */ sheetData) {
       var cell = sheetData.cells[coordA1];   
       if (typeof cell !== 'undefined' && cell.valuetype.charAt(0) == "n") { // if not blank and is number
         list.push(cell.datavalue);
@@ -16596,10 +17186,11 @@ SocialCalc.Formula.StoreIoEventFormula = function(function_name, coord, operand_
     };
 
     var triggerTimeCellId = SocialCalc.Formula.PlainCoord(operand[0].value); // strip dollar signs
-    
+
+    /** @type {any[]} */
     var currentTriggerTimeList = [];
-    
-    if(operand[0].type == "range" )  {      
+
+    if(operand[0].type == "range" )  {
       var rangeinfo = SocialCalc.Formula.DecodeRangeParts(sheet, triggerTimeCellId);
       for (var i=0; i<rangeinfo.ncols; i++) {
         for (var j=0; j<rangeinfo.nrows; j++) {
@@ -16634,7 +17225,7 @@ SocialCalc.Formula.StoreIoEventFormula = function(function_name, coord, operand_
   if(io_parameters == "EventTree"	&& (operand[0].type == "coord" || operand[0].type == "range")) { // trigger cell exists   
   	// create a list of action formulas for each trigger cell  
     var triggerCellId = operand[0].value.replace(/\$/g,''); // strip dollar signs
-    var PushTriggerCord = function(list, index, v) {
+    var PushTriggerCord = function(/** @type {any} */ list, /** @type {string} */ index, /** @type {string} */ v) {
         if(typeof list[index] === 'undefined') list[index] = {};
         list[index][v] = v;
     };
@@ -16702,6 +17293,10 @@ SocialCalc.Formula.StoreIoEventFormula = function(function_name, coord, operand_
  * Warning - nested vales are NOT tested.
  * returns true if both arrays contain the same values
  */    
+/**
+ * @param {any[]} a
+ * @param {any[]} b
+ */
 SocialCalc.Formula.ArrayValuesEqual = function(a, b) {
   var i = a.length;
   if (i != b.length) return false;
@@ -16711,6 +17306,10 @@ SocialCalc.Formula.ArrayValuesEqual = function(a, b) {
   return true;
 };
 
+/**
+ * @param {any} destination
+ * @param {any} source
+ */
 SocialCalc.Formula.Clone =   function(destination, source) {
         for (var property in source) {
             if (typeof source[property] === "object" && source[property] !== null && destination[property]) { 
@@ -16770,9 +17369,17 @@ SocialCalc.Formula.LoadFormFields =   function() {
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any} sheet
+ * @param {string} [coord]
+ */
 SocialCalc.Formula.CalculateFunction = function(fname, operand, sheet, coord) {
 
-   var fobj, foperand, ffunc, argnum, ttext;
+   var fobj, ffunc, argnum, ttext;
+   /** @type {any[]} */
+   var foperand;
    var scf = SocialCalc.Formula;
    var ok = 1;
    var errortext = "";
@@ -16838,6 +17445,11 @@ SocialCalc.Formula.CalculateFunction = function(fname, operand, sheet, coord) {
 // Pushes the type and value onto the operand stack
 //
 
+/**
+ * @param {any[]} operand
+ * @param {any} t
+ * @param {any} v
+ */
 SocialCalc.Formula.PushOperand = function(operand, t, v) {
 
    operand.push({type: t, value: v});
@@ -16851,9 +17463,13 @@ SocialCalc.Formula.PushOperand = function(operand, t, v) {
 // reversing order in the process.
 //
 
+/**
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ */
 SocialCalc.Formula.CopyFunctionArgs = function(operand, foperand) {
 
-   var fobj, foperand, ffunc, argnum;
+   var fobj, ffunc, argnum;
    var scf = SocialCalc.Formula;
    var ok = 1;
    var errortext = null;
@@ -16873,6 +17489,10 @@ SocialCalc.Formula.CopyFunctionArgs = function(operand, foperand) {
 // Pushes appropriate error on operand stack and returns errortext, including fname
 //
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ */
 SocialCalc.Formula.FunctionArgsError = function(fname, operand) {
 
    var errortext = SocialCalc.Constants.s_calcerrincorrectargstofunction+" " + fname + ". ";
@@ -16889,6 +17509,12 @@ SocialCalc.Formula.FunctionArgsError = function(fname, operand) {
 // Pushes specified error and text on operand stack.
 //
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any} errortype
+ * @param {string} errortext
+ */
 SocialCalc.Formula.FunctionSpecificError = function(fname, operand, errortype, errortext) {
 
    SocialCalc.Formula.PushOperand(operand, errortype, errortext);
@@ -16903,6 +17529,10 @@ SocialCalc.Formula.FunctionSpecificError = function(fname, operand, errortype, e
 // If v.type is an error, push it on operand stack and return true, otherwise return false.
 //
 
+/**
+ * @param {any[]} operand
+ * @param {any} v
+ */
 SocialCalc.Formula.CheckForErrorValue = function(operand, v) {
 
    if (v.type.charAt(0) == "e") {
@@ -16978,6 +17608,7 @@ SocialCalc.Formula.FillFunctionInfo = function() {
 // Returns a string representing the arguments to function fname.
 //
 
+/** @param {string} fname */
 SocialCalc.Formula.FunctionArgString = function(fname) {
 
    var scf = SocialCalc.Formula;
@@ -17048,6 +17679,12 @@ SocialCalc.Formula.FunctionArgString = function(fname) {
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.SeriesFunctions = function(fname, operand, foperand, sheet) {
 
    var value1, t, v1;
@@ -17057,7 +17694,7 @@ SocialCalc.Formula.SeriesFunctions = function(fname, operand, foperand, sheet) {
    var lookup_result_type = scf.LookupResultType;
    var typelookupplus = scf.TypeLookupTable.plus;
 
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
+   var PushOperand = function(/** @type {any} */ t, /** @type {any} */ v) {operand.push({type: t, value: v});};
 
 
    var concat = "";
@@ -17069,7 +17706,7 @@ SocialCalc.Formula.SeriesFunctions = function(fname, operand, foperand, sheet) {
    var product = 1;
    var maxval;
    var minval;
-   var mk, sk, mk1, sk1; // For variance, etc.: M sub k, k-1, and S sub k-1
+   var mk = 0, sk = 0, mk1 = 0, sk1 = 0; // For variance, etc.: M sub k, k-1, and S sub k-1
                          // as per Knuth "The Art of Computer Programming" Vol. 2 3rd edition, page 232
 
    while (foperand.length > 0) {
@@ -17217,13 +17854,22 @@ SocialCalc.Formula.FunctionList["VARP"] = [SocialCalc.Formula.SeriesFunctions, -
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.SumProductFunction = function(fname, operand, foperand, sheet) {
-  
-   var range, products = [], sum = 0;
+
+   var range, sum = 0;
+   /** @type {any[]} */
+   var products = [];
    var scf = SocialCalc.Formula;
    var ncols = 0, nrows = 0;
+   var rangeinfo, i, j, k, cellcr, cell, value;
 
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
+   var PushOperand = function(/** @type {any} */ t, /** @type {any} */ v) {operand.push({type: t, value: v});};
 
    while (foperand.length > 0) {
       range = scf.TopOfStackValueAndType(sheet, foperand);
@@ -17232,6 +17878,10 @@ SocialCalc.Formula.SumProductFunction = function(fname, operand, foperand, sheet
          return;
          }
       rangeinfo = scf.DecodeRangeParts(sheet, range.value);
+      if (!rangeinfo) {
+         PushOperand("e#REF!", 0);
+         return;
+         }
       if (!ncols) ncols = rangeinfo.ncols;
       else if (ncols != rangeinfo.ncols) {
          PushOperand("e#VALUE!", 0);
@@ -17283,20 +17933,27 @@ SocialCalc.Formula.FunctionList["SUMPRODUCT"] = [SocialCalc.Formula.SumProductFu
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.DSeriesFunctions = function(fname, operand, foperand, sheet) {
 
-   var value1, tostype, cr, dbrange, fieldname, criteriarange, dbinfo, criteriainfo;
-   var fieldasnum, targetcol, i, j, k, cell, criteriafieldnums;
+   var tostype, cr, dbrange, fieldname, criteriarange, dbinfo, criteriainfo;
+   var fieldasnum, targetcol, i, j, k, cell, criteriafieldnums, criterianum;
    var testok, criteriacr, criteria, testcol, testcr;
-   var t;
+   var t, v1;
 
    var scf = SocialCalc.Formula;
    var operand_value_and_type = scf.OperandValueAndType;
    var lookup_result_type = scf.LookupResultType;
    var typelookupplus = scf.TypeLookupTable.plus;
 
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
+   var PushOperand = function(/** @type {any} */ t, /** @type {any} */ v) {operand.push({type: t, value: v});};
 
+   /** @type {any} */
    var value1 = {};
 
    var sum = 0;
@@ -17304,11 +17961,11 @@ SocialCalc.Formula.DSeriesFunctions = function(fname, operand, foperand, sheet) 
    var count = 0;
    var counta = 0;
    var countblank = 0;
-   var countmatches = 0;   
+   var countmatches = 0;
    var product = 1;
    var maxval;
    var minval;
-   var mk, sk, mk1, sk1; // For variance, etc.: M sub k, k-1, and S sub k-1
+   var mk = 0, sk = 0, mk1 = 0, sk1 = 0; // For variance, etc.: M sub k, k-1, and S sub k-1
                          // as per Knuth "The Art of Computer Programming" Vol. 2 3rd edition, page 232
 
    dbrange = scf.TopOfStackValueAndType(sheet, foperand); // get a range
@@ -17517,6 +18174,14 @@ SocialCalc.Formula.FunctionList["DVARP"] = [SocialCalc.Formula.DSeriesFunctions,
 #
 */
 
+/**
+ * @param {any} sheet
+ * @param {number} col1num
+ * @param {number} ncols
+ * @param {number} row1num
+ * @param {any} fieldname
+ * @param {any} fieldtype
+ */
 SocialCalc.Formula.FieldToColnum = function(sheet, col1num, ncols, row1num, fieldname, fieldtype) {
 
    var colnum, cell, value;
@@ -17556,17 +18221,28 @@ SocialCalc.Formula.FieldToColnum = function(sheet, col1num, ncols, row1num, fiel
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.LookupFunctions = function(fname, operand, foperand, sheet) {
 
-   var lookupvalue, range, offset, rangelookup, offsetvalue, rangeinfo;
-   var c, r, cincr, rincr, previousOK, csave, rsave, cell, value, valuetype, cr, lookupvalue;
+   var lookupvalue, range, offset, rangelookup, rangeinfo;
+   /** @type {any} */
+   var offsetvalue = 0;
+   /** @type {number} */
+   var c = 0, r = 0, csave = 0, rsave = 0;
+   var cincr, rincr;
+   var previousOK, cell, value, valuetype, cr;
 
    var scf = SocialCalc.Formula;
    var operand_value_and_type = scf.OperandValueAndType;
    var lookup_result_type = scf.LookupResultType;
    var typelookupplus = scf.TypeLookupTable.plus;
 
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
+   var PushOperand = function(/** @type {any} */ t, /** @type {any} */ v) {operand.push({type: t, value: v});};
 
    lookupvalue = operand_value_and_type(sheet, foperand);
    if (typeof lookupvalue.value == "string") {
@@ -17766,13 +18442,19 @@ SocialCalc.Formula.FunctionList["VLOOKUP"] = [SocialCalc.Formula.LookupFunctions
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.IndexFunction = function(fname, operand, foperand, sheet) {
 
    var range, sheetname, indexinfo, rowindex, colindex, result, resulttype;
 
    var scf = SocialCalc.Formula;
 
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
+   var PushOperand = function(/** @type {any} */ t, /** @type {any} */ v) {operand.push({type: t, value: v});};
 
    range = scf.TopOfStackValueAndType(sheet, foperand); // get range
    if (range.type != "range") {
@@ -17880,6 +18562,12 @@ SocialCalc.Formula.FunctionList["INDEX"] = [SocialCalc.Formula.IndexFunction, -1
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.CountifSumifFunctions = function(fname, operand, foperand, sheet) {
 
    var range, criteria, sumrange, f2operand, result, resulttype, value1, value2;
@@ -17892,7 +18580,7 @@ SocialCalc.Formula.CountifSumifFunctions = function(fname, operand, foperand, sh
    var lookup_result_type = scf.LookupResultType;
    var typelookupplus = scf.TypeLookupTable.plus;
 
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
+   var PushOperand = function(/** @type {any} */ t, /** @type {any} */ v) {operand.push({type: t, value: v});};
 
    range = scf.TopOfStackValueAndType(sheet, foperand); // get range or coord
    criteria = scf.OperandAsText(sheet, foperand); // get criteria
@@ -17976,6 +18664,12 @@ SocialCalc.Formula.FunctionList["SUMIF"] = [SocialCalc.Formula.CountifSumifFunct
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.SumifsFunction = function(fname, operand, foperand, sheet) {
    var range, criteria, sumrange, f2operand, result, resulttype, value1, value2;
    var sum = 0;
@@ -17987,7 +18681,7 @@ SocialCalc.Formula.SumifsFunction = function(fname, operand, foperand, sheet) {
    var lookup_result_type = scf.LookupResultType;
    var typelookupplus = scf.TypeLookupTable.plus;
 
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
+   var PushOperand = function(/** @type {any} */ t, /** @type {any} */ v) {operand.push({type: t, value: v});};
 
    sumrange = scf.TopOfStackValueAndType(sheet, foperand);
    if (sumrange.type != "coord" && sumrange.type != "range") {
@@ -18056,6 +18750,12 @@ SocialCalc.Formula.FunctionList["SUMIFS"] = [SocialCalc.Formula.SumifsFunction, 
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.IfFunction = function(fname, operand, foperand, sheet) {
 
    var cond, t;
@@ -18096,6 +18796,12 @@ SocialCalc.Formula.FunctionList["IF"] = [SocialCalc.Formula.IfFunction, -2, "iff
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.DateFunction = function(fname, operand, foperand, sheet) {
 
    var scf = SocialCalc.Formula;
@@ -18124,6 +18830,12 @@ SocialCalc.Formula.FunctionList["DATE"] = [SocialCalc.Formula.DateFunction, 3, "
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.TimeFunction = function(fname, operand, foperand, sheet) {
 
    var scf = SocialCalc.Formula;
@@ -18153,6 +18865,12 @@ SocialCalc.Formula.FunctionList["TIME"] = [SocialCalc.Formula.TimeFunction, 3, "
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.DMYFunctions = function(fname, operand, foperand, sheet) {
 
    var ymd, dtype, doffset;
@@ -18218,6 +18936,12 @@ SocialCalc.Formula.FunctionList["WEEKDAY"] = [SocialCalc.Formula.DMYFunctions, -
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.HMSFunctions = function(fname, operand, foperand, sheet) {
 
    var hours, minutes, seconds, fraction;
@@ -18267,6 +18991,12 @@ SocialCalc.Formula.FunctionList["SECOND"] = [SocialCalc.Formula.HMSFunctions, 1,
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.ExactFunction = function(fname, operand, foperand, sheet) {
 
    var scf = SocialCalc.Formula;
@@ -18383,10 +19113,18 @@ SocialCalc.Formula.ArgList = {
                 UPPER: [1]
                };
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.StringFunctions = function(fname, operand, foperand, sheet) {
 
    var i, value, offset, len, start, count;
+   var fulltext, oldtext, newtext, which, oldpos, pos;
    var scf = SocialCalc.Formula;
+   /** @type {any} */
    var result = 0;
    var resulttype = "e#VALUE!";
 
@@ -18469,8 +19207,8 @@ SocialCalc.Formula.StringFunctions = function(fname, operand, foperand, sheet) {
          break;
 
       case "PROPER":
-         result = operand_value[1].replace(/\b\w+\b/g, function(word) {
-                     return word.substring(0,1).toUpperCase() + 
+         result = operand_value[1].replace(/\b\w+\b/g, function(/** @type {string} */ word) {
+                     return word.substring(0,1).toUpperCase() +
                         word.substring(1);
                      }); // uppercase first character of words (see JavaScript, Flanagan, 5th edition, page 704)
          resulttype = "t";
@@ -18618,6 +19356,12 @@ SocialCalc.Formula.FunctionList["UPPER"] = [SocialCalc.Formula.StringFunctions, 
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.IsFunctions = function(fname, operand, foperand, sheet) {
 
    var scf = SocialCalc.Formula;
@@ -18687,9 +19431,16 @@ SocialCalc.Formula.FunctionList["ISTEXT"] = [SocialCalc.Formula.IsFunctions, 1, 
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.NTVFunctions = function(fname, operand, foperand, sheet) {
 
    var scf = SocialCalc.Formula;
+   /** @type {any} */
    var result = 0;
    var resulttype = "e#VALUE!";
 
@@ -18763,9 +19514,16 @@ SocialCalc.Formula.FunctionList["VALUE"] = [SocialCalc.Formula.NTVFunctions, 1, 
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.Math1Functions = function(fname, operand, foperand, sheet) {
 
    var v1, value, f;
+   /** @type {any} */
    var result = {};
 
    var scf = SocialCalc.Formula;
@@ -18929,9 +19687,16 @@ SocialCalc.Formula.FunctionList["TAN"] = [SocialCalc.Formula.Math1Functions, 1, 
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.Math2Functions = function(fname, operand, foperand, sheet) {
 
    var xval, yval, value, quotient, decimalscale, i;
+   /** @type {any} */
    var result = {};
 
    var scf = SocialCalc.Formula;
@@ -19011,9 +19776,16 @@ SocialCalc.Formula.FunctionList["TRUNC"] = [SocialCalc.Formula.Math2Functions, 2
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.LogFunction = function(fname, operand, foperand, sheet) {
 
    var value, value2;
+   /** @type {any} */
    var result = {};
 
    var scf = SocialCalc.Formula;
@@ -19060,6 +19832,12 @@ SocialCalc.Formula.FunctionList["LOG"] = [SocialCalc.Formula.LogFunction, -1, "l
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.RoundFunction = function(fname, operand, foperand, sheet) {
 
    var value2, decimalscale, scaledvalue, i;
@@ -19069,7 +19847,7 @@ SocialCalc.Formula.RoundFunction = function(fname, operand, foperand, sheet) {
    var resulttype = "e#VALUE!";
 
    var value = scf.OperandValueAndType(sheet, foperand);
-   var resulttype = scf.LookupResultType(value.type, value.type, scf.TypeLookupTable.oneargnumeric);
+   resulttype = scf.LookupResultType(value.type, value.type, scf.TypeLookupTable.oneargnumeric);
 
    if (foperand.length == 1) {
       value2 = scf.OperandValueAndType(sheet, foperand);
@@ -19126,12 +19904,18 @@ SocialCalc.Formula.FunctionList["ROUND"] = [SocialCalc.Formula.RoundFunction, -1
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.CeilingFloorFunctions = function(fname, operand, foperand, sheet) {
 
    var scf = SocialCalc.Formula;
    var val, sig, t;
 
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
+   var PushOperand = function(/** @type {any} */ t, /** @type {any} */ v) {operand.push({type: t, value: v});};
 
    val = scf.OperandValueAndType(sheet, foperand);
    t = val.type.charAt(0);
@@ -19191,6 +19975,12 @@ SocialCalc.Formula.FunctionList["FLOOR"] = [SocialCalc.Formula.CeilingFloorFunct
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.AndOrFunctions = function(fname, operand, foperand, sheet) {
 
    var value1, result;
@@ -19241,6 +20031,12 @@ SocialCalc.Formula.FunctionList["OR"] = [SocialCalc.Formula.AndOrFunctions, -1, 
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.NotFunction = function(fname, operand, foperand, sheet) {
 
    var result = 0;
@@ -19270,6 +20066,12 @@ SocialCalc.Formula.FunctionList["NOT"] = [SocialCalc.Formula.NotFunction, 1, "v"
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.ChooseFunction = function(fname, operand, foperand, sheet) {
 
    var resulttype, count, value1;
@@ -19313,6 +20115,12 @@ SocialCalc.Formula.FunctionList["CHOOSE"] = [SocialCalc.Formula.ChooseFunction, 
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.ColumnsRowsFunctions = function(fname, operand, foperand, sheet) {
 
    var resulttype, rangeinfo;
@@ -19363,9 +20171,16 @@ SocialCalc.Formula.FunctionList["ROWS"] = [SocialCalc.Formula.ColumnsRowsFunctio
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.ZeroArgFunctions = function(fname, operand, foperand, sheet) {
 
    var startval, tzoffset, start_1_1_1970, seconds_in_a_day, nowdays;
+   /** @type {{ type?: string, value: any }} */
    var result = {value: 0};
    
    switch (fname) {
@@ -19449,6 +20264,12 @@ SocialCalc.Formula.FunctionList["TRUE"] = [SocialCalc.Formula.ZeroArgFunctions, 
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.DDBFunction = function(fname, operand, foperand, sheet) {
 
    var method, depreciation, accumulateddepreciation, i;
@@ -19507,6 +20328,12 @@ SocialCalc.Formula.FunctionList["DDB"] = [SocialCalc.Formula.DDBFunction, -4, "d
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.SLNFunction = function(fname, operand, foperand, sheet) {
 
    var depreciation;
@@ -19543,6 +20370,12 @@ SocialCalc.Formula.FunctionList["SLN"] = [SocialCalc.Formula.SLNFunction, 3, "cs
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.SYDFunction = function(fname, operand, foperand, sheet) {
 
    var depreciation, sumperiods;
@@ -19592,11 +20425,17 @@ SocialCalc.Formula.FunctionList["SYD"] = [SocialCalc.Formula.SYDFunction, 4, "cs
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.InterestFunctions = function(fname, operand, foperand, sheet) {
 
    var resulttype, result, dval, eval_, fval;
    var pv, fv, rate, n, payment, paytype, guess, part1, part2, part3, part4, part5;
-   var olddelta, maxloop, tries, deltaepsilon, rate, oldrate, m;
+   var olddelta, maxloop, tries, delta, epsilon, oldrate, m;
 
    var scf = SocialCalc.Formula;
 
@@ -19773,6 +20612,12 @@ SocialCalc.Formula.FunctionList["RATE"] = [SocialCalc.Formula.InterestFunctions,
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.NPVFunction = function(fname, operand, foperand, sheet) {
 
    var resulttypenpv, rate, sum, factor, value1;
@@ -19821,6 +20666,12 @@ SocialCalc.Formula.FunctionList["NPV"] = [SocialCalc.Formula.NPVFunction, -2, "n
 #
 */
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
 SocialCalc.Formula.IRRFunction = function(fname, operand, foperand, sheet) {
 
    var value1, guess, oldsum, maxloop, tries, epsilon, rate, oldrate, m, sum, factor, i;
@@ -19938,6 +20789,13 @@ SocialCalc.Formula.FunctionList["IRR"] = [SocialCalc.Formula.IRRFunction, -1, "i
 */
 
 
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ * @param {string} [coord]
+ */
 SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord) {
 
   
@@ -19963,6 +20821,7 @@ SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord
 
 
 
+   /** @type {{ [key: string]: number[] }} */
    var argList = {
 				 BUTTON: [2]
         ,IMAGEBUTTON: [2]
@@ -19980,27 +20839,32 @@ SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord
         ,RADIOBUTTON: [2, 2]
 				,COPYVALUE: [4, 12, 15]
 				,COPYFORMULA: [4, 12, 12]
-        ,INSERT: [4, 8, -12, -15]  // change code to allow unlimited 
+        ,INSERT: [4, 8, -12, -15]  // change code to allow unlimited
         ,DELETEIF: [4,7,8]
         ,COMMAND: [4, 14]
         ,COMMANDIF: [4, 13, 14]
-        ,PANEL:[15, -12] // # PANEL(indices_or_csv, panel1_range [, panel2_range , ...])  
+        ,PANEL:[15, -12] // # PANEL(indices_or_csv, panel1_range [, panel2_range , ...])
         ,SPLASH:[12]  // SPLASH(splash_panel_range)  // shows splash screen (range)
-        ,STYLE:[6] // # STYLE(css)  
+        ,STYLE:[6] // # STYLE(css)
    };
    
-   var i, parameter, offset, len, start, count;
+   /** @type {number} */
+   var i;
+   var parameter, offset, len, start, count;
    var scf = SocialCalc.Formula;
+   /** @type {any} */
    var result = 0;
    var resulttype = "e#VALUE!";
 
    var numargs = foperand.length;
    var argdef = argList[fname];
+   /** @type {any[]} */
    var operand_value = [];
+   /** @type {any[]} */
    var operand_type = [];
 
    var repeatCount = -1;  // number of repeated parameters
-   var repeatIndex;  // index of begining of repeated parameters
+   var repeatIndex = 0;  // index of begining of repeated parameters
    var wantedType;
    
    for (i=1; i <= numargs; i++) { // go through each arg, get value and type, and check for errors
@@ -20090,8 +20954,8 @@ SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord
 
    
    switch (fname) {
-     case "STYLE":  
-       var parameters = sheet.ioParameterList[coord];
+     case "STYLE":
+       var parameters = sheet.ioParameterList[/** @type {string} */(coord)];
        if(parameters) {
          var css = SocialCalc.Formula.getStandardizedList(sheet, {value: operand_value[1], type: operand_type[1]});
          if(css.length > 0 ) {
@@ -20099,11 +20963,11 @@ SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord
            parameters.cssParameter = (operand_type[1] == "t") ? '"'+operand_value[1]+'"' : operand_value[1];
          }
          result = ""; // ensure return value does not get changed by style - will add this empty string to number or string
-         resulttype = "ni"; // important - allows widgets to keep type - use: TEXTBOX("")+STYLE(css)  - must add style to widget 
+         resulttype = "ni"; // important - allows widgets to keep type - use: TEXTBOX("")+STYLE(css)  - must add style to widget
        }
        break;
      case "SELECT":  // # SELECT(string, range [,size [,multiple]])
-         var parameters = sheet.ioParameterList[coord];
+         var parameters = sheet.ioParameterList[/** @type {string} */(coord)];
          var optionSource = SocialCalc.Formula.getStandardizedList(sheet, parameters[1]);
          
          parameters.html = [];        
@@ -20119,12 +20983,15 @@ SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord
          break;
      case "SUBMIT":
        result = "Submit";
+       if (numargs>0) result = operand_value[1];
+       resulttype = "ti"+fname;
+       break;
      case "BUTTON":
      case "IMAGEBUTTON":
      case "TEXTBOX":
      case "AUTOCOMPLETE":
          if (numargs>0) result = operand_value[1];
-         resulttype = "ti"+fname; // (t)ext value with (i)nterface (BUTTON,IMAGEBUTTON,TEXTBOX,AUTOCOMPLETE, SELECT) 
+         resulttype = "ti"+fname; // (t)ext value with (i)nterface (BUTTON,IMAGEBUTTON,TEXTBOX,AUTOCOMPLETE, SELECT)
          break;
 
       case "EMAIL":
@@ -20223,12 +21090,12 @@ SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord
             }
           }   //  --- END FOR
           
-          var spreadsheet =  window.spreadsheet;
-          if (spreadsheet == null) spreadsheet = window.ss
+          var spreadsheet =  /** @type {any} */(window).spreadsheet;
+          if (spreadsheet == null) spreadsheet = /** @type {any} */(window).ss
 
           var forceRender = false;
           var lastShowDimension = 0;
-          var showGridDimension =  function(sheet, lastIndex, sheetHideList, showList, getIndexOf) {
+          var showGridDimension =  function(/** @type {any} */ sheet, /** @type {number} */ lastIndex, /** @type {any} */ sheetHideList, /** @type {any} */ showList, /** @type {(arg: number) => any} */ getIndexOf) {
             //  --- hide all rows/col    up to sheet.attribs.lastrow/col         
             //  --- FOR each row/col -- create function to do the loop          
             for(var arrayIndex = 1; arrayIndex <= lastIndex; arrayIndex ++ ) { // start at col/row 1
@@ -20257,7 +21124,7 @@ SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord
           };
 
           
-          var getRowIndex = function(row) { return row };
+          var getRowIndex = function(/** @type {any} */ row) { return row };
           showGridDimension(sheet,  sheet.attribs.lastrow,  sheet.rowattribs.hide, showrows, getRowIndex);
           lastShowDimension = 0;
           showGridDimension(sheet,  sheet.attribs.lastcol,  sheet.colattribs.hide, showcols, SocialCalc.rcColname );
@@ -20320,9 +21187,10 @@ SocialCalc.Formula.FunctionList["SPLASH"] = [SocialCalc.Formula.IoFunctions, -1,
 SocialCalc.Formula.FunctionList["STYLE"] = [SocialCalc.Formula.IoFunctions, -1, "css", "", "gui", ""];
 
 // on enter input box refresh the auto complete list
+/** @param {string} triggerCellId */
 SocialCalc.TriggerIoAction.AddAutocomplete = function(triggerCellId) {
-  var spreadsheet =  window.spreadsheet;
-  if (spreadsheet == null) spreadsheet = window.ss
+  var spreadsheet =  /** @type {any} */(window).spreadsheet;
+  if (spreadsheet == null) spreadsheet = /** @type {any} */(window).ss
   var sheet = spreadsheet.sheet;
   var scf = SocialCalc.Formula; 
   
@@ -20332,10 +21200,10 @@ SocialCalc.TriggerIoAction.AddAutocomplete = function(triggerCellId) {
   var autocompleteSource = SocialCalc.Formula.getStandardizedList(sheet, parameters[1])
 
   //Overrides the default autocomplete filter function to search only from the beginning of the string
-  $.ui.autocomplete.filter = function (array, term) {
+  $.ui.autocomplete.filter = function (/** @type {any[]} */ array, /** @type {string} */ term) {
     // * RegEx Unit Test - https://regex101.com/r/kO6eC4/1
     var matcher = new RegExp("\\b" + $.ui.autocomplete.escapeRegex(term), "i");
-    return $.grep(array, function (value) {
+    return $.grep(array, function (/** @type {any} */ value) {
         return matcher.test(value.label || value.value || value);
     });
   };
@@ -20345,11 +21213,11 @@ SocialCalc.TriggerIoAction.AddAutocomplete = function(triggerCellId) {
     source: autocompleteSource,
     minLength: 1,
     autoFocus: true,
-    select: function(event, ui) {
+    select: function(/** @type {any} */ event, /** @type {any} */ ui) {
       $(this).val(ui.item.label);
       SocialCalc.TriggerIoAction.AutoComplete(triggerCellId);
     },
-    change: function (event, ui) {
+    change: function (/** @type {any} */ event, /** @type {any} */ ui) {
       if (ui.item === null) {
           $(this).val('');
       }
@@ -20359,9 +21227,10 @@ SocialCalc.TriggerIoAction.AddAutocomplete = function(triggerCellId) {
 }
 // Event triggered, e.g. button/imagebutton clicked. - call linked action formulas 
 // eddy TriggerIoAction {
+/** @param {string} triggerCellId */
 SocialCalc.TriggerIoAction.Button = function(triggerCellId) {
- var spreadsheet =  window.spreadsheet;
- if (spreadsheet == null) spreadsheet = window.ss
+ var spreadsheet =  /** @type {any} */(window).spreadsheet;
+ if (spreadsheet == null) spreadsheet = /** @type {any} */(window).ss
  var sheet = spreadsheet.sheet;
  var scf = SocialCalc.Formula; 
  //spreadsheet.editor.EditorScheduleSheetCommands('set A2 value n 10',  true, false);
@@ -20395,18 +21264,18 @@ SocialCalc.TriggerIoAction.Button = function(triggerCellId) {
       // get row and col of dest cell
       var destcr = SocialCalc.coordToCr(parameters[1].value);
       
-      var sheetCommandList = SocialCalc.TriggerIoAction.CopyFormulaToRange(parameterdata, destcr);
-        
+      sheetCommandList = SocialCalc.TriggerIoAction.CopyFormulaToRange(parameterdata, destcr);
+
       spreadsheet.editor.EditorScheduleSheetCommands(sheetCommandList,  true, false);
       break;
-    case "INSERT" :  
+    case "INSERT" :
       //       # INSERT(trigger_cell, destination_range ,formula_range,value_range,formula_range, ...) // 
       //       insertrow A1      
       //       insertcol A1
       var parameterdata = SocialCalc.Formula.getStandardizedValues(sheet, parameters[1]); // destination_range
       if(parameterdata.type != "range") break; // invalid insert, requires range
       var insertCommand;
-      var colOffset, rowOffset;
+      var colOffset = 0, rowOffset = 0;
       if (parameterdata.ncols > 1) {  // insert column
         colOffset = 1;
         rowOffset = 0;
@@ -20418,13 +21287,13 @@ SocialCalc.TriggerIoAction.Button = function(triggerCellId) {
         insertCommand = "insertrow";
       }
       var insertcellCoord = parameterdata.cellcoord[colOffset][rowOffset];
-      var sheetCommandList = insertCommand + " " + insertcellCoord;
+      sheetCommandList = insertCommand + " " + insertcellCoord;
       var destcr = SocialCalc.coordToCr(insertcellCoord);
       var sourceDataIndex = 2; 
       while(sourceDataIndex < parameters.length ) {
         
         if(parameters[sourceDataIndex].type == "range" || parameters[sourceDataIndex].type == "coord" || sourceDataIndex % 2 == 1) {
-          copyCellRange = SocialCalc.Formula.getStandardizedValues(sheet, parameters[sourceDataIndex]); // formulas to insert
+          var copyCellRange = SocialCalc.Formula.getStandardizedValues(sheet, parameters[sourceDataIndex]); // formulas to insert
           
           if (sourceDataIndex % 2 == 0) {
             sheetCommandList = sheetCommandList + "\n" + SocialCalc.TriggerIoAction.CopyFormulaToRange(copyCellRange, destcr);
@@ -20446,9 +21315,9 @@ SocialCalc.TriggerIoAction.Button = function(triggerCellId) {
       var testRangeParameter = SocialCalc.Formula.getStandardizedValues(sheet, parameters[2]); // test_range - ignore first and last, as it would produce ref error
 
       // set command list to empty
-      var sheetCommandList = "";
+      sheetCommandList = "";
 
-      var colOffset, rowOffset, deleteCommand;
+      var colOffset = 0, rowOffset = 0, deleteCommand;
       if (testRangeParameter.ncols > 1 && testRangeParameter.nrows > 1) return; // error invalid range, only one cell wide/high
       if (testRangeParameter.ncols > 1) {  // delete column
         colOffset = 1;
@@ -20479,14 +21348,15 @@ SocialCalc.TriggerIoAction.Button = function(triggerCellId) {
       if (sheetCommandList != "" ) spreadsheet.editor.EditorScheduleSheetCommands(sheetCommandList,  true, false);        
       
       break;
-    case "COMMANDIF" :  //    # COMMANDIF(trigger_cell, condition, commands) 
-      conditionsParameter = SocialCalc.Formula.getStandardizedValues(sheet, parameters[1]); // commands 
+    // @ts-ignore COMMANDIF intentionally falls through to COMMAND after capturing condition.
+    case "COMMANDIF" :  //    # COMMANDIF(trigger_cell, condition, commands)
+      conditionsParameter = SocialCalc.Formula.getStandardizedValues(sheet, parameters[1]); // commands
 
-      
-    case "COMMAND" :  // COMMAND(trigger_cell, commands) 
+
+    case "COMMAND" :  // COMMAND(trigger_cell, commands)
       var commandsParameter;
       // set command list to empty
-      var sheetCommandList = "";
+      sheetCommandList = "";
       if( conditionsParameter != null) {
         var commandsParameter = SocialCalc.Formula.getStandardizedValues(sheet, parameters[2]); // commands 
         if (conditionsParameter.ncols != commandsParameter.ncols || conditionsParameter.nrows != commandsParameter.nrows) break;
@@ -20540,6 +21410,10 @@ SocialCalc.TriggerIoAction.Button = function(triggerCellId) {
  *  set B3  formula TEXTBOX("")             ... coord: "B3", datavalue: "william", datatype: "f", formula: "TEXTBOX("william")", valuetype: "tiTEXTBOX"
  */
 
+/**
+ * @param {any} formulaData
+ * @param {{col: number, row: number, [key: string]: any}} destcr
+ */
 SocialCalc.TriggerIoAction.CopyFormulaToRange = function(formulaData, destcr) {
 
   // set command list to empty
@@ -20594,6 +21468,10 @@ SocialCalc.TriggerIoAction.CopyFormulaToRange = function(formulaData, destcr) {
  * @return commands to execute to do the copy.  - String of sheet commands, \n between each command -  
  *   
  ******************************/
+/**
+ * @param {any} sourceData
+ * @param {{col: number, row: number, [key: string]: any}} destcr
+ */
 SocialCalc.TriggerIoAction.CopyValueToRange = function(sourceData, destcr) {
 
 
@@ -20657,11 +21535,15 @@ SocialCalc.TriggerIoAction.CopyValueToRange = function(sourceData, destcr) {
 
 // optionalTriggerCellId - edited cell - used by EMAILONEDIT and EMAILONEDITIF
 //onClick=EMAIL 
+/**
+ * @param {string} emailFormulaCellId
+ * @param {string | null} [optionalTriggerCellId]
+ */
 SocialCalc.TriggerIoAction.Email = function(emailFormulaCellId, optionalTriggerCellId) {
      optionalTriggerCellId = typeof optionalTriggerCellId !== 'undefined' ? optionalTriggerCellId : null;
 	 var scf = SocialCalc.Formula;	
-	 var spreadsheet =  window.spreadsheet;
-	 if (spreadsheet == null) spreadsheet = window.ss
+	 var spreadsheet =  /** @type {any} */(window).spreadsheet;
+	 if (spreadsheet == null) spreadsheet = /** @type {any} */(window).ss
 
 	 var sheet = spreadsheet.sheet;
 	 var cell = sheet.cells[emailFormulaCellId];
@@ -20672,9 +21554,11 @@ SocialCalc.TriggerIoAction.Email = function(emailFormulaCellId, optionalTriggerC
    if(typeof parameters === 'undefined') return;
    //var debugLog = "debug TriggerIoAction.Email\n"; //eddy
 
-	 //spreadsheet.editor.EditorScheduleSheetCommands('sendemail to eddy.nihon',  false, false); 
-	 // grab array for TO, SUBJECT and BODY 
+	 //spreadsheet.editor.EditorScheduleSheetCommands('sendemail to eddy.nihon',  false, false);
+	 // grab array for TO, SUBJECT and BODY
+	 /** @type {any[]} */
 	 var parameterValues = [];
+	 /** @type {any[]} */
 	 var parameterCellRefs = []; // OnEdit uses to workout what row/col was edited
 	 var maxRangeSize = 1;
 	 for(var index=0; index < parameters.length; index ++) {
@@ -20711,6 +21595,8 @@ SocialCalc.TriggerIoAction.Email = function(emailFormulaCellId, optionalTriggerC
 
       case "EMAILIF":
     	  conditionIndex = 0;
+    	  toAddressParamOffset = 1;
+    	  break;
       case "EMAILAT":
       case "EMAILONEDIT":
     	  toAddressParamOffset = 1;
@@ -20744,7 +21630,7 @@ SocialCalc.TriggerIoAction.Email = function(emailFormulaCellId, optionalTriggerC
 		 // if email formula is conditional && condition is false then skip 
 		 if(conditionIndex != -1) {
 			 var conditionRangeIndex = (rangeIndex >= parameterValues[conditionIndex].length) ? 0 : rangeIndex;
-			 if(parameterValues[conditionIndex][conditionRangeIndex] == false) continue;			 
+			 if(parameterValues[conditionIndex][conditionRangeIndex] == false) continue;
 		 }
 
 		 if(optionalTriggerCellId && optionalTriggerCellId != parameterCellRefs[0][rangeIndex]) continue;
@@ -20772,6 +21658,7 @@ SocialCalc.TriggerIoAction.Email = function(emailFormulaCellId, optionalTriggerC
  * creates command on form: submitform \rtimestamp\rB2value\rC2value ...
  */
 
+/** @param {string} triggerCellId */
 SocialCalc.TriggerIoAction.Submit = function(triggerCellId) {
   var formDataViewer = (SocialCalc.CurrentSpreadsheetControlObject != null) 
   ? SocialCalc.CurrentSpreadsheetControlObject.formDataViewer 
@@ -20779,8 +21666,8 @@ SocialCalc.TriggerIoAction.Submit = function(triggerCellId) {
 
   if(formDataViewer != null && formDataViewer.loaded == true) {
 
-    var spreadsheet =  window.spreadsheet;
-    if (spreadsheet == null) spreadsheet = window.ss
+    var spreadsheet =  /** @type {any} */(window).spreadsheet;
+    if (spreadsheet == null) spreadsheet = /** @type {any} */(window).ss
     var sheet = spreadsheet.sheet;
     
     
@@ -20798,29 +21685,33 @@ SocialCalc.TriggerIoAction.Submit = function(triggerCellId) {
 }
 
 //onChange=select tag (combobox) 
+/** @param {string} selectListCellId */
 SocialCalc.TriggerIoAction.SelectList = function(selectListCellId) {
-  var getHTMLselectListCellValue = function( selectListWidget ) { return selectListWidget.value; };
+  var getHTMLselectListCellValue = function(/** @type {any} */ selectListWidget ) { return selectListWidget.value; };
   var function_name = "SELECT";
   SocialCalc.TriggerIoAction.updateInputWidgetFormula(function_name, selectListCellId, getHTMLselectListCellValue );
 }
 
 //onKeyUp=AutoComplete
+/** @param {string} autoCompleteCellId */
 SocialCalc.TriggerIoAction.AutoComplete = function(autoCompleteCellId) {
-  var getHTMLAutoCompleteCellValue = function( autoCompleteWidget ) { return autoCompleteWidget.value; };
+  var getHTMLAutoCompleteCellValue = function(/** @type {any} */ autoCompleteWidget ) { return autoCompleteWidget.value; };
   var function_name = "AUTOCOMPLETE";
   SocialCalc.TriggerIoAction.updateInputWidgetFormula(function_name, autoCompleteCellId, getHTMLAutoCompleteCellValue );
 }
 
 // onKeyUp=TextBox 
+/** @param {string} textBoxCellId */
 SocialCalc.TriggerIoAction.TextBox = function(textBoxCellId) {
-  var getHTMLTextBoxCellValue = function( textBoxWidget ) { return textBoxWidget.value; };
+  var getHTMLTextBoxCellValue = function(/** @type {any} */ textBoxWidget ) { return textBoxWidget.value; };
   var function_name = "TEXTBOX";
   SocialCalc.TriggerIoAction.updateInputWidgetFormula(function_name, textBoxCellId, getHTMLTextBoxCellValue );
 }
 
 //onKeyUp=CheckBox 
+/** @param {string} checkBoxCellId */
 SocialCalc.TriggerIoAction.CheckBox = function(checkBoxCellId) {
-  var getHTMLCheckBoxCellValue = function( checkBoxWidget ) { return (checkBoxWidget.checked ? "TRUE" : "FALSE") };
+  var getHTMLCheckBoxCellValue = function(/** @type {any} */ checkBoxWidget ) { return (checkBoxWidget.checked ? "TRUE" : "FALSE") };
   var function_name = "CHECKBOX"
   SocialCalc.TriggerIoAction.updateInputWidgetFormula(function_name, checkBoxCellId, getHTMLCheckBoxCellValue );
 }
@@ -20828,8 +21719,9 @@ SocialCalc.TriggerIoAction.CheckBox = function(checkBoxCellId) {
 //Radio Button state changed
 // onclick when selected
 // update true/false in formula param
+/** @param {string} radioButtonGroupName */
 SocialCalc.TriggerIoAction.RadioButton = function(radioButtonGroupName) {
-  var getHTMLRadioButtonValue = function( radioButtonWidget ) { return (radioButtonWidget.checked ? "TRUE" : "FALSE") };
+  var getHTMLRadioButtonValue = function(/** @type {any} */ radioButtonWidget ) { return (radioButtonWidget.checked ? "TRUE" : "FALSE") };
   var function_name = "RADIOBUTTON"
   // for each radio button in group
   $('input[name="'+radioButtonGroupName+'"]').each(function () {
@@ -20838,10 +21730,15 @@ SocialCalc.TriggerIoAction.RadioButton = function(radioButtonGroupName) {
 }
 
 
+/**
+ * @param {string} function_name
+ * @param {string} widgetCellId
+ * @param {(widget: any) => string} getHTMLWidgetCellValue
+ */
 SocialCalc.TriggerIoAction.updateInputWidgetFormula = function(function_name, widgetCellId, getHTMLWidgetCellValue ) {
 
- var spreadsheet =  window.spreadsheet;
- if (spreadsheet == null) spreadsheet = window.ss
+ var spreadsheet =  /** @type {any} */(window).spreadsheet;
+ if (spreadsheet == null) spreadsheet = /** @type {any} */(window).ss
  var sheet = spreadsheet.sheet;
  var cell = sheet.cells[widgetCellId];
  var parameters = sheet.ioParameterList[widgetCellId];
@@ -20888,6 +21785,11 @@ SocialCalc.TriggerIoAction.updateInputWidgetFormula = function(function_name, wi
 }
 
 // On edit of Form Input widget - Update form data sheet 
+/**
+ * @param {string} function_name
+ * @param {string} formCellId
+ * @param {string} inputValue
+ */
 SocialCalc.TriggerIoAction.UpdateFormDataSheet = function(function_name, formCellId, inputValue) {
   var formDataViewer = (SocialCalc.CurrentSpreadsheetControlObject != null) 
        ? SocialCalc.CurrentSpreadsheetControlObject.formDataViewer 
@@ -20906,6 +21808,10 @@ SocialCalc.TriggerIoAction.UpdateFormDataSheet = function(function_name, formCel
 //getStandardizedValues(parameterData)  
 // gets cell data of range/coord OR param value as cell data - also get coord data as cell.coord is invalid when rows deleted
 // CALL getProcessedParameter  with request for values 
+/**
+ * @param {any} sheet
+ * @param {any} parameterData
+ */
 SocialCalc.Formula.getStandardizedValues = function(sheet, parameterData) {
   return SocialCalc.Formula.getStandardizedParameter(sheet, parameterData, true, true);
 }  
@@ -20913,6 +21819,10 @@ SocialCalc.Formula.getStandardizedValues = function(sheet, parameterData) {
 
 // getStandardizedCoords(parameterData)  // gets coord(s) of range/coord
 // CALL getProcessedParameter  with request for coord info
+/**
+ * @param {any} sheet
+ * @param {any} parameterData
+ */
 SocialCalc.Formula.getStandardizedCoords = function(sheet, parameterData) {
   return SocialCalc.Formula.getStandardizedParameter(sheet, parameterData, true, false);
 }  
@@ -20923,6 +21833,10 @@ SocialCalc.Formula.getStandardizedCoords = function(sheet, parameterData) {
  * @listParameter csv or array or single value - convert into single array
  * @return array of values - one dimension
  ****************/
+/**
+ * @param {any} sheet
+ * @param {any} listParameter
+ */
 SocialCalc.Formula.getStandardizedList = function(sheet, listParameter) {
   
   var listValues = [];
@@ -20973,10 +21887,17 @@ SocialCalc.Formula.getStandardizedList = function(sheet, listParameter) {
  *
  *
  *******************************/
+/**
+ * @param {any} sheet
+ * @param {any} parameterData
+ * @param {boolean} [includeCellCoord]
+ * @param {boolean} [includeCellData]
+ */
 SocialCalc.Formula.getStandardizedParameter = function(sheet, parameterData, includeCellCoord, includeCellData) {
-  
+
   //SET result = {}
   //SET store param values in result (.value .type)
+  /** @type {any} */
   var result = { type: parameterData.type, value:parameterData.value};
   if(includeCellData) result.celldata = [];
            
@@ -21114,6 +22035,7 @@ SocialCalc.Formula.SheetCache = {
 // Loading is handled elsewhere, e.g., in the recalc loop.
 //
 
+/** @param {string} sheetname */
 SocialCalc.Formula.FindInSheetCache = function(sheetname) {
 
    var str;
@@ -21147,6 +22069,11 @@ alert("Using SocialCalc.Formula.SheetCache.loadsheet - deprecated");
 // Returns the sheet object filled out with the str (a saved sheet).
 //
 
+/**
+ * @param {string} sheetname
+ * @param {string} str
+ * @param {boolean} [live]
+ */
 SocialCalc.Formula.AddSheetToCache = function(sheetname, str, live) {
 
    var newsheet = null;
@@ -21171,6 +22098,7 @@ SocialCalc.Formula.AddSheetToCache = function(sheetname, str, live) {
 // nsheet = SocialCalc.Formula.NormalizeSheetName(sheetname)
 //
 
+/** @param {string} sheetname */
 SocialCalc.Formula.NormalizeSheetName = function(sheetname) {
 
    if (SocialCalc.Callbacks.NormalizeSheetName) {
@@ -21253,6 +22181,7 @@ SocialCalc.Formula.FreshnessInfoReset = function() {
 // Returns: coord without any $'s
 //
 
+/** @param {string} coord */
 SocialCalc.Formula.PlainCoord = function(coord) {
 
    if (coord.indexOf("$") == -1) return coord;
@@ -21267,9 +22196,14 @@ SocialCalc.Formula.PlainCoord = function(coord) {
 // Returns: {c1: col, r1: row, c2: col, r2 = row} with c1/r1 upper left
 //
 
+/**
+ * @param {string} coord1
+ * @param {string} coord2
+ */
 SocialCalc.Formula.OrderRangeParts = function(coord1, coord2) {
 
    var cr1, cr2;
+   /** @type {{ c1?: number, r1?: number, c2?: number, r2?: number }} */
    var result = {};
 
    cr1 = SocialCalc.coordToCr(coord1);
@@ -21293,6 +22227,11 @@ SocialCalc.Formula.OrderRangeParts = function(coord1, coord2) {
 // Returns true or false
 //
 
+/**
+ * @param {any} value
+ * @param {any} type
+ * @param {any} criteria
+ */
 SocialCalc.Formula.TestCriteria = function(value, type, criteria) {
 
    var comparitor, basestring, basevalue, cond, testvalue;
@@ -21453,7 +22392,8 @@ SocialCalc.Formula.TestCriteria = function(value, type, criteria) {
 
    }
 
-//
+// Opt this module into TypeScript strict checking via the r2scout config.
+// @ts-check
 /*
 // The module of the SocialCalc package for the optional popup menus in socialcalcspreadsheetcontrol.js
 //
@@ -21461,7 +22401,7 @@ SocialCalc.Formula.TestCriteria = function(value, type, criteria) {
 // All Rights Reserved.
 //
 // The contents of this file are subject to the Artistic License 2.0; you may not
-// use this file except in compliance with the License. You may obtain a copy of 
+// use this file except in compliance with the License. You may obtain a copy of
 // the License at http://socialcalc.org/licenses/al-20/.
 //
 // Some of the other files in the SocialCalc package are licensed under
@@ -21473,7 +22413,9 @@ SocialCalc.Formula.TestCriteria = function(value, type, criteria) {
 //
 */
 
-   var SocialCalc; // All values are stored in the master SocialCalc object
+   /** @type {any} */
+   // @ts-ignore - SocialCalc is declared ambiently; runtime re-declaration is intentional.
+   var SocialCalc;
    if (!SocialCalc) {
       SocialCalc = {};
       }
@@ -21519,6 +22461,10 @@ SocialCalc.Formula.TestCriteria = function(value, type, criteria) {
 
    // Override this for localization
 
+   /**
+    * @param {string} str
+    * @returns {string}
+    */
    SocialCalc.Popup.LocalizeString = function(str) {return str;};
 
 
@@ -21534,6 +22480,11 @@ SocialCalc.Formula.TestCriteria = function(value, type, criteria) {
 // Creates a control of type "type" as the children of document element "id" using "attribs"
 //
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @param {any} [attribs]
+ */
 SocialCalc.Popup.Create = function(type, id, attribs) {
 
    var pt = SocialCalc.Popup.Types[type];
@@ -21552,6 +22503,10 @@ SocialCalc.Popup.Create = function(type, id, attribs) {
 // Sets the value of control.
 //
 
+/**
+ * @param {string} id
+ * @param {any} value
+ */
 SocialCalc.Popup.SetValue = function(id, value) {
 
    var sp = SocialCalc.Popup;
@@ -21580,6 +22535,10 @@ SocialCalc.Popup.SetValue = function(id, value) {
 // Sets whether the control is disabled (true) or not (false).
 //
 
+/**
+ * @param {string} id
+ * @param {boolean} disabled
+ */
 SocialCalc.Popup.SetDisabled = function(id, disabled) {
 
    var sp = SocialCalc.Popup;
@@ -21608,6 +22567,10 @@ SocialCalc.Popup.SetDisabled = function(id, disabled) {
 // Returns the value of control.
 //
 
+/**
+ * @param {string} id
+ * @returns {any}
+ */
 SocialCalc.Popup.GetValue = function(id) {
 
    var sp = SocialCalc.Popup;
@@ -21634,6 +22597,10 @@ SocialCalc.Popup.GetValue = function(id) {
 // Gives "data" to the appropriate initialization code.
 //
 
+/**
+ * @param {string} id
+ * @param {any} data
+ */
 SocialCalc.Popup.Initialize = function(id, data) {
 
    var sp = SocialCalc.Popup;
@@ -21658,6 +22625,9 @@ SocialCalc.Popup.Initialize = function(id, data) {
 // Resets Popup, such as when turning to page.
 //
 
+/**
+ * @param {string} type
+ */
 SocialCalc.Popup.Reset = function(type) {
 
    var sp = SocialCalc.Popup;
@@ -21675,6 +22645,9 @@ SocialCalc.Popup.Reset = function(type) {
 // Should be called when the user clicks on a control to do the popup
 //
 
+/**
+ * @param {string} id
+ */
 SocialCalc.Popup.CClick = function(id) {
 
    var sp = SocialCalc.Popup;
@@ -21755,6 +22728,11 @@ SocialCalc.Popup.Cancel = function() {
 // If attribs.title, create one with that text, and optionally attribs.moveable.
 //
 
+/**
+ * @param {string} id
+ * @param {any} attribs
+ * @returns {HTMLElement}
+ */
 SocialCalc.Popup.CreatePopupDiv = function(id, attribs) {
 
    var pos, ele;
@@ -21770,7 +22748,7 @@ SocialCalc.Popup.CreatePopupDiv = function(id, attribs) {
 
    main.style.top = (pos.top+spcdata.mainele.offsetHeight)+"px";
    main.style.left = pos.left+"px";
-   main.style.zIndex = 100;
+   main.style.zIndex = /** @type {any} */ (100);
    main.style.backgroundColor = "#FFF";
    main.style.border = "1px solid black";
 
@@ -21786,9 +22764,14 @@ SocialCalc.Popup.CreatePopupDiv = function(id, attribs) {
          '<td style="font-size:10px;cursor:default;color:#666;" onclick="SocialCalc.Popup.Cancel();">&nbsp;X&nbsp;</td></tr></table>';
 
       if (attribs.moveable) {
-         spcdata.dragregistered = main.firstChild.firstChild.firstChild.firstChild;
-         SocialCalc.DragRegister(spcdata.dragregistered, true, true, 
-                    {MouseDown: SocialCalc.DragFunctionStart, 
+         // The DOM tree we just assigned via innerHTML guarantees these nodes exist.
+         var tableEle = /** @type {HTMLElement} */ (main.firstChild);
+         var tbodyEle = /** @type {HTMLElement} */ (tableEle.firstChild);
+         var trEle = /** @type {HTMLElement} */ (tbodyEle.firstChild);
+         var tdEle = /** @type {HTMLElement} */ (trEle.firstChild);
+         spcdata.dragregistered = tdEle;
+         SocialCalc.DragRegister(spcdata.dragregistered, true, true,
+                    {MouseDown: SocialCalc.DragFunctionStart,
                      MouseMove: SocialCalc.DragFunctionPosition,
                      MouseUp: SocialCalc.DragFunctionPosition,
                      Disabled: null, positionobj: main},
@@ -21807,6 +22790,10 @@ SocialCalc.Popup.CreatePopupDiv = function(id, attribs) {
 // and appropriate with respect to the main element controlling the popup.
 //
 
+/**
+ * @param {string} id
+ * @param {HTMLElement} container
+ */
 SocialCalc.Popup.EnsurePosition = function(id, container) {
 
    var sp = SocialCalc.Popup;
@@ -21817,6 +22804,10 @@ SocialCalc.Popup.EnsurePosition = function(id, container) {
    if (!main) {alert("No main popup element firstChild.");return};
    var popup = spcdata.popupele;
 
+   /**
+    * @param {any} ele
+    * @returns {{top: number, left: number, height: number, width: number, bottom: number, right: number}}
+    */
    function GetLayoutValues(ele) {
       var r = SocialCalc.GetElementPosition(ele);
       r.height = ele.offsetHeight;
@@ -21896,6 +22887,10 @@ SocialCalc.Popup.EnsurePosition = function(id, container) {
 // Utility function to get rid of the main popup div.
 //
 
+/**
+ * @param {HTMLElement | null} ele
+ * @param {any} dragregistered
+ */
 SocialCalc.Popup.DestroyPopupDiv = function(ele, dragregistered) {
 
    if (!ele) return;
@@ -21914,6 +22909,10 @@ SocialCalc.Popup.DestroyPopupDiv = function(ele, dragregistered) {
 // Color Utility Functions
 //
 
+/**
+ * @param {string} val
+ * @returns {string}
+ */
 SocialCalc.Popup.RGBToHex = function(val) {
 
    var sp = SocialCalc.Popup;
@@ -21923,7 +22922,7 @@ SocialCalc.Popup.RGBToHex = function(val) {
       }
    var rgbvals = val.match(/(\d+)\D+(\d+)\D+(\d+)/);
    if (rgbvals) {
-      return sp.ToHex(rgbvals[1])+sp.ToHex(rgbvals[2])+sp.ToHex(rgbvals[3]);
+      return sp.ToHex(Number(rgbvals[1]))+sp.ToHex(Number(rgbvals[2]))+sp.ToHex(Number(rgbvals[3]));
       }
    else {
       return "000000";
@@ -21932,6 +22931,10 @@ SocialCalc.Popup.RGBToHex = function(val) {
 
 SocialCalc.Popup.HexDigits="0123456789ABCDEF";
 
+/**
+ * @param {number} num
+ * @returns {string}
+ */
 SocialCalc.Popup.ToHex = function(num) {
    var sp = SocialCalc.Popup;
    var first=Math.floor(num / 16);
@@ -21939,6 +22942,10 @@ SocialCalc.Popup.ToHex = function(num) {
    return sp.HexDigits.charAt(first)+sp.HexDigits.charAt(second);
    }
 
+/**
+ * @param {string} str
+ * @returns {number}
+ */
 SocialCalc.Popup.FromHex = function(str) {
 
    var sp = SocialCalc.Popup;
@@ -21947,6 +22954,10 @@ SocialCalc.Popup.FromHex = function(str) {
    return ((first>=0)?first:0)*16+((second>=0)?second:0);
    }
 
+/**
+ * @param {string} val
+ * @returns {string}
+ */
 SocialCalc.Popup.HexToRGB = function(val) {
 
    var sp = SocialCalc.Popup;
@@ -21955,17 +22966,27 @@ SocialCalc.Popup.HexToRGB = function(val) {
 
    }
 
+/**
+ * @param {number} r
+ * @param {number} g
+ * @param {number} b
+ * @returns {string}
+ */
 SocialCalc.Popup.makeRGB = function(r, g, b) {
    return "rgb("+(r>0?r:0)+","+(g>0?g:0)+","+(b>0?b:0)+")";
    }
 
+/**
+ * @param {string} rgb
+ * @returns {{r: number, g: number, b: number}}
+ */
 SocialCalc.Popup.splitRGB = function(rgb) {
    var parts = rgb.match(/(\d+)\D+(\d+)\D+(\d+)\D/);
    if (!parts) {
       return {r:0, g:0, b:0};
       }
    else {
-      return {r: parts[1]-0, g: parts[2]-0, b: parts[3]-0};
+      return {r: Number(parts[1]), g: Number(parts[2]), b: Number(parts[3])};
       }
    }
 
@@ -22009,12 +23030,18 @@ SocialCalc.Popup.splitRGB = function(rgb) {
 
 SocialCalc.Popup.Types.List = {};
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @param {any} [attribs]
+ */
 SocialCalc.Popup.Types.List.Create = function(type, id, attribs) {
 
    var sp = SocialCalc.Popup;
    var spt = sp.Types;
    var spc = sp.Controls;
 
+   /** @type {{type: string, value: string, display: string, data: {[k: string]: any}}} */
    var spcid = {type: type, value: "", display: "", data: {}};
    //if (spc[id]) {alert("Already created "+id); return;}
    spc[id] = spcid;
@@ -22033,9 +23060,14 @@ SocialCalc.Popup.Types.List.Create = function(type, id, attribs) {
 
    }
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @param {any} value
+ */
 SocialCalc.Popup.Types.List.SetValue = function(type, id, value) {
 
-   var i;
+   var i, o;
 
    var sp = SocialCalc.Popup;
    var spt = sp.Types;
@@ -22069,6 +23101,11 @@ SocialCalc.Popup.Types.List.SetValue = function(type, id, value) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @param {boolean} disabled
+ */
 SocialCalc.Popup.Types.List.SetDisabled = function(type, id, disabled) {
 
    var i;
@@ -22087,6 +23124,11 @@ SocialCalc.Popup.Types.List.SetDisabled = function(type, id, disabled) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @returns {any}
+ */
 SocialCalc.Popup.Types.List.GetValue = function(type, id) {
 
    var sp = SocialCalc.Popup;
@@ -22101,6 +23143,11 @@ SocialCalc.Popup.Types.List.GetValue = function(type, id) {
 
 // data is: {value: initial value, attribs: {attribs stuff}, options: [{o: option-name, v: value-to-return, a: optional-attribs}, ...]}
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @param {any} data
+ */
 SocialCalc.Popup.Types.List.Initialize = function(type, id, data) {
 
    var a;
@@ -22123,6 +23170,9 @@ SocialCalc.Popup.Types.List.Initialize = function(type, id, data) {
    }
 
 
+/**
+ * @param {string} type
+ */
 SocialCalc.Popup.Types.List.Reset = function(type) {
 
    var sp = SocialCalc.Popup;
@@ -22137,6 +23187,10 @@ SocialCalc.Popup.Types.List.Reset = function(type) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.List.Show = function(type, id) {
 
    var i, ele, o, bg;
@@ -22156,7 +23210,10 @@ SocialCalc.Popup.Types.List.Show = function(type, id) {
       ele = document.createElement("div");
       ele.innerHTML = '<div style="cursor:default;padding:4px;background-color:#CCC;">'+str+'</div>';
 
-      spcdata.customele = ele.firstChild.firstChild.childNodes[1];
+      // innerHTML above guarantees these chains of firstChild nodes exist.
+      var outerDiv = /** @type {HTMLElement} */ (ele.firstChild);
+      var innerDiv = /** @type {HTMLElement} */ (outerDiv.firstChild);
+      spcdata.customele = innerDiv.childNodes[1];
       spcdata.listdiv = null;
       spcdata.contentele = ele;
       }
@@ -22184,6 +23241,11 @@ SocialCalc.Popup.Types.List.Show = function(type, id) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @returns {string}
+ */
 SocialCalc.Popup.Types.List.MakeList = function(type, id) {
 
    var i, ele, o, bg;
@@ -22229,6 +23291,11 @@ SocialCalc.Popup.Types.List.MakeList = function(type, id) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @returns {string}
+ */
 SocialCalc.Popup.Types.List.MakeCustom = function(type, id) {
 
    var SPLoc = SocialCalc.Popup.LocalizeString;
@@ -22259,6 +23326,10 @@ SocialCalc.Popup.Types.List.MakeCustom = function(type, id) {
    }
 
 
+/**
+ * @param {string} id
+ * @param {number | string} num
+ */
 SocialCalc.Popup.Types.List.ItemClicked = function(id, num) {
 
    var oele, str, nele;
@@ -22274,7 +23345,10 @@ SocialCalc.Popup.Types.List.ItemClicked = function(id, num) {
       str = SocialCalc.Popup.Types.List.MakeCustom("List", id);
       nele = document.createElement("div");
       nele.innerHTML = '<div style="cursor:default;padding:4px;background-color:#CCC;">'+str+'</div>';
-      spcdata.customele = nele.firstChild.firstChild.childNodes[1];
+      // innerHTML above guarantees the nested firstChild DOM is present.
+      var outerDivIC = /** @type {HTMLElement} */ (nele.firstChild);
+      var innerDivIC = /** @type {HTMLElement} */ (outerDivIC.firstChild);
+      spcdata.customele = innerDivIC.childNodes[1];
       spcdata.listdiv = null;
       spcdata.contentele = nele;
       spcdata.popupele.replaceChild(nele, oele);
@@ -22296,6 +23370,9 @@ SocialCalc.Popup.Types.List.ItemClicked = function(id, num) {
    }
 
 
+/**
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.List.CustomToList = function(id) {
 
    var oele, str, nele;
@@ -22319,6 +23396,9 @@ SocialCalc.Popup.Types.List.CustomToList = function(id) {
    }
 
 
+/**
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.List.CustomOK = function(id) {
 
    var i, c;
@@ -22334,6 +23414,10 @@ SocialCalc.Popup.Types.List.CustomOK = function(id) {
    }
 
 
+/**
+ * @param {string} id
+ * @param {HTMLElement} ele
+ */
 SocialCalc.Popup.Types.List.MouseMove = function(id, ele) {
 
    var col, i, c;
@@ -22358,6 +23442,10 @@ SocialCalc.Popup.Types.List.MouseMove = function(id, ele) {
    
    }
 
+/**
+ * @param {string} type
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.List.Hide = function(type, id) {
 
    var sp = SocialCalc.Popup;
@@ -22374,6 +23462,10 @@ SocialCalc.Popup.Types.List.Hide = function(type, id) {
 
    }
 
+/**
+ * @param {string} type
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.List.Cancel = function(type, id) {
 
    SocialCalc.Popup.Types.List.Hide(type, id);
@@ -22413,12 +23505,18 @@ SocialCalc.Popup.Types.List.Cancel = function(type, id) {
 
 SocialCalc.Popup.Types.ColorChooser = {};
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @param {any} [attribs]
+ */
 SocialCalc.Popup.Types.ColorChooser.Create = function(type, id, attribs) {
 
    var sp = SocialCalc.Popup;
    var spt = sp.Types;
    var spc = sp.Controls;
 
+   /** @type {{type: string, value: string, display: string, data: {[k: string]: any}}} */
    var spcid = {type: type, value: "", display: "", data: {}};
    //if (spc[id]) {alert("Already created "+id); return;}
    spc[id] = spcid;
@@ -22440,6 +23538,11 @@ SocialCalc.Popup.Types.ColorChooser.Create = function(type, id, attribs) {
 
    }
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @param {any} value
+ */
 SocialCalc.Popup.Types.ColorChooser.SetValue = function(type, id, value) {
 
    var i, img, pos;
@@ -22482,9 +23585,14 @@ SocialCalc.Popup.Types.ColorChooser.SetValue = function(type, id, value) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @param {boolean} disabled
+ */
 SocialCalc.Popup.Types.ColorChooser.SetDisabled = function(type, id, disabled) {
 
-   var i;
+   var i, img, pos;
 
    var sp = SocialCalc.Popup;
    var spt = sp.Types;
@@ -22516,6 +23624,11 @@ SocialCalc.Popup.Types.ColorChooser.SetDisabled = function(type, id, disabled) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @returns {any}
+ */
 SocialCalc.Popup.Types.ColorChooser.GetValue = function(type, id) {
 
    var sp = SocialCalc.Popup;
@@ -22528,6 +23641,11 @@ SocialCalc.Popup.Types.ColorChooser.GetValue = function(type, id) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @param {any} data
+ */
 SocialCalc.Popup.Types.ColorChooser.Initialize = function(type, id, data) {
 
    var a;
@@ -22548,6 +23666,9 @@ SocialCalc.Popup.Types.ColorChooser.Initialize = function(type, id, data) {
    }
 
 
+/**
+ * @param {string} type
+ */
 SocialCalc.Popup.Types.ColorChooser.Reset = function(type) {
 
    var sp = SocialCalc.Popup;
@@ -22562,6 +23683,10 @@ SocialCalc.Popup.Types.ColorChooser.Reset = function(type) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.ColorChooser.Show = function(type, id) {
 
    var i, ele, mainele;
@@ -22583,7 +23708,10 @@ SocialCalc.Popup.Types.ColorChooser.Show = function(type, id) {
       ele = document.createElement("div");
       ele.innerHTML = '<div style="cursor:default;padding:4px;background-color:#CCC;">'+str+'</div>';
 
-      spcdata.customele = ele.firstChild.firstChild.childNodes[2];
+      // innerHTML above guarantees the nested firstChild DOM is present.
+      var ccOuter = /** @type {HTMLElement} */ (ele.firstChild);
+      var ccInner = /** @type {HTMLElement} */ (ccOuter.firstChild);
+      spcdata.customele = ccInner.childNodes[2];
       spcdata.contentele = ele;
       }
    else {
@@ -22607,6 +23735,11 @@ SocialCalc.Popup.Types.ColorChooser.Show = function(type, id) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @returns {string}
+ */
 SocialCalc.Popup.Types.ColorChooser.MakeCustom = function(type, id) {
 
    var i, ele, o, bg;
@@ -22633,6 +23766,10 @@ SocialCalc.Popup.Types.ColorChooser.MakeCustom = function(type, id) {
    }
 
 
+/**
+ * @param {string} id
+ * @param {number | string} num
+ */
 SocialCalc.Popup.Types.ColorChooser.ItemClicked = function(id, num) {
 
    var oele, str, nele;
@@ -22646,6 +23783,9 @@ SocialCalc.Popup.Types.ColorChooser.ItemClicked = function(id, num) {
    }
 
 
+/**
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.ColorChooser.CustomToList = function(id) {
 
    var oele, str, nele;
@@ -22657,6 +23797,9 @@ SocialCalc.Popup.Types.ColorChooser.CustomToList = function(id) {
    }
 
 
+/**
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.ColorChooser.CustomOK = function(id) {
 
    var i, c;
@@ -22672,6 +23815,10 @@ SocialCalc.Popup.Types.ColorChooser.CustomOK = function(id) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.ColorChooser.Hide = function(type, id) {
 
    var sp = SocialCalc.Popup;
@@ -22685,6 +23832,10 @@ SocialCalc.Popup.Types.ColorChooser.Hide = function(type, id) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.ColorChooser.Cancel = function(type, id) {
 
    var sp = SocialCalc.Popup;
@@ -22699,6 +23850,11 @@ SocialCalc.Popup.Types.ColorChooser.Cancel = function(type, id) {
    }
 
 
+/**
+ * @param {string} type
+ * @param {string} id
+ * @returns {HTMLElement}
+ */
 SocialCalc.Popup.Types.ColorChooser.CreateGrid = function (type, id) {
 
    var ele, pos, row, rowele, col, g;
@@ -22709,15 +23865,17 @@ SocialCalc.Popup.Types.ColorChooser.CreateGrid = function (type, id) {
    var SPLoc = sp.LocalizeString;
    var spcdata = spc[id].data;
    spcdata.grid = {};
+   /** @type {any} */
    var grid = spcdata.grid;
 
    var mainele = document.createElement("div");
 
-   ele = document.createElement("table");
-   ele.cellSpacing = 0;
-   ele.cellPadding = 0;
-   ele.style.width = "100px";
-   grid.table = ele;
+   /** @type {any} */
+   var tele = document.createElement("table");
+   tele.cellSpacing = 0;
+   tele.cellPadding = 0;
+   tele.style.width = "100px";
+   grid.table = tele;
 
    ele = document.createElement("tbody");
    grid.table.appendChild(ele);
@@ -22726,7 +23884,9 @@ SocialCalc.Popup.Types.ColorChooser.CreateGrid = function (type, id) {
    for (row=0; row<16; row++) {
       rowele = document.createElement("tr");
       for (col=0; col<5; col++) {
-         g = {};
+         /** @type {any} */
+         var gEntry = {};
+         g = gEntry;
          grid[row+","+col] = g;
          ele = document.createElement("td");
          ele.style.fontSize = "1px";
@@ -22754,11 +23914,15 @@ SocialCalc.Popup.Types.ColorChooser.CreateGrid = function (type, id) {
       '<td style="width:23px;height:16px;font-size:10px;text-align:center;cursor:pointer;" title="'+SPLoc("Custom")+'">#</td>'+
       '<td style="width:60px;height:16px;font-size:10px;text-align:center;cursor:pointer;">'+SPLoc("OK")+'</td>'+
       '</tr></table>';
-   grid.defaultbox = ele.firstChild.firstChild.firstChild.childNodes[0];
+   // innerHTML above guarantees the nested firstChild DOM (table>tbody>tr with 3 td children) is present.
+   var cgTable = /** @type {HTMLElement} */ (ele.firstChild);
+   var cgTbody = /** @type {HTMLElement} */ (cgTable.firstChild);
+   var cgTr = /** @type {HTMLElement} */ (cgTbody.firstChild);
+   grid.defaultbox = cgTr.childNodes[0];
    grid.defaultbox.onclick = spt.ColorChooser.DefaultClicked;
-   grid.custom = ele.firstChild.firstChild.firstChild.childNodes[1];
+   grid.custom = cgTr.childNodes[1];
    grid.custom.onclick = spt.ColorChooser.CustomClicked;
-   grid.msg = ele.firstChild.firstChild.firstChild.childNodes[2];
+   grid.msg = cgTr.childNodes[2];
    grid.msg.onclick = spt.ColorChooser.CloseOK;
    mainele.appendChild(ele);
 
@@ -22771,12 +23935,21 @@ SocialCalc.Popup.Types.ColorChooser.CreateGrid = function (type, id) {
 
    }
 
+/**
+ * @param {any} grid
+ * @param {number} row
+ * @param {number} col
+ * @returns {any}
+ */
 SocialCalc.Popup.Types.ColorChooser.gridToG = function(grid, row, col) {
 
    return grid[row+","+col];
 
    }
 
+/**
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.ColorChooser.DetermineColors = function(id) {
 
    var sp = SocialCalc.Popup;
@@ -22822,11 +23995,14 @@ SocialCalc.Popup.Types.ColorChooser.DetermineColors = function(id) {
    var x;
    for (row=0; row<16; row++) {
       x = commonrgb[row];
-      sptc.gridToG(grid,row,col).rgb = "rgb("+steps[x.charAt(0)-0]+","+steps[x.charAt(1)-0]+","+steps[x.charAt(2)-0]+")";
+      sptc.gridToG(grid,row,col).rgb = "rgb("+steps[Number(x.charAt(0))]+","+steps[Number(x.charAt(1))]+","+steps[Number(x.charAt(2))]+")";
       }
 
    }
 
+/**
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.ColorChooser.SetColors = function(id) {
 
    var row, col, g, ele, rgb;
@@ -22874,6 +24050,9 @@ SocialCalc.Popup.Types.ColorChooser.SetColors = function(id) {
 
    }
 
+/**
+ * @param {any} e
+ */
 SocialCalc.Popup.Types.ColorChooser.GridMouseDown = function(e) {
 
    var event = e || window.event;
@@ -22939,6 +24118,9 @@ SocialCalc.Popup.Types.ColorChooser.GridMouseDown = function(e) {
    }
 
 
+/**
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.ColorChooser.ControlClicked = function(id) {
 
    var sp = SocialCalc.Popup;
@@ -22956,6 +24138,9 @@ SocialCalc.Popup.Types.ColorChooser.ControlClicked = function(id) {
 
    }
 
+/**
+ * @param {any} [e]
+ */
 SocialCalc.Popup.Types.ColorChooser.DefaultClicked = function(e) {
 
    var event = e || window.event;
@@ -22977,6 +24162,9 @@ SocialCalc.Popup.Types.ColorChooser.DefaultClicked = function(e) {
 
    }
 
+/**
+ * @param {any} [e]
+ */
 SocialCalc.Popup.Types.ColorChooser.CustomClicked = function(e) {
 
    var event = e || window.event;
@@ -22997,7 +24185,10 @@ SocialCalc.Popup.Types.ColorChooser.CustomClicked = function(e) {
    str = SocialCalc.Popup.Types.ColorChooser.MakeCustom("ColorChooser", id);
    nele = document.createElement("div");
    nele.innerHTML = '<div style="cursor:default;padding:4px;background-color:#CCC;">'+str+'</div>';
-   spcdata.customele = nele.firstChild.firstChild.childNodes[2];
+   // innerHTML above guarantees the nested firstChild DOM is present.
+   var ccOuter2 = /** @type {HTMLElement} */ (nele.firstChild);
+   var ccInner2 = /** @type {HTMLElement} */ (ccOuter2.firstChild);
+   spcdata.customele = ccInner2.childNodes[2];
    spcdata.contentele = nele;
    spcdata.popupele.replaceChild(nele, oele);
 
@@ -23011,6 +24202,9 @@ SocialCalc.Popup.Types.ColorChooser.CustomClicked = function(e) {
 
 
 
+/**
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.ColorChooser.CustomToGrid = function(id) {
 
    var oele, str, nele;
@@ -23039,6 +24233,9 @@ SocialCalc.Popup.Types.ColorChooser.CustomToGrid = function(id) {
    }
 
 
+/**
+ * @param {string} id
+ */
 SocialCalc.Popup.Types.ColorChooser.CustomOK = function(id) {
 
    var i, c;
@@ -23053,6 +24250,9 @@ SocialCalc.Popup.Types.ColorChooser.CustomOK = function(id) {
    
    }
 
+/**
+ * @param {any} [e]
+ */
 SocialCalc.Popup.Types.ColorChooser.CloseOK = function(e) {
 
    var event = e || window.event;
@@ -23074,6 +24274,8 @@ SocialCalc.Popup.Types.ColorChooser.CloseOK = function(e) {
    }
 
 
+// @ts-check
+// Opt-in to TypeScript strict checking (noImplicitAny, strictNullChecks) via r2scout config.
 //
 // SocialCalcSpreadsheetControl
 //
@@ -23160,6 +24362,8 @@ See the comments in the main SocialCalc code module file of the SocialCalc packa
 
 */
 
+   /** @type {any} */
+   // @ts-ignore - SocialCalc is declared ambiently; runtime re-declaration is intentional.
    var SocialCalc;
    if (!SocialCalc) {
       alert("Main SocialCalc code module needed");
@@ -23168,6 +24372,7 @@ See the comments in the main SocialCalc code module file of the SocialCalc packa
    if (!SocialCalc.TableEditor) {
       alert("SocialCalc TableEditor code module needed");
       }
+
 
 // *************************************
 //
@@ -23182,6 +24387,10 @@ See the comments in the main SocialCalc code module file of the SocialCalc packa
 
 // Constructor:
 
+/**
+ * @this {any}
+ * @param {string} [idPrefix]
+ */
 SocialCalc.SpreadsheetControl = function(idPrefix) {
 
    var scc = SocialCalc.Constants;
@@ -23292,7 +24501,7 @@ SocialCalc.SpreadsheetControl = function(idPrefix) {
 
    SocialCalc.CurrentSpreadsheetControlObject = this; // remember this for rendezvousing on events
 
-   this.editor.MoveECellCallback.movefrom = function(editor) {
+   this.editor.MoveECellCallback.movefrom = /** @param {any} editor */ function(editor) {
       var cr;
       var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
       spreadsheet.context.cursorsuffix = "";
@@ -23401,14 +24610,14 @@ SocialCalc.SpreadsheetControl = function(idPrefix) {
       ' </div>'+
       '</div>',
       view: "settings",
-      onclick: function(s, t) {
+      onclick: /** @param {any} s @param {any} t */ function(s, t) {
          SocialCalc.SettingsControls.idPrefix = s.idPrefix; // used to get color chooser div
          SocialCalc.SettingControlReset();
          var sheetattribs = s.sheet.EncodeSheetAttributes();
          var cellattribs = s.sheet.EncodeCellAttributes(s.editor.ecell.coord);
          SocialCalc.SettingsControlLoadPanel(s.views.settings.values.sheetspanel, sheetattribs);
          SocialCalc.SettingsControlLoadPanel(s.views.settings.values.cellspanel, cellattribs);
-         document.getElementById(s.idPrefix+"settingsecell").innerHTML = s.editor.ecell.coord;
+         /** @type {any} */(document.getElementById(s.idPrefix+"settingsecell")).innerHTML = s.editor.ecell.coord;
          SocialCalc.SpreadsheetControlSettingsSwitch("cell");
          s.views.settings.element.style.height = s.viewheight+"px";
          s.views.settings.element.firstChild.style.height = s.viewheight+"px";
@@ -23421,13 +24630,13 @@ SocialCalc.SpreadsheetControl = function(idPrefix) {
          else {
             range = s.editor.ecell.coord;
             }
-         document.getElementById(s.idPrefix+"settings-savecell").value = SocialCalc.LocalizeString("Save to")+": "+range;
+         /** @type {any} */(document.getElementById(s.idPrefix+"settings-savecell")).value = SocialCalc.LocalizeString("Save to")+": "+range;
          },
       onclickFocus: true
          });
 
    this.views["settings"] = {name: "settings", values: {},
-      oncreate: function(s, viewobj) {
+      oncreate: /** @param {any} s @param {any} viewobj */ function(s, viewobj) {
          var scc = SocialCalc.Constants;
 
          viewobj.values.sheetspanel = {
@@ -23834,7 +25043,7 @@ SocialCalc.SpreadsheetControl = function(idPrefix) {
       '</div>',
       view: "audit",
       onclick:
-         function(s, t) {
+         /** @param {any} s @param {any} t */ function(s, t) {
             var SCLoc = SocialCalc.LocalizeString;
             var i, j;
             var str = '<table cellspacing="0" cellpadding="0" style="margin-bottom:10px;"><tr><td style="font-size:small;padding:6px;"><b>'+SCLoc("Audit Trail This Session")+':</b><br><br>';
@@ -23850,12 +25059,13 @@ SocialCalc.SpreadsheetControl = function(idPrefix) {
  		    // eddy log {
 
 			// --------------------------------------------   
-			var ObjToSource = function(o){
+			/** @type {any} */
+			var ObjToSource = /** @param {any} o */ function(o){
 				if (typeof(o) == "string") return o;
 				if (!o) return 'null';
 				if (typeof(o) == "object") {
 					if (!ObjToSource.check) ObjToSource.check = new Array();
-					for (var i=0, k=ObjToSource.check.length ; i<k ; ++i) {
+					for (var i=0, k2=ObjToSource.check.length ; i<k2 ; ++i) {
 						if (ObjToSource.check[i] == o) {return '{}';}
 					}
 					ObjToSource.check.push(o);
@@ -23986,26 +25196,34 @@ SocialCalc.SpreadsheetControl = function(idPrefix) {
 // Methods:
 
 SocialCalc.SpreadsheetControl.prototype.InitializeSpreadsheetControl =
+   /** @param {any} node @param {number} [height] @param {number} [width] @param {number} [spacebelow] */
    function(node, height, width, spacebelow) {return SocialCalc.InitializeSpreadsheetControl(this, node, height, width, spacebelow);};
 SocialCalc.SpreadsheetControl.prototype.DoOnResize = function() {return SocialCalc.DoOnResize(this);};
 SocialCalc.SpreadsheetControl.prototype.SizeSSDiv = function() {return SocialCalc.SizeSSDiv(this);};
-SocialCalc.SpreadsheetControl.prototype.ExecuteCommand = 
+SocialCalc.SpreadsheetControl.prototype.ExecuteCommand =
+   /** @param {string} combostr @param {string} [sstr] */
    function(combostr, sstr) {return SocialCalc.SpreadsheetControlExecuteCommand(this, combostr, sstr);};
-SocialCalc.SpreadsheetControl.prototype.CreateSheetHTML = 
+SocialCalc.SpreadsheetControl.prototype.CreateSheetHTML =
    function() {return SocialCalc.SpreadsheetControlCreateSheetHTML(this);};
-SocialCalc.SpreadsheetControl.prototype.CreateSpreadsheetSave = 
+SocialCalc.SpreadsheetControl.prototype.CreateSpreadsheetSave =
+   /** @param {{[k: string]: string}} [otherparts] */
    function(otherparts) {return SocialCalc.SpreadsheetControlCreateSpreadsheetSave(this, otherparts);};
-SocialCalc.SpreadsheetControl.prototype.DecodeSpreadsheetSave = 
+SocialCalc.SpreadsheetControl.prototype.DecodeSpreadsheetSave =
+   /** @param {string} str */
    function(str) {return SocialCalc.SpreadsheetControlDecodeSpreadsheetSave(this, str);};
-SocialCalc.SpreadsheetControl.prototype.CreateCellHTML = 
+SocialCalc.SpreadsheetControl.prototype.CreateCellHTML =
+   /** @param {string} coord */
    function(coord) {return SocialCalc.SpreadsheetControlCreateCellHTML(this, coord);};
-SocialCalc.SpreadsheetControl.prototype.CreateCellHTMLSave = 
+SocialCalc.SpreadsheetControl.prototype.CreateCellHTMLSave =
+   /** @param {string} [range] */
    function(range) {return SocialCalc.SpreadsheetControlCreateCellHTMLSave(this, range);};
 
 
 // Sheet Methods to make things a little easier:
 
-SocialCalc.SpreadsheetControl.prototype.ParseSheetSave = function(str) {return this.sheet.ParseSheetSave(str);};
+SocialCalc.SpreadsheetControl.prototype.ParseSheetSave =
+   /** @param {string} str */
+   function(str) {return this.sheet.ParseSheetSave(str);};
 SocialCalc.SpreadsheetControl.prototype.CreateSheetSave = function() {return this.sheet.CreateSheetSave();};
 
 
@@ -24025,6 +25243,13 @@ SocialCalc.SpreadsheetControl.prototype.CreateSheetSave = function() {return thi
 // You should do a redisplay or recalc (which redisplays) after running this.
 //
 
+/**
+ * @param {any} spreadsheet
+ * @param {any} node
+ * @param {number} [height]
+ * @param {number} [width]
+ * @param {number} [spacebelow]
+ */
 SocialCalc.InitializeSpreadsheetControl = function(spreadsheet, node, height, width, spacebelow) {
 
    var scc = SocialCalc.Constants;
@@ -24039,7 +25264,7 @@ SocialCalc.InitializeSpreadsheetControl = function(spreadsheet, node, height, wi
    spreadsheet.requestedWidth = width;
    spreadsheet.requestedSpaceBelow = spacebelow;
 
-   if (typeof node == "string") node = document.getElementById(node);
+   if (typeof node == "string") node = /** @type {any} */(document.getElementById(node));
 
    if (node == null) {
       alert("SocialCalc.SpreadsheetControl not given parent node.");
@@ -24129,7 +25354,7 @@ spreadsheet.Buttons = {
    }
 
    for (button in spreadsheet.Buttons) {
-      bele = document.getElementById(spreadsheet.idPrefix+button);
+      bele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+button));
       if (!bele) {alert("Button "+(spreadsheet.idPrefix+button)+" missing"); continue;}
       bele.style.border = "1px solid "+scc.ISCButtonBorderNormal;
       bele.title = SCLoc(spreadsheet.Buttons[button].tooltip);
@@ -24191,7 +25416,7 @@ spreadsheet.Buttons = {
    input.on('blur', function() {
         SocialCalc.Keyboard.passThru = false;
    });
-   input.keyup(function (e) {
+   input.keyup(/** @param {any} e */ function (e) {
         if (e.keyCode == 13) {
            // search down when enter is pressed
            if (e.shiftKey) {
@@ -24305,6 +25530,7 @@ spreadsheet.Buttons = {
 
 
 // eddy CalculateSheetNonViewHeight {
+/** @param {any} spreadsheet */
 SocialCalc.CalculateSheetNonViewHeight = function(spreadsheet) {
   spreadsheet.nonviewheight = spreadsheet.statuslineheight;
   for(var nodeIndex = 0;  nodeIndex < spreadsheet.spreadsheetDiv.childNodes.length;  nodeIndex++ ) {
@@ -24329,6 +25555,7 @@ SocialCalc.CalculateSheetNonViewHeight = function(spreadsheet) {
 // would look for SocialCalc.Constants.s_loc_a_X_b.
 //
 
+/** @param {string} str */
 SocialCalc.LocalizeString = function(str) {
    var cstr = SocialCalc.LocalizeStringList[str]; // found already this session?
    if (!cstr) { // no - look up
@@ -24362,6 +25589,7 @@ SocialCalc.LocalizeStringList = {}; // a list of strings to localize accumulated
 // If the constant doesn't exist, throws and alert.
 //
 
+/** @param {string} str */
 SocialCalc.LocalizeSubstrings = function(str) {
 
    var SCLoc = SocialCalc.LocalizeString;
@@ -24398,6 +25626,7 @@ SocialCalc.GetSpreadsheetControlObject = function() {
 // SetSpreadsheetControlObject(spreadsheet)
 //
 
+/** @param {any} spreadsheet */
 SocialCalc.SetSpreadsheetControlObject = function(spreadsheet) {
 
    SocialCalc.CurrentSpreadsheetControlObject = spreadsheet;
@@ -24415,9 +25644,11 @@ SocialCalc.SetSpreadsheetControlObject = function(spreadsheet) {
 // Processes an onResize event, setting the different views.
 //
 
+/** @param {any} spreadsheet */
 SocialCalc.DoOnResize = function(spreadsheet) {
 
    var v;
+   var vname;
    var views = spreadsheet.views;
 
    var needresize = spreadsheet.SizeSSDiv();
@@ -24442,6 +25673,7 @@ SocialCalc.DoOnResize = function(spreadsheet) {
 // Return true if different than existing values.
 //
 
+/** @param {any} spreadsheet */
 SocialCalc.SizeSSDiv = function(spreadsheet) {
 
    var sizes, pos, resized, nodestyle, newval;
@@ -24499,10 +25731,25 @@ SocialCalc.SizeSSDiv = function(spreadsheet) {
 // The obj argument is either a string with the tab name or a DOM element with an ID
 //
 
+/**
+ * @param {any} obj Tab name string or DOM element with an ID.
+ */
 SocialCalc.SetTab = function(obj) {
 
-   var newtab, tname, newtabnum, newview, i, vname, ele;
+   /** @type {any} */
+   var newtab;
+   /** @type {any} */
+   var tname;
+   var newtabnum = 0;
+   /** @type {any} */
+   var newview;
+   var i;
+   var vname;
+   /** @type {any} */
+   var ele;
+   /** @type {{[k: string]: any}} */
    var menutabs = {};
+   /** @type {{[k: string]: any}} */
    var tools = {};
    var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
    var tabs = spreadsheet.tabs;
@@ -24530,8 +25777,8 @@ SocialCalc.SetTab = function(obj) {
 
    for (i=0; i<tabs.length; i++) {
       tname = tabs[i].name;
-      menutabs[tname] = document.getElementById(spreadsheet.idPrefix+tname+"tab");
-      tools[tname] = document.getElementById(spreadsheet.idPrefix+tname+"tools");
+      menutabs[tname] = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+tname+"tab"));
+      tools[tname] = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+tname+"tools"));
       if (tname==newtab) {
          newtabnum = i;
          tools[tname].style.display = "block";
@@ -24562,7 +25809,7 @@ SocialCalc.SetTab = function(obj) {
    if (tabs[newtabnum].onclickFocus) {
       ele = tabs[newtabnum].onclickFocus;
       if (typeof ele == "string") {
-         ele = document.getElementById(spreadsheet.idPrefix+ele);
+         ele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+ele));
          ele.focus();
          }
       SocialCalc.CmdGotFocus(ele);
@@ -24592,11 +25839,12 @@ SocialCalc.SetTab = function(obj) {
 // SocialCalc.SpreadsheetControlStatuslineCallback
 //
 
+/** @param {any} editor @param {string} status @param {any} arg @param {{[k: string]: any}} params */
 SocialCalc.SpreadsheetControlStatuslineCallback = function(editor, status, arg, params) {
 
    var rele1, rele2;
 
-   var ele = document.getElementById(params.statuslineid);
+   var ele = /** @type {any} */(document.getElementById(params.statuslineid));
 
    if (ele) {
       ele.innerHTML = editor.GetStatuslineString(status, arg, params);
@@ -24606,8 +25854,8 @@ SocialCalc.SpreadsheetControlStatuslineCallback = function(editor, status, arg, 
       case "cmdendnorender":
       case "calcfinished":
       case "doneposcalc":
-         rele1 = document.getElementById(params.recalcid1);
-         rele2 = document.getElementById(params.recalcid2);
+         rele1 = /** @type {any} */(document.getElementById(params.recalcid1));
+         rele2 = /** @type {any} */(document.getElementById(params.recalcid2));
          if (!rele1 || !rele2) break;
          if (editor.context.sheetobj.attribs.needsrecalc=="yes") {
             rele1.style.display = "inline";
@@ -24632,9 +25880,10 @@ SocialCalc.SpreadsheetControlStatuslineCallback = function(editor, status, arg, 
 // Updates sort range proposed in the UI in element idPrefix+sortlist
 //
 
+/** @param {any} editor */
 SocialCalc.UpdateSortRangeProposal = function(editor) {
 
-   var ele = document.getElementById(SocialCalc.GetSpreadsheetControlObject().idPrefix+"sortlist");
+   var ele = /** @type {any} */(document.getElementById(SocialCalc.GetSpreadsheetControlObject().idPrefix+"sortlist"));
    if (editor.range.hasrange) {
       ele.options[0].text = SocialCalc.crToCoord(editor.range.left, editor.range.top) + ":" +
                             SocialCalc.crToCoord(editor.range.right, editor.range.bottom);
@@ -24651,6 +25900,7 @@ SocialCalc.UpdateSortRangeProposal = function(editor) {
 // Updates list of columns for choosing which to sort for Major, Minor, and Last sort
 //
 
+/** @param {any} spreadsheet */
 SocialCalc.LoadColumnChoosers = function(spreadsheet) {
 
    var SCLoc = SocialCalc.LocalizeString;
@@ -24671,7 +25921,7 @@ SocialCalc.LoadColumnChoosers = function(spreadsheet) {
       sortrange = spreadsheet.sortrange;
       }
    var range = SocialCalc.ParseRange(sortrange);
-   sele = document.getElementById(spreadsheet.idPrefix+"majorsort");
+   sele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"majorsort"));
    oldindex = sele.selectedIndex;
    sele.options.length = 0;
    sele.options[sele.options.length] = new Option(SCLoc("[None]"), "");
@@ -24680,7 +25930,7 @@ SocialCalc.LoadColumnChoosers = function(spreadsheet) {
       sele.options[sele.options.length] = new Option(SCLoc("Column ")+colname, colname);
       }
    sele.selectedIndex = oldindex > 1 && oldindex <= (range.cr2.col-range.cr1.col+1) ? oldindex : 1; // restore what was there if reasonable
-   sele = document.getElementById(spreadsheet.idPrefix+"minorsort");
+   sele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"minorsort"));
    oldindex = sele.selectedIndex;
    sele.options.length = 0;
    sele.options[sele.options.length] = new Option(SCLoc("[None]"), "");
@@ -24689,7 +25939,7 @@ SocialCalc.LoadColumnChoosers = function(spreadsheet) {
       sele.options[sele.options.length] = new Option(colname, colname);
       }
    sele.selectedIndex = oldindex > 0 && oldindex <= (range.cr2.col-range.cr1.col+1) ? oldindex : 0; // default to [none]
-   sele = document.getElementById(spreadsheet.idPrefix+"lastsort");
+   sele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"lastsort"));
    oldindex = sele.selectedIndex;
    sele.options.length = 0;
    sele.options[sele.options.length] = new Option(SCLoc("[None]"), "");
@@ -24707,6 +25957,7 @@ SocialCalc.LoadColumnChoosers = function(spreadsheet) {
 // Sets SocialCalc.Keyboard.passThru: obj should be element with focus or "true"
 //
 
+/** @param {any} obj */
 SocialCalc.CmdGotFocus = function(obj) {
 
    SocialCalc.Keyboard.passThru = obj;
@@ -24718,6 +25969,7 @@ SocialCalc.CmdGotFocus = function(obj) {
 // SocialCalc.DoButtonCmd(e, buttoninfo, bobj)
 //
 
+/** @param {any} e @param {any} buttoninfo @param {any} bobj */
 SocialCalc.DoButtonCmd = function(e, buttoninfo, bobj) {
 
    SocialCalc.DoCmd(bobj.element, bobj.functionobj.command);
@@ -24730,6 +25982,7 @@ SocialCalc.DoButtonCmd = function(e, buttoninfo, bobj) {
 // xxx
 //
 
+/** @param {any} obj @param {string} which */
 SocialCalc.DoCmd = function(obj, which) {
 
    var combostr, sstr, cl, i, clele, slist, slistele, str, sele, rele, lele, ele, sortrange, nrange, rparts;
@@ -24748,9 +26001,10 @@ SocialCalc.DoCmd = function(obj, which) {
          break;
 
       case "fill-rowcolstuff":
+      // @ts-ignore - intentional fallthrough: fill-* builds the options then runs changed-* logic with which rewritten.
       case "fill-text":
          cl = which.substring(5);
-         clele = document.getElementById(spreadsheet.idPrefix+cl+"list");
+         clele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+cl+"list"));
          clele.length = 0;
          for (i=0; i<SocialCalc.SpreadsheetCmdTable[cl].length; i++) {
             clele.options[i] = new Option(SocialCalc.SpreadsheetCmdTable[cl][i].t);
@@ -24760,9 +26014,9 @@ SocialCalc.DoCmd = function(obj, which) {
       case "changed-rowcolstuff":
       case "changed-text":
          cl = which.substring(8);
-         clele = document.getElementById(spreadsheet.idPrefix+cl+"list");
+         clele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+cl+"list"));
          slist = SocialCalc.SpreadsheetCmdTable.slists[SocialCalc.SpreadsheetCmdTable[cl][clele.selectedIndex].s]; // get sList for this command
-         slistele = document.getElementById(spreadsheet.idPrefix+cl+"slist");
+         slistele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+cl+"slist"));
          slistele.length = 0; // reset
          for (i=0; i<(slist.length||0); i++) {
             slistele.options[i] = new Option(slist[i].t, slist[i].s);
@@ -24772,15 +26026,15 @@ SocialCalc.DoCmd = function(obj, which) {
       case "ok-rowcolstuff":
       case "ok-text":
          cl = which.substring(3);
-         clele = document.getElementById(spreadsheet.idPrefix+cl+"list");
-         slistele = document.getElementById(spreadsheet.idPrefix+cl+"slist");
+         clele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+cl+"list"));
+         slistele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+cl+"slist"));
          combostr = SocialCalc.SpreadsheetCmdTable[cl][clele.selectedIndex].c;
          sstr = slistele[slistele.selectedIndex].value;
          SocialCalc.SpreadsheetControlExecuteCommand(obj, combostr, sstr);
          break;
 
       case "ok-setsort":
-         lele = document.getElementById(spreadsheet.idPrefix+"sortlist");
+         lele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"sortlist"));
          if (lele.selectedIndex==0) {
             if (editor.range.hasrange) {
                spreadsheet.sortrange = SocialCalc.crToCoord(editor.range.left, editor.range.top) + ":" +
@@ -24816,7 +26070,7 @@ SocialCalc.DoCmd = function(obj, which) {
                 spreadsheet.sortrange = lele.options[lele.selectedIndex].value;
             }
          }
-         ele = document.getElementById(spreadsheet.idPrefix+"sortbutton");
+         ele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"sortbutton"));
          ele.value = SocialCalc.LocalizeString("Sort ")+spreadsheet.sortrange;
          ele.style.visibility = "visible";
          SocialCalc.LoadColumnChoosers(spreadsheet);
@@ -24836,17 +26090,17 @@ SocialCalc.DoCmd = function(obj, which) {
             }
          if (sortrange == "A1:A1") return;
          str = "sort "+sortrange+" ";
-         sele = document.getElementById(spreadsheet.idPrefix+"majorsort");
-         rele = document.getElementById(spreadsheet.idPrefix+"majorsortup");
+         sele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"majorsort"));
+         rele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"majorsortup"));
          str += sele.options[sele.selectedIndex].value + (rele.checked ? " up" : " down");
-         sele = document.getElementById(spreadsheet.idPrefix+"minorsort");
+         sele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"minorsort"));
          if (sele.selectedIndex>0) {
-           rele = document.getElementById(spreadsheet.idPrefix+"minorsortup");
+           rele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"minorsortup"));
            str += " "+sele.options[sele.selectedIndex].value + (rele.checked ? " up" : " down");
            }
-         sele = document.getElementById(spreadsheet.idPrefix+"lastsort");
+         sele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"lastsort"));
          if (sele.selectedIndex>0) {
-           rele = document.getElementById(spreadsheet.idPrefix+"lastsortup");
+           rele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"lastsortup"));
            str += " "+sele.options[sele.selectedIndex].value + (rele.checked ? " up" : " down");
            }
          spreadsheet.ExecuteCommand(str, "");
@@ -24884,11 +26138,11 @@ SocialCalc.DoCmd = function(obj, which) {
             editor.range2.hasrange = true;
             }
          str = editor.range2.hasrange ? "" : "off";
-         ele = document.getElementById(spreadsheet.idPrefix+"button_movefrom");
+         ele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"button_movefrom"));
          ele.src=spreadsheet.imagePrefix+"movefrom"+str+".gif";
-         ele = document.getElementById(spreadsheet.idPrefix+"button_movepaste");
+         ele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"button_movepaste"));
          ele.src=spreadsheet.imagePrefix+"movepaste"+str+".gif";
-         ele = document.getElementById(spreadsheet.idPrefix+"button_moveinsert");
+         ele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"button_moveinsert"));
          ele.src=spreadsheet.imagePrefix+"moveinsert"+str+".gif";
          if (editor.range2.hasrange) editor.RangeRemove();
          break;
@@ -24903,11 +26157,11 @@ SocialCalc.DoCmd = function(obj, which) {
                +" "+editor.ecell.coord;
             spreadsheet.ExecuteCommand(combostr, "");
             editor.Range2Remove();
-            ele = document.getElementById(spreadsheet.idPrefix+"button_movefrom");
+            ele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"button_movefrom"));
             ele.src=spreadsheet.imagePrefix+"movefromoff.gif";
-            ele = document.getElementById(spreadsheet.idPrefix+"button_movepaste");
+            ele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"button_movepaste"));
             ele.src=spreadsheet.imagePrefix+"movepasteoff.gif";
-            ele = document.getElementById(spreadsheet.idPrefix+"button_moveinsert");
+            ele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"button_moveinsert"));
             ele.src=spreadsheet.imagePrefix+"moveinsertoff.gif";
             }
          break;
@@ -25144,12 +26398,14 @@ SocialCalc.SpreadsheetCmdTable = {
 // xxx
 //
 
+/** @param {any} obj @param {string} combostr @param {string} [sstr] */
 SocialCalc.SpreadsheetControlExecuteCommand = function(obj, combostr, sstr) {
 
    var i, commands;
    var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
    var eobj = spreadsheet.editor;
 
+   /** @type {{[k: string]: any}} */
    var str = {};
    str.P = "%";
    str.N = "\n"
@@ -25191,6 +26447,7 @@ SocialCalc.SpreadsheetControlExecuteCommand = function(obj, combostr, sstr) {
 // Returns the HTML representation of the whole spreadsheet
 //
 
+/** @param {any} spreadsheet */
 SocialCalc.SpreadsheetControlCreateSheetHTML = function(spreadsheet) {
 
    var context, div, ele;
@@ -25212,6 +26469,7 @@ SocialCalc.SpreadsheetControlCreateSheetHTML = function(spreadsheet) {
 // Returns the HTML representation of a cell. Blank is "", not "&nbsp;".
 //
 
+/** @param {any} spreadsheet @param {string} coord @param {any} [linkstyle] */
 SocialCalc.SpreadsheetControlCreateCellHTML = function(spreadsheet, coord, linkstyle) {
 
    var result = "";
@@ -25245,6 +26503,7 @@ SocialCalc.SpreadsheetControlCreateCellHTML = function(spreadsheet, coord, links
 // Empty cells are skipped. The cell-HTML is encoded with ":"=>"\c", newline=>"\n", and "\"=>"\b".
 //
 
+/** @param {any} spreadsheet @param {string} [range] @param {any} [linkstyle] */
 SocialCalc.SpreadsheetControlCreateCellHTMLSave = function(spreadsheet, range, linkstyle) {
 
    var cr1, cr2, row, col, coord, cell, cellHTML;
@@ -25298,7 +26557,7 @@ SocialCalc.SpreadsheetControl.DoFunctionList = function() {
    var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
    var idp = spreadsheet.idPrefix+"function";
 
-   ele = document.getElementById(idp+"dialog");
+   ele = /** @type {any} */(document.getElementById(idp+"dialog"));
    if (ele) return; // already have one
 
    scf.FillFunctionInfo();
@@ -25329,7 +26588,7 @@ SocialCalc.SpreadsheetControl.DoFunctionList = function() {
 
    main.style.top = ((vp.height/3)-pos.top)+"px";
    main.style.left = ((vp.width/3)-pos.left)+"px";
-   main.style.zIndex = 100;
+   main.style.zIndex = "100";
    main.style.backgroundColor = "#FFF";
    main.style.border = "1px solid black";
 
@@ -25344,7 +26603,7 @@ SocialCalc.SpreadsheetControl.DoFunctionList = function() {
 
    main.innerHTML = str;
 
-   SocialCalc.DragRegister(main.firstChild.firstChild.firstChild.firstChild, true, true,
+   SocialCalc.DragRegister(/** @type {any} */(main.firstChild).firstChild.firstChild.firstChild, true, true,
                  {MouseDown: SocialCalc.DragFunctionStart, 
                   MouseMove: SocialCalc.DragFunctionPosition,
                   MouseUp: SocialCalc.DragFunctionPosition,
@@ -25353,20 +26612,21 @@ SocialCalc.SpreadsheetControl.DoFunctionList = function() {
 
    spreadsheet.spreadsheetDiv.appendChild(main);
 
-   ele = document.getElementById(idp+"name");
+   ele = /** @type {any} */(document.getElementById(idp+"name"));
    ele.focus();
    SocialCalc.CmdGotFocus(ele);
 //!!! need to do keyboard handling: if esc, hide; if All, letter scrolls to there
 
    }
 
+/** @param {string} [cname] */
 SocialCalc.SpreadsheetControl.GetFunctionNamesStr = function(cname) {
 
    var i, f;
    var scf = SocialCalc.Formula;
    var str = "";
 
-   f = scf.FunctionClasses[cname];
+   f = scf.FunctionClasses[cname || "all"];
    for (i=0; i<f.items.length; i++) {
       str += '<option value="'+f.items[i]+'"'+(i==0?' selected>':'>')+f.items[i]+'</option>';
       }
@@ -25375,6 +26635,7 @@ SocialCalc.SpreadsheetControl.GetFunctionNamesStr = function(cname) {
 
    }
 
+/** @param {string} cname @param {any} ele */
 SocialCalc.SpreadsheetControl.FillFunctionNames = function(cname, ele) {
 
    var i, f;
@@ -25390,6 +26651,7 @@ SocialCalc.SpreadsheetControl.FillFunctionNames = function(cname, ele) {
       }
    }
 
+/** @param {string} fname */
 SocialCalc.SpreadsheetControl.GetFunctionInfoStr = function(fname) {
    
    var scf = SocialCalc.Formula;
@@ -25403,24 +26665,26 @@ SocialCalc.SpreadsheetControl.GetFunctionInfoStr = function(fname) {
 
    }
 
+/** @param {string} cname */
 SocialCalc.SpreadsheetControl.FunctionClassChosen = function(cname) {
 
    var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
    var idp = spreadsheet.idPrefix+"function";
    var scf = SocialCalc.Formula;
 
-   SocialCalc.SpreadsheetControl.FillFunctionNames(cname, document.getElementById(idp+"name"));
+   SocialCalc.SpreadsheetControl.FillFunctionNames(cname, /** @type {any} */(document.getElementById(idp+"name")));
 
    SocialCalc.SpreadsheetControl.FunctionChosen(scf.FunctionClasses[cname].items[0]);
 
    }
 
+/** @param {string} fname */
 SocialCalc.SpreadsheetControl.FunctionChosen = function(fname) {
 
    var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
    var idp = spreadsheet.idPrefix+"function";
 
-   document.getElementById(idp+"desc").innerHTML = SocialCalc.SpreadsheetControl.GetFunctionInfoStr(fname);
+   /** @type {any} */(document.getElementById(idp+"desc")).innerHTML = SocialCalc.SpreadsheetControl.GetFunctionInfoStr(fname);
 
    }
 
@@ -25428,7 +26692,7 @@ SocialCalc.SpreadsheetControl.HideFunctions = function() {
 
    var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
 
-   var ele = document.getElementById(spreadsheet.idPrefix+"functiondialog");
+   var ele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"functiondialog"));
    ele.innerHTML = "";
 
    SocialCalc.DragUnregister(ele);
@@ -25445,8 +26709,8 @@ SocialCalc.SpreadsheetControl.DoFunctionPaste = function() {
 
    var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
    var editor = spreadsheet.editor;
-   var ele = document.getElementById(spreadsheet.idPrefix+"functionname");
-   var mele = document.getElementById(spreadsheet.idPrefix+"multilinetextarea");
+   var ele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"functionname"));
+   var mele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"multilinetextarea"));
 
    var text = ele.value+"(";
 
@@ -25478,7 +26742,7 @@ SocialCalc.SpreadsheetControl.DoMultiline = function() {
    var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
    var idp = spreadsheet.idPrefix+"multiline";
 
-   ele = document.getElementById(idp+"dialog");
+   ele = /** @type {any} */(document.getElementById(idp+"dialog"));
    if (ele) return; // already have one
 
    switch (editor.state) {
@@ -25517,7 +26781,7 @@ SocialCalc.SpreadsheetControl.DoMultiline = function() {
 
    main.style.top = ((vp.height/3)-pos.top)+"px";
    main.style.left = ((vp.width/3)-pos.left)+"px";
-   main.style.zIndex = 100;
+   main.style.zIndex = "100";
    main.style.backgroundColor = "#FFF";
    main.style.border = "1px solid black";
 
@@ -25529,7 +26793,7 @@ SocialCalc.SpreadsheetControl.DoMultiline = function() {
       '<td style="font-size:10px;cursor:default;color:#666;" onclick="SocialCalc.SpreadsheetControl.HideMultiline();">&nbsp;X&nbsp;</td></tr></table>'+
       '<div style="background-color:#DDD;">'+str+'</div>';
 
-   SocialCalc.DragRegister(main.firstChild.firstChild.firstChild.firstChild, true, true, 
+   SocialCalc.DragRegister(/** @type {any} */(main.firstChild).firstChild.firstChild.firstChild, true, true, 
                  {MouseDown: SocialCalc.DragFunctionStart, 
                   MouseMove: SocialCalc.DragFunctionPosition,
                   MouseUp: SocialCalc.DragFunctionPosition,
@@ -25538,7 +26802,7 @@ SocialCalc.SpreadsheetControl.DoMultiline = function() {
 
    spreadsheet.spreadsheetDiv.appendChild(main);
 
-   ele = document.getElementById(idp+"textarea");
+   ele = /** @type {any} */(document.getElementById(idp+"textarea"));
    ele.focus();
    SocialCalc.CmdGotFocus(ele);
 //!!! need to do keyboard handling: if esc, hide?
@@ -25552,7 +26816,7 @@ SocialCalc.SpreadsheetControl.HideMultiline = function() {
    var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
    var editor = spreadsheet.editor;
 
-   var ele = document.getElementById(spreadsheet.idPrefix+"multilinedialog");
+   var ele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"multilinedialog"));
    ele.innerHTML = "";
 
    SocialCalc.DragUnregister(ele);
@@ -25581,7 +26845,7 @@ SocialCalc.SpreadsheetControl.DoMultilineClear = function() {
 
    var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
 
-   var ele = document.getElementById(spreadsheet.idPrefix+"multilinetextarea");
+   var ele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"multilinetextarea"));
 
    ele.value = "";
    ele.focus();
@@ -25595,7 +26859,7 @@ SocialCalc.SpreadsheetControl.DoMultilinePaste = function() {
    var editor = spreadsheet.editor;
    var wval = editor.workingvalues;
 
-   var ele = document.getElementById(spreadsheet.idPrefix+"multilinetextarea");
+   var ele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"multilinetextarea"));
 
    var text = ele.value;
 
@@ -25635,7 +26899,7 @@ SocialCalc.SpreadsheetControl.DoLink = function() {
    var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
    var idp = spreadsheet.idPrefix+"link";
 
-   ele = document.getElementById(idp+"dialog");
+   ele = /** @type {any} */(document.getElementById(idp+"dialog"));
    if (ele) return; // already have one
 
    switch (editor.state) {
@@ -25705,7 +26969,7 @@ SocialCalc.SpreadsheetControl.DoLink = function() {
 
    main.style.top = ((vp.height/3)-pos.top)+"px";
    main.style.left = ((vp.width/3)-pos.left)+"px";
-   main.style.zIndex = 100;
+   main.style.zIndex = "100";
    main.style.backgroundColor = "#FFF";
    main.style.border = "1px solid black";
 
@@ -25716,7 +26980,7 @@ SocialCalc.SpreadsheetControl.DoLink = function() {
       '<td style="font-size:10px;cursor:default;color:#666;" onclick="SocialCalc.SpreadsheetControl.HideLink();">&nbsp;X&nbsp;</td></tr></table>'+
       '<div style="background-color:#DDD;">'+str+'</div>';
 
-   SocialCalc.DragRegister(main.firstChild.firstChild.firstChild.firstChild, true, true, 
+   SocialCalc.DragRegister(/** @type {any} */(main.firstChild).firstChild.firstChild.firstChild, true, true, 
                  {MouseDown: SocialCalc.DragFunctionStart, 
                   MouseMove: SocialCalc.DragFunctionPosition,
                   MouseUp: SocialCalc.DragFunctionPosition,
@@ -25725,7 +26989,7 @@ SocialCalc.SpreadsheetControl.DoLink = function() {
 
    spreadsheet.spreadsheetDiv.appendChild(main);
 
-   ele = document.getElementById(idp+"url");
+   ele = /** @type {any} */(document.getElementById(idp+"url"));
    ele.focus();
    SocialCalc.CmdGotFocus(ele);
 //!!! need to do keyboard handling: if esc, hide?
@@ -25739,7 +27003,7 @@ SocialCalc.SpreadsheetControl.HideLink = function() {
    var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
    var editor = spreadsheet.editor;
 
-   var ele = document.getElementById(spreadsheet.idPrefix+"linkdialog");
+   var ele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"linkdialog"));
    ele.innerHTML = "";
 
    SocialCalc.DragUnregister(ele);
@@ -25768,11 +27032,11 @@ SocialCalc.SpreadsheetControl.DoLinkClear = function() {
 
    var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
 
-   document.getElementById(spreadsheet.idPrefix+"linkdesc").value = "";
-   document.getElementById(spreadsheet.idPrefix+"linkpagename").value = "";
-   document.getElementById(spreadsheet.idPrefix+"linkworkspace").value = "";
+   /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"linkdesc")).value = "";
+   /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"linkpagename")).value = "";
+   /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"linkworkspace")).value = "";
 
-   var ele = document.getElementById(spreadsheet.idPrefix+"linkurl");
+   var ele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"linkurl"));
    ele.value = "";
    ele.focus();
 
@@ -25785,12 +27049,12 @@ SocialCalc.SpreadsheetControl.DoLinkPaste = function() {
    var editor = spreadsheet.editor;
    var wval = editor.workingvalues;
 
-   var descele = document.getElementById(spreadsheet.idPrefix+"linkdesc");
-   var urlele = document.getElementById(spreadsheet.idPrefix+"linkurl");
-   var pagenameele = document.getElementById(spreadsheet.idPrefix+"linkpagename");
-   var workspaceele = document.getElementById(spreadsheet.idPrefix+"linkworkspace");
-   var formatele = document.getElementById(spreadsheet.idPrefix+"linkformat");
-   var popupele = document.getElementById(spreadsheet.idPrefix+"linkpopup");
+   var descele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"linkdesc"));
+   var urlele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"linkurl"));
+   var pagenameele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"linkpagename"));
+   var workspaceele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"linkworkspace"));
+   var formatele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"linkformat"));
+   var popupele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"linkpopup"));
 
    var text = "";
 
@@ -25925,6 +27189,7 @@ SocialCalc.SpreadsheetControl.FindInSheet = function() {
         
 }
 
+/** @param {0|1} direction */
 SocialCalc.SpreadsheetControl.SearchSheet = function(direction) {
     var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
     var sheet = spreadsheet.sheet;
@@ -25941,7 +27206,7 @@ SocialCalc.SpreadsheetControl.SearchSheet = function(direction) {
     var new_cell = cells[selected_cell];
     sheet.selected_search_cell = selected_cell; 
     spreadsheet.editor.MoveECell(new_cell);
-    document.getElementById("searchstatus").textContent = String(selected_cell+1) + " of " + cells.length;
+    /** @type {any} */(document.getElementById("searchstatus")).textContent = String(selected_cell+1) + " of " + cells.length;
 }
  
 SocialCalc.SpreadsheetControl.SearchUp = function() {
@@ -25958,11 +27223,12 @@ SocialCalc.SpreadsheetControl.SearchDown = function() {
 
 // Sort
 
+/** @param {any} s @param {any} t */
 SocialCalc.SpreadsheetControlSortOnclick = function(s, t) {
 
    var name, i;
    var namelist = [];
-   var nl = document.getElementById(s.idPrefix+"sortlist");
+   var nl = /** @type {any} */(document.getElementById(s.idPrefix+"sortlist"));
    SocialCalc.LoadColumnChoosers(s);
    s.editor.RangeChangeCallback.sort = SocialCalc.UpdateSortRangeProposal;
 
@@ -25973,7 +27239,7 @@ SocialCalc.SpreadsheetControlSortOnclick = function(s, t) {
    nl.length = 0;
    nl.options[0] = new Option(SocialCalc.LocalizeString("[select range]"));
    nl.options[1] = new Option(SocialCalc.LocalizeString("Sort All"), "all");
-   n_options = nl.options.length;
+   var n_options = nl.options.length;
 
    for (i=0; i<namelist.length; i++) {
       name = namelist[i];
@@ -25992,6 +27258,7 @@ SocialCalc.SpreadsheetControlSortOnclick = function(s, t) {
 
    }
 
+/** @param {any} editor @param {any} setting */
 SocialCalc.SpreadsheetControlSortSave = function(editor, setting) {
    // Format is:
    //    sort:sortrange:major:up/down:minor:up/down:last:up/down
@@ -26000,20 +27267,20 @@ SocialCalc.SpreadsheetControlSortSave = function(editor, setting) {
    var str, sele, rele;
 
    str = "sort:"+SocialCalc.encodeForSave(spreadsheet.sortrange)+":";
-   sele = document.getElementById(spreadsheet.idPrefix+"majorsort");
-   rele = document.getElementById(spreadsheet.idPrefix+"majorsortup");
+   sele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"majorsort"));
+   rele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"majorsortup"));
    str += sele.selectedIndex + (rele.checked ? ":up" : ":down");
-   sele = document.getElementById(spreadsheet.idPrefix+"minorsort");
+   sele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"minorsort"));
    if (sele.selectedIndex>0) {
-      rele = document.getElementById(spreadsheet.idPrefix+"minorsortup");
+      rele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"minorsortup"));
       str += ":"+sele.selectedIndex + (rele.checked ? ":up" : ":down");
       }
    else {
       str += "::";
       }
-   sele = document.getElementById(spreadsheet.idPrefix+"lastsort");
+   sele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"lastsort"));
    if (sele.selectedIndex>0) {
-      rele = document.getElementById(spreadsheet.idPrefix+"lastsortup");
+      rele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"lastsortup"));
       str += ":"+sele.selectedIndex + (rele.checked ? ":up" : ":down");
       }
     else {
@@ -26022,14 +27289,20 @@ SocialCalc.SpreadsheetControlSortSave = function(editor, setting) {
    return str+"\n";
    }
 
+/** @param {any} editor @param {any} setting @param {string} line @param {any} flags */
 SocialCalc.SpreadsheetControlSortLoad = function(editor, setting, line, flags) {
-   var parts, ele;
+   /** @type {any} */
+   var parts;
+   /** @type {any} */
+   var ele;
+   /** @type {any} */
+   var sele;
 
    var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
 
    parts = line.split(":");
    spreadsheet.sortrange = SocialCalc.decodeFromSave(parts[1]);
-   ele = document.getElementById(spreadsheet.idPrefix+"sortbutton");
+   ele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"sortbutton"));
    if (spreadsheet.sortrange) {
       ele.value = SocialCalc.LocalizeString("Sort ")+spreadsheet.sortrange;
       ele.style.visibility = "visible";
@@ -26039,26 +27312,26 @@ SocialCalc.SpreadsheetControlSortLoad = function(editor, setting, line, flags) {
       }
    SocialCalc.LoadColumnChoosers(spreadsheet);
 
-   sele = document.getElementById(spreadsheet.idPrefix+"majorsort");
+   sele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"majorsort"));
    sele.selectedIndex = parts[2]-0;
-   document.getElementById(spreadsheet.idPrefix+"majorsort"+parts[3]).checked = true;
-   sele = document.getElementById(spreadsheet.idPrefix+"minorsort");
+   /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"majorsort"+parts[3])).checked = true;
+   sele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"minorsort"));
    if (parts[4]) {
       sele.selectedIndex = parts[4]-0;
-      document.getElementById(spreadsheet.idPrefix+"minorsort"+parts[5]).checked = true;
+      /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"minorsort"+parts[5])).checked = true;
       }
    else {
       sele.selectedIndex = 0;
-      document.getElementById(spreadsheet.idPrefix+"minorsortup").checked = true;
+      /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"minorsortup")).checked = true;
       }
-   sele = document.getElementById(spreadsheet.idPrefix+"lastsort");
+   sele = /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"lastsort"));
    if (parts[6]) {
       sele.selectedIndex = parts[6]-0;
-      document.getElementById(spreadsheet.idPrefix+"lastsort"+parts[7]).checked = true;
+      /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"lastsort"+parts[7])).checked = true;
       }
     else {
       sele.selectedIndex = 0;
-      document.getElementById(spreadsheet.idPrefix+"lastsortup").checked = true;
+      /** @type {any} */(document.getElementById(spreadsheet.idPrefix+"lastsortup")).checked = true;
       }
 
    return true;
@@ -26066,6 +27339,7 @@ SocialCalc.SpreadsheetControlSortLoad = function(editor, setting, line, flags) {
 
 // Comment
 
+/** @param {any} s @param {any} t */
 SocialCalc.SpreadsheetControlCommentOnclick = function(s, t) {
    s.editor.MoveECellCallback.comment = SocialCalc.SpreadsheetControlCommentMoveECell;
    SocialCalc.SpreadsheetControlCommentDisplay(s, t);
@@ -26073,39 +27347,43 @@ SocialCalc.SpreadsheetControlCommentOnclick = function(s, t) {
    return;
    }
 
+/** @param {any} s @param {any} t */
 SocialCalc.SpreadsheetControlCommentDisplay = function(s, t) {
    var c = "";
    if (s.editor.ecell && s.editor.ecell.coord && s.sheet.cells[s.editor.ecell.coord]) {
       c = s.sheet.cells[s.editor.ecell.coord].comment || "";
       }
-   document.getElementById(s.idPrefix+"commenttext").value = c;
+   /** @type {any} */(document.getElementById(s.idPrefix+"commenttext")).value = c;
    }
 
+/** @param {any} editor */
 SocialCalc.SpreadsheetControlCommentMoveECell = function(editor) {
    SocialCalc.SpreadsheetControlCommentDisplay(SocialCalc.GetSpreadsheetControlObject(), "comment");
    }
 
 SocialCalc.SpreadsheetControlCommentSet = function() {
    var s=SocialCalc.GetSpreadsheetControlObject();
-   s.ExecuteCommand("set %C comment "+SocialCalc.encodeForSave(document.getElementById(s.idPrefix+"commenttext").value));
+   s.ExecuteCommand("set %C comment "+SocialCalc.encodeForSave(/** @type {any} */(document.getElementById(s.idPrefix+"commenttext")).value));
    var cell=SocialCalc.GetEditorCellElement(s.editor, s.editor.ecell.row, s.editor.ecell.col);
    if (!s.editor.ECellReadonly()) {
-      cell.element.title = document.getElementById(s.idPrefix+"commenttext").value;
+      cell.element.title = /** @type {any} */(document.getElementById(s.idPrefix+"commenttext")).value;
       s.editor.UpdateCellCSS(cell, s.editor.ecell.row, s.editor.ecell.col);
       }
    SocialCalc.KeyboardFocus();
    }
 
+/** @param {any} s @param {any} t */
 SocialCalc.SpreadsheetControlCommentOnunclick = function(s, t) {
    delete s.editor.MoveECellCallback.comment;
    }
 
 // Names
 
+/** @param {any} s @param {any} t */
 SocialCalc.SpreadsheetControlNamesOnclick = function(s, t) {
-   document.getElementById(s.idPrefix+"namesname").value = "";
-   document.getElementById(s.idPrefix+"namesdesc").value = "";
-   document.getElementById(s.idPrefix+"namesvalue").value = "";
+   /** @type {any} */(document.getElementById(s.idPrefix+"namesname")).value = "";
+   /** @type {any} */(document.getElementById(s.idPrefix+"namesdesc")).value = "";
+   /** @type {any} */(document.getElementById(s.idPrefix+"namesvalue")).value = "";
    s.editor.RangeChangeCallback.names = SocialCalc.SpreadsheetControlNamesRangeChange;
    s.editor.MoveECellCallback.names = SocialCalc.SpreadsheetControlNamesRangeChange;
    SocialCalc.SpreadsheetControlNamesRangeChange(s.editor);
@@ -26118,8 +27396,8 @@ SocialCalc.SpreadsheetControlNamesFillNameList = function() {
    var name, i;
    var namelist = [];
    var s=SocialCalc.GetSpreadsheetControlObject();
-   var nl = document.getElementById(s.idPrefix+"nameslist");
-   var currentname = document.getElementById(s.idPrefix+"namesname").value.toUpperCase().replace(/[^A-Z0-9_\.]/g, "");
+   var nl = /** @type {any} */(document.getElementById(s.idPrefix+"nameslist"));
+   var currentname = /** @type {any} */(document.getElementById(s.idPrefix+"namesname")).value.toUpperCase().replace(/[^A-Z0-9_\.]/g, "");
    for (name in s.sheet.names) {
       namelist.push(name);
       }
@@ -26145,23 +27423,24 @@ SocialCalc.SpreadsheetControlNamesFillNameList = function() {
 
 SocialCalc.SpreadsheetControlNamesChangedName = function() {
    var s=SocialCalc.GetSpreadsheetControlObject();
-   var nl = document.getElementById(s.idPrefix+"nameslist");
+   var nl = /** @type {any} */(document.getElementById(s.idPrefix+"nameslist"));
    var name = nl.options[nl.selectedIndex].value;
    if (s.sheet.names[name]) {
-      document.getElementById(s.idPrefix+"namesname").value = name;
-      document.getElementById(s.idPrefix+"namesdesc").value = s.sheet.names[name].desc || "";
-      document.getElementById(s.idPrefix+"namesvalue").value = s.sheet.names[name].definition || "";
+      /** @type {any} */(document.getElementById(s.idPrefix+"namesname")).value = name;
+      /** @type {any} */(document.getElementById(s.idPrefix+"namesdesc")).value = s.sheet.names[name].desc || "";
+      /** @type {any} */(document.getElementById(s.idPrefix+"namesvalue")).value = s.sheet.names[name].definition || "";
       }
    else {
-      document.getElementById(s.idPrefix+"namesname").value = "";
-      document.getElementById(s.idPrefix+"namesdesc").value = "";
-      document.getElementById(s.idPrefix+"namesvalue").value = "";
+      /** @type {any} */(document.getElementById(s.idPrefix+"namesname")).value = "";
+      /** @type {any} */(document.getElementById(s.idPrefix+"namesdesc")).value = "";
+      /** @type {any} */(document.getElementById(s.idPrefix+"namesvalue")).value = "";
       }
    }
 
+/** @param {any} editor */
 SocialCalc.SpreadsheetControlNamesRangeChange = function(editor) {
    var s = SocialCalc.GetSpreadsheetControlObject();
-   var ele = document.getElementById(s.idPrefix+"namesrangeproposal");
+   var ele = /** @type {any} */(document.getElementById(s.idPrefix+"namesrangeproposal"));
    if (editor.range.hasrange) {
       ele.value = SocialCalc.crToCoord(editor.range.left, editor.range.top) + ":" +
                             SocialCalc.crToCoord(editor.range.right, editor.range.bottom);
@@ -26171,6 +27450,7 @@ SocialCalc.SpreadsheetControlNamesRangeChange = function(editor) {
       }
    }
 
+/** @param {any} s @param {any} t */
 SocialCalc.SpreadsheetControlNamesOnunclick = function(s, t) {
    delete s.editor.RangeChangeCallback.names;
    delete s.editor.MoveECellCallback.names;
@@ -26178,31 +27458,31 @@ SocialCalc.SpreadsheetControlNamesOnunclick = function(s, t) {
 
 SocialCalc.SpreadsheetControlNamesSetValue = function() {
    var s = SocialCalc.GetSpreadsheetControlObject();
-   document.getElementById(s.idPrefix+"namesvalue").value = document.getElementById(s.idPrefix+"namesrangeproposal").value;
+   /** @type {any} */(document.getElementById(s.idPrefix+"namesvalue")).value = /** @type {any} */(document.getElementById(s.idPrefix+"namesrangeproposal")).value;
    SocialCalc.KeyboardFocus();
    }
 
 SocialCalc.SpreadsheetControlNamesSave = function() {
    var s = SocialCalc.GetSpreadsheetControlObject();
-   var name = document.getElementById(s.idPrefix+"namesname").value;
+   var name = /** @type {any} */(document.getElementById(s.idPrefix+"namesname")).value;
    SocialCalc.SetTab(s.tabs[0].name); // return to first tab
    SocialCalc.KeyboardFocus();
    if (name != "") {
-      s.ExecuteCommand("name define "+name+" "+document.getElementById(s.idPrefix+"namesvalue").value+"\n"+
-         "name desc "+name+" "+document.getElementById(s.idPrefix+"namesdesc").value);
+      s.ExecuteCommand("name define "+name+" "+/** @type {any} */(document.getElementById(s.idPrefix+"namesvalue")).value+"\n"+
+         "name desc "+name+" "+/** @type {any} */(document.getElementById(s.idPrefix+"namesdesc")).value);
       }
    }
 
 SocialCalc.SpreadsheetControlNamesDelete = function() {
    var s = SocialCalc.GetSpreadsheetControlObject();
-   var name = document.getElementById(s.idPrefix+"namesname").value;
+   var name = /** @type {any} */(document.getElementById(s.idPrefix+"namesname")).value;
    SocialCalc.SetTab(s.tabs[0].name); // return to first tab
    SocialCalc.KeyboardFocus();
    if (name != "") {
       s.ExecuteCommand("name delete "+name);
-//      document.getElementById(s.idPrefix+"namesname").value = "";
-//      document.getElementById(s.idPrefix+"namesvalue").value = "";
-//      document.getElementById(s.idPrefix+"namesdesc").value = "";
+//      /** @type {any} */(document.getElementById(s.idPrefix+"namesname")).value = "";
+//      /** @type {any} */(document.getElementById(s.idPrefix+"namesvalue")).value = "";
+//      /** @type {any} */(document.getElementById(s.idPrefix+"namesdesc")).value = "";
 //      SocialCalc.SpreadsheetControlNamesFillNameList();
       }
    SocialCalc.KeyboardFocus();
@@ -26210,10 +27490,11 @@ SocialCalc.SpreadsheetControlNamesDelete = function() {
 
 // Clipboard
 
+/** @param {any} s @param {any} t */
 SocialCalc.SpreadsheetControlClipboardOnclick = function(s, t) {
-   var s = SocialCalc.GetSpreadsheetControlObject();
-   clipele = document.getElementById(s.idPrefix+"clipboardtext");
-   document.getElementById(s.idPrefix+"clipboardformat-tab").checked = true;
+   s = SocialCalc.GetSpreadsheetControlObject();
+   var clipele = /** @type {any} */(document.getElementById(s.idPrefix+"clipboardtext"));
+   /** @type {any} */(document.getElementById(s.idPrefix+"clipboardformat-tab")).checked = true;
 
    try {
       clipele.value = SocialCalc.ConvertSaveToOtherFormat(SocialCalc.Clipboard.clipboard, "tab");
@@ -26224,9 +27505,10 @@ SocialCalc.SpreadsheetControlClipboardOnclick = function(s, t) {
    return;
    }
 
+/** @param {string} which */
 SocialCalc.SpreadsheetControlClipboardFormat = function(which) {
    var s = SocialCalc.GetSpreadsheetControlObject();
-   clipele = document.getElementById(s.idPrefix+"clipboardtext");
+   var clipele = /** @type {any} */(document.getElementById(s.idPrefix+"clipboardtext"));
    clipele.value = SocialCalc.ConvertSaveToOtherFormat(SocialCalc.Clipboard.clipboard, which);
    }
 
@@ -26235,22 +27517,22 @@ SocialCalc.SpreadsheetControlClipboardLoad = function() {
    var savetype = "tab";
    SocialCalc.SetTab(s.tabs[0].name); // return to first tab
    SocialCalc.KeyboardFocus();
-   if (document.getElementById(s.idPrefix+"clipboardformat-csv").checked) {
+   if (/** @type {any} */(document.getElementById(s.idPrefix+"clipboardformat-csv")).checked) {
       savetype = "csv";
       }
-   else if (document.getElementById(s.idPrefix+"clipboardformat-scsave").checked) {
+   else if (/** @type {any} */(document.getElementById(s.idPrefix+"clipboardformat-scsave")).checked) {
       savetype = "scsave";
       }
    // control+v ignores ignore windows clipboard - see ctrlkeyFunction(editor, charname)
    s.editor.pastescclipboard = true;
    s.editor.EditorScheduleSheetCommands("loadclipboard "+
       SocialCalc.encodeForSave(
-         SocialCalc.ConvertOtherFormatToSave(document.getElementById(s.idPrefix+"clipboardtext").value, savetype)), true, false);
+         SocialCalc.ConvertOtherFormatToSave(/** @type {any} */(document.getElementById(s.idPrefix+"clipboardtext")).value, savetype)), true, false);
    }
 
 SocialCalc.SpreadsheetControlClipboardClear = function() {
    var s = SocialCalc.GetSpreadsheetControlObject();
-   var clipele = document.getElementById(s.idPrefix+"clipboardtext");
+   var clipele = /** @type {any} */(document.getElementById(s.idPrefix+"clipboardtext"));
    clipele.value = "";
    s.editor.EditorScheduleSheetCommands("clearclipboard", true, false);
    clipele.focus();
@@ -26267,13 +27549,14 @@ SocialCalc.SpreadsheetControlClipboardExport = function() {
 
 // Settings
 
+/** @param {string} target */
 SocialCalc.SpreadsheetControlSettingsSwitch = function(target) {
    SocialCalc.SettingControlReset();
    var s = SocialCalc.GetSpreadsheetControlObject();
-   var sheettable = document.getElementById(s.idPrefix+"sheetsettingstable");
-   var celltable = document.getElementById(s.idPrefix+"cellsettingstable");
-   var sheettoolbar = document.getElementById(s.idPrefix+"sheetsettingstoolbar");
-   var celltoolbar = document.getElementById(s.idPrefix+"cellsettingstoolbar");
+   var sheettable = /** @type {any} */(document.getElementById(s.idPrefix+"sheetsettingstable"));
+   var celltable = /** @type {any} */(document.getElementById(s.idPrefix+"cellsettingstable"));
+   var sheettoolbar = /** @type {any} */(document.getElementById(s.idPrefix+"sheetsettingstoolbar"));
+   var celltoolbar = /** @type {any} */(document.getElementById(s.idPrefix+"cellsettingstoolbar"));
    if (target=="sheet") {
       sheettable.style.display = "block";
       celltable.style.display = "none";
@@ -26290,6 +27573,7 @@ SocialCalc.SpreadsheetControlSettingsSwitch = function(target) {
       }
    }
 
+/** @param {string} target */
 SocialCalc.SettingsControlSave = function(target) {
    var range, cmdstr;
    var s = SocialCalc.GetSpreadsheetControlObject();
@@ -26342,6 +27626,7 @@ SocialCalc.SettingsControlSave = function(target) {
 //
 
 
+/** @param {any} spreadsheet @param {{[k: string]: string}} [otherparts] */
 SocialCalc.SpreadsheetControlCreateSpreadsheetSave = function(spreadsheet, otherparts) {
 
    var result;
@@ -26352,7 +27637,10 @@ SocialCalc.SpreadsheetControlCreateSpreadsheetSave = function(spreadsheet, other
 
    if (otherparts) {
       for (partname in otherparts) {
-         if (otherparts[partname].charAt(otherparts[partname]-1) != "\n") {
+         // Bug fix: original `otherparts[partname]-1` coerced the string value to NaN and
+         // effectively asked for charAt(NaN), which always returned "" and forced extranl="\n".
+         // Correct check is the last character of the string.
+         if (otherparts[partname].charAt(otherparts[partname].length-1) != "\n") {
             extranl = "\n";
             }
          else {
@@ -26391,9 +27679,11 @@ SocialCalc.SpreadsheetControlCreateSpreadsheetSave = function(spreadsheet, other
 //    {type1: {start: startpos, end: endpos}, type2:...}
 //
 
+/** @param {any} spreadsheet @param {string} str */
 SocialCalc.SpreadsheetControlDecodeSpreadsheetSave = function(spreadsheet, str) {
 
    var pos1, mpregex, searchinfo, boundary, boundaryregex, blanklineregex, start, ending, lines, i, line, p, pnum;
+   /** @type {{[k: string]: {start: number; end: number}}} */
    var parts = {};
    var partlist = [];
 
@@ -26404,7 +27694,9 @@ SocialCalc.SpreadsheetControlDecodeSpreadsheetSave = function(spreadsheet, str) 
    mpregex.lastIndex = pos1;
 
    searchinfo = mpregex.exec(str);
-   if (mpregex.lastIndex <= 0) return parts;
+   // Bug fix: original checked `mpregex.lastIndex <= 0` which is the regex state, not the
+   // match result. Check `searchinfo` directly so we don't dereference a null match on miss.
+   if (!searchinfo || mpregex.lastIndex <= 0) return parts;
    boundary = searchinfo[1];
 
    boundaryregex = new RegExp("^--"+boundary+"(?:\r\n|\n)", "mg");
@@ -26487,6 +27779,7 @@ SocialCalc.SettingsControls = {
 // SocialCalc.SettingsControlSetCurrentPanel(panel-object)
 //
 
+/** @param {any} panelobj */
 SocialCalc.SettingsControlSetCurrentPanel = function(panelobj) {
 
    SocialCalc.SettingsControls.CurrentPanel = panelobj;
@@ -26500,9 +27793,10 @@ SocialCalc.SettingsControlSetCurrentPanel = function(panelobj) {
 // SocialCalc.SettingsControlInitializePanel(panel-object)
 //
 
+/** @param {any} panelobj */
 SocialCalc.SettingsControlInitializePanel = function(panelobj) {
 
-   var ctrlname;
+   var ctrlname, ctrl;
    var sc = SocialCalc.SettingsControls;
 
    for (ctrlname in panelobj) {
@@ -26518,9 +27812,10 @@ SocialCalc.SettingsControlInitializePanel = function(panelobj) {
 // SocialCalc.SettingsControlLoadPanel(panel-object, attribs)
 //
 
+/** @param {any} panelobj @param {{[k: string]: any}} attribs */
 SocialCalc.SettingsControlLoadPanel = function(panelobj, attribs) {
 
-   var ctrlname;
+   var ctrlname, ctrl;
    var sc = SocialCalc.SettingsControls;
 
    for (ctrlname in panelobj) {
@@ -26535,10 +27830,12 @@ SocialCalc.SettingsControlLoadPanel = function(panelobj, attribs) {
 // attribs = SocialCalc.SettingsControlUnloadPanel(panel-object)
 //
 
+/** @param {any} panelobj */
 SocialCalc.SettingsControlUnloadPanel = function(panelobj) {
 
-   var ctrlname;
+   var ctrlname, ctrl;
    var sc = SocialCalc.SettingsControls;
+   /** @type {{[k: string]: any}} */
    var attribs = {};
 
    for (ctrlname in panelobj) {
@@ -26555,11 +27852,12 @@ SocialCalc.SettingsControlUnloadPanel = function(panelobj) {
 // SocialCalc.SettingsControls.PopupChangeCallback
 //
 
+/** @param {any} attribs @param {any} id @param {any} value */
 SocialCalc.SettingsControls.PopupChangeCallback = function(attribs, id, value) {
 
    var sc = SocialCalc.Constants;
 
-   var ele = document.getElementById("sample-text");
+   var ele = /** @type {any} */(document.getElementById("sample-text"));
 
    if (!ele || !attribs || !attribs.panelobj) return;
 
@@ -26571,6 +27869,7 @@ SocialCalc.SettingsControls.PopupChangeCallback = function(attribs, id, value) {
 
    parts = sc.defaultCellLayout.match(/^padding.(\S+) (\S+) (\S+) (\S+).vertical.align.(\S+);$/) || [];
 
+   /** @type {{[k: string]: any}} */
    var cv = {color: ["textcolor"], backgroundColor: ["bgcolor", "#FFF"],
              fontSize: ["fontsize", sc.defaultCellFontSize], fontFamily: ["fontfamily"],
              paddingTop: ["padtop", parts[1]], paddingRight: ["padright", parts[2]],
@@ -26620,6 +27919,7 @@ SocialCalc.SettingsControls.PopupChangeCallback = function(attribs, id, value) {
 // PopupList Control
 //
 
+/** @param {any} panelobj @param {string} ctrlname @param {any} value */
 SocialCalc.SettingsControls.PopupListSetValue = function(panelobj, ctrlname, value) {
 
    if (!value) {alert(ctrlname+" no value"); return;}
@@ -26639,6 +27939,7 @@ SocialCalc.SettingsControls.PopupListSetValue = function(panelobj, ctrlname, val
 // SocialCalc.SettingsControls.PopupListGetValue
 //
 
+/** @param {any} panelobj @param {string} ctrlname */
 SocialCalc.SettingsControls.PopupListGetValue = function(panelobj, ctrlname) {
 
    var ctl = panelobj[ctrlname];
@@ -26658,6 +27959,7 @@ SocialCalc.SettingsControls.PopupListGetValue = function(panelobj, ctrlname) {
 // SocialCalc.SettingsControls.PopupListInitialize
 //
 
+/** @param {any} panelobj @param {string} ctrlname */
 SocialCalc.SettingsControls.PopupListInitialize = function(panelobj, ctrlname) {
 
    var i, val, pos, otext;
@@ -26707,6 +28009,7 @@ SocialCalc.SettingsControls.PopupListInitialize = function(panelobj, ctrlname) {
 // SocialCalc.SettingsControls.PopupListReset
 //
 
+/** @param {string} ctrlname */
 SocialCalc.SettingsControls.PopupListReset = function(ctrlname) {
 
    SocialCalc.Popup.Reset("List");
@@ -26725,6 +28028,7 @@ SocialCalc.SettingsControls.Controls.PopupList = {
 // ColorChooser Control
 //
 
+/** @param {any} panelobj @param {string} ctrlname @param {any} value */
 SocialCalc.SettingsControls.ColorChooserSetValue = function(panelobj, ctrlname, value) {
 
    if (!value) {alert(ctrlname+" no value"); return;}
@@ -26744,6 +28048,7 @@ SocialCalc.SettingsControls.ColorChooserSetValue = function(panelobj, ctrlname, 
 // SocialCalc.SettingsControls.ColorChooserGetValue
 //
 
+/** @param {any} panelobj @param {string} ctrlname */
 SocialCalc.SettingsControls.ColorChooserGetValue = function(panelobj, ctrlname) {
 
    var value = SocialCalc.Popup.GetValue(panelobj[ctrlname].id);
@@ -26760,6 +28065,7 @@ SocialCalc.SettingsControls.ColorChooserGetValue = function(panelobj, ctrlname) 
 // SocialCalc.SettingsControls.ColorChooserInitialize
 //
 
+/** @param {any} panelobj @param {string} ctrlname */
 SocialCalc.SettingsControls.ColorChooserInitialize = function(panelobj, ctrlname) {
 
    var i, val, pos, otext;
@@ -26777,6 +28083,7 @@ SocialCalc.SettingsControls.ColorChooserInitialize = function(panelobj, ctrlname
 // SocialCalc.SettingsControls.ColorChooserReset
 //
 
+/** @param {string} ctrlname */
 SocialCalc.SettingsControls.ColorChooserReset = function(ctrlname) {
 
    SocialCalc.Popup.Reset("ColorChooser");
@@ -26796,6 +28103,7 @@ SocialCalc.SettingsControls.Controls.ColorChooser = {
 // SocialCalc.SettingsControls.BorderSideSetValue
 //
 
+/** @param {any} panelobj @param {string} ctrlname @param {any} value */
 SocialCalc.SettingsControls.BorderSideSetValue = function(panelobj, ctrlname, value) {
 
    var sc = SocialCalc.SettingsControls;
@@ -26804,7 +28112,7 @@ SocialCalc.SettingsControls.BorderSideSetValue = function(panelobj, ctrlname, va
 
    if (!value) {alert(ctrlname+" no value"); return;}
 
-   ele = document.getElementById(idstart+"-onoff-bcb"); // border checkbox
+   ele = /** @type {any} */(document.getElementById(idstart+"-onoff-bcb")); // border checkbox
    if (!ele) return;
 
    if (value.val) { // border does not use default: it looks only to the value currently
@@ -26829,13 +28137,14 @@ SocialCalc.SettingsControls.BorderSideSetValue = function(panelobj, ctrlname, va
 // SocialCalc.SettingsControls.BorderSideGetValue
 //
 
+/** @param {any} panelobj @param {string} ctrlname */
 SocialCalc.SettingsControls.BorderSideGetValue = function(panelobj, ctrlname) {
 
    var sc = SocialCalc.SettingsControls;
    var ele, value;
    var idstart = panelobj[ctrlname].id;
 
-   ele = document.getElementById(idstart+"-onoff-bcb"); // border checkbox
+   ele = /** @type {any} */(document.getElementById(idstart+"-onoff-bcb")); // border checkbox
    if (!ele) return;
 
 
@@ -26854,6 +28163,7 @@ SocialCalc.SettingsControls.BorderSideGetValue = function(panelobj, ctrlname) {
 // SocialCalc.SettingsControls.BorderSideInitialize
 //
 
+/** @param {any} panelobj @param {string} ctrlname */
 SocialCalc.SettingsControls.BorderSideInitialize = function(panelobj, ctrlname) {
 
    var sc = SocialCalc.SettingsControls;
@@ -26871,6 +28181,7 @@ SocialCalc.SettingsControls.BorderSideInitialize = function(panelobj, ctrlname) 
 // SocialCalc.SettingsControlOnchangeBorder = function(ele)
 //
 
+/** @param {any} ele */
 SocialCalc.SettingsControlOnchangeBorder = function(ele) {
 
    var idname, value, found, ele2;
@@ -26928,6 +28239,7 @@ SocialCalc.SettingControlReset = function() {
 
 SocialCalc.OtherSaveParts = {}; // holds other parts to save - must be set when loaded if you want to keep
 
+/** @param {string} whichpart */
 SocialCalc.CtrlSEditor = function(whichpart) {
 
    var strtoedit, partname;
@@ -26948,15 +28260,16 @@ SocialCalc.CtrlSEditor = function(whichpart) {
       'onclick="SocialCalc.CtrlSEditorDone (\'socialcalc-editbox\', \''+whichpart+'\');" value="OK">';
    document.body.appendChild(editbox);
 
-   var ebta = document.getElementById("socialcalc-editbox-textarea");
+   var ebta = /** @type {any} */(document.getElementById("socialcalc-editbox-textarea"));
    ebta.focus();
    SocialCalc.CmdGotFocus(ebta);
 
    }
 
+/** @param {string} idprefix @param {string} whichpart */
 SocialCalc.CtrlSEditorDone = function(idprefix, whichpart) {
 
-   var edittextarea = document.getElementById(idprefix+"-textarea");
+   var edittextarea = /** @type {any} */(document.getElementById(idprefix+"-textarea"));
    var text = edittextarea.value;
    if (whichpart.length > 0) {
       if (text.length > 0) {
@@ -26967,7 +28280,7 @@ SocialCalc.CtrlSEditorDone = function(idprefix, whichpart) {
          }
       }
 
-   var editbox = document.getElementById(idprefix);
+   var editbox = /** @type {any} */(document.getElementById(idprefix));
    SocialCalc.KeyboardFocus();
    editbox.parentNode.removeChild(editbox);
 

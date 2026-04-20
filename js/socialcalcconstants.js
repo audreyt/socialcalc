@@ -1,3 +1,7 @@
+// Opt-in TypeScript checking for this file. socialcalcconstants.js is almost entirely
+// a single object literal of localization strings plus two tiny utility functions,
+// so it should strict-check easily against the existing .d.ts.
+// @ts-check
 //
 /*
 // The module of the SocialCalc package with customizable constants, strings, etc.
@@ -29,6 +33,8 @@
 //
 */
 
+/** @type {any} */
+// @ts-ignore - SocialCalc is declared ambiently; runtime re-declaration is intentional.
 var SocialCalc;
 if (!SocialCalc) SocialCalc = {};
 
@@ -846,6 +852,9 @@ SocialCalc.ConstantsDefaultClasses = {
 // lets you combine both.
 //
 
+/**
+ * @param {string} [prefix]
+ */
 SocialCalc.ConstantsSetClasses = function(prefix) {
 
    var defaults = SocialCalc.ConstantsDefaultClasses;
@@ -870,6 +879,9 @@ SocialCalc.ConstantsSetClasses = function(prefix) {
 
 // Set the image prefix on all images.
 
+/**
+ * @param {string} imagePrefix
+ */
 SocialCalc.ConstantsSetImagePrefix = function(imagePrefix) {
 
    var scc = SocialCalc.Constants;
