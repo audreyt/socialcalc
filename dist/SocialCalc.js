@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Taken from https://github.com/umdjs/umd/blob/master/templates/returnExports.js
 // (c) by The UMD contributors
 // MIT License: https://github.com/umdjs/umd/blob/master/LICENSE.md
@@ -18,6 +19,7 @@
 }(typeof globalThis !== 'undefined' ? globalThis : this, function (window) {
 "use strict";
 
+// @ts-nocheck
 //
 /*
 // The module of the SocialCalc package with customizable constants, strings, etc.
@@ -904,6 +906,7 @@ SocialCalc.ConstantsSetImagePrefix = function(imagePrefix) {
    }
 
 
+// @ts-nocheck
 //
 // The main SocialCalc code module of the SocialCalc package
 //
@@ -7407,6 +7410,7 @@ SocialCalc.SetConvertedCell = function(sheet, cr, rawvalue) {
    }
 
 
+// @ts-nocheck
 //
 // SocialCalcTableEditor
 //
@@ -13838,7 +13842,8 @@ SocialCalc.ProcessKey = function (ch, e) {
 
 
 
-// @ts-check
+// @ts-nocheck
+// 
 // Opt-in TypeScript checking for this file. formatnumber2.js has a 95%
 // Stryker mutation score, so the code is healthy and worth type-checking.
 // Other .js files under js/ remain un-checked (see tsconfig.json
@@ -13876,7 +13881,7 @@ SocialCalc.ProcessKey = function (ch, e) {
 */
 
    /** @type {any} */
-   // @ts-ignore - SocialCalc is declared ambiently; runtime re-declaration is intentional.
+   //  - SocialCalc is declared ambiently; runtime re-declaration is intentional.
    var SocialCalc;
    if (!SocialCalc) SocialCalc = {}; // May be used with other SocialCalc libraries or standalone
 
@@ -14647,7 +14652,7 @@ SocialCalc.FormatNumber.parse_format_string = function(format_defs, format_strin
          ampmstr += ch;
          part=ampmstr.toLowerCase();
          if (part!="am/pm".substring(0,part.length) && part!="a/p".substring(0,part.length)) {
-            // @ts-expect-error: intentional no-op assignment to a discarded global.
+            // : intentional no-op assignment to a discarded global.
             // Clearing `ampmstr` here would change behavior (incomplete AM/PM runs
             // would stop swallowing subsequent characters); see format-coverage
             // test "partial AM/PM run ... is discarded".
@@ -14925,6 +14930,7 @@ SocialCalc.intFunc = function(n) {
    }
 
 
+// @ts-nocheck
 //
 //
 /*
@@ -14956,11 +14962,55 @@ SocialCalc.intFunc = function(n) {
 // Unless otherwise specified, referring to "SocialCalc" in comments refers to this
 // JavaScript version of the code, not the SocialCalc Perl code.
 //
-*/
-
-   var SocialCalc;
-   if (!SocialCalc) SocialCalc = {}; // May be used with other SocialCalc libraries or standalone
-                                     // In any case, requires SocialCalc.Constants.
+*/function stryNS_9fa48() {
+  var g = typeof globalThis === 'object' && globalThis && globalThis.Math === Math && globalThis || new Function("return this")();
+  var ns = g.__stryker__ || (g.__stryker__ = {});
+  if (ns.activeMutant === undefined && g.process && g.process.env && g.process.env.__STRYKER_ACTIVE_MUTANT__) {
+    ns.activeMutant = g.process.env.__STRYKER_ACTIVE_MUTANT__;
+  }
+  function retrieveNS() {
+    return ns;
+  }
+  stryNS_9fa48 = retrieveNS;
+  return retrieveNS();
+}
+stryNS_9fa48();
+function stryCov_9fa48() {
+  var ns = stryNS_9fa48();
+  var cov = ns.mutantCoverage || (ns.mutantCoverage = {
+    static: {},
+    perTest: {}
+  });
+  function cover() {
+    var c = cov.static;
+    if (ns.currentTestId) {
+      c = cov.perTest[ns.currentTestId] = cov.perTest[ns.currentTestId] || {};
+    }
+    var a = arguments;
+    for (var i = 0; i < a.length; i++) {
+      c[a[i]] = (c[a[i]] || 0) + 1;
+    }
+  }
+  stryCov_9fa48 = cover;
+  cover.apply(null, arguments);
+}
+function stryMutAct_9fa48(id) {
+  var ns = stryNS_9fa48();
+  function isActive(id) {
+    if (ns.activeMutant === id) {
+      if (ns.hitCount !== void 0 && ++ns.hitCount > ns.hitLimit) {
+        throw new Error('Stryker: Hit count limit reached (' + ns.hitCount + ')');
+      }
+      return true;
+    }
+    return false;
+  }
+  stryMutAct_9fa48 = isActive;
+  return isActive(id);
+}
+var SocialCalc;
+if (!SocialCalc) SocialCalc = {}; // May be used with other SocialCalc libraries or standalone
+// In any case, requires SocialCalc.Constants.
 
 SocialCalc.Formula = {};
 SocialCalc.TriggerIoAction = {}; // eddy
@@ -14969,95 +15019,290 @@ SocialCalc.TriggerIoAction = {}; // eddy
 // Formula constants for parsing:
 //
 
-   SocialCalc.Formula.ParseState = {num: 1, alpha: 2, coord: 3, string: 4, stringquote: 5, numexp1: 6, numexp2: 7, alphanumeric: 8, specialvalue:9};
+SocialCalc.Formula.ParseState = {
+  num: 1,
+  alpha: 2,
+  coord: 3,
+  string: 4,
+  stringquote: 5,
+  numexp1: 6,
+  numexp2: 7,
+  alphanumeric: 8,
+  specialvalue: 9
+};
+SocialCalc.Formula.TokenType = {
+  num: 1,
+  coord: 2,
+  op: 3,
+  name: 4,
+  error: 5,
+  string: 6,
+  space: 7
+};
+SocialCalc.Formula.CharClass = {
+  num: 1,
+  numstart: 2,
+  op: 3,
+  eof: 4,
+  alpha: 5,
+  incoord: 6,
+  error: 7,
+  quote: 8,
+  space: 9,
+  specialstart: 10
+};
+SocialCalc.Formula.CharClassTable = {
+  " ": 9,
+  "!": 3,
+  '"': 8,
+  "'": 8,
+  "#": 10,
+  "$": 6,
+  "%": 3,
+  "&": 3,
+  "(": 3,
+  ")": 3,
+  "*": 3,
+  "+": 3,
+  ",": 3,
+  "-": 3,
+  ".": 2,
+  "/": 3,
+  "0": 1,
+  "1": 1,
+  "2": 1,
+  "3": 1,
+  "4": 1,
+  "5": 1,
+  "6": 1,
+  "7": 1,
+  "8": 1,
+  "9": 1,
+  ":": 3,
+  "<": 3,
+  "=": 3,
+  ">": 3,
+  "A": 5,
+  "B": 5,
+  "C": 5,
+  "D": 5,
+  "E": 5,
+  "F": 5,
+  "G": 5,
+  "H": 5,
+  "I": 5,
+  "J": 5,
+  "K": 5,
+  "L": 5,
+  "M": 5,
+  "N": 5,
+  "O": 5,
+  "P": 5,
+  "Q": 5,
+  "R": 5,
+  "S": 5,
+  "T": 5,
+  "U": 5,
+  "V": 5,
+  "W": 5,
+  "X": 5,
+  "Y": 5,
+  "Z": 5,
+  "^": 3,
+  "_": 5,
+  "a": 5,
+  "b": 5,
+  "c": 5,
+  "d": 5,
+  "e": 5,
+  "f": 5,
+  "g": 5,
+  "h": 5,
+  "i": 5,
+  "j": 5,
+  "k": 5,
+  "l": 5,
+  "m": 5,
+  "n": 5,
+  "o": 5,
+  "p": 5,
+  "q": 5,
+  "r": 5,
+  "s": 5,
+  "t": 5,
+  "u": 5,
+  "v": 5,
+  "w": 5,
+  "x": 5,
+  "y": 5,
+  "z": 5
+};
+SocialCalc.Formula.UpperCaseTable = {
+  "a": "A",
+  "b": "B",
+  "c": "C",
+  "d": "D",
+  "e": "E",
+  "f": "F",
+  "g": "G",
+  "h": "H",
+  "i": "I",
+  "j": "J",
+  "k": "K",
+  "l": "L",
+  "m": "M",
+  "n": "N",
+  "o": "O",
+  "p": "P",
+  "q": "Q",
+  "r": "R",
+  "s": "S",
+  "t": "T",
+  "u": "U",
+  "v": "V",
+  "w": "W",
+  "x": "X",
+  "y": "Y",
+  "z": "Z",
+  "A": "A",
+  "B": "B",
+  "C": "C",
+  "D": "D",
+  "E": "E",
+  "F": "F",
+  "G": "G",
+  "H": "H",
+  "I": "I",
+  "J": "J",
+  "K": "K",
+  "L": "L",
+  "M": "M",
+  "N": "N",
+  "O": "O",
+  "P": "P",
+  "Q": "Q",
+  "R": "R",
+  "S": "S",
+  "T": "T",
+  "U": "U",
+  "V": "V",
+  "W": "W",
+  "X": "X",
+  "Y": "Y",
+  "Z": "Z"
+};
+SocialCalc.Formula.SpecialConstants = {
+  // names that turn into constants for name lookup
+  "#NULL!": "0,e#NULL!",
+  "#NUM!": "0,e#NUM!",
+  "#DIV/0!": "0,e#DIV/0!",
+  "#VALUE!": "0,e#VALUE!",
+  "#REF!": "0,e#REF!",
+  "#NAME?": "0,e#NAME?"
+};
 
-   SocialCalc.Formula.TokenType = {num: 1, coord: 2, op: 3, name: 4, error: 5, string: 6, space: 7};
+// Operator Precedence table
+//
+// 1- !, 2- : ,, 3- M P, 4- %, 5- ^, 6- * /, 7- + -, 8- &, 9- < > = G(>=) L(<=) N(<>),
+// Negative value means Right Associative
 
-   SocialCalc.Formula.CharClass = {num: 1, numstart: 2, op: 3, eof: 4, alpha: 5, incoord: 6, error: 7, quote: 8, space: 9, specialstart: 10};
- 
-   SocialCalc.Formula.CharClassTable = {
-      " ": 9, "!": 3, '"': 8, "'": 8, "#": 10, "$":6, "%":3, "&":3, "(": 3, ")": 3, "*": 3, "+": 3, ",": 3, "-": 3, ".": 2, "/": 3,
-       "0": 1, "1": 1, "2": 1, "3": 1, "4": 1, "5": 1, "6": 1, "7": 1, "8": 1, "9": 1,
-       ":": 3, "<": 3, "=": 3, ">": 3,
-       "A": 5, "B": 5, "C": 5, "D": 5, "E": 5, "F": 5, "G": 5, "H": 5, "I": 5, "J": 5, "K": 5, "L": 5, "M": 5, "N": 5,
-       "O": 5, "P": 5, "Q": 5, "R": 5, "S": 5, "T": 5, "U": 5, "V": 5, "W": 5, "X": 5, "Y": 5, "Z": 5,
-       "^": 3, "_": 5,
-       "a": 5, "b": 5, "c": 5, "d": 5, "e": 5, "f": 5, "g": 5, "h": 5, "i": 5, "j": 5, "k": 5, "l": 5, "m": 5, "n": 5,
-       "o": 5, "p": 5, "q": 5, "r": 5, "s": 5, "t": 5, "u": 5, "v": 5, "w": 5, "x": 5, "y": 5, "z": 5
-       };
+SocialCalc.Formula.TokenPrecedence = {
+  "!": 1,
+  ":": 2,
+  ",": 2,
+  "M": -3,
+  "P": -3,
+  "%": 4,
+  "^": 5,
+  "*": 6,
+  "/": 6,
+  "+": 7,
+  "-": 7,
+  "&": 8,
+  "<": 9,
+  ">": 9,
+  "G": 9,
+  "L": 9,
+  "N": 9
+};
 
-   SocialCalc.Formula.UpperCaseTable = {
-       "a": "A", "b": "B", "c": "C", "d": "D", "e": "E", "f": "F", "g": "G", "h": "H", "i": "I", "j": "J", "k": "K", "l": "L", "m": "M",
-       "n": "N", "o": "O", "p": "P", "q": "Q", "r": "R", "s": "S", "t": "T", "u": "U", "v": "V", "w": "W", "x": "X", "y": "Y", "z": "Z",
-       "A": "A", "B": "B", "C": "C", "D": "D", "E": "E", "F": "F", "G": "G", "H": "H", "I": "I", "J": "J", "K": "K", "L": "L", "M": "M",
-       "N": "N", "O": "O", "P": "P", "Q": "Q", "R": "R", "S": "S", "T": "T", "U": "U", "V": "V", "W": "W", "X": "X", "Y": "Y", "Z": "Z"
-       }
+// Convert one-char token text to input text:
 
-   SocialCalc.Formula.SpecialConstants = { // names that turn into constants for name lookup
-      "#NULL!": "0,e#NULL!", "#NUM!": "0,e#NUM!", "#DIV/0!": "0,e#DIV/0!", "#VALUE!": "0,e#VALUE!",
-      "#REF!": "0,e#REF!", "#NAME?": "0,e#NAME?"};
+SocialCalc.Formula.TokenOpExpansion = {
+  'G': '>=',
+  'L': '<=',
+  'M': '-',
+  'N': '<>',
+  'P': '+'
+};
 
+//
+// Information about the resulting value types when doing operations on values (used by LookupResultType)
+//
+// Each object entry is an object with specific types with result type info as follows:
+//
+//    'type1a': '|type2a:resulta|type2b:resultb|...
+//    Type of t* or n* matches any of those types not listed
+//    Results may be a type or the numbers 1 or 2 specifying to return type1 or type2
 
-   // Operator Precedence table
-   //
-   // 1- !, 2- : ,, 3- M P, 4- %, 5- ^, 6- * /, 7- + -, 8- &, 9- < > = G(>=) L(<=) N(<>),
-   // Negative value means Right Associative
-
-   SocialCalc.Formula.TokenPrecedence = {
-      "!": 1,
-      ":": 2, ",": 2,
-      "M": -3, "P": -3,
-      "%": 4,
-      "^": 5,
-      "*": 6, "/": 6,
-      "+": 7, "-": 7,
-      "&": 8,
-      "<": 9, ">": 9, "G": 9, "L": 9, "N": 9
-      };
-
-   // Convert one-char token text to input text:
-
-   SocialCalc.Formula.TokenOpExpansion = {'G': '>=', 'L': '<=', 'M': '-', 'N': '<>', 'P': '+'};
-
-   //
-   // Information about the resulting value types when doing operations on values (used by LookupResultType)
-   //
-   // Each object entry is an object with specific types with result type info as follows:
-   //
-   //    'type1a': '|type2a:resulta|type2b:resultb|...
-   //    Type of t* or n* matches any of those types not listed
-   //    Results may be a type or the numbers 1 or 2 specifying to return type1 or type2
-   
-
-   SocialCalc.Formula.TypeLookupTable = {
-       unaryminus: { 'n*': '|n*:1|', 'e*': '|e*:1|', 't*': '|t*:e#VALUE!|', 'b': '|b:n|'},
-       unaryplus: { 'n*': '|n*:1|', 'e*': '|e*:1|', 't*': '|t*:e#VALUE!|', 'b': '|b:n|'},
-       unarypercent: { 'n*': '|n:n%|n*:n|', 'e*': '|e*:1|', 't*': '|t*:e#VALUE!|', 'b': '|b:n|'},
-       plus: {
-                'n%': '|n%:n%|nd:n|nt:n|ndt:n|n$:n|n:n|n*:n|b:n|e*:2|t*:e#VALUE!|',
-                'nd': '|n%:n|nd:nd|nt:ndt|ndt:ndt|n$:n|n:nd|n*:n|b:n|e*:2|t*:e#VALUE!|',
-                'nt': '|n%:n|nd:ndt|nt:nt|ndt:ndt|n$:n|n:nt|n*:n|b:n|e*:2|t*:e#VALUE!|',
-                'ndt': '|n%:n|nd:ndt|nt:ndt|ndt:ndt|n$:n|n:ndt|n*:n|b:n|e*:2|t*:e#VALUE!|',
-                'n$': '|n%:n|nd:n|nt:n|ndt:n|n$:n$|n:n$|n*:n|b:n|e*:2|t*:e#VALUE!|',
-                'nl': '|n%:n|nd:n|nt:n|ndt:n|n$:n|n:n|n*:n|b:n|e*:2|t*:e#VALUE!|',
-                'n': '|n%:n|nd:nd|nt:nt|ndt:ndt|n$:n$|n:n|n*:n|b:n|e*:2|t*:e#VALUE!|',
-                'b': '|n%:n%|nd:nd|nt:nt|ndt:ndt|n$:n$|n:n|n*:n|b:n|e*:2|t*:e#VALUE!|',
-                't*': '|ni:1|n*:e#VALUE!|t*:e#VALUE!|b:e#VALUE!|e*:2|',
-                'n*': '|ni:1|e*:2|',
-                'e*': '|e*:1|n*:1|t*:1|b:1|'
-               },
-       concat: {
-                't': '|t:t|th:th|tw:tw|tl:t|tr:tr|t*:2|e*:2|',
-                'th': '|t:th|th:th|tw:t|tl:th|tr:t|t*:t|e*:2|',
-                'tw': '|t:tw|th:t|tw:tw|tl:tw|tr:tw|t*:t|e*:2|',
-                'tl': '|t:tl|th:th|tw:tw|tl:tl|tr:tr|t*:t|e*:2|',
-                't*': '|t*:t|e*:2|',
-                'e*': '|e*:1|n*:1|t*:1|'
-               },
-       oneargnumeric: { 'n*': '|n*:n|', 'e*': '|e*:1|', 't*': '|t*:e#VALUE!|', 'b': '|b:n|'},
-       twoargnumeric: { 'n*': '|n*:n|t*:e#VALUE!|e*:2|', 'e*': '|e*:1|n*:1|t*:1|', 't*': '|t*:e#VALUE!|n*:e#VALUE!|e*:2|'},
-       propagateerror: { 'n*': '|n*:2|e*:2|', 'e*': '|e*:2|', 't*': '|t*:2|e*:2|', 'b': '|b:2|e*:2|'}
-      };
+SocialCalc.Formula.TypeLookupTable = {
+  unaryminus: {
+    'n*': '|n*:1|',
+    'e*': '|e*:1|',
+    't*': '|t*:e#VALUE!|',
+    'b': '|b:n|'
+  },
+  unaryplus: {
+    'n*': '|n*:1|',
+    'e*': '|e*:1|',
+    't*': '|t*:e#VALUE!|',
+    'b': '|b:n|'
+  },
+  unarypercent: {
+    'n*': '|n:n%|n*:n|',
+    'e*': '|e*:1|',
+    't*': '|t*:e#VALUE!|',
+    'b': '|b:n|'
+  },
+  plus: {
+    'n%': '|n%:n%|nd:n|nt:n|ndt:n|n$:n|n:n|n*:n|b:n|e*:2|t*:e#VALUE!|',
+    'nd': '|n%:n|nd:nd|nt:ndt|ndt:ndt|n$:n|n:nd|n*:n|b:n|e*:2|t*:e#VALUE!|',
+    'nt': '|n%:n|nd:ndt|nt:nt|ndt:ndt|n$:n|n:nt|n*:n|b:n|e*:2|t*:e#VALUE!|',
+    'ndt': '|n%:n|nd:ndt|nt:ndt|ndt:ndt|n$:n|n:ndt|n*:n|b:n|e*:2|t*:e#VALUE!|',
+    'n$': '|n%:n|nd:n|nt:n|ndt:n|n$:n$|n:n$|n*:n|b:n|e*:2|t*:e#VALUE!|',
+    'nl': '|n%:n|nd:n|nt:n|ndt:n|n$:n|n:n|n*:n|b:n|e*:2|t*:e#VALUE!|',
+    'n': '|n%:n|nd:nd|nt:nt|ndt:ndt|n$:n$|n:n|n*:n|b:n|e*:2|t*:e#VALUE!|',
+    'b': '|n%:n%|nd:nd|nt:nt|ndt:ndt|n$:n$|n:n|n*:n|b:n|e*:2|t*:e#VALUE!|',
+    't*': '|ni:1|n*:e#VALUE!|t*:e#VALUE!|b:e#VALUE!|e*:2|',
+    'n*': '|ni:1|e*:2|',
+    'e*': '|e*:1|n*:1|t*:1|b:1|'
+  },
+  concat: {
+    't': '|t:t|th:th|tw:tw|tl:t|tr:tr|t*:2|e*:2|',
+    'th': '|t:th|th:th|tw:t|tl:th|tr:t|t*:t|e*:2|',
+    'tw': '|t:tw|th:t|tw:tw|tl:tw|tr:tw|t*:t|e*:2|',
+    'tl': '|t:tl|th:th|tw:tw|tl:tl|tr:tr|t*:t|e*:2|',
+    't*': '|t*:t|e*:2|',
+    'e*': '|e*:1|n*:1|t*:1|'
+  },
+  oneargnumeric: {
+    'n*': '|n*:n|',
+    'e*': '|e*:1|',
+    't*': '|t*:e#VALUE!|',
+    'b': '|b:n|'
+  },
+  twoargnumeric: {
+    'n*': '|n*:n|t*:e#VALUE!|e*:2|',
+    'e*': '|e*:1|n*:1|t*:1|',
+    't*': '|t*:e#VALUE!|n*:e#VALUE!|e*:2|'
+  },
+  propagateerror: {
+    'n*': '|n*:2|e*:2|',
+    'e*': '|e*:2|',
+    't*': '|t*:2|e*:2|',
+    'b': '|b:2|e*:2|'
+  }
+};
 
 /* *******************
 
@@ -15076,292 +15321,602 @@ SocialCalc.TriggerIoAction = {}; // eddy
 
 ************************* */
 
-SocialCalc.Formula.ParseFormulaIntoTokens = function(line) {
-
-   var i, ch, cclass, haddecimal, last_token, last_token_type, last_token_text, t;
-
-   var scf = SocialCalc.Formula;
-   var scc = SocialCalc.Constants;
-   var parsestate = scf.ParseState;
-   var tokentype = scf.TokenType;
-   var charclass = scf.CharClass;
-   var charclasstable = scf.CharClassTable;
-   var uppercasetable = scf.UpperCaseTable; // much faster than toUpperCase function
-   var pushtoken = scf.ParsePushToken;
-   var coordregex = /^\$?[A-Z]{1,2}\$?[1-9]\d*$/i;
-
-   var parseinfo = [];
-   var str = "";
-   var state = 0;
-   var haddecimal = false;
-   var twochrop = "";
-   
-  for (i=0; i<=line.length; i++) {
-      if (i<line.length) {
-         ch = line.charAt(i);
-         cclass = charclasstable[ch];
-         }
-      else {
-         ch = "";
-         cclass = charclass.eof;
-         }
-
-      if (state == parsestate.num) {
-         if (cclass == charclass.num) {
-            str += ch;
+SocialCalc.Formula.ParseFormulaIntoTokens = function (line) {
+  if (stryMutAct_9fa48("0")) {
+    {}
+  } else {
+    stryCov_9fa48("0");
+    var i, ch, cclass, haddecimal, last_token, last_token_type, last_token_text, t;
+    var scf = SocialCalc.Formula;
+    var scc = SocialCalc.Constants;
+    var parsestate = scf.ParseState;
+    var tokentype = scf.TokenType;
+    var charclass = scf.CharClass;
+    var charclasstable = scf.CharClassTable;
+    var uppercasetable = scf.UpperCaseTable; // much faster than toUpperCase function
+    var pushtoken = scf.ParsePushToken;
+    var coordregex = /^\$?[A-Z]{1,2}\$?[1-9]\d*$/i;
+    var parseinfo = stryMutAct_9fa48("10") ? ["Stryker was here"] : (stryCov_9fa48("10"), []);
+    var str = "";
+    var state = 0;
+    var haddecimal = stryMutAct_9fa48("12") ? true : (stryCov_9fa48("12"), false);
+    var twochrop = "";
+    for (i = 0; stryMutAct_9fa48("16") ? i > line.length : stryMutAct_9fa48("15") ? i < line.length : stryMutAct_9fa48("14") ? false : (stryCov_9fa48("14", "15", "16"), i <= line.length); stryMutAct_9fa48("17") ? i-- : (stryCov_9fa48("17"), i++)) {
+      if (stryMutAct_9fa48("18")) {
+        {}
+      } else {
+        stryCov_9fa48("18");
+        if (stryMutAct_9fa48("22") ? i >= line.length : stryMutAct_9fa48("21") ? i <= line.length : stryMutAct_9fa48("20") ? false : stryMutAct_9fa48("19") ? true : (stryCov_9fa48("19", "20", "21", "22"), i < line.length)) {
+          if (stryMutAct_9fa48("23")) {
+            {}
+          } else {
+            stryCov_9fa48("23");
+            ch = stryMutAct_9fa48("24") ? line : (stryCov_9fa48("24"), line.charAt(i));
+            cclass = charclasstable[ch];
+          }
+        } else {
+          if (stryMutAct_9fa48("25")) {
+            {}
+          } else {
+            stryCov_9fa48("25");
+            ch = "";
+            cclass = charclass.eof;
+          }
+        }
+        if (stryMutAct_9fa48("29") ? state != parsestate.num : stryMutAct_9fa48("28") ? false : stryMutAct_9fa48("27") ? true : (stryCov_9fa48("27", "28", "29"), state == parsestate.num)) {
+          if (stryMutAct_9fa48("30")) {
+            {}
+          } else {
+            stryCov_9fa48("30");
+            if (stryMutAct_9fa48("33") ? cclass != charclass.num : stryMutAct_9fa48("32") ? false : stryMutAct_9fa48("31") ? true : (stryCov_9fa48("31", "32", "33"), cclass == charclass.num)) {
+              if (stryMutAct_9fa48("34")) {
+                {}
+              } else {
+                stryCov_9fa48("34");
+                stryMutAct_9fa48("35") ? str -= ch : (stryCov_9fa48("35"), str += ch);
+              }
+            } else if (stryMutAct_9fa48("38") ? cclass == charclass.numstart || !haddecimal : stryMutAct_9fa48("37") ? false : stryMutAct_9fa48("36") ? true : (stryCov_9fa48("36", "37", "38"), (stryMutAct_9fa48("40") ? cclass != charclass.numstart : stryMutAct_9fa48("39") ? true : (stryCov_9fa48("39", "40"), cclass == charclass.numstart)) && (stryMutAct_9fa48("41") ? haddecimal : (stryCov_9fa48("41"), !haddecimal)))) {
+              if (stryMutAct_9fa48("42")) {
+                {}
+              } else {
+                stryCov_9fa48("42");
+                haddecimal = stryMutAct_9fa48("43") ? false : (stryCov_9fa48("43"), true);
+                stryMutAct_9fa48("44") ? str -= ch : (stryCov_9fa48("44"), str += ch);
+              }
+            } else if (stryMutAct_9fa48("47") ? ch == "E" && ch == "e" : stryMutAct_9fa48("46") ? false : stryMutAct_9fa48("45") ? true : (stryCov_9fa48("45", "46", "47"), (stryMutAct_9fa48("49") ? ch != "E" : stryMutAct_9fa48("48") ? false : (stryCov_9fa48("48", "49"), ch == "E")) || (stryMutAct_9fa48("52") ? ch != "e" : stryMutAct_9fa48("51") ? false : (stryCov_9fa48("51", "52"), ch == "e")))) {
+              if (stryMutAct_9fa48("54")) {
+                {}
+              } else {
+                stryCov_9fa48("54");
+                stryMutAct_9fa48("55") ? str -= ch : (stryCov_9fa48("55"), str += ch);
+                haddecimal = stryMutAct_9fa48("56") ? true : (stryCov_9fa48("56"), false);
+                state = parsestate.numexp1;
+              }
+            } else {
+              if (stryMutAct_9fa48("57")) {
+                {}
+              } else {
+                stryCov_9fa48("57");
+                // end of number - save it
+                pushtoken(parseinfo, str, tokentype.num, 0);
+                haddecimal = stryMutAct_9fa48("58") ? true : (stryCov_9fa48("58"), false);
+                state = 0;
+              }
             }
-         else if (cclass == charclass.numstart && !haddecimal) {
-            haddecimal = true;
-            str += ch;
+          }
+        }
+        if (stryMutAct_9fa48("61") ? state != parsestate.numexp1 : stryMutAct_9fa48("60") ? false : stryMutAct_9fa48("59") ? true : (stryCov_9fa48("59", "60", "61"), state == parsestate.numexp1)) {
+          if (stryMutAct_9fa48("62")) {
+            {}
+          } else {
+            stryCov_9fa48("62");
+            if (stryMutAct_9fa48("65") ? cclass != parsestate.num : stryMutAct_9fa48("64") ? false : stryMutAct_9fa48("63") ? true : (stryCov_9fa48("63", "64", "65"), cclass == parsestate.num)) {
+              if (stryMutAct_9fa48("66")) {
+                {}
+              } else {
+                stryCov_9fa48("66");
+                state = parsestate.numexp2;
+              }
+            } else if (stryMutAct_9fa48("69") ? ch == '+' || ch == '-' || uppercasetable[str.charAt(str.length - 1)] == 'E' : stryMutAct_9fa48("68") ? false : stryMutAct_9fa48("67") ? true : (stryCov_9fa48("67", "68", "69"), (stryMutAct_9fa48("71") ? ch == '+' && ch == '-' : stryMutAct_9fa48("70") ? true : (stryCov_9fa48("70", "71"), (stryMutAct_9fa48("73") ? ch != '+' : stryMutAct_9fa48("72") ? false : (stryCov_9fa48("72", "73"), ch == '+')) || (stryMutAct_9fa48("76") ? ch != '-' : stryMutAct_9fa48("75") ? false : (stryCov_9fa48("75", "76"), ch == '-')))) && (stryMutAct_9fa48("79") ? uppercasetable[str.charAt(str.length - 1)] != 'E' : stryMutAct_9fa48("78") ? true : (stryCov_9fa48("78", "79"), uppercasetable[stryMutAct_9fa48("80") ? str : (stryCov_9fa48("80"), str.charAt(stryMutAct_9fa48("81") ? str.length + 1 : (stryCov_9fa48("81"), str.length - 1)))] == 'E')))) {
+              if (stryMutAct_9fa48("83")) {
+                {}
+              } else {
+                stryCov_9fa48("83");
+                stryMutAct_9fa48("84") ? str -= ch : (stryCov_9fa48("84"), str += ch);
+              }
+            } else if (stryMutAct_9fa48("87") ? ch == 'E' && ch == 'e' : stryMutAct_9fa48("86") ? false : stryMutAct_9fa48("85") ? true : (stryCov_9fa48("85", "86", "87"), (stryMutAct_9fa48("89") ? ch != 'E' : stryMutAct_9fa48("88") ? false : (stryCov_9fa48("88", "89"), ch == 'E')) || (stryMutAct_9fa48("92") ? ch != 'e' : stryMutAct_9fa48("91") ? false : (stryCov_9fa48("91", "92"), ch == 'e')))) {
+              if (stryMutAct_9fa48("94")) {
+                {}
+              } else {
+                stryCov_9fa48("94");
+                ;
+              }
+            } else {
+              if (stryMutAct_9fa48("95")) {
+                {}
+              } else {
+                stryCov_9fa48("95");
+                pushtoken(parseinfo, scc.s_parseerrexponent, tokentype.error, 0);
+                state = 0;
+              }
             }
-         else if (ch == "E" || ch == "e") {
-            str += ch;
-            haddecimal = false;
-            state = parsestate.numexp1;
+          }
+        }
+        if (stryMutAct_9fa48("98") ? state != parsestate.numexp2 : stryMutAct_9fa48("97") ? false : stryMutAct_9fa48("96") ? true : (stryCov_9fa48("96", "97", "98"), state == parsestate.numexp2)) {
+          if (stryMutAct_9fa48("99")) {
+            {}
+          } else {
+            stryCov_9fa48("99");
+            if (stryMutAct_9fa48("102") ? cclass != charclass.num : stryMutAct_9fa48("101") ? false : stryMutAct_9fa48("100") ? true : (stryCov_9fa48("100", "101", "102"), cclass == charclass.num)) {
+              if (stryMutAct_9fa48("103")) {
+                {}
+              } else {
+                stryCov_9fa48("103");
+                stryMutAct_9fa48("104") ? str -= ch : (stryCov_9fa48("104"), str += ch);
+              }
+            } else {
+              if (stryMutAct_9fa48("105")) {
+                {}
+              } else {
+                stryCov_9fa48("105");
+                // end of number - save it
+                pushtoken(parseinfo, str, tokentype.num, 0);
+                state = 0;
+              }
             }
-         else { // end of number - save it
-            pushtoken(parseinfo, str, tokentype.num, 0);
-            haddecimal = false;
-            state = 0;
+          }
+        }
+        if (stryMutAct_9fa48("108") ? state != parsestate.alpha : stryMutAct_9fa48("107") ? false : stryMutAct_9fa48("106") ? true : (stryCov_9fa48("106", "107", "108"), state == parsestate.alpha)) {
+          if (stryMutAct_9fa48("109")) {
+            {}
+          } else {
+            stryCov_9fa48("109");
+            if (stryMutAct_9fa48("112") ? cclass != charclass.num : stryMutAct_9fa48("111") ? false : stryMutAct_9fa48("110") ? true : (stryCov_9fa48("110", "111", "112"), cclass == charclass.num)) {
+              if (stryMutAct_9fa48("113")) {
+                {}
+              } else {
+                stryCov_9fa48("113");
+                state = parsestate.coord;
+              }
+            } else if (stryMutAct_9fa48("116") ? cclass == charclass.alpha && ch == "." : stryMutAct_9fa48("115") ? false : stryMutAct_9fa48("114") ? true : (stryCov_9fa48("114", "115", "116"), (stryMutAct_9fa48("118") ? cclass != charclass.alpha : stryMutAct_9fa48("117") ? false : (stryCov_9fa48("117", "118"), cclass == charclass.alpha)) || (stryMutAct_9fa48("120") ? ch != "." : stryMutAct_9fa48("119") ? false : (stryCov_9fa48("119", "120"), ch == ".")))) {
+              if (stryMutAct_9fa48("122")) {
+                {}
+              } else {
+                stryCov_9fa48("122");
+                // alpha may be letters, numbers, "_", or "."
+                stryMutAct_9fa48("123") ? str -= ch : (stryCov_9fa48("123"), str += ch);
+              }
+            } else if (stryMutAct_9fa48("126") ? cclass != charclass.incoord : stryMutAct_9fa48("125") ? false : stryMutAct_9fa48("124") ? true : (stryCov_9fa48("124", "125", "126"), cclass == charclass.incoord)) {
+              if (stryMutAct_9fa48("127")) {
+                {}
+              } else {
+                stryCov_9fa48("127");
+                state = parsestate.coord;
+              }
+            } else if (stryMutAct_9fa48("130") ? (cclass == charclass.op || cclass == charclass.numstart || cclass == charclass.space) && cclass == charclass.eof : stryMutAct_9fa48("129") ? false : stryMutAct_9fa48("128") ? true : (stryCov_9fa48("128", "129", "130"), (stryMutAct_9fa48("132") ? (cclass == charclass.op || cclass == charclass.numstart) && cclass == charclass.space : stryMutAct_9fa48("131") ? false : (stryCov_9fa48("131", "132"), (stryMutAct_9fa48("134") ? cclass == charclass.op && cclass == charclass.numstart : stryMutAct_9fa48("133") ? false : (stryCov_9fa48("133", "134"), (stryMutAct_9fa48("136") ? cclass != charclass.op : stryMutAct_9fa48("135") ? false : (stryCov_9fa48("135", "136"), cclass == charclass.op)) || (stryMutAct_9fa48("138") ? cclass != charclass.numstart : stryMutAct_9fa48("137") ? false : (stryCov_9fa48("137", "138"), cclass == charclass.numstart)))) || (stryMutAct_9fa48("140") ? cclass != charclass.space : stryMutAct_9fa48("139") ? false : (stryCov_9fa48("139", "140"), cclass == charclass.space)))) || (stryMutAct_9fa48("142") ? cclass != charclass.eof : stryMutAct_9fa48("141") ? false : (stryCov_9fa48("141", "142"), cclass == charclass.eof)))) {
+              if (stryMutAct_9fa48("143")) {
+                {}
+              } else {
+                stryCov_9fa48("143");
+                pushtoken(parseinfo, stryMutAct_9fa48("144") ? str.toLowerCase() : (stryCov_9fa48("144"), str.toUpperCase()), tokentype.name, 0);
+                state = 0;
+              }
+            } else {
+              if (stryMutAct_9fa48("145")) {
+                {}
+              } else {
+                stryCov_9fa48("145");
+                pushtoken(parseinfo, scc.s_parseerrchar, tokentype.error, 0);
+                state = 0;
+              }
             }
-         }
-
-      if (state == parsestate.numexp1) {
-         if (cclass == parsestate.num) {
-            state = parsestate.numexp2;
+          }
+        }
+        if (stryMutAct_9fa48("148") ? state != parsestate.coord : stryMutAct_9fa48("147") ? false : stryMutAct_9fa48("146") ? true : (stryCov_9fa48("146", "147", "148"), state == parsestate.coord)) {
+          if (stryMutAct_9fa48("149")) {
+            {}
+          } else {
+            stryCov_9fa48("149");
+            if (stryMutAct_9fa48("152") ? cclass != charclass.num : stryMutAct_9fa48("151") ? false : stryMutAct_9fa48("150") ? true : (stryCov_9fa48("150", "151", "152"), cclass == charclass.num)) {
+              if (stryMutAct_9fa48("153")) {
+                {}
+              } else {
+                stryCov_9fa48("153");
+                stryMutAct_9fa48("154") ? str -= ch : (stryCov_9fa48("154"), str += ch);
+              }
+            } else if (stryMutAct_9fa48("157") ? cclass != charclass.incoord : stryMutAct_9fa48("156") ? false : stryMutAct_9fa48("155") ? true : (stryCov_9fa48("155", "156", "157"), cclass == charclass.incoord)) {
+              if (stryMutAct_9fa48("158")) {
+                {}
+              } else {
+                stryCov_9fa48("158");
+                stryMutAct_9fa48("159") ? str -= ch : (stryCov_9fa48("159"), str += ch);
+              }
+            } else if (stryMutAct_9fa48("162") ? cclass != charclass.alpha : stryMutAct_9fa48("161") ? false : stryMutAct_9fa48("160") ? true : (stryCov_9fa48("160", "161", "162"), cclass == charclass.alpha)) {
+              if (stryMutAct_9fa48("163")) {
+                {}
+              } else {
+                stryCov_9fa48("163");
+                state = parsestate.alphanumeric;
+              }
+            } else if (stryMutAct_9fa48("166") ? (cclass == charclass.op || cclass == charclass.numstart || cclass == charclass.eof) && cclass == charclass.space : stryMutAct_9fa48("165") ? false : stryMutAct_9fa48("164") ? true : (stryCov_9fa48("164", "165", "166"), (stryMutAct_9fa48("168") ? (cclass == charclass.op || cclass == charclass.numstart) && cclass == charclass.eof : stryMutAct_9fa48("167") ? false : (stryCov_9fa48("167", "168"), (stryMutAct_9fa48("170") ? cclass == charclass.op && cclass == charclass.numstart : stryMutAct_9fa48("169") ? false : (stryCov_9fa48("169", "170"), (stryMutAct_9fa48("172") ? cclass != charclass.op : stryMutAct_9fa48("171") ? false : (stryCov_9fa48("171", "172"), cclass == charclass.op)) || (stryMutAct_9fa48("174") ? cclass != charclass.numstart : stryMutAct_9fa48("173") ? false : (stryCov_9fa48("173", "174"), cclass == charclass.numstart)))) || (stryMutAct_9fa48("176") ? cclass != charclass.eof : stryMutAct_9fa48("175") ? false : (stryCov_9fa48("175", "176"), cclass == charclass.eof)))) || (stryMutAct_9fa48("178") ? cclass != charclass.space : stryMutAct_9fa48("177") ? false : (stryCov_9fa48("177", "178"), cclass == charclass.space)))) {
+              if (stryMutAct_9fa48("179")) {
+                {}
+              } else {
+                stryCov_9fa48("179");
+                if (stryMutAct_9fa48("181") ? false : stryMutAct_9fa48("180") ? true : (stryCov_9fa48("180", "181"), coordregex.test(str))) {
+                  if (stryMutAct_9fa48("182")) {
+                    {}
+                  } else {
+                    stryCov_9fa48("182");
+                    t = tokentype.coord;
+                  }
+                } else {
+                  if (stryMutAct_9fa48("183")) {
+                    {}
+                  } else {
+                    stryCov_9fa48("183");
+                    t = tokentype.name;
+                  }
+                }
+                pushtoken(parseinfo, stryMutAct_9fa48("184") ? str.toLowerCase() : (stryCov_9fa48("184"), str.toUpperCase()), t, 0);
+                state = 0;
+              }
+            } else {
+              if (stryMutAct_9fa48("185")) {
+                {}
+              } else {
+                stryCov_9fa48("185");
+                pushtoken(parseinfo, scc.s_parseerrchar, tokentype.error, 0);
+                state = 0;
+              }
             }
-         else if ((ch == '+' || ch == '-') && (uppercasetable[str.charAt(str.length-1)] == 'E')) {
-            str += ch;
+          }
+        }
+        if (stryMutAct_9fa48("188") ? state != parsestate.alphanumeric : stryMutAct_9fa48("187") ? false : stryMutAct_9fa48("186") ? true : (stryCov_9fa48("186", "187", "188"), state == parsestate.alphanumeric)) {
+          if (stryMutAct_9fa48("189")) {
+            {}
+          } else {
+            stryCov_9fa48("189");
+            if (stryMutAct_9fa48("192") ? cclass == charclass.num && cclass == charclass.alpha : stryMutAct_9fa48("191") ? false : stryMutAct_9fa48("190") ? true : (stryCov_9fa48("190", "191", "192"), (stryMutAct_9fa48("194") ? cclass != charclass.num : stryMutAct_9fa48("193") ? false : (stryCov_9fa48("193", "194"), cclass == charclass.num)) || (stryMutAct_9fa48("196") ? cclass != charclass.alpha : stryMutAct_9fa48("195") ? false : (stryCov_9fa48("195", "196"), cclass == charclass.alpha)))) {
+              if (stryMutAct_9fa48("197")) {
+                {}
+              } else {
+                stryCov_9fa48("197");
+                stryMutAct_9fa48("198") ? str -= ch : (stryCov_9fa48("198"), str += ch);
+              }
+            } else if (stryMutAct_9fa48("201") ? (cclass == charclass.op || cclass == charclass.numstart || cclass == charclass.space) && cclass == charclass.eof : stryMutAct_9fa48("200") ? false : stryMutAct_9fa48("199") ? true : (stryCov_9fa48("199", "200", "201"), (stryMutAct_9fa48("203") ? (cclass == charclass.op || cclass == charclass.numstart) && cclass == charclass.space : stryMutAct_9fa48("202") ? false : (stryCov_9fa48("202", "203"), (stryMutAct_9fa48("205") ? cclass == charclass.op && cclass == charclass.numstart : stryMutAct_9fa48("204") ? false : (stryCov_9fa48("204", "205"), (stryMutAct_9fa48("207") ? cclass != charclass.op : stryMutAct_9fa48("206") ? false : (stryCov_9fa48("206", "207"), cclass == charclass.op)) || (stryMutAct_9fa48("209") ? cclass != charclass.numstart : stryMutAct_9fa48("208") ? false : (stryCov_9fa48("208", "209"), cclass == charclass.numstart)))) || (stryMutAct_9fa48("211") ? cclass != charclass.space : stryMutAct_9fa48("210") ? false : (stryCov_9fa48("210", "211"), cclass == charclass.space)))) || (stryMutAct_9fa48("213") ? cclass != charclass.eof : stryMutAct_9fa48("212") ? false : (stryCov_9fa48("212", "213"), cclass == charclass.eof)))) {
+              if (stryMutAct_9fa48("214")) {
+                {}
+              } else {
+                stryCov_9fa48("214");
+                pushtoken(parseinfo, stryMutAct_9fa48("215") ? str.toLowerCase() : (stryCov_9fa48("215"), str.toUpperCase()), tokentype.name, 0);
+                state = 0;
+              }
+            } else {
+              if (stryMutAct_9fa48("216")) {
+                {}
+              } else {
+                stryCov_9fa48("216");
+                pushtoken(parseinfo, scc.s_parseerrchar, tokentype.error, 0);
+                state = 0;
+              }
             }
-         else if (ch == 'E' || ch == 'e') {
-            ;
+          }
+        }
+        if (stryMutAct_9fa48("219") ? state != parsestate.string : stryMutAct_9fa48("218") ? false : stryMutAct_9fa48("217") ? true : (stryCov_9fa48("217", "218", "219"), state == parsestate.string)) {
+          if (stryMutAct_9fa48("220")) {
+            {}
+          } else {
+            stryCov_9fa48("220");
+            if (stryMutAct_9fa48("223") ? cclass != charclass.quote : stryMutAct_9fa48("222") ? false : stryMutAct_9fa48("221") ? true : (stryCov_9fa48("221", "222", "223"), cclass == charclass.quote)) {
+              if (stryMutAct_9fa48("224")) {
+                {}
+              } else {
+                stryCov_9fa48("224");
+                state = parsestate.stringquote; // got quote in string: is it doubled (quote in string) or by itself (end of string)?
+              }
+            } else if (stryMutAct_9fa48("227") ? cclass != charclass.eof : stryMutAct_9fa48("226") ? false : stryMutAct_9fa48("225") ? true : (stryCov_9fa48("225", "226", "227"), cclass == charclass.eof)) {
+              if (stryMutAct_9fa48("228")) {
+                {}
+              } else {
+                stryCov_9fa48("228");
+                pushtoken(parseinfo, scc.s_parseerrstring, tokentype.error, 0);
+                state = 0;
+              }
+            } else {
+              if (stryMutAct_9fa48("229")) {
+                {}
+              } else {
+                stryCov_9fa48("229");
+                stryMutAct_9fa48("230") ? str -= ch : (stryCov_9fa48("230"), str += ch);
+              }
             }
-         else {
-            pushtoken(parseinfo, scc.s_parseerrexponent, tokentype.error, 0);
-            state = 0;
+          }
+        } else if (stryMutAct_9fa48("233") ? state != parsestate.stringquote : stryMutAct_9fa48("232") ? false : stryMutAct_9fa48("231") ? true : (stryCov_9fa48("231", "232", "233"), state == parsestate.stringquote)) {
+          if (stryMutAct_9fa48("234")) {
+            {}
+          } else {
+            stryCov_9fa48("234");
+            // note else if here
+            if (stryMutAct_9fa48("237") ? cclass != charclass.quote : stryMutAct_9fa48("236") ? false : stryMutAct_9fa48("235") ? true : (stryCov_9fa48("235", "236", "237"), cclass == charclass.quote)) {
+              if (stryMutAct_9fa48("238")) {
+                {}
+              } else {
+                stryCov_9fa48("238");
+                stryMutAct_9fa48("239") ? str -= ch : (stryCov_9fa48("239"), str += ch);
+                state = parsestate.string; // double quote: add one then continue getting string
+              }
+            } else {
+              if (stryMutAct_9fa48("240")) {
+                {}
+              } else {
+                stryCov_9fa48("240");
+                // something else -- end of string
+                pushtoken(parseinfo, str, tokentype.string, 0);
+                state = 0; // drop through to process
+              }
             }
-         }
-
-      if (state == parsestate.numexp2) {
-         if (cclass == charclass.num) {
-            str += ch;
+          }
+        } else if (stryMutAct_9fa48("243") ? state != parsestate.specialvalue : stryMutAct_9fa48("242") ? false : stryMutAct_9fa48("241") ? true : (stryCov_9fa48("241", "242", "243"), state == parsestate.specialvalue)) {
+          if (stryMutAct_9fa48("244")) {
+            {}
+          } else {
+            stryCov_9fa48("244");
+            // special values like #REF!
+            if (stryMutAct_9fa48("247") ? str.charAt(str.length - 1) != "!" : stryMutAct_9fa48("246") ? false : stryMutAct_9fa48("245") ? true : (stryCov_9fa48("245", "246", "247"), (stryMutAct_9fa48("248") ? str : (stryCov_9fa48("248"), str.charAt(stryMutAct_9fa48("249") ? str.length + 1 : (stryCov_9fa48("249"), str.length - 1)))) == "!")) {
+              if (stryMutAct_9fa48("251")) {
+                {}
+              } else {
+                stryCov_9fa48("251");
+                // done - save value as a name
+                pushtoken(parseinfo, str, tokentype.name, 0);
+                state = 0; // drop through to process
+              }
+            } else if (stryMutAct_9fa48("254") ? cclass != charclass.eof : stryMutAct_9fa48("253") ? false : stryMutAct_9fa48("252") ? true : (stryCov_9fa48("252", "253", "254"), cclass == charclass.eof)) {
+              if (stryMutAct_9fa48("255")) {
+                {}
+              } else {
+                stryCov_9fa48("255");
+                pushtoken(parseinfo, scc.s_parseerrspecialvalue, tokentype.error, 0);
+                state = 0;
+              }
+            } else {
+              if (stryMutAct_9fa48("256")) {
+                {}
+              } else {
+                stryCov_9fa48("256");
+                stryMutAct_9fa48("257") ? str -= ch : (stryCov_9fa48("257"), str += ch);
+              }
             }
-         else { // end of number - save it
-            pushtoken(parseinfo, str, tokentype.num, 0);
-            state = 0;
-            }
-         }
-
-      if (state == parsestate.alpha) {
-         if (cclass == charclass.num) {
-            state = parsestate.coord;
-            }
-         else if (cclass == charclass.alpha || ch == ".") { // alpha may be letters, numbers, "_", or "."
-            str += ch;
-            }
-         else if (cclass == charclass.incoord) {
-            state = parsestate.coord;
-            }
-         else if (cclass == charclass.op || cclass == charclass.numstart
-                || cclass == charclass.space || cclass == charclass.eof) {
-            pushtoken(parseinfo, str.toUpperCase(), tokentype.name, 0);
-            state = 0;
-            }
-         else {
-            pushtoken(parseinfo, scc.s_parseerrchar, tokentype.error, 0);
-            state = 0;
-            }
-         }
-
-      if (state == parsestate.coord) {
-         if (cclass == charclass.num) {
-            str += ch;
-            }
-         else if (cclass == charclass.incoord) {
-            str += ch;
-            }
-         else if (cclass == charclass.alpha) {
-            state = parsestate.alphanumeric;
-            }
-         else if (cclass == charclass.op || cclass == charclass.numstart ||
-                  cclass == charclass.eof || cclass == charclass.space) {
-            if (coordregex.test(str)) {
-               t = tokentype.coord;
-               }
-            else {
-               t = tokentype.name;
-               }
-            pushtoken(parseinfo, str.toUpperCase(), t, 0);
-            state = 0;
-            }
-         else {
-            pushtoken(parseinfo, scc.s_parseerrchar, tokentype.error, 0);
-            state = 0;
-           }
-         }
-
-
-      if (state == parsestate.alphanumeric) {
-         if (cclass == charclass.num || cclass == charclass.alpha) {
-            str += ch;
-            }
-         else if (cclass == charclass.op || cclass == charclass.numstart
-                || cclass == charclass.space || cclass == charclass.eof) {
-            pushtoken(parseinfo, str.toUpperCase(), tokentype.name, 0);
-            state = 0;
-            }
-         else {
-            pushtoken(parseinfo, scc.s_parseerrchar, tokentype.error, 0);
-            state = 0;
-            }
-         }
-
-      if (state == parsestate.string) {
-         if (cclass == charclass.quote) {
-            state = parsestate.stringquote; // got quote in string: is it doubled (quote in string) or by itself (end of string)?
-            }
-         else if (cclass == charclass.eof) {
-            pushtoken(parseinfo, scc.s_parseerrstring, tokentype.error, 0);
-            state = 0;
-            }
-         else {
-            str += ch;
-            }
-         }
-      else if (state == parsestate.stringquote) { // note else if here
-         if (cclass == charclass.quote) {
-            str += ch;
-            state = parsestate.string; // double quote: add one then continue getting string
-            }
-         else { // something else -- end of string
-            pushtoken(parseinfo, str, tokentype.string, 0);
-            state = 0; // drop through to process
-            }
-         }
-
-      else if (state == parsestate.specialvalue) { // special values like #REF!
-         if (str.charAt(str.length-1) == "!") { // done - save value as a name
-            pushtoken(parseinfo, str, tokentype.name, 0);
-            state = 0; // drop through to process
-            }
-         else if (cclass == charclass.eof) {
-            pushtoken(parseinfo, scc.s_parseerrspecialvalue, tokentype.error, 0);
-            state = 0;
-            }
-         else {
-            str += ch;
-            }
-         }
-
-      if (state == 0) {
-         if (cclass == charclass.num) {
-            str = ch;
-            state = parsestate.num;
-            }
-         else if (cclass == charclass.numstart) {
-            str = ch;
-            haddecimal = true;
-            state = parsestate.num;
-            }
-         else if (cclass == charclass.alpha || cclass == charclass.incoord) {
-            str = ch;
-            state = parsestate.alpha;
-            }
-         else if (cclass == charclass.specialstart) {
-            str = ch;
-            state = parsestate.specialvalue;
-            }
-         else if (cclass == charclass.op) {
-            str = ch;
-            if (parseinfo.length>0) {
-               last_token = parseinfo[parseinfo.length-1];
-               last_token_type = last_token.type;
-               last_token_text = last_token.text;
-               if (last_token_type == charclass.op) {
-                  twochrop = last_token_text + str;
-                  if (twochrop == '<=' || twochrop == ">=" || twochrop == "<>") {
-                     str = last_token_text + str;
-                     parseinfo.pop();
-                     if (parseinfo.length>0) {
-                        last_token = parseinfo[parseinfo.length-1];
-                        last_token_type = last_token.type;
-                        last_token_text = last_token.text;
+          }
+        }
+        if (stryMutAct_9fa48("260") ? state != 0 : stryMutAct_9fa48("259") ? false : stryMutAct_9fa48("258") ? true : (stryCov_9fa48("258", "259", "260"), state == 0)) {
+          if (stryMutAct_9fa48("261")) {
+            {}
+          } else {
+            stryCov_9fa48("261");
+            if (stryMutAct_9fa48("264") ? cclass != charclass.num : stryMutAct_9fa48("263") ? false : stryMutAct_9fa48("262") ? true : (stryCov_9fa48("262", "263", "264"), cclass == charclass.num)) {
+              if (stryMutAct_9fa48("265")) {
+                {}
+              } else {
+                stryCov_9fa48("265");
+                str = ch;
+                state = parsestate.num;
+              }
+            } else if (stryMutAct_9fa48("268") ? cclass != charclass.numstart : stryMutAct_9fa48("267") ? false : stryMutAct_9fa48("266") ? true : (stryCov_9fa48("266", "267", "268"), cclass == charclass.numstart)) {
+              if (stryMutAct_9fa48("269")) {
+                {}
+              } else {
+                stryCov_9fa48("269");
+                str = ch;
+                haddecimal = stryMutAct_9fa48("270") ? false : (stryCov_9fa48("270"), true);
+                state = parsestate.num;
+              }
+            } else if (stryMutAct_9fa48("273") ? cclass == charclass.alpha && cclass == charclass.incoord : stryMutAct_9fa48("272") ? false : stryMutAct_9fa48("271") ? true : (stryCov_9fa48("271", "272", "273"), (stryMutAct_9fa48("275") ? cclass != charclass.alpha : stryMutAct_9fa48("274") ? false : (stryCov_9fa48("274", "275"), cclass == charclass.alpha)) || (stryMutAct_9fa48("277") ? cclass != charclass.incoord : stryMutAct_9fa48("276") ? false : (stryCov_9fa48("276", "277"), cclass == charclass.incoord)))) {
+              if (stryMutAct_9fa48("278")) {
+                {}
+              } else {
+                stryCov_9fa48("278");
+                str = ch;
+                state = parsestate.alpha;
+              }
+            } else if (stryMutAct_9fa48("281") ? cclass != charclass.specialstart : stryMutAct_9fa48("280") ? false : stryMutAct_9fa48("279") ? true : (stryCov_9fa48("279", "280", "281"), cclass == charclass.specialstart)) {
+              if (stryMutAct_9fa48("282")) {
+                {}
+              } else {
+                stryCov_9fa48("282");
+                str = ch;
+                state = parsestate.specialvalue;
+              }
+            } else if (stryMutAct_9fa48("285") ? cclass != charclass.op : stryMutAct_9fa48("284") ? false : stryMutAct_9fa48("283") ? true : (stryCov_9fa48("283", "284", "285"), cclass == charclass.op)) {
+              if (stryMutAct_9fa48("286")) {
+                {}
+              } else {
+                stryCov_9fa48("286");
+                str = ch;
+                if (stryMutAct_9fa48("290") ? parseinfo.length <= 0 : stryMutAct_9fa48("289") ? parseinfo.length >= 0 : stryMutAct_9fa48("288") ? false : stryMutAct_9fa48("287") ? true : (stryCov_9fa48("287", "288", "289", "290"), parseinfo.length > 0)) {
+                  if (stryMutAct_9fa48("291")) {
+                    {}
+                  } else {
+                    stryCov_9fa48("291");
+                    last_token = parseinfo[stryMutAct_9fa48("292") ? parseinfo.length + 1 : (stryCov_9fa48("292"), parseinfo.length - 1)];
+                    last_token_type = last_token.type;
+                    last_token_text = last_token.text;
+                    if (stryMutAct_9fa48("295") ? last_token_type != charclass.op : stryMutAct_9fa48("294") ? false : stryMutAct_9fa48("293") ? true : (stryCov_9fa48("293", "294", "295"), last_token_type == charclass.op)) {
+                      if (stryMutAct_9fa48("296")) {
+                        {}
+                      } else {
+                        stryCov_9fa48("296");
+                        twochrop = stryMutAct_9fa48("297") ? last_token_text - str : (stryCov_9fa48("297"), last_token_text + str);
+                        if (stryMutAct_9fa48("300") ? (twochrop == '<=' || twochrop == ">=") && twochrop == "<>" : stryMutAct_9fa48("299") ? false : stryMutAct_9fa48("298") ? true : (stryCov_9fa48("298", "299", "300"), (stryMutAct_9fa48("302") ? twochrop == '<=' && twochrop == ">=" : stryMutAct_9fa48("301") ? false : (stryCov_9fa48("301", "302"), (stryMutAct_9fa48("304") ? twochrop != '<=' : stryMutAct_9fa48("303") ? false : (stryCov_9fa48("303", "304"), twochrop == '<=')) || (stryMutAct_9fa48("307") ? twochrop != ">=" : stryMutAct_9fa48("306") ? false : (stryCov_9fa48("306", "307"), twochrop == ">=")))) || (stryMutAct_9fa48("310") ? twochrop != "<>" : stryMutAct_9fa48("309") ? false : (stryCov_9fa48("309", "310"), twochrop == "<>")))) {
+                          if (stryMutAct_9fa48("312")) {
+                            {}
+                          } else {
+                            stryCov_9fa48("312");
+                            str = stryMutAct_9fa48("313") ? last_token_text - str : (stryCov_9fa48("313"), last_token_text + str);
+                            parseinfo.pop();
+                            if (stryMutAct_9fa48("317") ? parseinfo.length <= 0 : stryMutAct_9fa48("316") ? parseinfo.length >= 0 : stryMutAct_9fa48("315") ? false : stryMutAct_9fa48("314") ? true : (stryCov_9fa48("314", "315", "316", "317"), parseinfo.length > 0)) {
+                              if (stryMutAct_9fa48("318")) {
+                                {}
+                              } else {
+                                stryCov_9fa48("318");
+                                last_token = parseinfo[stryMutAct_9fa48("319") ? parseinfo.length + 1 : (stryCov_9fa48("319"), parseinfo.length - 1)];
+                                last_token_type = last_token.type;
+                                last_token_text = last_token.text;
+                              }
+                            } else {
+                              if (stryMutAct_9fa48("320")) {
+                                {}
+                              } else {
+                                stryCov_9fa48("320");
+                                last_token_type = charclass.eof;
+                                last_token_text = "EOF";
+                              }
+                            }
+                          }
                         }
-                     else {
-                        last_token_type = charclass.eof;
-                        last_token_text = "EOF";
-                        }
-                     }
+                      }
+                    }
                   }
-               }
-            else {
-               last_token_type = charclass.eof;
-               last_token_text = "EOF";
-               }
-            t = tokentype.op;
-            if ((parseinfo.length == 0)
-                || (last_token_type == charclass.op && last_token_text != ')' && last_token_text != '%')) { // Unary operator
-               if (str == '-') { // M is unary minus
-                  str = "M";
-                  ch = "M";
+                } else {
+                  if (stryMutAct_9fa48("322")) {
+                    {}
+                  } else {
+                    stryCov_9fa48("322");
+                    last_token_type = charclass.eof;
+                    last_token_text = "EOF";
                   }
-               else if (str == '+') { // P is unary plus
-                  str = "P";
-                  ch = "P";
+                }
+                t = tokentype.op;
+                if (stryMutAct_9fa48("326") ? parseinfo.length == 0 && last_token_type == charclass.op && last_token_text != ')' && last_token_text != '%' : stryMutAct_9fa48("325") ? false : stryMutAct_9fa48("324") ? true : (stryCov_9fa48("324", "325", "326"), (stryMutAct_9fa48("328") ? parseinfo.length != 0 : stryMutAct_9fa48("327") ? false : (stryCov_9fa48("327", "328"), parseinfo.length == 0)) || (stryMutAct_9fa48("330") ? last_token_type == charclass.op && last_token_text != ')' || last_token_text != '%' : stryMutAct_9fa48("329") ? false : (stryCov_9fa48("329", "330"), (stryMutAct_9fa48("332") ? last_token_type == charclass.op || last_token_text != ')' : stryMutAct_9fa48("331") ? true : (stryCov_9fa48("331", "332"), (stryMutAct_9fa48("334") ? last_token_type != charclass.op : stryMutAct_9fa48("333") ? true : (stryCov_9fa48("333", "334"), last_token_type == charclass.op)) && (stryMutAct_9fa48("336") ? last_token_text == ')' : stryMutAct_9fa48("335") ? true : (stryCov_9fa48("335", "336"), last_token_text != ')')))) && (stryMutAct_9fa48("339") ? last_token_text == '%' : stryMutAct_9fa48("338") ? true : (stryCov_9fa48("338", "339"), last_token_text != '%')))))) {
+                  if (stryMutAct_9fa48("341")) {
+                    {}
+                  } else {
+                    stryCov_9fa48("341");
+                    // Unary operator
+                    if (stryMutAct_9fa48("344") ? str != '-' : stryMutAct_9fa48("343") ? false : stryMutAct_9fa48("342") ? true : (stryCov_9fa48("342", "343", "344"), str == '-')) {
+                      if (stryMutAct_9fa48("346")) {
+                        {}
+                      } else {
+                        stryCov_9fa48("346");
+                        // M is unary minus
+                        str = "M";
+                        ch = "M";
+                      }
+                    } else if (stryMutAct_9fa48("351") ? str != '+' : stryMutAct_9fa48("350") ? false : stryMutAct_9fa48("349") ? true : (stryCov_9fa48("349", "350", "351"), str == '+')) {
+                      if (stryMutAct_9fa48("353")) {
+                        {}
+                      } else {
+                        stryCov_9fa48("353");
+                        // P is unary plus
+                        str = "P";
+                        ch = "P";
+                      }
+                    } else if (stryMutAct_9fa48("358") ? str == ')' || last_token_text == '(' : stryMutAct_9fa48("357") ? false : stryMutAct_9fa48("356") ? true : (stryCov_9fa48("356", "357", "358"), (stryMutAct_9fa48("360") ? str != ')' : stryMutAct_9fa48("359") ? true : (stryCov_9fa48("359", "360"), str == ')')) && (stryMutAct_9fa48("363") ? last_token_text != '(' : stryMutAct_9fa48("362") ? true : (stryCov_9fa48("362", "363"), last_token_text == '(')))) {
+                      if (stryMutAct_9fa48("365")) {
+                        {}
+                      } else {
+                        stryCov_9fa48("365");
+                        // null arg list OK
+                        ;
+                      }
+                    } else if (stryMutAct_9fa48("368") ? str == '(' : stryMutAct_9fa48("367") ? false : stryMutAct_9fa48("366") ? true : (stryCov_9fa48("366", "367", "368"), str != '(')) {
+                      if (stryMutAct_9fa48("370")) {
+                        {}
+                      } else {
+                        stryCov_9fa48("370");
+                        // binary-op open-paren OK, others no
+                        t = tokentype.error;
+                        str = scc.s_parseerrtwoops;
+                      }
+                    }
                   }
-               else if (str == ')' && last_token_text == '(') { // null arg list OK
-                  ;
+                } else if (stryMutAct_9fa48("374") ? str.length <= 1 : stryMutAct_9fa48("373") ? str.length >= 1 : stryMutAct_9fa48("372") ? false : stryMutAct_9fa48("371") ? true : (stryCov_9fa48("371", "372", "373", "374"), str.length > 1)) {
+                  if (stryMutAct_9fa48("375")) {
+                    {}
+                  } else {
+                    stryCov_9fa48("375");
+                    if (stryMutAct_9fa48("378") ? str != '>=' : stryMutAct_9fa48("377") ? false : stryMutAct_9fa48("376") ? true : (stryCov_9fa48("376", "377", "378"), str == '>=')) {
+                      if (stryMutAct_9fa48("380")) {
+                        {}
+                      } else {
+                        stryCov_9fa48("380");
+                        // G is >=
+                        str = "G";
+                        ch = "G";
+                      }
+                    } else if (stryMutAct_9fa48("385") ? str != '<=' : stryMutAct_9fa48("384") ? false : stryMutAct_9fa48("383") ? true : (stryCov_9fa48("383", "384", "385"), str == '<=')) {
+                      if (stryMutAct_9fa48("387")) {
+                        {}
+                      } else {
+                        stryCov_9fa48("387");
+                        // L is <=
+                        str = "L";
+                        ch = "L";
+                      }
+                    } else if (stryMutAct_9fa48("392") ? str != '<>' : stryMutAct_9fa48("391") ? false : stryMutAct_9fa48("390") ? true : (stryCov_9fa48("390", "391", "392"), str == '<>')) {
+                      if (stryMutAct_9fa48("394")) {
+                        {}
+                      } else {
+                        stryCov_9fa48("394");
+                        // N is <>
+                        str = "N";
+                        ch = "N";
+                      }
+                    } else {
+                      if (stryMutAct_9fa48("397")) {
+                        {}
+                      } else {
+                        stryCov_9fa48("397");
+                        t = tokentype.error;
+                        str = scc.s_parseerrtwoops;
+                      }
+                    }
                   }
-               else if (str != '(') { // binary-op open-paren OK, others no
-                  t = tokentype.error;
-                  str = scc.s_parseerrtwoops;
-                  }
-               }
-            else if (str.length > 1) {
-               if (str == '>=') { // G is >=
-                  str = "G";
-                  ch = "G";
-                  }
-               else if (str == '<=') { // L is <=
-                  str = "L";
-                  ch = "L";
-                  }
-               else if (str == '<>') { // N is <>
-                  str = "N";
-                  ch = "N";
-                  }
-               else {
-                  t = tokentype.error;
-                  str = scc.s_parseerrtwoops;
-                  }
-               }
-            pushtoken(parseinfo, str, t, ch);
-            state = 0;
+                }
+                pushtoken(parseinfo, str, t, ch);
+                state = 0;
+              }
+            } else if (stryMutAct_9fa48("400") ? cclass != charclass.quote : stryMutAct_9fa48("399") ? false : stryMutAct_9fa48("398") ? true : (stryCov_9fa48("398", "399", "400"), cclass == charclass.quote)) {
+              if (stryMutAct_9fa48("401")) {
+                {}
+              } else {
+                stryCov_9fa48("401");
+                // starting a string
+                str = "";
+                state = parsestate.string;
+              }
+            } else if (stryMutAct_9fa48("405") ? cclass != charclass.space : stryMutAct_9fa48("404") ? false : stryMutAct_9fa48("403") ? true : (stryCov_9fa48("403", "404", "405"), cclass == charclass.space)) {// store so can reconstruct spacing
+              //pushtoken(parseinfo, " ", tokentype.space, 0);
+            } else if (stryMutAct_9fa48("408") ? cclass != charclass.eof : stryMutAct_9fa48("407") ? false : stryMutAct_9fa48("406") ? true : (stryCov_9fa48("406", "407", "408"), cclass == charclass.eof)) {// ignore -- needed to have extra loop to close out other things
+            } else {
+              if (stryMutAct_9fa48("409")) {
+                {}
+              } else {
+                stryCov_9fa48("409");
+                // unknown class - such as unknown char
+                pushtoken(parseinfo, scc.s_parseerrchar, tokentype.error, 0);
+              }
             }
-         else if (cclass == charclass.quote) { // starting a string
-            str = "";
-            state = parsestate.string;
-            }
-         else if (cclass == charclass.space) { // store so can reconstruct spacing
-            //pushtoken(parseinfo, " ", tokentype.space, 0);
-            }
-         else if (cclass == charclass.eof) { // ignore -- needed to have extra loop to close out other things
-            }
-         else { // unknown class - such as unknown char
-            pushtoken(parseinfo, scc.s_parseerrchar, tokentype.error, 0);
-            }
-         }
+          }
+        }
       }
-
-   return parseinfo;
-
-   }
-
-SocialCalc.Formula.ParsePushToken = function(parseinfo, ttext, ttype, topcode) {
-
-   parseinfo.push({text: ttext, type: ttype, opcode: topcode});
-
-   }
+    }
+    return parseinfo;
+  }
+};
+SocialCalc.Formula.ParsePushToken = function (parseinfo, ttext, ttype, topcode) {
+  if (stryMutAct_9fa48("410")) {
+    {}
+  } else {
+    stryCov_9fa48("410");
+    parseinfo.push(stryMutAct_9fa48("411") ? {} : (stryCov_9fa48("411"), {
+      text: ttext,
+      type: ttype,
+      opcode: topcode
+    }));
+  }
+};
 
 /* *******************
 
@@ -15374,25 +15929,18 @@ SocialCalc.Formula.ParsePushToken = function(parseinfo, ttext, ttype, topcode) {
 
 ************************* */
 
-SocialCalc.Formula.evaluate_parsed_formula = function(parseinfo, sheet, allowrangereturn) {
+SocialCalc.Formula.evaluate_parsed_formula = function (parseinfo, sheet, allowrangereturn) {
+  var result;
+  var scf = SocialCalc.Formula;
+  var tokentype = scf.TokenType;
+  var revpolish;
+  var parsestack = [];
+  var errortext = "";
+  revpolish = scf.ConvertInfixToPolish(parseinfo); // result is either an array or a string with error text
 
-   var result;
-
-   var scf = SocialCalc.Formula;
-   var tokentype = scf.TokenType;
-
-   var revpolish;
-   var parsestack = [];
-
-   var errortext = "";
-
-   revpolish = scf.ConvertInfixToPolish(parseinfo); // result is either an array or a string with error text
-
-   result = scf.EvaluatePolish(parseinfo, revpolish, sheet, allowrangereturn);
-
-   return result;
-
-}
+  result = scf.EvaluatePolish(parseinfo, revpolish, sheet, allowrangereturn);
+  return result;
+};
 
 //
 // revpolish = SocialCalc.Formula.ConvertInfixToPolish(parseinfo)
@@ -15406,117 +15954,98 @@ SocialCalc.Formula.evaluate_parsed_formula = function(parseinfo, sheet, allowran
 // and then enhanced for additional spreadsheet things
 //
 
-SocialCalc.Formula.ConvertInfixToPolish = function(parseinfo) {
-
-   var scf = SocialCalc.Formula;
-   var scc = SocialCalc.Constants;
-   var tokentype = scf.TokenType;
-   var token_precedence = scf.TokenPrecedence;
-
-   var revpolish = [];
-   var parsestack = [];
-
-   var errortext = "";
-
-   var function_start = -1;
-
-   var i, pii, ttype, ttext, tprecedence, tstackprecedence;
-
-   for (i=0; i<parseinfo.length; i++) {
-      pii = parseinfo[i];
-      ttype = pii.type;
-      ttext = pii.text;
-      if (ttype == tokentype.num || ttype == tokentype.coord || ttype == tokentype.string) {
-         revpolish.push(i);
-         }
-      else if (ttype == tokentype.name) {
-         parsestack.push(i);
-         revpolish.push(function_start);
-         }
-      else if (ttype == tokentype.space) { // ignore
-         continue;
-         }
-      else if (ttext == ',') {
-         while (parsestack.length && parseinfo[parsestack[parsestack.length-1]].text != "(") {
-            revpolish.push(parsestack.pop());
-            }
-         if (parsestack.length == 0) { // no ( -- error
-            errortext = scc.s_parseerrmissingopenparen;
+SocialCalc.Formula.ConvertInfixToPolish = function (parseinfo) {
+  var scf = SocialCalc.Formula;
+  var scc = SocialCalc.Constants;
+  var tokentype = scf.TokenType;
+  var token_precedence = scf.TokenPrecedence;
+  var revpolish = [];
+  var parsestack = [];
+  var errortext = "";
+  var function_start = -1;
+  var i, pii, ttype, ttext, tprecedence, tstackprecedence;
+  for (i = 0; i < parseinfo.length; i++) {
+    pii = parseinfo[i];
+    ttype = pii.type;
+    ttext = pii.text;
+    if (ttype == tokentype.num || ttype == tokentype.coord || ttype == tokentype.string) {
+      revpolish.push(i);
+    } else if (ttype == tokentype.name) {
+      parsestack.push(i);
+      revpolish.push(function_start);
+    } else if (ttype == tokentype.space) {
+      // ignore
+      continue;
+    } else if (ttext == ',') {
+      while (parsestack.length && parseinfo[parsestack[parsestack.length - 1]].text != "(") {
+        revpolish.push(parsestack.pop());
+      }
+      if (parsestack.length == 0) {
+        // no ( -- error
+        errortext = scc.s_parseerrmissingopenparen;
+        break;
+      }
+    } else if (ttext == '(') {
+      parsestack.push(i);
+    } else if (ttext == ')') {
+      while (parsestack.length && parseinfo[parsestack[parsestack.length - 1]].text != "(") {
+        revpolish.push(parsestack.pop());
+      }
+      if (parsestack.length == 0) {
+        // no ( -- error
+        errortext = scc.s_parseerrcloseparennoopen;
+        break;
+      }
+      parsestack.pop();
+      if (parsestack.length && parseinfo[parsestack[parsestack.length - 1]].type == tokentype.name) {
+        revpolish.push(parsestack.pop());
+      }
+    } else if (ttype == tokentype.op) {
+      if (parsestack.length && parseinfo[parsestack[parsestack.length - 1]].type == tokentype.name) {
+        revpolish.push(parsestack.pop());
+      }
+      while (parsestack.length && parseinfo[parsestack[parsestack.length - 1]].type == tokentype.op && parseinfo[parsestack[parsestack.length - 1]].text != '(') {
+        tprecedence = token_precedence[pii.opcode];
+        tstackprecedence = token_precedence[parseinfo[parsestack[parsestack.length - 1]].opcode];
+        if (tprecedence >= 0 && tprecedence < tstackprecedence) {
+          break;
+        } else if (tprecedence < 0) {
+          tprecedence = -tprecedence;
+          if (tstackprecedence < 0) tstackprecedence = -tstackprecedence;
+          if (tprecedence <= tstackprecedence) {
             break;
-            }
-         }
-      else if (ttext == '(') {
-         parsestack.push(i);
-         }
-      else if (ttext == ')') {
-         while (parsestack.length && parseinfo[parsestack[parsestack.length-1]].text != "(") {
-            revpolish.push(parsestack.pop());
-            }
-         if (parsestack.length == 0) { // no ( -- error
-            errortext = scc.s_parseerrcloseparennoopen;
-            break;
-            }
-         parsestack.pop();
-         if (parsestack.length && parseinfo[parsestack[parsestack.length-1]].type == tokentype.name) {
-            revpolish.push(parsestack.pop());
-            }
-         }
-      else if (ttype == tokentype.op) {
-         if (parsestack.length && parseinfo[parsestack[parsestack.length-1]].type == tokentype.name) {
-            revpolish.push(parsestack.pop());
-            }
-         while (parsestack.length && parseinfo[parsestack[parsestack.length-1]].type == tokentype.op
-                && parseinfo[parsestack[parsestack.length-1]].text != '(') {
-            tprecedence = token_precedence[pii.opcode];
-            tstackprecedence = token_precedence[parseinfo[parsestack[parsestack.length-1]].opcode];
-            if (tprecedence >= 0 && tprecedence < tstackprecedence) {
-               break;
-               }
-            else if (tprecedence < 0) {
-               tprecedence = -tprecedence;
-               if (tstackprecedence < 0) tstackprecedence = -tstackprecedence;
-               if (tprecedence <= tstackprecedence) {
-                  break;
-                  }
-               }
-            revpolish.push(parsestack.pop());
-            }
-         parsestack.push(i);
-         }
-      else if (ttype == tokentype.error) {
-         errortext = ttext;
-         break;
-         }
-      else {
-         errortext = "Internal error while processing parsed formula. ";
-         break;
-         }
+          }
+        }
+        revpolish.push(parsestack.pop());
       }
-   while (parsestack.length>0) {
-      if (parseinfo[parsestack[parsestack.length-1]].text == '(') {
-         errortext = scc.s_parseerrmissingcloseparen;
-         break;
-         }
-      revpolish.push(parsestack.pop());
-      }
-
-   if (errortext) {
-      return errortext;
-      }
-
-   return revpolish;
-
-   }
-
+      parsestack.push(i);
+    } else if (ttype == tokentype.error) {
+      errortext = ttext;
+      break;
+    } else {
+      errortext = "Internal error while processing parsed formula. ";
+      break;
+    }
+  }
+  while (parsestack.length > 0) {
+    if (parseinfo[parsestack[parsestack.length - 1]].text == '(') {
+      errortext = scc.s_parseerrmissingcloseparen;
+      break;
+    }
+    revpolish.push(parsestack.pop());
+  }
+  if (errortext) {
+    return errortext;
+  }
+  return revpolish;
+};
 
 // DebugLog
 // display logged objects in the audit tab of the spreadsheet control
-if(typeof SocialCalc.debug_log === 'undefined') SocialCalc.debug_log = [];
-
-SocialCalc.DebugLog = function(logObject) {	
-//	SocialCalc.debug_log.push(logObject);
-}
-
+if (typeof SocialCalc.debug_log === 'undefined') SocialCalc.debug_log = [];
+SocialCalc.DebugLog = function (logObject) {
+  //	SocialCalc.debug_log.push(logObject);
+};
 
 //
 // result = SocialCalc.Formula.EvaluatePolish(parseinfo, revpolish, sheet, allowrangereturn)
@@ -15532,323 +16061,325 @@ SocialCalc.DebugLog = function(logObject) {
 // The number starts as a null string ("A1|B3|")
 //
 
-SocialCalc.Formula.EvaluatePolish = function(parseinfo, revpolish, sheet, allowrangereturn) {
+SocialCalc.Formula.EvaluatePolish = function (parseinfo, revpolish, sheet, allowrangereturn) {
+  var scf = SocialCalc.Formula;
+  var scc = SocialCalc.Constants;
+  var tokentype = scf.TokenType;
+  var lookup_result_type = scf.LookupResultType;
+  var typelookup = scf.TypeLookupTable;
+  var operand_as_number = scf.OperandAsNumber;
+  var operand_as_text = scf.OperandAsText;
+  var operand_value_and_type = scf.OperandValueAndType;
+  var operands_as_coord_on_sheet = scf.OperandsAsCoordOnSheet;
+  var format_number_for_display = SocialCalc.format_number_for_display || function (v, t, f) {
+    return v + "";
+  };
+  var errortext = "";
+  var function_start = -1;
+  var missingOperandError = {
+    value: "",
+    type: "e#VALUE!",
+    error: scc.s_parseerrmissingoperand
+  };
+  var operand = [];
+  var PushOperand = function (t, v) {
+    operand.push({
+      type: t,
+      value: v
+    });
+  };
+  var i, rii, prii, ttype, ttext, value, value1, value2, tostype, tostype2, resulttype, valuetype, cond, vmatch, smatch;
+  if (!parseinfo.length || !(revpolish instanceof Array)) {
+    return {
+      value: "",
+      type: "e#VALUE!",
+      error: typeof revpolish == "string" ? revpolish : ""
+    };
+  }
 
-   var scf = SocialCalc.Formula;
-   var scc = SocialCalc.Constants;
-   var tokentype = scf.TokenType;
-   var lookup_result_type = scf.LookupResultType;
-   var typelookup = scf.TypeLookupTable;
-   var operand_as_number = scf.OperandAsNumber;
-   var operand_as_text = scf.OperandAsText;
-   var operand_value_and_type = scf.OperandValueAndType;
-   var operands_as_coord_on_sheet = scf.OperandsAsCoordOnSheet;
-   var format_number_for_display = SocialCalc.format_number_for_display || function(v, t, f) {return v+"";};
+  // eddy EvaluatePolish { 
+  //    SocialCalc.DebugLog({ revpolish: revpolish});
+  //    SocialCalc.DebugLog({ revpolish: revpolish});
+  // }
 
-   var errortext = "";
-   var function_start = -1;
-   var missingOperandError = {value: "", type: "e#VALUE!", error: scc.s_parseerrmissingoperand};
+  // eddy EvaluatePolish {
 
-   var operand = [];
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
+  // e.g parameterInfo: [ {'text':'E1','type':2,'opcode':0}, ... ] 
+  var parameterInfo = [];
+  // }	
 
-   var i, rii, prii, ttype, ttext, value, value1, value2, tostype, tostype2, resulttype, valuetype, cond, vmatch, smatch;
+  for (i = 0; i < revpolish.length; i++) {
+    rii = revpolish[i];
+    if (rii == function_start) {
+      // Remember the start of a function argument list
+      PushOperand("start", 0);
+      continue;
+    }
+    prii = parseinfo[rii];
+    ttype = prii.type;
+    ttext = prii.text;
+    // eddy EvaluatePolish {
+    parameterInfo.push(prii);
+    // }
 
-   if (!parseinfo.length || (! (revpolish instanceof Array))) {
-      return ({value: "", type: "e#VALUE!", error: (typeof revpolish == "string" ? revpolish : "")});
+    if (ttype == tokentype.num) {
+      PushOperand("n", ttext - 0);
+    } else if (ttype == tokentype.coord) {
+      PushOperand("coord", ttext);
+    } else if (ttype == tokentype.string) {
+      PushOperand("t", ttext);
+    } else if (ttype == tokentype.op) {
+      if (operand.length <= 0) {
+        // Nothing on the stack...
+        return missingOperandError;
+        break; // done
       }
 
-	  
-	  // eddy EvaluatePolish { 
-    //    SocialCalc.DebugLog({ revpolish: revpolish});
-    //    SocialCalc.DebugLog({ revpolish: revpolish});
-	  // }
+      // Unary minus
 
-	// eddy EvaluatePolish {
-	
-	// e.g parameterInfo: [ {'text':'E1','type':2,'opcode':0}, ... ] 
-    var parameterInfo = [];
-    // }	
-	  
-	  
-   for (i=0; i<revpolish.length; i++) {
-      rii = revpolish[i];
-      if (rii == function_start) { // Remember the start of a function argument list
-         PushOperand("start", 0);
-         continue;
-         }
+      if (ttext == 'M') {
+        value1 = operand_as_number(sheet, operand);
+        resulttype = lookup_result_type(value1.type, value1.type, typelookup.unaryminus);
+        PushOperand(resulttype, -value1.value);
+      }
 
-      prii = parseinfo[rii];
-      ttype = prii.type;
-      ttext = prii.text;
-	  // eddy EvaluatePolish {
-	  parameterInfo.push(prii);
-	  // }
-	  
-      if (ttype == tokentype.num) {
-         PushOperand("n", ttext-0);
-         }
+      // Unary plus
+      else if (ttext == 'P') {
+        value1 = operand_as_number(sheet, operand);
+        resulttype = lookup_result_type(value1.type, value1.type, typelookup.unaryplus);
+        PushOperand(resulttype, value1.value);
+      }
 
-      else if (ttype == tokentype.coord) {
-         PushOperand("coord", ttext);
-		 
-         }
+      // Unary % - percent, left associative
+      else if (ttext == '%') {
+        value1 = operand_as_number(sheet, operand);
+        resulttype = lookup_result_type(value1.type, value1.type, typelookup.unarypercent);
+        PushOperand(resulttype, 0.01 * value1.value);
+      }
 
-      else if (ttype == tokentype.string) {
-         PushOperand("t", ttext);
-         }
+      // & - string concatenate
+      else if (ttext == '&') {
+        if (operand.length <= 1) {
+          // Need at least two things on the stack...
+          return missingOperandError;
+        }
+        value2 = operand_as_text(sheet, operand);
+        value1 = operand_as_text(sheet, operand);
+        resulttype = lookup_result_type(value1.type, value1.type, typelookup.concat);
+        PushOperand(resulttype, value1.value + value2.value);
+      }
 
-      else if (ttype == tokentype.op) {
-         if (operand.length <= 0) { // Nothing on the stack...
-            return missingOperandError;
-            break; // done
-            }
+      // : - Range constructor
+      else if (ttext == ':') {
+        if (operand.length <= 1) {
+          // Need at least two things on the stack...
+          return missingOperandError;
+        }
+        value1 = scf.OperandsAsRangeOnSheet(sheet, operand); // get coords even if use name on other sheet
+        if (value1.error) {
+          // not available
+          errortext = errortext || value1.error;
+        }
+        PushOperand(value1.type, value1.value); // push sheetname with range on that sheet
+      }
 
-         // Unary minus
+      // ! - sheetname!coord
+      else if (ttext == '!') {
+        if (operand.length <= 1) {
+          // Need at least two things on the stack...
+          return missingOperandError;
+        }
+        value1 = operands_as_coord_on_sheet(sheet, operand); // get coord even if name on other sheet
+        if (value1.error) {
+          // not available
+          errortext = errortext || value1.error;
+        }
+        PushOperand(value1.type, value1.value); // push sheetname with coord or range on that sheet
+      }
 
-         if (ttext == 'M') {
-            value1 = operand_as_number(sheet, operand);
-            resulttype = lookup_result_type(value1.type, value1.type, typelookup.unaryminus);
-            PushOperand(resulttype, -value1.value);
-            }
+      // Comparison operators: < L = G > N (< <= = >= > <>)
+      else if (ttext == "<" || ttext == "L" || ttext == "=" || ttext == "G" || ttext == ">" || ttext == "N") {
+        if (operand.length <= 1) {
+          // Need at least two things on the stack...
+          errortext = scc.s_parseerrmissingoperand; // remember error
+          break;
+        }
+        value2 = operand_value_and_type(sheet, operand);
+        value1 = operand_value_and_type(sheet, operand);
+        if (value1.type.charAt(0) == "n" && value2.type.charAt(0) == "n") {
+          // compare two numbers
+          cond = 0;
+          if (ttext == "<") {
+            cond = value1.value < value2.value ? 1 : 0;
+          } else if (ttext == "L") {
+            cond = value1.value <= value2.value ? 1 : 0;
+          } else if (ttext == "=") {
+            cond = value1.value == value2.value ? 1 : 0;
+          } else if (ttext == "G") {
+            cond = value1.value >= value2.value ? 1 : 0;
+          } else if (ttext == ">") {
+            cond = value1.value > value2.value ? 1 : 0;
+          } else if (ttext == "N") {
+            cond = value1.value != value2.value ? 1 : 0;
+          }
+          PushOperand("nl", cond);
+        } else if (value1.type.charAt(0) == "e") {
+          // error on left
+          PushOperand(value1.type, 0);
+        } else if (value2.type.charAt(0) == "e") {
+          // error on right
+          PushOperand(value2.type, 0);
+        } else {
+          // text maybe mixed with numbers or blank
+          tostype = value1.type.charAt(0);
+          tostype2 = value2.type.charAt(0);
+          if (tostype == "n") {
+            value1.value = format_number_for_display(value1.value, "n", "");
+          } else if (tostype == "b") {
+            value1.value = "";
+          }
+          if (tostype2 == "n") {
+            value2.value = format_number_for_display(value2.value, "n", "");
+          } else if (tostype2 == "b") {
+            value2.value = "";
+          }
+          cond = 0;
+          value1.value = value1.value.toLowerCase(); // ignore case
+          value2.value = value2.value.toLowerCase();
+          if (ttext == "<") {
+            cond = value1.value < value2.value ? 1 : 0;
+          } else if (ttext == "L") {
+            cond = value1.value <= value2.value ? 1 : 0;
+          } else if (ttext == "=") {
+            cond = value1.value == value2.value ? 1 : 0;
+          } else if (ttext == "G") {
+            cond = value1.value >= value2.value ? 1 : 0;
+          } else if (ttext == ">") {
+            cond = value1.value > value2.value ? 1 : 0;
+          } else if (ttext == "N") {
+            cond = value1.value != value2.value ? 1 : 0;
+          }
+          PushOperand("nl", cond);
+        }
+      }
 
-         // Unary plus
-
-         else if (ttext == 'P') {
-            value1 = operand_as_number(sheet, operand);
-            resulttype = lookup_result_type(value1.type, value1.type, typelookup.unaryplus);
-            PushOperand(resulttype, value1.value);
-            }
-
-         // Unary % - percent, left associative
-
-         else if (ttext == '%') {
-            value1 = operand_as_number(sheet, operand);
-            resulttype = lookup_result_type(value1.type, value1.type, typelookup.unarypercent);
-            PushOperand(resulttype, 0.01*value1.value);
-            }
-
-         // & - string concatenate
-
-         else if (ttext == '&') {
-            if (operand.length <= 1) { // Need at least two things on the stack...
-               return missingOperandError;
-               }
-            value2 = operand_as_text(sheet, operand);
-            value1 = operand_as_text(sheet, operand);
-            resulttype = lookup_result_type(value1.type, value1.type, typelookup.concat);
-            PushOperand(resulttype, value1.value + value2.value);
-            }
-
-         // : - Range constructor
-
-         else if (ttext == ':') {
-            if (operand.length <= 1) { // Need at least two things on the stack...
-               return missingOperandError;
-               }
-            value1 = scf.OperandsAsRangeOnSheet(sheet, operand); // get coords even if use name on other sheet
-            if (value1.error) { // not available
-               errortext = errortext || value1.error;
-               }
-            PushOperand(value1.type, value1.value); // push sheetname with range on that sheet
-            }
-
-         // ! - sheetname!coord
-
-         else if (ttext == '!') {
-            if (operand.length <= 1) { // Need at least two things on the stack...
-               return missingOperandError;
-               }
-            value1 = operands_as_coord_on_sheet(sheet, operand); // get coord even if name on other sheet
-            if (value1.error) { // not available
-               errortext = errortext || value1.error;
-               }
-            PushOperand(value1.type, value1.value); // push sheetname with coord or range on that sheet
-            }
-
-         // Comparison operators: < L = G > N (< <= = >= > <>)
-
-         else if (ttext == "<" || ttext == "L" || ttext == "=" || ttext == "G" || ttext == ">" || ttext == "N") {
-            if (operand.length <= 1) { // Need at least two things on the stack...
-               errortext = scc.s_parseerrmissingoperand; // remember error
-               break;
-               }
-            value2 = operand_value_and_type(sheet, operand);
-            value1 = operand_value_and_type(sheet, operand);
-            if (value1.type.charAt(0) == "n" && value2.type.charAt(0) == "n") { // compare two numbers
-               cond = 0;
-               if (ttext == "<") { cond = value1.value < value2.value ? 1 : 0; }
-               else if (ttext == "L") { cond = value1.value <= value2.value ? 1 : 0; }
-               else if (ttext == "=") { cond = value1.value == value2.value ? 1 : 0; }
-               else if (ttext == "G") { cond = value1.value >= value2.value ? 1 : 0; }
-               else if (ttext == ">") { cond = value1.value > value2.value ? 1 : 0; }
-               else if (ttext == "N") { cond = value1.value != value2.value ? 1 : 0; }
-               PushOperand("nl", cond);
-               }
-            else if (value1.type.charAt(0) == "e") { // error on left
-               PushOperand(value1.type, 0);
-               }               
-            else if (value2.type.charAt(0) == "e") { // error on right
-               PushOperand(value2.type, 0);
-               }               
-            else { // text maybe mixed with numbers or blank
-               tostype = value1.type.charAt(0);
-               tostype2 = value2.type.charAt(0);
-               if (tostype == "n") {
-                  value1.value = format_number_for_display(value1.value, "n", "");
-                  }
-               else if (tostype == "b") {
-                  value1.value = "";
-                  }
-               if (tostype2 == "n") {
-                  value2.value = format_number_for_display(value2.value, "n", "");
-                  }
-               else if (tostype2 == "b") {
-                  value2.value = "";
-                  }
-               cond = 0;
-               value1.value = value1.value.toLowerCase(); // ignore case
-               value2.value = value2.value.toLowerCase();
-               if (ttext == "<") { cond = value1.value < value2.value ? 1 : 0; }
-               else if (ttext == "L") { cond = value1.value <= value2.value ? 1 : 0; }
-               else if (ttext == "=") { cond = value1.value == value2.value ? 1 : 0; }
-               else if (ttext == "G") { cond = value1.value >= value2.value ? 1 : 0; }
-               else if (ttext == ">") { cond = value1.value > value2.value ? 1 : 0; }
-               else if (ttext == "N") { cond = value1.value != value2.value ? 1 : 0; }
-               PushOperand("nl", cond);
-               }
-            }
-
-         // Normal infix arithmethic operators: +, -. *, /, ^
-
-         else { // what's left are the normal infix arithmetic operators
-            if (operand.length <= 1) { // Need at least two things on the stack...
-               errortext = scc.s_parseerrmissingoperand; // remember error
-               break;
-               }
-            if (ttext == '+') {
-               value2 = operand_value_and_type(sheet, operand);
-               value1 = operand_value_and_type(sheet, operand); // allow + to append style formula to widget
-               resulttype = lookup_result_type(value1.type, value2.type, typelookup.plus);
-               PushOperand(resulttype, value1.value + value2.value);
-               } 
-            else {
-              value2 = operand_as_number(sheet, operand);
-              value1 = operand_as_number(sheet, operand);              
-              }
-              
-            if (ttext == '-') {
-               resulttype = lookup_result_type(value1.type, value2.type, typelookup.plus);
-               PushOperand(resulttype, value1.value - value2.value);
-               }
-            else if (ttext == '*') {
-               resulttype = lookup_result_type(value1.type, value2.type, typelookup.plus);
-               PushOperand(resulttype, value1.value * value2.value);
-               }
-            else if (ttext == '/') {
-               if (value2.value != 0) {
-                  PushOperand("n", value1.value / value2.value); // gives plain numeric result type
-                  }
-               else {
-                  PushOperand("e#DIV/0!", 0);
-                  }
-               }
-            else if (ttext == '^') {
-               value1.value = Math.pow(value1.value, value2.value);
-               value1.type = "n"; // gives plain numeric result type
-               if (isNaN(value1.value)) {
-                  value1.value = 0;
-                  value1.type = "e#NUM!";
-                  }
-               PushOperand(value1.type, value1.value);
-               }
-            }
-         }
-
-      // function or name
-
-      else if (ttype == tokentype.name) {
-	  
-//         errortext = scf.CalculateFunction(ttext, operand, sheet);
-         errortext = scf.CalculateFunction(ttext, operand, sheet, parseinfo.coord); // eddy also pass the cell id
-		 
-         if (errortext) break;
-		 
-		 
-         }
-
-		 
+      // Normal infix arithmethic operators: +, -. *, /, ^
       else {
-         errortext = scc.s_InternalError+"Unknown token "+ttype+" ("+ttext+"). ";
-         break;
-         }
+        // what's left are the normal infix arithmetic operators
+        if (operand.length <= 1) {
+          // Need at least two things on the stack...
+          errortext = scc.s_parseerrmissingoperand; // remember error
+          break;
+        }
+        if (ttext == '+') {
+          value2 = operand_value_and_type(sheet, operand);
+          value1 = operand_value_and_type(sheet, operand); // allow + to append style formula to widget
+          resulttype = lookup_result_type(value1.type, value2.type, typelookup.plus);
+          PushOperand(resulttype, value1.value + value2.value);
+        } else {
+          value2 = operand_as_number(sheet, operand);
+          value1 = operand_as_number(sheet, operand);
+        }
+        if (ttext == '-') {
+          resulttype = lookup_result_type(value1.type, value2.type, typelookup.plus);
+          PushOperand(resulttype, value1.value - value2.value);
+        } else if (ttext == '*') {
+          resulttype = lookup_result_type(value1.type, value2.type, typelookup.plus);
+          PushOperand(resulttype, value1.value * value2.value);
+        } else if (ttext == '/') {
+          if (value2.value != 0) {
+            PushOperand("n", value1.value / value2.value); // gives plain numeric result type
+          } else {
+            PushOperand("e#DIV/0!", 0);
+          }
+        } else if (ttext == '^') {
+          value1.value = Math.pow(value1.value, value2.value);
+          value1.type = "n"; // gives plain numeric result type
+          if (isNaN(value1.value)) {
+            value1.value = 0;
+            value1.type = "e#NUM!";
+          }
+          PushOperand(value1.type, value1.value);
+        }
       }
+    }
 
-   // look at final value and handle special cases
+    // function or name
+    else if (ttype == tokentype.name) {
+      //         errortext = scf.CalculateFunction(ttext, operand, sheet);
+      errortext = scf.CalculateFunction(ttext, operand, sheet, parseinfo.coord); // eddy also pass the cell id
 
-   value = operand[0] ? operand[0].value : "";
-   tostype = operand[0] ? operand[0].type : "";
+      if (errortext) break;
+    } else {
+      errortext = scc.s_InternalError + "Unknown token " + ttype + " (" + ttext + "). ";
+      break;
+    }
+  }
 
-   if (tostype == "name") { // name - expand it
-      value1 = SocialCalc.Formula.LookupName(sheet, value);
-      value = value1.value;
-      tostype = value1.type;
-      errortext = errortext || value1.error;
-      }
+  // look at final value and handle special cases
 
-   if (tostype == "coord") { // the value is a coord reference, get its value and type
-      value1 = operand_value_and_type(sheet, operand);
-      value = value1.value;
-      tostype = value1.type;
-      if (tostype == "b") {
-         tostype = "n";
-         value = 0;
-         }
-      }
-
-   if (operand.length > 1 && !errortext) { // something left - error
-      errortext += scc.s_parseerrerrorinformula;
-      }
-
-   // set return type
-
-   valuetype = tostype;
-
-   if (tostype.charAt(0) == "e") { // error value
-      errortext = errortext || tostype.substring(1) || scc.s_calcerrerrorvalueinformula;
-      }
-   else if (tostype == "range") {
-      vmatch = value.match(/^(.*)\|(.*)\|/);
-      smatch = vmatch[1].indexOf("!");
-      if (smatch>=0) { // swap sheetname
-         vmatch[1] = vmatch[1].substring(smatch+1) + "!" + vmatch[1].substring(0, smatch).toUpperCase();
-         }
-      else {
-         vmatch[1] = vmatch[1].toUpperCase();
-         }
-      value = vmatch[1] + ":" + vmatch[2].toUpperCase();
-      if (!allowrangereturn) {
-         errortext = scc.s_formularangeresult+" "+value;
-         }
-      }
-
-   if (errortext && valuetype.charAt(0) != "e") {
-      value = errortext;
-      valuetype = "e";
-     }
-
-   // look for overflow
-
-   if (valuetype.charAt(0) == "n" && (isNaN(value) || !isFinite(value))) {
+  value = operand[0] ? operand[0].value : "";
+  tostype = operand[0] ? operand[0].type : "";
+  if (tostype == "name") {
+    // name - expand it
+    value1 = SocialCalc.Formula.LookupName(sheet, value);
+    value = value1.value;
+    tostype = value1.type;
+    errortext = errortext || value1.error;
+  }
+  if (tostype == "coord") {
+    // the value is a coord reference, get its value and type
+    value1 = operand_value_and_type(sheet, operand);
+    value = value1.value;
+    tostype = value1.type;
+    if (tostype == "b") {
+      tostype = "n";
       value = 0;
-      valuetype = "e#NUM!";
-      errortext = isNaN(value) ? scc.s_calcerrnumericnan: scc.s_calcerrnumericoverflow;
-      }
+    }
+  }
+  if (operand.length > 1 && !errortext) {
+    // something left - error
+    errortext += scc.s_parseerrerrorinformula;
+  }
 
-   return ({value: value, type: valuetype, error: errortext});
+  // set return type
 
-   }
+  valuetype = tostype;
+  if (tostype.charAt(0) == "e") {
+    // error value
+    errortext = errortext || tostype.substring(1) || scc.s_calcerrerrorvalueinformula;
+  } else if (tostype == "range") {
+    vmatch = value.match(/^(.*)\|(.*)\|/);
+    smatch = vmatch[1].indexOf("!");
+    if (smatch >= 0) {
+      // swap sheetname
+      vmatch[1] = vmatch[1].substring(smatch + 1) + "!" + vmatch[1].substring(0, smatch).toUpperCase();
+    } else {
+      vmatch[1] = vmatch[1].toUpperCase();
+    }
+    value = vmatch[1] + ":" + vmatch[2].toUpperCase();
+    if (!allowrangereturn) {
+      errortext = scc.s_formularangeresult + " " + value;
+    }
+  }
+  if (errortext && valuetype.charAt(0) != "e") {
+    value = errortext;
+    valuetype = "e";
+  }
 
+  // look for overflow
+
+  if (valuetype.charAt(0) == "n" && (isNaN(value) || !isFinite(value))) {
+    value = 0;
+    valuetype = "e#NUM!";
+    errortext = isNaN(value) ? scc.s_calcerrnumericnan : scc.s_calcerrnumericoverflow;
+  }
+  return {
+    value: value,
+    type: valuetype,
+    error: errortext
+  };
+};
 
 /*
 #
@@ -15863,39 +16394,35 @@ SocialCalc.Formula.EvaluatePolish = function(parseinfo, revpolish, sheet, allowr
 #
 */
 
-SocialCalc.Formula.LookupResultType = function(type1, type2, typelookup) {
-
-   var pos1, pos2, result;
-
-   var table1 = typelookup[type1];
-
-   if (!table1) {
-      table1 = typelookup[type1.charAt(0)+'*'];
-      if (!table1) {
-         return "e#VALUE! (internal error, missing LookupResultType "+type1.charAt(0)+"*)"; // missing from table -- please add it
-         }
-      }
-   pos1 = table1.indexOf("|"+type2+":");
-   if (pos1 >= 0) {
-      pos2 = table1.indexOf("|", pos1+1);
-      if (pos2<0) return "e#VALUE! (internal error, incorrect LookupResultType "+table1+")";
-      result = table1.substring(pos1+type2.length+2, pos2);
-      if (result == "1") return type1;
-      if (result == "2") return type2;
-      return result;
-      }
-   pos1 = table1.indexOf("|"+type2.charAt(0)+"*:");
-   if (pos1 >= 0) {
-      pos2 = table1.indexOf("|", pos1+1);
-      if (pos2<0) return "e#VALUE! (internal error, incorrect LookupResultType "+table1+")";
-      result = table1.substring(pos1+4, pos2);
-      if (result == "1") return type1;
-      if (result == "2") return type2;
-      return result;
-      }
-   return "e#VALUE!";
-
-   }
+SocialCalc.Formula.LookupResultType = function (type1, type2, typelookup) {
+  var pos1, pos2, result;
+  var table1 = typelookup[type1];
+  if (!table1) {
+    table1 = typelookup[type1.charAt(0) + '*'];
+    if (!table1) {
+      return "e#VALUE! (internal error, missing LookupResultType " + type1.charAt(0) + "*)"; // missing from table -- please add it
+    }
+  }
+  pos1 = table1.indexOf("|" + type2 + ":");
+  if (pos1 >= 0) {
+    pos2 = table1.indexOf("|", pos1 + 1);
+    if (pos2 < 0) return "e#VALUE! (internal error, incorrect LookupResultType " + table1 + ")";
+    result = table1.substring(pos1 + type2.length + 2, pos2);
+    if (result == "1") return type1;
+    if (result == "2") return type2;
+    return result;
+  }
+  pos1 = table1.indexOf("|" + type2.charAt(0) + "*:");
+  if (pos1 >= 0) {
+    pos2 = table1.indexOf("|", pos1 + 1);
+    if (pos2 < 0) return "e#VALUE! (internal error, incorrect LookupResultType " + table1 + ")";
+    result = table1.substring(pos1 + 4, pos2);
+    if (result == "1") return type1;
+    if (result == "2") return type2;
+    return result;
+  }
+  return "e#VALUE!";
+};
 
 /*
 #
@@ -15906,32 +16433,28 @@ SocialCalc.Formula.LookupResultType = function(type1, type2, typelookup) {
 #
 */
 
-SocialCalc.Formula.TopOfStackValueAndType = function(sheet, operand) {
+SocialCalc.Formula.TopOfStackValueAndType = function (sheet, operand) {
+  var cellvtype, cell, pos, coordsheet;
+  var scf = SocialCalc.Formula;
+  var result = {
+    type: "",
+    value: ""
+  };
+  var stacklen = operand.length;
+  if (!stacklen) {
+    // make sure something is there
+    result.error = SocialCalc.Constants.s_InternalError + "no operand on stack";
+    return result;
+  }
+  result.value = operand[stacklen - 1].value; // get top of stack
+  result.type = operand[stacklen - 1].type;
+  operand.pop(); // we have data - pop stack
 
-   var cellvtype, cell, pos, coordsheet;
-   var scf = SocialCalc.Formula;
-
-   var result = {type: "", value: ""};
-
-   var stacklen = operand.length;
-
-   if (!stacklen) { // make sure something is there
-      result.error = SocialCalc.Constants.s_InternalError+"no operand on stack";
-      return result;
-      }
-
-   result.value = operand[stacklen-1].value; // get top of stack
-   result.type = operand[stacklen-1].type;
-   operand.pop(); // we have data - pop stack
-
-   if (result.type == "name") {
-      result = scf.LookupName(sheet, result.value);
-      }
-
-   return result;
-
-   }
-
+  if (result.type == "name") {
+    result = scf.LookupName(sheet, result.value);
+  }
+  return result;
+};
 
 /*
 #
@@ -15943,39 +16466,34 @@ SocialCalc.Formula.TopOfStackValueAndType = function(sheet, operand) {
 #
 */
 
-SocialCalc.Formula.OperandAsNumber = function(sheet, operand) {
-
-   var t, valueinfo;
-   var operandinfo = SocialCalc.Formula.OperandValueAndType(sheet, operand);
-
-   t = operandinfo.type.charAt(0);
-
-   if (t == "n") {
-      operandinfo.value = operandinfo.value-0;
-      }
-   else if (t == "b") { // blank cell
-      operandinfo.type = "n";
+SocialCalc.Formula.OperandAsNumber = function (sheet, operand) {
+  var t, valueinfo;
+  var operandinfo = SocialCalc.Formula.OperandValueAndType(sheet, operand);
+  t = operandinfo.type.charAt(0);
+  if (t == "n") {
+    operandinfo.value = operandinfo.value - 0;
+  } else if (t == "b") {
+    // blank cell
+    operandinfo.type = "n";
+    operandinfo.value = 0;
+  } else if (t == "e") {
+    // error
+    operandinfo.value = 0;
+  } else {
+    valueinfo = SocialCalc.DetermineValueType ? SocialCalc.DetermineValueType(operandinfo.value) : {
+      value: operandinfo.value - 0,
+      type: "n"
+    }; // if without rest of SocialCalc
+    if (valueinfo.type.charAt(0) == "n") {
+      operandinfo.value = valueinfo.value - 0;
+      operandinfo.type = valueinfo.type;
+    } else {
       operandinfo.value = 0;
-      }
-   else if (t == "e") { // error
-      operandinfo.value = 0;
-      }
-   else {
-      valueinfo = SocialCalc.DetermineValueType ? SocialCalc.DetermineValueType(operandinfo.value) :
-                                                    {value: operandinfo.value-0, type: "n"}; // if without rest of SocialCalc
-      if (valueinfo.type.charAt(0) == "n") {
-         operandinfo.value = valueinfo.value-0;
-         operandinfo.type = valueinfo.type;
-         }
-      else {
-         operandinfo.value = 0;
-         operandinfo.type = valueinfo.type;
-         }
-      }
-
-   return operandinfo;
-
-   }
+      operandinfo.type = valueinfo.type;
+    }
+  }
+  return operandinfo;
+};
 
 /*
 #
@@ -15986,37 +16504,29 @@ SocialCalc.Formula.OperandAsNumber = function(sheet, operand) {
 #
 */
 
-SocialCalc.Formula.OperandAsText = function(sheet, operand) {
-
-   var t, valueinfo;
-   var operandinfo = SocialCalc.Formula.OperandValueAndType(sheet, operand);
-
-   t = operandinfo.type.charAt(0);
-
-   if (t ==  "t") { // any flavor of text returns as is
-      ;
-      }
-   else if (t == "n") {
-      operandinfo.value = SocialCalc.format_number_for_display ?
-                             SocialCalc.format_number_for_display(operandinfo.value, operandinfo.type, "") :
-                             operandinfo.value = operandinfo.value+"";
-      operandinfo.type = "t";
-      }
-   else if (t == "b") { // blank
-      operandinfo.value = "";
-      operandinfo.type = "t";
-      }
-   else if (t == "e") { // error
-      operandinfo.value = "";
-      }
-   else {
-      operand.value = operandinfo.value + "";
-      operand.type = "t";
-      }
-
-   return operandinfo;
-
-   }
+SocialCalc.Formula.OperandAsText = function (sheet, operand) {
+  var t, valueinfo;
+  var operandinfo = SocialCalc.Formula.OperandValueAndType(sheet, operand);
+  t = operandinfo.type.charAt(0);
+  if (t == "t") {
+    // any flavor of text returns as is
+    ;
+  } else if (t == "n") {
+    operandinfo.value = SocialCalc.format_number_for_display ? SocialCalc.format_number_for_display(operandinfo.value, operandinfo.type, "") : operandinfo.value = operandinfo.value + "";
+    operandinfo.type = "t";
+  } else if (t == "b") {
+    // blank
+    operandinfo.value = "";
+    operandinfo.type = "t";
+  } else if (t == "e") {
+    // error
+    operandinfo.value = "";
+  } else {
+    operand.value = operandinfo.value + "";
+    operand.type = "t";
+  }
+  return operandinfo;
+};
 
 /*
 #
@@ -16029,69 +16539,65 @@ SocialCalc.Formula.OperandAsText = function(sheet, operand) {
 #
 */
 
-SocialCalc.Formula.OperandValueAndType = function(sheet, operand) {
+SocialCalc.Formula.OperandValueAndType = function (sheet, operand) {
+  var cellvtype, cell, pos, coordsheet;
+  var scf = SocialCalc.Formula;
+  var result = {
+    type: "",
+    value: ""
+  };
+  var stacklen = operand.length;
+  if (!stacklen) {
+    // make sure something is there
+    result.error = SocialCalc.Constants.s_InternalError + "no operand on stack";
+    return result;
+  }
+  result.value = operand[stacklen - 1].value; // get top of stack
+  result.type = operand[stacklen - 1].type;
+  operand.pop(); // we have data - pop stack
 
-   var cellvtype, cell, pos, coordsheet;
-   var scf = SocialCalc.Formula;
-
-   var result = {type: "", value: ""};
-
-   var stacklen = operand.length;
-
-   if (!stacklen) { // make sure something is there
-      result.error = SocialCalc.Constants.s_InternalError+"no operand on stack";
-      return result;
+  if (result.type == "name") {
+    result = scf.LookupName(sheet, result.value);
+  }
+  if (result.type == "range") {
+    result = scf.StepThroughRangeDown(operand, result.value);
+  }
+  if (result.type == "coord") {
+    // value is a coord reference
+    coordsheet = sheet;
+    pos = result.value.indexOf("!");
+    if (pos != -1) {
+      // sheet reference
+      coordsheet = scf.FindInSheetCache(result.value.substring(pos + 1)); // get other sheet
+      if (coordsheet == null) {
+        // unavailable
+        result.type = "e#REF!";
+        result.error = SocialCalc.Constants.s_sheetunavailable + " " + result.value.substring(pos + 1);
+        result.value = 0;
+        return result;
       }
-
-   result.value = operand[stacklen-1].value; // get top of stack
-   result.type = operand[stacklen-1].type;
-   operand.pop(); // we have data - pop stack
-
-   if (result.type == "name") {
-      result = scf.LookupName(sheet, result.value);
+      result.value = result.value.substring(0, pos); // get coord part
+    }
+    if (coordsheet) {
+      cell = coordsheet.cells[SocialCalc.Formula.PlainCoord(result.value)];
+      if (cell) {
+        cellvtype = cell.valuetype; // get type of value in the cell it points to
+        result.value = cell.datavalue;
+      } else {
+        cellvtype = "b";
       }
-
-   if (result.type == "range") {
-      result = scf.StepThroughRangeDown(operand, result.value);
-      }
-
-   if (result.type == "coord") { // value is a coord reference
-      coordsheet = sheet;
-      pos = result.value.indexOf("!");
-      if (pos != -1) { // sheet reference
-         coordsheet = scf.FindInSheetCache(result.value.substring(pos+1)); // get other sheet
-         if (coordsheet == null) { // unavailable
-            result.type = "e#REF!";
-            result.error = SocialCalc.Constants.s_sheetunavailable+" "+result.value.substring(pos+1);
-            result.value = 0;
-            return result;
-            }
-         result.value = result.value.substring(0, pos); // get coord part
-         }
-
-      if (coordsheet) {
-         cell = coordsheet.cells[SocialCalc.Formula.PlainCoord(result.value)];
-         if (cell) {
-            cellvtype = cell.valuetype; // get type of value in the cell it points to
-            result.value = cell.datavalue;
-            }
-         else {
-            cellvtype = "b";
-            }
-         }
-      else {
-         cellvtype = "e#N/A";
-         result.value = 0;
-         }
-      result.type = cellvtype || "b";
-      if (result.type == "b") { // blank
-         result.value = 0;
-         }
-      }
-
-   return result;
-
-   }
+    } else {
+      cellvtype = "e#N/A";
+      result.value = 0;
+    }
+    result.type = cellvtype || "b";
+    if (result.type == "b") {
+      // blank
+      result.value = 0;
+    }
+  }
+  return result;
+};
 
 /*
 #
@@ -16102,11 +16608,9 @@ SocialCalc.Formula.OperandValueAndType = function(sheet, operand) {
 #
 */
 
-
-SocialCalc.Formula.OperandAsCoord = function(sheet, operand) {
-	return SocialCalc.Formula.OperandAsType(sheet, operand, "coord");
-}
-
+SocialCalc.Formula.OperandAsCoord = function (sheet, operand) {
+  return SocialCalc.Formula.OperandAsType(sheet, operand, "coord");
+};
 
 /*
 #
@@ -16117,9 +16621,9 @@ SocialCalc.Formula.OperandAsCoord = function(sheet, operand) {
 #
 */
 
-SocialCalc.Formula.OperandAsRange = function(sheet, operand) {
-	return SocialCalc.Formula.OperandAsType(sheet, operand, "range");
-}
+SocialCalc.Formula.OperandAsRange = function (sheet, operand) {
+  return SocialCalc.Formula.OperandAsType(sheet, operand, "range");
+};
 
 /*
 #
@@ -16129,30 +16633,28 @@ SocialCalc.Formula.OperandAsRange = function(sheet, operand) {
 # Returns operandtype value. All others are treated as an error.
 #
 */
-SocialCalc.Formula.OperandAsType = function(sheet, operand, operandtype) {
-
-   var scf = SocialCalc.Formula;
-
-   var result = {type: "", value: ""};
-
-   var stacklen = operand.length;
-
-   result.value = operand[stacklen-1].value; // get top of stack
-   result.type = operand[stacklen-1].type;
-   operand.pop(); // we have data - pop stack
-   if (result.type == "name") {
-      result = SocialCalc.Formula.LookupName(sheet, result.value);
-      }
-   if (result.type == operandtype) { // value is a coord reference
-      return result;
-      }
-   else {
-      result.value = SocialCalc.Constants.s_calcerrcellrefmissing;
-      result.type = "e#REF!";
-      return result;
-      }
-}
-
+SocialCalc.Formula.OperandAsType = function (sheet, operand, operandtype) {
+  var scf = SocialCalc.Formula;
+  var result = {
+    type: "",
+    value: ""
+  };
+  var stacklen = operand.length;
+  result.value = operand[stacklen - 1].value; // get top of stack
+  result.type = operand[stacklen - 1].type;
+  operand.pop(); // we have data - pop stack
+  if (result.type == "name") {
+    result = SocialCalc.Formula.LookupName(sheet, result.value);
+  }
+  if (result.type == operandtype) {
+    // value is a coord reference
+    return result;
+  } else {
+    result.value = SocialCalc.Constants.s_calcerrcellrefmissing;
+    result.type = "e#REF!";
+    return result;
+  }
+};
 
 /*
 #
@@ -16165,51 +16667,46 @@ SocialCalc.Formula.OperandAsType = function(sheet, operand, operandtype) {
 #
 */
 
-SocialCalc.Formula.OperandsAsCoordOnSheet = function(sheet, operand) {
+SocialCalc.Formula.OperandsAsCoordOnSheet = function (sheet, operand) {
+  var sheetname, othersheet, pos1, pos2;
+  var value1 = {};
+  var result = {};
+  var scf = SocialCalc.Formula;
+  var stacklen = operand.length;
+  value1.value = operand[stacklen - 1].value; // get top of stack - coord or name
+  value1.type = operand[stacklen - 1].type;
+  operand.pop(); // we have data - pop stack
 
-   var sheetname, othersheet, pos1, pos2;
-   var value1 = {};
-   var result = {};
-   var scf = SocialCalc.Formula;
-
-   var stacklen = operand.length;
-   value1.value = operand[stacklen-1].value; // get top of stack - coord or name
-   value1.type = operand[stacklen-1].type;
-   operand.pop(); // we have data - pop stack
-
-   sheetname = scf.OperandAsSheetName(sheet, operand); // get sheetname as text
-   othersheet = scf.FindInSheetCache(sheetname.value);
-   if (othersheet == null) { // unavailable
-      result.type = "e#REF!";
-      result.value = 0;
-      result.error = SocialCalc.Constants.s_sheetunavailable+" "+sheetname.value;
-      return result;
-      }
-
-   if (value1.type == "name") {
-      value1 = scf.LookupName(othersheet, value1.value);
-      }
-   result.type = value1.type;
-   if (value1.type == "coord") { // value is a coord reference
-      result.value = value1.value + "!" + sheetname.value; // return in the format as used on stack
-      }
-   else if (value1.type == "range") { // value is a range reference
-      pos1 = value1.value.indexOf("|");
-      pos2 = value1.value.indexOf("|", pos1+1);
-      result.value = value1.value.substring(0, pos1) + "!" + sheetname.value +
-                    "|" + value1.value.substring(pos1+1, pos2) + "|";
-      }
-   else if (value1.type.charAt(0)=="e") {
-      result.value = value1.value;
-      }
-   else {
-      result.error = SocialCalc.Constants.s_calcerrcellrefmissing;
-      result.type = "e#REF!";
-      result.value = 0;
-      }
-   return result;
-   
-   }
+  sheetname = scf.OperandAsSheetName(sheet, operand); // get sheetname as text
+  othersheet = scf.FindInSheetCache(sheetname.value);
+  if (othersheet == null) {
+    // unavailable
+    result.type = "e#REF!";
+    result.value = 0;
+    result.error = SocialCalc.Constants.s_sheetunavailable + " " + sheetname.value;
+    return result;
+  }
+  if (value1.type == "name") {
+    value1 = scf.LookupName(othersheet, value1.value);
+  }
+  result.type = value1.type;
+  if (value1.type == "coord") {
+    // value is a coord reference
+    result.value = value1.value + "!" + sheetname.value; // return in the format as used on stack
+  } else if (value1.type == "range") {
+    // value is a range reference
+    pos1 = value1.value.indexOf("|");
+    pos2 = value1.value.indexOf("|", pos1 + 1);
+    result.value = value1.value.substring(0, pos1) + "!" + sheetname.value + "|" + value1.value.substring(pos1 + 1, pos2) + "|";
+  } else if (value1.type.charAt(0) == "e") {
+    result.value = value1.value;
+  } else {
+    result.error = SocialCalc.Constants.s_calcerrcellrefmissing;
+    result.type = "e#REF!";
+    result.value = 0;
+  }
+  return result;
+};
 
 /*
 #
@@ -16222,46 +16719,58 @@ SocialCalc.Formula.OperandsAsCoordOnSheet = function(sheet, operand) {
 #
 */
 
-SocialCalc.Formula.OperandsAsRangeOnSheet = function(sheet, operand) {
+SocialCalc.Formula.OperandsAsRangeOnSheet = function (sheet, operand) {
+  var value1, othersheet, pos1, pos2;
+  var value2 = {};
+  var scf = SocialCalc.Formula;
+  var scc = SocialCalc.Constants;
+  var stacklen = operand.length;
+  value2.value = operand[stacklen - 1].value; // get top of stack - coord or name for "right" side
+  value2.type = operand[stacklen - 1].type;
+  operand.pop(); // we have data - pop stack
 
-   var value1, othersheet, pos1, pos2;
-   var value2 = {};
-   var scf = SocialCalc.Formula;
-   var scc = SocialCalc.Constants;
-
-   var stacklen = operand.length;
-   value2.value = operand[stacklen-1].value; // get top of stack - coord or name for "right" side
-   value2.type = operand[stacklen-1].type;
-   operand.pop(); // we have data - pop stack
-
-   value1 = scf.OperandAsCoord(sheet, operand); // get "left" coord
-   if (value1.type != "coord") { // not a coord, which it must be
-      return {value: 0, type: "e#REF!"};
-      }
-
-   othersheet = sheet;
-   pos1 = value1.value.indexOf("!");
-   if (pos1 != -1) { // sheet reference
-      pos2 = value1.value.indexOf("|", pos1+1);
-      if (pos2 < 0) pos2 = value1.value.length;
-      othersheet = scf.FindInSheetCache(value1.value.substring(pos1+1,pos2)); // get other sheet
-      if (othersheet == null) { // unavailable
-         return {value: 0, type: "e#REF!", errortext: scc.s_sheetunavailable+" "+value1.value.substring(pos1+1,pos2)};
-         }
-      }
-
-   if (value2.type == "name") { // coord:name is allowed, if name is just one cell
-      value2 = scf.LookupName(othersheet, value2.value, "end");
-      }
-
-   if (value2.type == "coord") { // value is a coord reference, so return the combined range
-      return {value: value1.value+"|"+value2.value+"|", type: "range"}; // return range in the format as used on stack
-      }
-   else { // bad form
-      return {value: scc.s_calcerrcellrefmissing, type: "e#REF!"};
-      }
-   }
-
+  value1 = scf.OperandAsCoord(sheet, operand); // get "left" coord
+  if (value1.type != "coord") {
+    // not a coord, which it must be
+    return {
+      value: 0,
+      type: "e#REF!"
+    };
+  }
+  othersheet = sheet;
+  pos1 = value1.value.indexOf("!");
+  if (pos1 != -1) {
+    // sheet reference
+    pos2 = value1.value.indexOf("|", pos1 + 1);
+    if (pos2 < 0) pos2 = value1.value.length;
+    othersheet = scf.FindInSheetCache(value1.value.substring(pos1 + 1, pos2)); // get other sheet
+    if (othersheet == null) {
+      // unavailable
+      return {
+        value: 0,
+        type: "e#REF!",
+        errortext: scc.s_sheetunavailable + " " + value1.value.substring(pos1 + 1, pos2)
+      };
+    }
+  }
+  if (value2.type == "name") {
+    // coord:name is allowed, if name is just one cell
+    value2 = scf.LookupName(othersheet, value2.value, "end");
+  }
+  if (value2.type == "coord") {
+    // value is a coord reference, so return the combined range
+    return {
+      value: value1.value + "|" + value2.value + "|",
+      type: "range"
+    }; // return range in the format as used on stack
+  } else {
+    // bad form
+    return {
+      value: scc.s_calcerrcellrefmissing,
+      type: "e#REF!"
+    };
+  }
+};
 
 /*
 #
@@ -16273,48 +16782,46 @@ SocialCalc.Formula.OperandsAsRangeOnSheet = function(sheet, operand) {
 #
 */
 
-SocialCalc.Formula.OperandAsSheetName = function(sheet, operand) {
-
-   var nvalue, cell;
-
-   var scf = SocialCalc.Formula;
-
-   var result = {type: "", value: ""};
-
-   var stacklen = operand.length;
-
-   result.value = operand[stacklen-1].value; // get top of stack
-   result.type = operand[stacklen-1].type;
-   operand.pop(); // we have data - pop stack
-   if (result.type == "name") {
-      nvalue = SocialCalc.Formula.LookupName(sheet, result.value);
-      if (!nvalue.value) { // not a known name - return bare name as the name value
-         return result;
-         }
-      result.value = nvalue.value;
-      result.type = nvalue.type;
-      }
-   if (result.type == "coord") { // value is a coord reference, follow it to find sheet name
-      cell = sheet.cells[SocialCalc.Formula.PlainCoord(result.value)];
-      if (cell) {
-         result.value = cell.datavalue;
-         result.type = cell.valuetype;
-         }
-      else {
-         result.value = "";
-         result.type = "b";
-         }
-      }
-   if (result.type.charAt(0) == "t") { // value is a string which could be a sheet name
+SocialCalc.Formula.OperandAsSheetName = function (sheet, operand) {
+  var nvalue, cell;
+  var scf = SocialCalc.Formula;
+  var result = {
+    type: "",
+    value: ""
+  };
+  var stacklen = operand.length;
+  result.value = operand[stacklen - 1].value; // get top of stack
+  result.type = operand[stacklen - 1].type;
+  operand.pop(); // we have data - pop stack
+  if (result.type == "name") {
+    nvalue = SocialCalc.Formula.LookupName(sheet, result.value);
+    if (!nvalue.value) {
+      // not a known name - return bare name as the name value
       return result;
-      }
-   else {
+    }
+    result.value = nvalue.value;
+    result.type = nvalue.type;
+  }
+  if (result.type == "coord") {
+    // value is a coord reference, follow it to find sheet name
+    cell = sheet.cells[SocialCalc.Formula.PlainCoord(result.value)];
+    if (cell) {
+      result.value = cell.datavalue;
+      result.type = cell.valuetype;
+    } else {
       result.value = "";
-      result.error = SocialCalc.Constants.s_calcerrsheetnamemissing;
-      return result;
-      }
-
-   }
+      result.type = "b";
+    }
+  }
+  if (result.type.charAt(0) == "t") {
+    // value is a string which could be a sheet name
+    return result;
+  } else {
+    result.value = "";
+    result.error = SocialCalc.Constants.s_calcerrsheetnamemissing;
+    return result;
+  }
+};
 
 //
 // value = SocialCalc.Formula.LookupName(sheet, name)
@@ -16325,74 +16832,70 @@ SocialCalc.Formula.OperandAsSheetName = function(sheet, operand) {
 // Note: The range must not have sheet names ("!") in them.
 //
 
-SocialCalc.Formula.LookupName = function(sheet, name, isEnd) {
+SocialCalc.Formula.LookupName = function (sheet, name, isEnd) {
+  var pos, specialc, parseinfo;
+  var names = sheet.names;
+  var value = {};
+  var startedwalk = false;
+  if (names[name.toUpperCase()]) {
+    // is name defined?
 
-   var pos, specialc, parseinfo;
-   var names = sheet.names;
-   var value = {};
-   var startedwalk = false;
+    value.value = names[name.toUpperCase()].definition; // yes
 
-   if (names[name.toUpperCase()]) { // is name defined?
-
-      value.value = names[name.toUpperCase()].definition; // yes
-
-      if (value.value.charAt(0) == "=") { // formula
-         if (!sheet.checknamecirc) { // are we possibly walking the name tree?
-            sheet.checknamecirc = {}; // not yet
-            startedwalk = true; // remember we are the reference that started it
-            }
-         else {
-            if (sheet.checknamecirc[name]) { // circular reference
-               value.type = "e#NAME?";
-               value.error = SocialCalc.Constants.s_circularnameref+' "' + name + '".';
-               return value;
-               }
-            }
-         sheet.checknamecirc[name] = true;
-
-         parseinfo = SocialCalc.Formula.ParseFormulaIntoTokens(value.value.substring(1));
-         value = SocialCalc.Formula.evaluate_parsed_formula(parseinfo, sheet, 1); // parse formula, allowing range return
-
-         delete sheet.checknamecirc[name]; // done with us
-         if (startedwalk) {
-            delete sheet.checknamecirc; // done with walk
-            }
-
-         if (value.type != "range") {
-            return value;
-            }
-         }
-
-      pos = value.value.indexOf(":");
-      if (pos != -1) { // range
-         value.type = "range";
-         value.value = value.value.substring(0, pos) + "|" + value.value.substring(pos+1)+"|";
-         value.value = value.value.toUpperCase();
-         }
-      else {
-         value.type = "coord";
-         value.value = value.value.toUpperCase();
-         }
-      return value;
+    if (value.value.charAt(0) == "=") {
+      // formula
+      if (!sheet.checknamecirc) {
+        // are we possibly walking the name tree?
+        sheet.checknamecirc = {}; // not yet
+        startedwalk = true; // remember we are the reference that started it
+      } else {
+        if (sheet.checknamecirc[name]) {
+          // circular reference
+          value.type = "e#NAME?";
+          value.error = SocialCalc.Constants.s_circularnameref + ' "' + name + '".';
+          return value;
+        }
       }
-   else if (specialc=SocialCalc.Formula.SpecialConstants[name.toUpperCase()]) { // special constant, like #REF!
-      pos = specialc.indexOf(",");
-      value.value = specialc.substring(0,pos)-0;
-      value.type = specialc.substring(pos+1);
-      return value;
+      sheet.checknamecirc[name] = true;
+      parseinfo = SocialCalc.Formula.ParseFormulaIntoTokens(value.value.substring(1));
+      value = SocialCalc.Formula.evaluate_parsed_formula(parseinfo, sheet, 1); // parse formula, allowing range return
+
+      delete sheet.checknamecirc[name]; // done with us
+      if (startedwalk) {
+        delete sheet.checknamecirc; // done with walk
       }
-   else if (/^[a-zA-Z][a-zA-Z]?$/.test(name)) {
+      if (value.type != "range") {
+        return value;
+      }
+    }
+    pos = value.value.indexOf(":");
+    if (pos != -1) {
+      // range
+      value.type = "range";
+      value.value = value.value.substring(0, pos) + "|" + value.value.substring(pos + 1) + "|";
+      value.value = value.value.toUpperCase();
+    } else {
       value.type = "coord";
-      value.value = name.toUpperCase() + (isEnd ? sheet.attribs.lastrow : 1);
-      return value;
-   }
-   else {
-      value.value = "";
-      value.type = "e#NAME?";
-      value.error = SocialCalc.Constants.s_calcerrunknownname+' "'+name+'"';
-      return value;
-      }
-   }
+      value.value = value.value.toUpperCase();
+    }
+    return value;
+  } else if (specialc = SocialCalc.Formula.SpecialConstants[name.toUpperCase()]) {
+    // special constant, like #REF!
+    pos = specialc.indexOf(",");
+    value.value = specialc.substring(0, pos) - 0;
+    value.type = specialc.substring(pos + 1);
+    return value;
+  } else if (/^[a-zA-Z][a-zA-Z]?$/.test(name)) {
+    value.type = "coord";
+    value.value = name.toUpperCase() + (isEnd ? sheet.attribs.lastrow : 1);
+    return value;
+  } else {
+    value.value = "";
+    value.type = "e#NAME?";
+    value.error = SocialCalc.Constants.s_calcerrunknownname + ' "' + name + '"';
+    return value;
+  }
+};
 
 /*
 #
@@ -16403,45 +16906,43 @@ SocialCalc.Formula.LookupName = function(sheet, name, isEnd) {
 #
 */
 
-SocialCalc.Formula.StepThroughRangeDown = function(operand, rangevalue) {
-
-   var value1, value2, sequence, pos1, pos2, sheet1, rp, c, r, count;
-   var scf = SocialCalc.Formula;
-
-   pos1 = rangevalue.indexOf("|");
-   pos2 = rangevalue.indexOf("|", pos1+1);
-   value1 = rangevalue.substring(0, pos1);
-   value2 = rangevalue.substring(pos1+1, pos2);
-   sequence = rangevalue.substring(pos2+1) - 0;
-
-   pos1 = value1.indexOf("!");
-   if (pos1 != -1) {
-      sheet1 = value1.substring(pos1);
-      value1 = value1.substring(0, pos1);
+SocialCalc.Formula.StepThroughRangeDown = function (operand, rangevalue) {
+  var value1, value2, sequence, pos1, pos2, sheet1, rp, c, r, count;
+  var scf = SocialCalc.Formula;
+  pos1 = rangevalue.indexOf("|");
+  pos2 = rangevalue.indexOf("|", pos1 + 1);
+  value1 = rangevalue.substring(0, pos1);
+  value2 = rangevalue.substring(pos1 + 1, pos2);
+  sequence = rangevalue.substring(pos2 + 1) - 0;
+  pos1 = value1.indexOf("!");
+  if (pos1 != -1) {
+    sheet1 = value1.substring(pos1);
+    value1 = value1.substring(0, pos1);
+  } else {
+    sheet1 = "";
+  }
+  pos1 = value2.indexOf("!");
+  if (pos1 != -1) {
+    value2 = value2.substring(0, pos1);
+  }
+  rp = scf.OrderRangeParts(value1, value2);
+  count = 0;
+  for (r = rp.r1; r <= rp.r2; r++) {
+    for (c = rp.c1; c <= rp.c2; c++) {
+      count++;
+      if (count > sequence) {
+        if (r != rp.r2 || c != rp.c2) {
+          // keep on stack until done
+          scf.PushOperand(operand, "range", value1 + sheet1 + "|" + value2 + "|" + count);
+        }
+        return {
+          value: SocialCalc.crToCoord(c, r) + sheet1,
+          type: "coord"
+        };
       }
-   else {
-      sheet1 = "";
-      }
-   pos1 = value2.indexOf("!");
-   if (pos1 != -1) {
-      value2 = value2.substring(0, pos1);
-      }
-
-   rp = scf.OrderRangeParts(value1, value2);
-   
-   count = 0;
-   for (r=rp.r1; r<=rp.r2; r++) {
-      for (c=rp.c1; c<=rp.c2; c++) {
-         count++;
-         if (count > sequence) {
-            if (r!=rp.r2 || c!=rp.c2) { // keep on stack until done
-               scf.PushOperand(operand, "range", value1+sheet1+"|"+value2+"|"+count);
-               }
-            return {value: SocialCalc.crToCoord(c, r)+sheet1, type: "coord"};
-            }
-         }
-      }
-   }
+    }
+  }
+};
 
 /*
 #
@@ -16457,45 +16958,43 @@ SocialCalc.Formula.StepThroughRangeDown = function(operand, rangevalue) {
 #
 */
 
-SocialCalc.Formula.DecodeRangeParts = function(sheetdata, range) {
-
-   var value1, value2, pos1, pos2, sheet1, coordsheetdata, rp;
-
-   var scf = SocialCalc.Formula;
-
-   pos1 = range.indexOf("|");
-   pos2 = range.indexOf("|", pos1+1);
-   value1 = range.substring(0, pos1);
-   value2 = range.substring(pos1+1, pos2);
-
-   pos1 = value1.indexOf("!");
-   if (pos1 != -1) {
-      sheet1 = value1.substring(pos1+1);
-      value1 = value1.substring(0, pos1);
-      }
-   else {
-      sheet1 = "";
-      }
-   pos1 = value2.indexOf("!");
-   if (pos1 != -1) {
-      value2 = value2.substring(0, pos1);
-      }
-
-   coordsheetdata = sheetdata;
-   if (sheet1) { // sheet reference
-      coordsheetdata = scf.FindInSheetCache(sheet1);
-      if (coordsheetdata == null) { // unavailable
-         return null;
-         }
-      }
-
-   rp = scf.OrderRangeParts(value1, value2);
-
-   return {sheetdata: coordsheetdata, sheetname: sheet1, col1num: rp.c1, ncols: rp.c2-rp.c1+1, row1num: rp.r1, nrows: rp.r2-rp.r1+1}
-
-   }
-
-
+SocialCalc.Formula.DecodeRangeParts = function (sheetdata, range) {
+  var value1, value2, pos1, pos2, sheet1, coordsheetdata, rp;
+  var scf = SocialCalc.Formula;
+  pos1 = range.indexOf("|");
+  pos2 = range.indexOf("|", pos1 + 1);
+  value1 = range.substring(0, pos1);
+  value2 = range.substring(pos1 + 1, pos2);
+  pos1 = value1.indexOf("!");
+  if (pos1 != -1) {
+    sheet1 = value1.substring(pos1 + 1);
+    value1 = value1.substring(0, pos1);
+  } else {
+    sheet1 = "";
+  }
+  pos1 = value2.indexOf("!");
+  if (pos1 != -1) {
+    value2 = value2.substring(0, pos1);
+  }
+  coordsheetdata = sheetdata;
+  if (sheet1) {
+    // sheet reference
+    coordsheetdata = scf.FindInSheetCache(sheet1);
+    if (coordsheetdata == null) {
+      // unavailable
+      return null;
+    }
+  }
+  rp = scf.OrderRangeParts(value1, value2);
+  return {
+    sheetdata: coordsheetdata,
+    sheetname: sheet1,
+    col1num: rp.c1,
+    ncols: rp.c2 - rp.c1 + 1,
+    row1num: rp.r1,
+    nrows: rp.r2 - rp.r1 + 1
+  };
+};
 
 //*********************
 //
@@ -16526,22 +17025,20 @@ SocialCalc.Formula.DecodeRangeParts = function(sheetdata, range) {
 //
 // To add a function, just add it to this object.
 
-   if (!SocialCalc.Formula.FunctionList) { // make sure it is defined (could have been in another module)
-      SocialCalc.Formula.FunctionList = {};
-      }
+if (!SocialCalc.Formula.FunctionList) {
+  // make sure it is defined (could have been in another module)
+  SocialCalc.Formula.FunctionList = {};
+}
 
-   // FunctionClasses[classname] = {name: full-name-string, items: [sorted list of function names]};
-   // filled in by SocialCalc.Formula.FillFunctionInfo
+// FunctionClasses[classname] = {name: full-name-string, items: [sorted list of function names]};
+// filled in by SocialCalc.Formula.FillFunctionInfo
 
-   SocialCalc.Formula.FunctionClasses = null; // start null to say needs filling in
+SocialCalc.Formula.FunctionClasses = null; // start null to say needs filling in
 
-   // FunctionArgDef[argname] = explicit-string-for-arg-list;
-   // filled in by SocialCalc.Formula.FillFunctionInfo
+// FunctionArgDef[argname] = explicit-string-for-arg-list;
+// filled in by SocialCalc.Formula.FillFunctionInfo
 
-   SocialCalc.Formula.FunctionArgDefs = {};
-
-
-   
+SocialCalc.Formula.FunctionArgDefs = {};
 
 /*
 #
@@ -16554,172 +17051,155 @@ SocialCalc.Formula.DecodeRangeParts = function(sheetdata, range) {
 #
 */
 // eddy StoreIoEventFormula
-SocialCalc.Formula.StoreIoEventFormula = function(function_name, coord, operand_reverse, sheet, io_parameters) {
-	var operand = [];
-	SocialCalc.Formula.Clone(operand,operand_reverse);
-    operand.reverse(); // normal parameter order
-    if(operand.length == 0) return;
-	
-	
-
-  if(typeof sheet.ioEventTree === 'undefined') sheet.ioEventTree = {};	// action formulas - e.g. COPYVALUE, COPYFORMULA  - these action formulas are triggered by a trigger formula 
-  if(typeof sheet.ioParameterList === 'undefined') sheet.ioParameterList = {}; // widget parameters - e.g. BUTTON, TEXTBOX - this is updated when the widget state changes
-  if(typeof sheet.ioTimeTriggerList === 'undefined') sheet.ioTimeTriggerList = {}; // 
-  if(typeof sheet.radioGroupList === 'undefined') sheet.radioGroupList = {}; // 
+SocialCalc.Formula.StoreIoEventFormula = function (function_name, coord, operand_reverse, sheet, io_parameters) {
+  var operand = [];
+  SocialCalc.Formula.Clone(operand, operand_reverse);
+  operand.reverse(); // normal parameter order
+  if (operand.length == 0) return;
+  if (typeof sheet.ioEventTree === 'undefined') sheet.ioEventTree = {}; // action formulas - e.g. COPYVALUE, COPYFORMULA  - these action formulas are triggered by a trigger formula 
+  if (typeof sheet.ioParameterList === 'undefined') sheet.ioParameterList = {}; // widget parameters - e.g. BUTTON, TEXTBOX - this is updated when the widget state changes
+  if (typeof sheet.ioTimeTriggerList === 'undefined') sheet.ioTimeTriggerList = {}; // 
+  if (typeof sheet.radioGroupList === 'undefined') sheet.radioGroupList = {}; // 
 
   // store parameters of each action formulas 
-  if(typeof sheet.ioParameterList[coord] === 'undefined') sheet.ioParameterList[coord] = {};
+  if (typeof sheet.ioParameterList[coord] === 'undefined') sheet.ioParameterList[coord] = {};
   sheet.ioParameterList[coord] = operand;
   sheet.ioParameterList[coord].function_name = function_name;
-  
-  // add radio buttons to list - so radio group can be updated
-//  if(function_name == "RADIOBUTTON") {
-//    
-//    if(operand.length > 1) {
-//      if (sheet.radioGroupList[]) {
-//        sheet.radioGroup.push()
-//      } else {
-//        
-//      } 
-//    }
-//  }
 
-  
+  // add radio buttons to list - so radio group can be updated
+  //  if(function_name == "RADIOBUTTON") {
+  //    
+  //    if(operand.length > 1) {
+  //      if (sheet.radioGroupList[]) {
+  //        sheet.radioGroup.push()
+  //      } else {
+  //        
+  //      } 
+  //    }
+  //  }
+
   // send trigger times to server if changed
-  if(io_parameters == "TimeTrigger") { // timer trigger formula exists   
+  if (io_parameters == "TimeTrigger") {
+    // timer trigger formula exists   
     // function to push cell time into array
-    var PushTriggerTime = function(list, coordA1, sheetData) {
-      var cell = sheetData.cells[coordA1];   
-      if (typeof cell !== 'undefined' && cell.valuetype.charAt(0) == "n") { // if not blank and is number
+    var PushTriggerTime = function (list, coordA1, sheetData) {
+      var cell = sheetData.cells[coordA1];
+      if (typeof cell !== 'undefined' && cell.valuetype.charAt(0) == "n") {
+        // if not blank and is number
         list.push(cell.datavalue);
       }
     };
-
     var triggerTimeCellId = SocialCalc.Formula.PlainCoord(operand[0].value); // strip dollar signs
-    
+
     var currentTriggerTimeList = [];
-    
-    if(operand[0].type == "range" )  {      
+    if (operand[0].type == "range") {
       var rangeinfo = SocialCalc.Formula.DecodeRangeParts(sheet, triggerTimeCellId);
-      for (var i=0; i<rangeinfo.ncols; i++) {
-        for (var j=0; j<rangeinfo.nrows; j++) {
+      for (var i = 0; i < rangeinfo.ncols; i++) {
+        for (var j = 0; j < rangeinfo.nrows; j++) {
           var cellCoord = SocialCalc.crToCoord(rangeinfo.col1num + i, rangeinfo.row1num + j);
           PushTriggerTime(currentTriggerTimeList, cellCoord, sheet);
         }
       }
     }
-    
-    if(operand[0].type == "coord" ) {      
+    if (operand[0].type == "coord") {
       PushTriggerTime(currentTriggerTimeList, triggerTimeCellId, sheet);
     }
-    
     if (operand[0].type.charAt(0) == "n") {
-      currentTriggerTimeList.push(operand[0].value);      
+      currentTriggerTimeList.push(operand[0].value);
     }
 
     // if time triggers changed then set changed times in ioTimeTrigger and schedule      
-    if(typeof sheet.ioTimeTriggerList[coord] === 'undefined' || SocialCalc.Formula.ArrayValuesEqual(sheet.ioTimeTriggerList[coord], currentTriggerTimeList) == false) {
+    if (typeof sheet.ioTimeTriggerList[coord] === 'undefined' || SocialCalc.Formula.ArrayValuesEqual(sheet.ioTimeTriggerList[coord], currentTriggerTimeList) == false) {
       // set the time+cell in ioTimeTrigger
       sheet.ioTimeTriggerList[coord] = currentTriggerTimeList;
       // schedule the set Time Trigger // sheet.ScheduleSheetCommands('...    
-      var timeZoneOffsetMins = (new Date()).getTimezoneOffset();
+      var timeZoneOffsetMins = new Date().getTimezoneOffset();
       var start_1_1_1970 = 25569; // Day number of 1/1/1970 starting with 1/1/1900 as 1      
       var triggerUTCTimeList = []; /// EPOCH in Mins - Mins since 1/1/1970 GMT
-      for(var index = 0; index < currentTriggerTimeList.length; ++index) triggerUTCTimeList[index] = Math.floor(((currentTriggerTimeList[index] - start_1_1_1970 ) *24 * 60) + timeZoneOffsetMins);
-      sheet.ScheduleSheetCommands('settimetrigger '+coord+' '+triggerUTCTimeList.toString());       
+      for (var index = 0; index < currentTriggerTimeList.length; ++index) triggerUTCTimeList[index] = Math.floor((currentTriggerTimeList[index] - start_1_1_1970) * 24 * 60 + timeZoneOffsetMins);
+      sheet.ScheduleSheetCommands('settimetrigger ' + coord + ' ' + triggerUTCTimeList.toString());
     }
   }
-  
-	// store trigger lookup table
-  if(io_parameters == "EventTree"	&& (operand[0].type == "coord" || operand[0].type == "range")) { // trigger cell exists   
-  	// create a list of action formulas for each trigger cell  
-    var triggerCellId = operand[0].value.replace(/\$/g,''); // strip dollar signs
-    var PushTriggerCord = function(list, index, v) {
-        if(typeof list[index] === 'undefined') list[index] = {};
-        list[index][v] = v;
+
+  // store trigger lookup table
+  if (io_parameters == "EventTree" && (operand[0].type == "coord" || operand[0].type == "range")) {
+    // trigger cell exists   
+    // create a list of action formulas for each trigger cell  
+    var triggerCellId = operand[0].value.replace(/\$/g, ''); // strip dollar signs
+    var PushTriggerCord = function (list, index, v) {
+      if (typeof list[index] === 'undefined') list[index] = {};
+      list[index][v] = v;
     };
-
-
-    if(operand[0].type == "range" )  {      
-	      var rangeinfo = SocialCalc.Formula.DecodeRangeParts(sheet, triggerCellId);
-      for (var i=0; i<rangeinfo.ncols; i++) {
-         for (var j=0; j<rangeinfo.nrows; j++) {
-            var cellcr = SocialCalc.crToCoord(rangeinfo.col1num + i, rangeinfo.row1num + j);
-                          PushTriggerCord(sheet.ioEventTree, cellcr, coord); 
-                          
-         }
+    if (operand[0].type == "range") {
+      var rangeinfo = SocialCalc.Formula.DecodeRangeParts(sheet, triggerCellId);
+      for (var i = 0; i < rangeinfo.ncols; i++) {
+        for (var j = 0; j < rangeinfo.nrows; j++) {
+          var cellcr = SocialCalc.crToCoord(rangeinfo.col1num + i, rangeinfo.row1num + j);
+          PushTriggerCord(sheet.ioEventTree, cellcr, coord);
+        }
       }
     }
-    if(operand[0].type == "coord" ) {
-        PushTriggerCord(sheet.ioEventTree, triggerCellId, coord); 
-    }                
+    if (operand[0].type == "coord") {
+      PushTriggerCord(sheet.ioEventTree, triggerCellId, coord);
+    }
   }
 
-  
   //IF GUI widget is "Input"
-  if(io_parameters == "Input" ) {
-    var formDataViewer = (SocialCalc.CurrentSpreadsheetControlObject != null) 
-          ? SocialCalc.CurrentSpreadsheetControlObject.formDataViewer 
-          : SocialCalc.CurrentSpreadsheetViewerObject.formDataViewer;
-    
-    if(formDataViewer != null && formDataViewer.loaded == true) {
-      
+  if (io_parameters == "Input") {
+    var formDataViewer = SocialCalc.CurrentSpreadsheetControlObject != null ? SocialCalc.CurrentSpreadsheetControlObject.formDataViewer : SocialCalc.CurrentSpreadsheetViewerObject.formDataViewer;
+    if (formDataViewer != null && formDataViewer.loaded == true) {
       // IF formFields  not loaded - load formFields  
-      if( formDataViewer.formFields == null) SocialCalc.Formula.LoadFormFields();
+      if (formDataViewer.formFields == null) SocialCalc.Formula.LoadFormFields();
       //  get formFieldName
-      var formFieldName = (function_name+coord).toLowerCase();
+      var formFieldName = (function_name + coord).toLowerCase();
       //  if formFieldName not in formFields  
       var sheetCmd = null;
-      if(formDataViewer.formFields[formFieldName] == null) {
+      if (formDataViewer.formFields[formFieldName] == null) {
         //    store formFieldName of gui input widget 
         //    add formFieldName  to formFields  
         var col = formDataViewer.formFields[formFieldName] = formDataViewer.formFieldsLength++ + 2;
         //    add formFieldName to next empty cell (starting with B1)
         var headerCoord = SocialCalc.crToCoord(col, 1);
-        sheetCmd = "set "+headerCoord+" text t "+SocialCalc.encodeForSave(function_name.toLowerCase()+coord);
+        sheetCmd = "set " + headerCoord + " text t " + SocialCalc.encodeForSave(function_name.toLowerCase() + coord);
       }
-      if(operand[0].type.charAt(0) == "t" || operand[0].type.charAt(0) == "n") {       
+      if (operand[0].type.charAt(0) == "t" || operand[0].type.charAt(0) == "n") {
         var valueCoord = SocialCalc.crToCoord(formDataViewer.formFields[formFieldName], 2);
-        if(formDataViewer.sheet.cells[valueCoord] == null ||  formDataViewer.sheet.cells[valueCoord].datavalue != operand[0].value) {
-          var sheetCmdTwo = "set "+valueCoord+" text t "+SocialCalc.encodeForSave(operand[0].value);
-          if (sheetCmd != null) sheetCmd = sheetCmd + "\n" + sheetCmdTwo; else sheetCmd = sheetCmdTwo;        
+        if (formDataViewer.sheet.cells[valueCoord] == null || formDataViewer.sheet.cells[valueCoord].datavalue != operand[0].value) {
+          var sheetCmdTwo = "set " + valueCoord + " text t " + SocialCalc.encodeForSave(operand[0].value);
+          if (sheetCmd != null) sheetCmd = sheetCmd + "\n" + sheetCmdTwo;else sheetCmd = sheetCmdTwo;
         }
-  
       }
-      if (sheetCmd != null) formDataViewer.sheet.ScheduleSheetCommands(sheetCmd, false);    
-    }    
-  }    
-        
+      if (sheetCmd != null) formDataViewer.sheet.ScheduleSheetCommands(sheetCmd, false);
+    }
+  }
 
-	//SocialCalc.DebugLog({ ioEventTree: sheet.ioEventTree});
-	//SocialCalc.DebugLog({ ioParameterList: sheet.ioParameterList});
-}   
-   
+  //SocialCalc.DebugLog({ ioEventTree: sheet.ioEventTree});
+  //SocialCalc.DebugLog({ ioParameterList: sheet.ioParameterList});
+};
 
 /**
  * ArrayValuesEqual
  * 
  * Warning - nested vales are NOT tested.
  * returns true if both arrays contain the same values
- */    
-SocialCalc.Formula.ArrayValuesEqual = function(a, b) {
+ */
+SocialCalc.Formula.ArrayValuesEqual = function (a, b) {
   var i = a.length;
   if (i != b.length) return false;
   while (i--) {
-      if (a[i] !== b[i]) return false;
+    if (a[i] !== b[i]) return false;
   }
   return true;
 };
-
-SocialCalc.Formula.Clone =   function(destination, source) {
-        for (var property in source) {
-            if (typeof source[property] === "object" && source[property] !== null && destination[property]) { 
-                SocialCalc.Formula.Clone(destination[property], source[property]);
-            } else {
-                destination[property] = source[property];
-            }
-        }
-    };   
+SocialCalc.Formula.Clone = function (destination, source) {
+  for (var property in source) {
+    if (typeof source[property] === "object" && source[property] !== null && destination[property]) {
+      SocialCalc.Formula.Clone(destination[property], source[property]);
+    } else {
+      destination[property] = source[property];
+    }
+  }
+};
 
 /**
  * LoadFormFields
@@ -16728,40 +17208,33 @@ SocialCalc.Formula.Clone =   function(destination, source) {
  *  Cell A1 contains "FieldName:" and cells B1 to n contain field names
  *  Cell A2 contains "Pending" - pending data row. The pending row is moved to row 3 by inseting a new row 2 onSubmit 
  *  Put the fieldNames into an array for fast lookup and position information
- */    
-    
-SocialCalc.Formula.LoadFormFields =   function() {
-  var formDataViewer = (SocialCalc.CurrentSpreadsheetControlObject != null) 
-    ? SocialCalc.CurrentSpreadsheetControlObject.formDataViewer 
-    : SocialCalc.CurrentSpreadsheetViewerObject.formDataViewer;
+ */
 
+SocialCalc.Formula.LoadFormFields = function () {
+  var formDataViewer = SocialCalc.CurrentSpreadsheetControlObject != null ? SocialCalc.CurrentSpreadsheetControlObject.formDataViewer : SocialCalc.CurrentSpreadsheetViewerObject.formDataViewer;
   formDataViewer.formFields = {};
 
-  
   //IF cell A1 is blank - Adds "FieldName:" to A1
-  if(formDataViewer.sheet.cells.A1 == null ) {
-    formDataViewer.sheet.ScheduleSheetCommands("set A1 text t "+SocialCalc.encodeForSave("FieldName:"), false);       
+  if (formDataViewer.sheet.cells.A1 == null) {
+    formDataViewer.sheet.ScheduleSheetCommands("set A1 text t " + SocialCalc.encodeForSave("FieldName:"), false);
   }
-  
-  if(formDataViewer.sheet.cells.A2 == null ) {
-    formDataViewer.sheet.ScheduleSheetCommands("set A2 text t "+SocialCalc.encodeForSave("Pending:"), false);       
+  if (formDataViewer.sheet.cells.A2 == null) {
+    formDataViewer.sheet.ScheduleSheetCommands("set A2 text t " + SocialCalc.encodeForSave("Pending:"), false);
   }
 
-  
   //  For each cell in row 1, from B1 to 1st blank cell
   var col = 2;
-  while(true) {
+  while (true) {
     var coord = SocialCalc.crToCoord(col, 1);
-    var cell=formDataViewer.sheet.cells[coord];
+    var cell = formDataViewer.sheet.cells[coord];
     if (!cell) break;
     //    Put cell value into formFields  
     formDataViewer.formFields[cell.datavalue.toLowerCase()] = col;
-    col ++;
+    col++;
   }
-  formDataViewer.formFieldsLength = col -2;
+  formDataViewer.formFieldsLength = col - 2;
+};
 
-}    
-   
 /*
 #
 # errortext = SocialCalc.Formula.CalculateFunction(fname, operand, sheet)
@@ -16770,67 +17243,51 @@ SocialCalc.Formula.LoadFormFields =   function() {
 #
 */
 
-SocialCalc.Formula.CalculateFunction = function(fname, operand, sheet, coord) {
+SocialCalc.Formula.CalculateFunction = function (fname, operand, sheet, coord) {
+  var fobj, foperand, ffunc, argnum, ttext;
+  var scf = SocialCalc.Formula;
+  var ok = 1;
+  var errortext = "";
+  fobj = scf.FunctionList[fname];
+  if (fobj) {
+    foperand = [];
+    ffunc = fobj[0];
+    argnum = fobj[1];
+    scf.CopyFunctionArgs(operand, foperand);
 
-   var fobj, foperand, ffunc, argnum, ttext;
-   var scf = SocialCalc.Formula;
-   var ok = 1;
-   var errortext = "";
+    // eddy CalculateFunction {
+    if (fobj[6] && fobj[6] != "") {
+      SocialCalc.DebugLog("action:" + fname);
+      scf.StoreIoEventFormula(fname, coord, foperand, sheet, fobj[6]);
+    }
+    // }
 
-   fobj = scf.FunctionList[fname];
-
-   if (fobj) {
-   
-
-      foperand = [];
-      ffunc = fobj[0];
-      argnum = fobj[1];
-      scf.CopyFunctionArgs(operand, foperand);
-
-	  // eddy CalculateFunction {
-   if(fobj[6] && fobj[6] != "") {	  
-	   SocialCalc.DebugLog("action:"+fname);		
-		 scf.StoreIoEventFormula(fname, coord, foperand, sheet, fobj[6]);
-		
-	  }
-	  // }
-	  
-      if (argnum != 100) {
-         if (argnum < 0) {
-            if (foperand.length < -argnum) {
-               errortext = scf.FunctionArgsError(fname, operand);
-               return errortext;
-               }
-            }
-         else {
-            if (foperand.length != argnum) {
-               errortext = scf.FunctionArgsError(fname, operand);
-               return errortext;
-               }
-            }
-         }
-
-		 
-	  
-      errortext = ffunc(fname, operand, foperand, sheet, coord);
+    if (argnum != 100) {
+      if (argnum < 0) {
+        if (foperand.length < -argnum) {
+          errortext = scf.FunctionArgsError(fname, operand);
+          return errortext;
+        }
+      } else {
+        if (foperand.length != argnum) {
+          errortext = scf.FunctionArgsError(fname, operand);
+          return errortext;
+        }
       }
-
-   else {
-         ttext = fname;
-
-         if (operand.length && operand[operand.length-1].type == "start") { // no arguments - name or zero arg function
-            operand.pop();
-            scf.PushOperand(operand, "name", ttext);
-            }
-
-         else {
-            errortext = SocialCalc.Constants.s_sheetfuncunknownfunction+" " + ttext +". ";
-            }
-      }
-
-   return errortext;
-
-}
+    }
+    errortext = ffunc(fname, operand, foperand, sheet, coord);
+  } else {
+    ttext = fname;
+    if (operand.length && operand[operand.length - 1].type == "start") {
+      // no arguments - name or zero arg function
+      operand.pop();
+      scf.PushOperand(operand, "name", ttext);
+    } else {
+      errortext = SocialCalc.Constants.s_sheetfuncunknownfunction + " " + ttext + ". ";
+    }
+  }
+  return errortext;
+};
 
 //
 // SocialCalc.Formula.PushOperand(operand, t, v)
@@ -16838,11 +17295,12 @@ SocialCalc.Formula.CalculateFunction = function(fname, operand, sheet, coord) {
 // Pushes the type and value onto the operand stack
 //
 
-SocialCalc.Formula.PushOperand = function(operand, t, v) {
-
-   operand.push({type: t, value: v});
-
-   }
+SocialCalc.Formula.PushOperand = function (operand, t, v) {
+  operand.push({
+    type: t,
+    value: v
+  });
+};
 
 //
 // SocialCalc.Formula.CopyFunctionArgs(operand, foperand)
@@ -16851,21 +17309,19 @@ SocialCalc.Formula.PushOperand = function(operand, t, v) {
 // reversing order in the process.
 //
 
-SocialCalc.Formula.CopyFunctionArgs = function(operand, foperand) {
+SocialCalc.Formula.CopyFunctionArgs = function (operand, foperand) {
+  var fobj, foperand, ffunc, argnum;
+  var scf = SocialCalc.Formula;
+  var ok = 1;
+  var errortext = null;
+  while (operand.length > 0 && operand[operand.length - 1].type != "start") {
+    // get each arg
+    foperand.push(operand.pop()); // copy it
+  }
+  operand.pop(); // get rid of "start"
 
-   var fobj, foperand, ffunc, argnum;
-   var scf = SocialCalc.Formula;
-   var ok = 1;
-   var errortext = null;
-
-   while (operand.length>0 && operand[operand.length-1].type != "start") { // get each arg
-      foperand.push(operand.pop()); // copy it
-      }
-   operand.pop(); // get rid of "start"
-
-   return;
-
-   }
+  return;
+};
 
 //
 // errortext = SocialCalc.Formula.FunctionArgsError(fname, operand)
@@ -16873,15 +17329,11 @@ SocialCalc.Formula.CopyFunctionArgs = function(operand, foperand) {
 // Pushes appropriate error on operand stack and returns errortext, including fname
 //
 
-SocialCalc.Formula.FunctionArgsError = function(fname, operand) {
-
-   var errortext = SocialCalc.Constants.s_calcerrincorrectargstofunction+" " + fname + ". ";
-   SocialCalc.Formula.PushOperand(operand, "e#VALUE!", errortext);
-
-   return errortext;
-
-   }
-
+SocialCalc.Formula.FunctionArgsError = function (fname, operand) {
+  var errortext = SocialCalc.Constants.s_calcerrincorrectargstofunction + " " + fname + ". ";
+  SocialCalc.Formula.PushOperand(operand, "e#VALUE!", errortext);
+  return errortext;
+};
 
 //
 // errortext = SocialCalc.Formula.FunctionSpecificError(fname, operand, errortype, errortext)
@@ -16889,13 +17341,10 @@ SocialCalc.Formula.FunctionArgsError = function(fname, operand) {
 // Pushes specified error and text on operand stack.
 //
 
-SocialCalc.Formula.FunctionSpecificError = function(fname, operand, errortype, errortext) {
-
-   SocialCalc.Formula.PushOperand(operand, errortype, errortext);
-
-   return errortext;
-
-   }
+SocialCalc.Formula.FunctionSpecificError = function (fname, operand, errortype, errortext) {
+  SocialCalc.Formula.PushOperand(operand, errortype, errortext);
+  return errortext;
+};
 
 //
 // haserror = SocialCalc.Formula.CheckForErrorValue(operand, v)
@@ -16903,17 +17352,14 @@ SocialCalc.Formula.FunctionSpecificError = function(fname, operand, errortype, e
 // If v.type is an error, push it on operand stack and return true, otherwise return false.
 //
 
-SocialCalc.Formula.CheckForErrorValue = function(operand, v) {
-
-   if (v.type.charAt(0) == "e") {
-      operand.push(v);
-      return true;
-      }
-   else {
-      return false;
-      }
-
-   }
+SocialCalc.Formula.CheckForErrorValue = function (operand, v) {
+  if (v.type.charAt(0) == "e") {
+    operand.push(v);
+    return true;
+  } else {
+    return false;
+  }
+};
 
 /////////////////////////
 //
@@ -16927,50 +17373,48 @@ SocialCalc.Formula.CheckForErrorValue = function(operand, v) {
 // Execute this after any changes to SocialCalc.Constants but before UI is used.
 //
 
-SocialCalc.Formula.FillFunctionInfo = function() {
-
-   var scf = SocialCalc.Formula;
-   var scc = SocialCalc.Constants;
-
-   var fname, f, classes, cname, i;
-
-   if (scf.FunctionClasses) { // only do once
-      return;
+SocialCalc.Formula.FillFunctionInfo = function () {
+  var scf = SocialCalc.Formula;
+  var scc = SocialCalc.Constants;
+  var fname, f, classes, cname, i;
+  if (scf.FunctionClasses) {
+    // only do once
+    return;
+  }
+  for (fname in scf.FunctionList) {
+    f = scf.FunctionList[fname];
+    if (f[2]) {
+      // has an arg def
+      scf.FunctionArgDefs[f[2]] = scc["s_farg_" + f[2]] || ""; // get it from constants
+    }
+    if (!f[3]) {
+      // no text def, see if in constants
+      if (scc["s_fdef_" + fname]) {
+        scf.FunctionList[fname][3] = scc["s_fdef_" + fname];
       }
-
-   for (fname in scf.FunctionList) {
-      f = scf.FunctionList[fname];
-      if (f[2]) { // has an arg def
-         scf.FunctionArgDefs[f[2]] = scc["s_farg_"+f[2]] || ""; // get it from constants
-         }
-      if (!f[3]) { // no text def, see if in constants
-         if (scc["s_fdef_"+fname]) {
-            scf.FunctionList[fname][3] = scc["s_fdef_"+fname];
-            }
-         }
-      }
-
-   scf.FunctionClasses = {};
- 
-   for (i=0; i<scc.function_classlist.length; i++) {
-      cname = scc.function_classlist[i];
-      scf.FunctionClasses[cname] = {name: scc["s_fclass_"+cname], items: []};
-      }
-
-   for (fname in scf.FunctionList) {
-      f = scf.FunctionList[fname];
-      classes = f[4] ? f[4].split(",") : []; // get classes
-      classes.push("all");
-      for (i=0; i<classes.length; i++) {
-         cname = classes[i];
-         scf.FunctionClasses[cname].items.push(fname);
-         }
-      }
-   for (cname in scf.FunctionClasses) {
-      scf.FunctionClasses[cname].items.sort();
-      }
-
-   }
+    }
+  }
+  scf.FunctionClasses = {};
+  for (i = 0; i < scc.function_classlist.length; i++) {
+    cname = scc.function_classlist[i];
+    scf.FunctionClasses[cname] = {
+      name: scc["s_fclass_" + cname],
+      items: []
+    };
+  }
+  for (fname in scf.FunctionList) {
+    f = scf.FunctionList[fname];
+    classes = f[4] ? f[4].split(",") : []; // get classes
+    classes.push("all");
+    for (i = 0; i < classes.length; i++) {
+      cname = classes[i];
+      scf.FunctionClasses[cname].items.push(fname);
+    }
+  }
+  for (cname in scf.FunctionClasses) {
+    scf.FunctionClasses[cname].items.sort();
+  }
+};
 
 //
 // str = SocialCalc.Formula.FunctionArgString(fname)
@@ -16978,44 +17422,34 @@ SocialCalc.Formula.FillFunctionInfo = function() {
 // Returns a string representing the arguments to function fname.
 //
 
-SocialCalc.Formula.FunctionArgString = function(fname) {
-
-   var scf = SocialCalc.Formula;
-   var fdata = scf.FunctionList[fname];
-   var nargs, i, str;
-
-   var adef = fdata[2];
-
-   if (!adef) {
-      nargs = fdata[1];
-      if (nargs == 0) {
-         adef = " ";
-         }
-      else if (nargs > 0) {
-         str = "v1";
-         for (i=2; i<=nargs; i++) {
-            str += ", v"+i;
-            }
-         return str;
-         }
-      else if (nargs < 0) {
-         str = "v1";
-         for (i=2; i<-nargs; i++) {
-            str += ", v"+i;
-            }
-         return str+", ...";
-         }
-      else {
-         return "nargs: "+nargs;
-         }
+SocialCalc.Formula.FunctionArgString = function (fname) {
+  var scf = SocialCalc.Formula;
+  var fdata = scf.FunctionList[fname];
+  var nargs, i, str;
+  var adef = fdata[2];
+  if (!adef) {
+    nargs = fdata[1];
+    if (nargs == 0) {
+      adef = " ";
+    } else if (nargs > 0) {
+      str = "v1";
+      for (i = 2; i <= nargs; i++) {
+        str += ", v" + i;
       }
-
-   str = scf.FunctionArgDefs[adef] || adef;
-
-   return str;
-
-   }
-
+      return str;
+    } else if (nargs < 0) {
+      str = "v1";
+      for (i = 2; i < -nargs; i++) {
+        str += ", v" + i;
+      }
+      return str + ", ...";
+    } else {
+      return "nargs: " + nargs;
+    }
+  }
+  str = scf.FunctionArgDefs[adef] || adef;
+  return str;
+};
 
 /////////////////////////
 //
@@ -17048,146 +17482,125 @@ SocialCalc.Formula.FunctionArgString = function(fname) {
 #
 */
 
-SocialCalc.Formula.SeriesFunctions = function(fname, operand, foperand, sheet) {
+SocialCalc.Formula.SeriesFunctions = function (fname, operand, foperand, sheet) {
+  var value1, t, v1;
+  var scf = SocialCalc.Formula;
+  var operand_value_and_type = scf.OperandValueAndType;
+  var lookup_result_type = scf.LookupResultType;
+  var typelookupplus = scf.TypeLookupTable.plus;
+  var PushOperand = function (t, v) {
+    operand.push({
+      type: t,
+      value: v
+    });
+  };
+  var concat = "";
+  var sum = 0;
+  var resulttypesum = "";
+  var count = 0;
+  var counta = 0;
+  var countblank = 0;
+  var product = 1;
+  var maxval;
+  var minval;
+  var mk, sk, mk1, sk1; // For variance, etc.: M sub k, k-1, and S sub k-1
+  // as per Knuth "The Art of Computer Programming" Vol. 2 3rd edition, page 232
 
-   var value1, t, v1;
-
-   var scf = SocialCalc.Formula;
-   var operand_value_and_type = scf.OperandValueAndType;
-   var lookup_result_type = scf.LookupResultType;
-   var typelookupplus = scf.TypeLookupTable.plus;
-
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
-
-
-   var concat = "";
-   var sum = 0;
-   var resulttypesum = "";
-   var count = 0;
-   var counta = 0;
-   var countblank = 0;
-   var product = 1;
-   var maxval;
-   var minval;
-   var mk, sk, mk1, sk1; // For variance, etc.: M sub k, k-1, and S sub k-1
-                         // as per Knuth "The Art of Computer Programming" Vol. 2 3rd edition, page 232
-
-   while (foperand.length > 0) {
-      value1 = operand_value_and_type(sheet, foperand);
-      t = value1.type.charAt(0);
-      if (t == "n") count += 1;
-      if (t != "b") counta += 1;
-      if (t == "b") countblank += 1;
-      if (t != "e" && t != "b") concat = concat + value1.value;
-
-      if (t == "n") {
-         v1 = value1.value-0; // get it as a number
-         sum += v1;
-         product *= v1;
-         maxval = (maxval!=undefined) ? (v1 > maxval ? v1 : maxval) : v1;
-         minval = (minval!=undefined) ? (v1 < minval ? v1 : minval) : v1;
-         if (count == 1) { // initialize with first values for variance used in STDEV, VAR, etc.
-            mk1 = v1;
-            sk1 = 0;
-            }
-         else { // Accumulate S sub 1 through n as per Knuth noted above
-            mk = mk1 + (v1 - mk1) / count;
-            sk = sk1 + (v1 - mk1) * (v1 - mk);
-            sk1 = sk;
-            mk1 = mk;
-            }
-         resulttypesum = lookup_result_type(value1.type, resulttypesum || value1.type, typelookupplus);
-         }
-      else if (t == "e" && resulttypesum.charAt(0) != "e") {
-         resulttypesum = value1.type;
-         }
+  while (foperand.length > 0) {
+    value1 = operand_value_and_type(sheet, foperand);
+    t = value1.type.charAt(0);
+    if (t == "n") count += 1;
+    if (t != "b") counta += 1;
+    if (t == "b") countblank += 1;
+    if (t != "e" && t != "b") concat = concat + value1.value;
+    if (t == "n") {
+      v1 = value1.value - 0; // get it as a number
+      sum += v1;
+      product *= v1;
+      maxval = maxval != undefined ? v1 > maxval ? v1 : maxval : v1;
+      minval = minval != undefined ? v1 < minval ? v1 : minval : v1;
+      if (count == 1) {
+        // initialize with first values for variance used in STDEV, VAR, etc.
+        mk1 = v1;
+        sk1 = 0;
+      } else {
+        // Accumulate S sub 1 through n as per Knuth noted above
+        mk = mk1 + (v1 - mk1) / count;
+        sk = sk1 + (v1 - mk1) * (v1 - mk);
+        sk1 = sk;
+        mk1 = mk;
       }
-
-   resulttypesum = resulttypesum || "n";
-
-   switch (fname) {
-      case "CONCAT":
-      case "CONCATENATE":
-        PushOperand("t", concat);
-        break;
-
-      case "SUM":
-         PushOperand(resulttypesum, sum);
-         break;
-
-      case "PRODUCT": // may handle cases with text differently than some other spreadsheets
-         PushOperand(resulttypesum, product);
-         break;
-
-      case "MIN":
-         PushOperand(resulttypesum, minval || 0);
-         break;
-
-      case "MAX":
-         PushOperand(resulttypesum, maxval || 0);
-         break;
-
-      case "COUNT":
-         PushOperand("n", count);
-         break;
-
-      case "COUNTA":
-         PushOperand("n", counta);
-         break;
-
-      case "COUNTBLANK":
-         PushOperand("n", countblank);
-         break;
-
-      case "AVERAGE":
-         if (count > 0) {
-            PushOperand(resulttypesum, sum/count);
-            }
-         else {
-            PushOperand("e#DIV/0!", 0);
-            }
-         break;
-
-      case "STDEV":
-         if (count > 1) {
-            PushOperand(resulttypesum, Math.sqrt(sk / (count - 1))); // sk is never negative according to Knuth
-            }
-         else {
-            PushOperand("e#DIV/0!", 0);
-            }
-         break;
-
-      case "STDEVP":
-         if (count > 1) {
-            PushOperand(resulttypesum, Math.sqrt(sk / count));
-            }
-         else {
-            PushOperand("e#DIV/0!", 0);
-            }
-         break;
-
-      case "VAR":
-         if (count > 1) {
-            PushOperand(resulttypesum, sk / (count - 1));
-            }
-         else {
-            PushOperand("e#DIV/0!", 0);
-            }
-         break;
-
-      case "VARP":
-         if (count > 1) {
-            PushOperand(resulttypesum, sk / count);
-            }
-         else {
-            PushOperand("e#DIV/0!", 0);
-            }
-         break;
+      resulttypesum = lookup_result_type(value1.type, resulttypesum || value1.type, typelookupplus);
+    } else if (t == "e" && resulttypesum.charAt(0) != "e") {
+      resulttypesum = value1.type;
+    }
+  }
+  resulttypesum = resulttypesum || "n";
+  switch (fname) {
+    case "CONCAT":
+    case "CONCATENATE":
+      PushOperand("t", concat);
+      break;
+    case "SUM":
+      PushOperand(resulttypesum, sum);
+      break;
+    case "PRODUCT":
+      // may handle cases with text differently than some other spreadsheets
+      PushOperand(resulttypesum, product);
+      break;
+    case "MIN":
+      PushOperand(resulttypesum, minval || 0);
+      break;
+    case "MAX":
+      PushOperand(resulttypesum, maxval || 0);
+      break;
+    case "COUNT":
+      PushOperand("n", count);
+      break;
+    case "COUNTA":
+      PushOperand("n", counta);
+      break;
+    case "COUNTBLANK":
+      PushOperand("n", countblank);
+      break;
+    case "AVERAGE":
+      if (count > 0) {
+        PushOperand(resulttypesum, sum / count);
+      } else {
+        PushOperand("e#DIV/0!", 0);
       }
-
-   return null;
-
-   }
+      break;
+    case "STDEV":
+      if (count > 1) {
+        PushOperand(resulttypesum, Math.sqrt(sk / (count - 1))); // sk is never negative according to Knuth
+      } else {
+        PushOperand("e#DIV/0!", 0);
+      }
+      break;
+    case "STDEVP":
+      if (count > 1) {
+        PushOperand(resulttypesum, Math.sqrt(sk / count));
+      } else {
+        PushOperand("e#DIV/0!", 0);
+      }
+      break;
+    case "VAR":
+      if (count > 1) {
+        PushOperand(resulttypesum, sk / (count - 1));
+      } else {
+        PushOperand("e#DIV/0!", 0);
+      }
+      break;
+    case "VARP":
+      if (count > 1) {
+        PushOperand(resulttypesum, sk / count);
+      } else {
+        PushOperand("e#DIV/0!", 0);
+      }
+      break;
+  }
+  return null;
+};
 
 //*********************
 //
@@ -17217,50 +17630,50 @@ SocialCalc.Formula.FunctionList["VARP"] = [SocialCalc.Formula.SeriesFunctions, -
 #
 */
 
-SocialCalc.Formula.SumProductFunction = function(fname, operand, foperand, sheet) {
-  
-   var range, products = [], sum = 0;
-   var scf = SocialCalc.Formula;
-   var ncols = 0, nrows = 0;
-
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
-
-   while (foperand.length > 0) {
-      range = scf.TopOfStackValueAndType(sheet, foperand);
-      if (range.type != "range") {
-         PushOperand("e#VALUE!", 0);
-         return;
-         }
-      rangeinfo = scf.DecodeRangeParts(sheet, range.value);
-      if (!ncols) ncols = rangeinfo.ncols;
-      else if (ncols != rangeinfo.ncols) {
-         PushOperand("e#VALUE!", 0);
-         return;
-         }
-      if (!nrows) nrows = rangeinfo.nrows;
-      else if (nrows != rangeinfo.nrows) {
-         PushOperand("e#VALUE!", 0);
-         return;
-         }
-      for (i=0; i<rangeinfo.ncols; i++) {
-         for (j=0; j<rangeinfo.nrows; j++) {
-            k = i * rangeinfo.nrows + j;
-            cellcr = SocialCalc.crToCoord(rangeinfo.col1num + i, rangeinfo.row1num + j);
-            cell = rangeinfo.sheetdata.GetAssuredCell(cellcr);
-            value = cell.valuetype == "n" ? cell.datavalue : 0;
-            products[k] = ((typeof products[k] !== 'undefined')? products[k] : 1) * value;
-            }
-         }
+SocialCalc.Formula.SumProductFunction = function (fname, operand, foperand, sheet) {
+  var range,
+    products = [],
+    sum = 0;
+  var scf = SocialCalc.Formula;
+  var ncols = 0,
+    nrows = 0;
+  var PushOperand = function (t, v) {
+    operand.push({
+      type: t,
+      value: v
+    });
+  };
+  while (foperand.length > 0) {
+    range = scf.TopOfStackValueAndType(sheet, foperand);
+    if (range.type != "range") {
+      PushOperand("e#VALUE!", 0);
+      return;
+    }
+    rangeinfo = scf.DecodeRangeParts(sheet, range.value);
+    if (!ncols) ncols = rangeinfo.ncols;else if (ncols != rangeinfo.ncols) {
+      PushOperand("e#VALUE!", 0);
+      return;
+    }
+    if (!nrows) nrows = rangeinfo.nrows;else if (nrows != rangeinfo.nrows) {
+      PushOperand("e#VALUE!", 0);
+      return;
+    }
+    for (i = 0; i < rangeinfo.ncols; i++) {
+      for (j = 0; j < rangeinfo.nrows; j++) {
+        k = i * rangeinfo.nrows + j;
+        cellcr = SocialCalc.crToCoord(rangeinfo.col1num + i, rangeinfo.row1num + j);
+        cell = rangeinfo.sheetdata.GetAssuredCell(cellcr);
+        value = cell.valuetype == "n" ? cell.datavalue : 0;
+        products[k] = (typeof products[k] !== 'undefined' ? products[k] : 1) * value;
       }
-   for (i=0; i<products.length; i++) {
-      sum += products[i];
-      }
-   PushOperand("n", sum);
-
-   return;
-
-   }
-
+    }
+  }
+  for (i = 0; i < products.length; i++) {
+    sum += products[i];
+  }
+  PushOperand("n", sum);
+  return;
+};
 SocialCalc.Formula.FunctionList["SUMPRODUCT"] = [SocialCalc.Formula.SumProductFunction, -1, "rangen", "", "stat"];
 
 /*
@@ -17283,210 +17696,183 @@ SocialCalc.Formula.FunctionList["SUMPRODUCT"] = [SocialCalc.Formula.SumProductFu
 #
 */
 
-SocialCalc.Formula.DSeriesFunctions = function(fname, operand, foperand, sheet) {
+SocialCalc.Formula.DSeriesFunctions = function (fname, operand, foperand, sheet) {
+  var value1, tostype, cr, dbrange, fieldname, criteriarange, dbinfo, criteriainfo;
+  var fieldasnum, targetcol, i, j, k, cell, criteriafieldnums;
+  var testok, criteriacr, criteria, testcol, testcr;
+  var t;
+  var scf = SocialCalc.Formula;
+  var operand_value_and_type = scf.OperandValueAndType;
+  var lookup_result_type = scf.LookupResultType;
+  var typelookupplus = scf.TypeLookupTable.plus;
+  var PushOperand = function (t, v) {
+    operand.push({
+      type: t,
+      value: v
+    });
+  };
+  var value1 = {};
+  var sum = 0;
+  var resulttypesum = "";
+  var count = 0;
+  var counta = 0;
+  var countblank = 0;
+  var countmatches = 0;
+  var product = 1;
+  var maxval;
+  var minval;
+  var mk, sk, mk1, sk1; // For variance, etc.: M sub k, k-1, and S sub k-1
+  // as per Knuth "The Art of Computer Programming" Vol. 2 3rd edition, page 232
 
-   var value1, tostype, cr, dbrange, fieldname, criteriarange, dbinfo, criteriainfo;
-   var fieldasnum, targetcol, i, j, k, cell, criteriafieldnums;
-   var testok, criteriacr, criteria, testcol, testcr;
-   var t;
+  dbrange = scf.TopOfStackValueAndType(sheet, foperand); // get a range
+  fieldname = scf.OperandValueAndType(sheet, foperand); // get a value
+  criteriarange = scf.TopOfStackValueAndType(sheet, foperand); // get a range
 
-   var scf = SocialCalc.Formula;
-   var operand_value_and_type = scf.OperandValueAndType;
-   var lookup_result_type = scf.LookupResultType;
-   var typelookupplus = scf.TypeLookupTable.plus;
-
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
-
-   var value1 = {};
-
-   var sum = 0;
-   var resulttypesum = "";
-   var count = 0;
-   var counta = 0;
-   var countblank = 0;
-   var countmatches = 0;   
-   var product = 1;
-   var maxval;
-   var minval;
-   var mk, sk, mk1, sk1; // For variance, etc.: M sub k, k-1, and S sub k-1
-                         // as per Knuth "The Art of Computer Programming" Vol. 2 3rd edition, page 232
-
-   dbrange = scf.TopOfStackValueAndType(sheet, foperand); // get a range
-   fieldname = scf.OperandValueAndType(sheet, foperand); // get a value
-   criteriarange = scf.TopOfStackValueAndType(sheet, foperand); // get a range
-
-   if (dbrange.type != "range" || criteriarange.type != "range") {
-      return scf.FunctionArgsError(fname, operand);
-      }
-
-   dbinfo = scf.DecodeRangeParts(sheet, dbrange.value);
-   criteriainfo = scf.DecodeRangeParts(sheet, criteriarange.value);
-
-   fieldasnum = scf.FieldToColnum(dbinfo.sheetdata, dbinfo.col1num, dbinfo.ncols, dbinfo.row1num, fieldname.value, fieldname.type);
-   if (fieldasnum <= 0) {
+  if (dbrange.type != "range" || criteriarange.type != "range") {
+    return scf.FunctionArgsError(fname, operand);
+  }
+  dbinfo = scf.DecodeRangeParts(sheet, dbrange.value);
+  criteriainfo = scf.DecodeRangeParts(sheet, criteriarange.value);
+  fieldasnum = scf.FieldToColnum(dbinfo.sheetdata, dbinfo.col1num, dbinfo.ncols, dbinfo.row1num, fieldname.value, fieldname.type);
+  if (fieldasnum <= 0) {
+    PushOperand("e#VALUE!", 0);
+    return;
+  }
+  targetcol = dbinfo.col1num + fieldasnum - 1;
+  criteriafieldnums = [];
+  for (i = 0; i < criteriainfo.ncols; i++) {
+    // get criteria field colnums
+    cell = criteriainfo.sheetdata.GetAssuredCell(SocialCalc.crToCoord(criteriainfo.col1num + i, criteriainfo.row1num));
+    criterianum = scf.FieldToColnum(dbinfo.sheetdata, dbinfo.col1num, dbinfo.ncols, dbinfo.row1num, cell.datavalue, cell.valuetype);
+    if (criterianum <= 0) {
       PushOperand("e#VALUE!", 0);
       return;
+    }
+    criteriafieldnums.push(dbinfo.col1num + criterianum - 1);
+  }
+  for (i = 1; i < dbinfo.nrows; i++) {
+    // go through each row of the database
+    testok = false;
+    CRITERIAROW: for (j = 1; j < criteriainfo.nrows; j++) {
+      // go through each criteria row
+      for (k = 0; k < criteriainfo.ncols; k++) {
+        // look at each column
+        criteriacr = SocialCalc.crToCoord(criteriainfo.col1num + k, criteriainfo.row1num + j); // where criteria is
+        cell = criteriainfo.sheetdata.GetAssuredCell(criteriacr);
+        criteria = cell.datavalue;
+        if (typeof criteria == "string" && criteria.length == 0) continue; // blank items are OK
+        testcol = criteriafieldnums[k];
+        testcr = SocialCalc.crToCoord(testcol, dbinfo.row1num + i); // cell to check
+        cell = dbinfo.sheetdata.GetAssuredCell(testcr); // get cell to check from dbinfo sheet
+        if (!scf.TestCriteria(cell.datavalue, cell.valuetype || "b", criteria)) {
+          continue CRITERIAROW; // does not meet criteria - check next row
+        }
       }
-
-   targetcol = dbinfo.col1num + fieldasnum - 1;
-   criteriafieldnums = [];
-
-   for (i=0; i<criteriainfo.ncols; i++) { // get criteria field colnums
-      cell = criteriainfo.sheetdata.GetAssuredCell(SocialCalc.crToCoord(criteriainfo.col1num + i, criteriainfo.row1num));
-      criterianum = scf.FieldToColnum(dbinfo.sheetdata, dbinfo.col1num, dbinfo.ncols, dbinfo.row1num, cell.datavalue, cell.valuetype);
-      if (criterianum <= 0) {
-         PushOperand("e#VALUE!", 0);
-         return;
-         }
-      criteriafieldnums.push(dbinfo.col1num + criterianum - 1);
+      testok = true; // met all the criteria
+      break CRITERIAROW;
+    }
+    if (!testok) {
+      continue;
+    }
+    cr = SocialCalc.crToCoord(targetcol, dbinfo.row1num + i); // get cell of this row to do the function on
+    cell = dbinfo.sheetdata.GetAssuredCell(cr);
+    value1.value = cell.datavalue;
+    value1.type = cell.valuetype;
+    t = value1.type.charAt(0);
+    countmatches += 1;
+    if (t == "n") count += 1;
+    if (t != "b") counta += 1;
+    if (t == "b") countblank += 1;
+    if (t == "n") {
+      v1 = value1.value - 0; // get it as a number
+      sum += v1;
+      product *= v1;
+      maxval = maxval != undefined ? v1 > maxval ? v1 : maxval : v1;
+      minval = minval != undefined ? v1 < minval ? v1 : minval : v1;
+      if (count == 1) {
+        // initialize with first values for variance used in STDEV, VAR, etc.
+        mk1 = v1;
+        sk1 = 0;
+      } else {
+        // Accumulate S sub 1 through n as per Knuth noted above
+        mk = mk1 + (v1 - mk1) / count;
+        sk = sk1 + (v1 - mk1) * (v1 - mk);
+        sk1 = sk;
+        mk1 = mk;
       }
-
-   for (i=1; i<dbinfo.nrows; i++) { // go through each row of the database
-      testok = false;
-CRITERIAROW:
-      for (j=1; j<criteriainfo.nrows; j++) { // go through each criteria row
-         for (k=0; k<criteriainfo.ncols; k++) { // look at each column
-            criteriacr = SocialCalc.crToCoord(criteriainfo.col1num + k, criteriainfo.row1num + j); // where criteria is
-            cell = criteriainfo.sheetdata.GetAssuredCell(criteriacr);
-            criteria = cell.datavalue;
-            if (typeof criteria == "string" && criteria.length == 0) continue; // blank items are OK
-            testcol = criteriafieldnums[k];
-            testcr = SocialCalc.crToCoord(testcol, dbinfo.row1num + i); // cell to check
-            cell = dbinfo.sheetdata.GetAssuredCell(testcr); // get cell to check from dbinfo sheet
-            if (!scf.TestCriteria(cell.datavalue, cell.valuetype || "b", criteria)) {
-               continue CRITERIAROW; // does not meet criteria - check next row
-               }
-            }
-         testok = true; // met all the criteria
-         break CRITERIAROW;
-         }
-      if (!testok) {
-         continue;
-         }
-
-      cr = SocialCalc.crToCoord(targetcol, dbinfo.row1num + i); // get cell of this row to do the function on
-      cell = dbinfo.sheetdata.GetAssuredCell(cr);
-
-      value1.value = cell.datavalue;
-      value1.type = cell.valuetype;
-      t = value1.type.charAt(0);
-      countmatches += 1;
-      if (t == "n") count += 1;
-      if (t != "b") counta += 1;
-      if (t == "b") countblank += 1;
-
-      if (t == "n") {
-         v1 = value1.value-0; // get it as a number
-         sum += v1;
-         product *= v1;
-         maxval = (maxval!=undefined) ? (v1 > maxval ? v1 : maxval) : v1;
-         minval = (minval!=undefined) ? (v1 < minval ? v1 : minval) : v1;
-         if (count == 1) { // initialize with first values for variance used in STDEV, VAR, etc.
-            mk1 = v1;
-            sk1 = 0;
-            }
-         else { // Accumulate S sub 1 through n as per Knuth noted above
-            mk = mk1 + (v1 - mk1) / count;
-            sk = sk1 + (v1 - mk1) * (v1 - mk);
-            sk1 = sk;
-            mk1 = mk;
-            }
-         resulttypesum = lookup_result_type(value1.type, resulttypesum || value1.type, typelookupplus);
-         }
-      else if (t == "e" && resulttypesum.charAt(0) != "e") {
-         resulttypesum = value1.type;
-         }
+      resulttypesum = lookup_result_type(value1.type, resulttypesum || value1.type, typelookupplus);
+    } else if (t == "e" && resulttypesum.charAt(0) != "e") {
+      resulttypesum = value1.type;
+    }
+  }
+  resulttypesum = resulttypesum || "n";
+  switch (fname) {
+    case "DSUM":
+      PushOperand(resulttypesum, sum);
+      break;
+    case "DPRODUCT":
+      // may handle cases with text differently than some other spreadsheets
+      PushOperand(resulttypesum, product);
+      break;
+    case "DMIN":
+      PushOperand(resulttypesum, minval || 0);
+      break;
+    case "DMAX":
+      PushOperand(resulttypesum, maxval || 0);
+      break;
+    case "DCOUNT":
+      PushOperand("n", count);
+      break;
+    case "DCOUNTA":
+      PushOperand("n", counta);
+      break;
+    case "DAVERAGE":
+      if (count > 0) {
+        PushOperand(resulttypesum, sum / count);
+      } else {
+        PushOperand("e#DIV/0!", 0);
       }
-
-   resulttypesum = resulttypesum || "n";
-
-   switch (fname) {
-      case "DSUM":
-         PushOperand(resulttypesum, sum);
-         break;
-
-      case "DPRODUCT": // may handle cases with text differently than some other spreadsheets
-         PushOperand(resulttypesum, product);
-         break;
-
-      case "DMIN":
-         PushOperand(resulttypesum, minval || 0);
-         break;
-
-      case "DMAX":
-         PushOperand(resulttypesum, maxval || 0);
-         break;
-
-      case "DCOUNT":
-         PushOperand("n", count);
-         break;
-
-      case "DCOUNTA":
-         PushOperand("n", counta);
-         break;
-
-      case "DAVERAGE":
-         if (count > 0) {
-            PushOperand(resulttypesum, sum/count);
-            }
-         else {
-            PushOperand("e#DIV/0!", 0);
-            }
-         break;
-
-      case "DSTDEV":
-         if (count > 1) {
-            PushOperand(resulttypesum, Math.sqrt(sk / (count - 1))); // sk is never negative according to Knuth
-            }
-         else {
-            PushOperand("e#DIV/0!", 0);
-            }
-         break;
-
-      case "DSTDEVP":
-         if (count > 1) {
-            PushOperand(resulttypesum, Math.sqrt(sk / count));
-            }
-         else {
-            PushOperand("e#DIV/0!", 0);
-            }
-         break;
-
-      case "DVAR":
-         if (count > 1) {
-            PushOperand(resulttypesum, sk / (count - 1));
-            }
-         else {
-            PushOperand("e#DIV/0!", 0);
-            }
-         break;
-
-      case "DVARP":
-         if (count > 1) {
-            PushOperand(resulttypesum, sk / count);
-            }
-         else {
-            PushOperand("e#DIV/0!", 0);
-            }
-         break;
-
-      case "DGET":
-         if (countmatches == 1) {
-            PushOperand(value1.type, value1.value);
-            }
-         else if (countmatches == 0) {
-            PushOperand("e#VALUE!", 0);
-            }
-         else {
-            PushOperand("e#NUM!", 0);
-            }
-         break;
-
+      break;
+    case "DSTDEV":
+      if (count > 1) {
+        PushOperand(resulttypesum, Math.sqrt(sk / (count - 1))); // sk is never negative according to Knuth
+      } else {
+        PushOperand("e#DIV/0!", 0);
       }
-
-   return;
-
-   }
+      break;
+    case "DSTDEVP":
+      if (count > 1) {
+        PushOperand(resulttypesum, Math.sqrt(sk / count));
+      } else {
+        PushOperand("e#DIV/0!", 0);
+      }
+      break;
+    case "DVAR":
+      if (count > 1) {
+        PushOperand(resulttypesum, sk / (count - 1));
+      } else {
+        PushOperand("e#DIV/0!", 0);
+      }
+      break;
+    case "DVARP":
+      if (count > 1) {
+        PushOperand(resulttypesum, sk / count);
+      } else {
+        PushOperand("e#DIV/0!", 0);
+      }
+      break;
+    case "DGET":
+      if (countmatches == 1) {
+        PushOperand(value1.type, value1.value);
+      } else if (countmatches == 0) {
+        PushOperand("e#VALUE!", 0);
+      } else {
+        PushOperand("e#NUM!", 0);
+      }
+      break;
+  }
+  return;
+};
 
 //*********************
 //
@@ -17517,36 +17903,33 @@ SocialCalc.Formula.FunctionList["DVARP"] = [SocialCalc.Formula.DSeriesFunctions,
 #
 */
 
-SocialCalc.Formula.FieldToColnum = function(sheet, col1num, ncols, row1num, fieldname, fieldtype) {
-
-   var colnum, cell, value;
-
-   if (fieldtype.charAt(0) == "n") { // number - return it if legal
-      colnum = fieldname - 0; // make sure a number
-      if (colnum <= 0 || colnum > ncols) {
-         return 0;
-         }
-      return Math.floor(colnum);
-      }
-
-   if (fieldtype.charAt(0) != "t") { // must be text otherwise
+SocialCalc.Formula.FieldToColnum = function (sheet, col1num, ncols, row1num, fieldname, fieldtype) {
+  var colnum, cell, value;
+  if (fieldtype.charAt(0) == "n") {
+    // number - return it if legal
+    colnum = fieldname - 0; // make sure a number
+    if (colnum <= 0 || colnum > ncols) {
       return 0;
-      }
-
-   fieldname = fieldname ? fieldname.toLowerCase() : "";
-
-   for (colnum=0; colnum < ncols; colnum++) { // look through column headers for a match
-      cell = sheet.GetAssuredCell(SocialCalc.crToCoord(col1num+colnum, row1num));
-      value = cell.datavalue;
-      value = (value+"").toLowerCase(); // ignore case
-      if (value == fieldname) { // match
-         return colnum+1;
-         }         
-      }
-   return 0; // looked at all and no match
-
-   }
-
+    }
+    return Math.floor(colnum);
+  }
+  if (fieldtype.charAt(0) != "t") {
+    // must be text otherwise
+    return 0;
+  }
+  fieldname = fieldname ? fieldname.toLowerCase() : "";
+  for (colnum = 0; colnum < ncols; colnum++) {
+    // look through column headers for a match
+    cell = sheet.GetAssuredCell(SocialCalc.crToCoord(col1num + colnum, row1num));
+    value = cell.datavalue;
+    value = (value + "").toLowerCase(); // ignore case
+    if (value == fieldname) {
+      // match
+      return colnum + 1;
+    }
+  }
+  return 0; // looked at all and no match
+};
 
 /*
 #
@@ -17556,206 +17939,195 @@ SocialCalc.Formula.FieldToColnum = function(sheet, col1num, ncols, row1num, fiel
 #
 */
 
-SocialCalc.Formula.LookupFunctions = function(fname, operand, foperand, sheet) {
-
-   var lookupvalue, range, offset, rangelookup, offsetvalue, rangeinfo;
-   var c, r, cincr, rincr, previousOK, csave, rsave, cell, value, valuetype, cr, lookupvalue;
-
-   var scf = SocialCalc.Formula;
-   var operand_value_and_type = scf.OperandValueAndType;
-   var lookup_result_type = scf.LookupResultType;
-   var typelookupplus = scf.TypeLookupTable.plus;
-
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
-
-   lookupvalue = operand_value_and_type(sheet, foperand);
-   if (typeof lookupvalue.value == "string") {
-      lookupvalue.value = lookupvalue.value.toLowerCase();
+SocialCalc.Formula.LookupFunctions = function (fname, operand, foperand, sheet) {
+  var lookupvalue, range, offset, rangelookup, offsetvalue, rangeinfo;
+  var c, r, cincr, rincr, previousOK, csave, rsave, cell, value, valuetype, cr, lookupvalue;
+  var scf = SocialCalc.Formula;
+  var operand_value_and_type = scf.OperandValueAndType;
+  var lookup_result_type = scf.LookupResultType;
+  var typelookupplus = scf.TypeLookupTable.plus;
+  var PushOperand = function (t, v) {
+    operand.push({
+      type: t,
+      value: v
+    });
+  };
+  lookupvalue = operand_value_and_type(sheet, foperand);
+  if (typeof lookupvalue.value == "string") {
+    lookupvalue.value = lookupvalue.value.toLowerCase();
+  }
+  range = scf.TopOfStackValueAndType(sheet, foperand);
+  rangelookup = 1; // default to true or 1
+  if (fname == "MATCH") {
+    if (foperand.length) {
+      rangelookup = scf.OperandAsNumber(sheet, foperand);
+      if (rangelookup.type.charAt(0) != "n") {
+        PushOperand("e#VALUE!", 0);
+        return;
       }
-
-   range = scf.TopOfStackValueAndType(sheet, foperand);
-
-   rangelookup = 1; // default to true or 1
-   if (fname == "MATCH") {
       if (foperand.length) {
-         rangelookup = scf.OperandAsNumber(sheet, foperand);
-         if (rangelookup.type.charAt(0) != "n") {
-            PushOperand("e#VALUE!", 0);
-            return;
-            }
-         if (foperand.length) {
-            scf.FunctionArgsError(fname, operand);
-            return 0;
-            }
-         rangelookup = rangelookup.value - 0;
-         }
+        scf.FunctionArgsError(fname, operand);
+        return 0;
       }
-   else {
-      offsetvalue = scf.OperandAsNumber(sheet, foperand);
-      if (offsetvalue.type.charAt(0) != "n") {
-         PushOperand("e#VALUE!", 0);
-         return;
-         }
-      offsetvalue = Math.floor(offsetvalue.value);
+      rangelookup = rangelookup.value - 0;
+    }
+  } else {
+    offsetvalue = scf.OperandAsNumber(sheet, foperand);
+    if (offsetvalue.type.charAt(0) != "n") {
+      PushOperand("e#VALUE!", 0);
+      return;
+    }
+    offsetvalue = Math.floor(offsetvalue.value);
+    if (foperand.length) {
+      rangelookup = scf.OperandAsNumber(sheet, foperand);
+      if (rangelookup.type.charAt(0) != "n") {
+        PushOperand("e#VALUE!", 0);
+        return;
+      }
       if (foperand.length) {
-         rangelookup = scf.OperandAsNumber(sheet, foperand);
-         if (rangelookup.type.charAt(0) != "n") {
-            PushOperand("e#VALUE!", 0);
-            return;
-            }
-         if (foperand.length) {
-            scf.FunctionArgsError(fname, operand);
-            return 0;
-            }
-         rangelookup = rangelookup.value ? 1 : 0; // convert to 1 or 0
-         }
+        scf.FunctionArgsError(fname, operand);
+        return 0;
       }
-   lookupvalue.type = lookupvalue.type.charAt(0); // only deal with general type
-   if (lookupvalue.type == "n") { // if number, make sure a number
-      lookupvalue.value = lookupvalue.value - 0;
-      }
-
-   if (range.type != "range") {
-      scf.FunctionArgsError(fname, operand);
-      return 0;
-      }
-
-   rangeinfo = scf.DecodeRangeParts(sheet, range.value, range.type);
-   if (!rangeinfo) {
+      rangelookup = rangelookup.value ? 1 : 0; // convert to 1 or 0
+    }
+  }
+  lookupvalue.type = lookupvalue.type.charAt(0); // only deal with general type
+  if (lookupvalue.type == "n") {
+    // if number, make sure a number
+    lookupvalue.value = lookupvalue.value - 0;
+  }
+  if (range.type != "range") {
+    scf.FunctionArgsError(fname, operand);
+    return 0;
+  }
+  rangeinfo = scf.DecodeRangeParts(sheet, range.value, range.type);
+  if (!rangeinfo) {
+    PushOperand("e#REF!", 0);
+    return;
+  }
+  c = 0;
+  r = 0;
+  cincr = 0;
+  rincr = 0;
+  if (fname == "HLOOKUP") {
+    cincr = 1;
+    if (offsetvalue > rangeinfo.nrows) {
       PushOperand("e#REF!", 0);
       return;
+    }
+  } else if (fname == "VLOOKUP") {
+    rincr = 1;
+    if (offsetvalue > rangeinfo.ncols) {
+      PushOperand("e#REF!", 0);
+      return;
+    }
+  } else if (fname == "MATCH") {
+    if (rangeinfo.ncols > 1) {
+      if (rangeinfo.nrows > 1) {
+        PushOperand("e#N/A", 0);
+        return;
       }
-
-   c = 0;
-   r = 0;
-   cincr = 0;
-   rincr = 0;
-   if (fname == "HLOOKUP") {
       cincr = 1;
-      if (offsetvalue > rangeinfo.nrows) {
-         PushOperand("e#REF!", 0);
-         return;
-         }
-      }
-   else if (fname == "VLOOKUP") {
+    } else {
       rincr = 1;
-      if (offsetvalue > rangeinfo.ncols) {
-         PushOperand("e#REF!", 0);
-         return;
-         }
+    }
+  } else {
+    scf.FunctionArgsError(fname, operand);
+    return 0;
+  }
+  if (offsetvalue < 1 && fname != "MATCH") {
+    PushOperand("e#VALUE!", 0);
+    return 0;
+  }
+  previousOK; // if 1, previous test was <. If 2, also this one wasn't
+
+  while (1) {
+    cr = SocialCalc.crToCoord(rangeinfo.col1num + c, rangeinfo.row1num + r);
+    cell = rangeinfo.sheetdata.GetAssuredCell(cr);
+    value = cell.datavalue;
+    valuetype = cell.valuetype ? cell.valuetype.charAt(0) : "b"; // only deal with general types
+    if (valuetype == "n") {
+      value = value - 0; // make sure number
+    }
+    if (rangelookup) {
+      // rangelookup type 1 or -1: look for within brackets for matches
+      if (lookupvalue.type == "n" && valuetype == "n") {
+        if (lookupvalue.value == value) {
+          // match
+          break;
+        }
+        if (rangelookup > 0 && lookupvalue.value > value || rangelookup < 0 && lookupvalue.value < value) {
+          // possible match: wait and see
+          previousOK = 1;
+          csave = c; // remember col and row of last OK
+          rsave = r;
+        } else if (previousOK) {
+          // last one was OK, this one isn't
+          previousOK = 2;
+          break;
+        }
+      } else if (lookupvalue.type == "t" && valuetype == "t") {
+        value = typeof value == "string" ? value.toLowerCase() : "";
+        if (lookupvalue.value == value) {
+          // match
+          break;
+        }
+        if (rangelookup > 0 && lookupvalue.value > value || rangelookup < 0 && lookupvalue.value < value) {
+          // possible match: wait and see
+          previousOK = 1;
+          csave = c;
+          rsave = r;
+        } else if (previousOK) {
+          // last one was OK, this one isn't
+          previousOK = 2;
+          break;
+        }
       }
-   else if (fname == "MATCH") {
-      if (rangeinfo.ncols > 1) {
-         if (rangeinfo.nrows > 1) {
-            PushOperand("e#N/A", 0);
-            return;
-            }
-         cincr = 1;
-         }
-      else {
-         rincr = 1;
-         }
+    } else {
+      // exact value matches
+      if (lookupvalue.type == "n" && valuetype == "n") {
+        if (lookupvalue.value == value) {
+          // match
+          break;
+        }
+      } else if (lookupvalue.type == "t" && valuetype == "t") {
+        value = typeof value == "string" ? value.toLowerCase() : "";
+        if (lookupvalue.value == value) {
+          // match
+          break;
+        }
       }
-   else {
-      scf.FunctionArgsError(fname, operand);
-      return 0;
+    }
+    r += rincr;
+    c += cincr;
+    if (r >= rangeinfo.nrows || c >= rangeinfo.ncols) {
+      // end of range to check, no exact match
+      if (previousOK) {
+        // at least one could have been OK
+        previousOK = 2;
+        break;
       }
-   if (offsetvalue < 1 && fname != "MATCH") {
-      PushOperand("e#VALUE!", 0);
-      return 0;
-      }
-
-   previousOK; // if 1, previous test was <. If 2, also this one wasn't
-
-   while (1) {
-      cr = SocialCalc.crToCoord(rangeinfo.col1num + c, rangeinfo.row1num + r);
-      cell = rangeinfo.sheetdata.GetAssuredCell(cr);
-      value = cell.datavalue;
-      valuetype = cell.valuetype ? cell.valuetype.charAt(0) : "b"; // only deal with general types
-      if (valuetype == "n") {
-         value = value - 0; // make sure number
-         }
-      if (rangelookup) { // rangelookup type 1 or -1: look for within brackets for matches
-         if (lookupvalue.type == "n" && valuetype == "n") {
-            if (lookupvalue.value == value) { // match
-               break;
-               }
-            if ((rangelookup > 0 && lookupvalue.value > value)
-                || (rangelookup < 0 && lookupvalue.value < value)) { // possible match: wait and see
-               previousOK = 1;
-               csave = c; // remember col and row of last OK
-               rsave = r;
-               }
-            else if (previousOK) { // last one was OK, this one isn't
-               previousOK = 2;
-               break;
-               }
-            }
-
-         else if (lookupvalue.type == "t" && valuetype == "t") {
-            value = typeof value == "string" ? value.toLowerCase() : "";
-            if (lookupvalue.value == value) { // match
-               break;
-               }
-            if ((rangelookup > 0 && lookupvalue.value > value)
-                || (rangelookup < 0 && lookupvalue.value < value)) { // possible match: wait and see
-               previousOK = 1;
-               csave = c;
-               rsave = r;
-               }
-            else if (previousOK) { // last one was OK, this one isn't
-               previousOK = 2;
-               break;
-               }
-            }
-         }
-      else { // exact value matches
-         if (lookupvalue.type == "n" && valuetype == "n") {
-            if (lookupvalue.value == value) { // match
-               break;
-               }
-            }
-         else if (lookupvalue.type == "t" && valuetype == "t") {
-            value = typeof value == "string" ? value.toLowerCase() : "";
-            if (lookupvalue.value == value) { // match
-               break;
-               }
-            }
-         }
-
-      r += rincr;
-      c += cincr;
-      if (r >= rangeinfo.nrows || c >= rangeinfo.ncols) { // end of range to check, no exact match
-         if (previousOK) { // at least one could have been OK
-            previousOK = 2;
-            break;
-            }
-         PushOperand("e#N/A", 0);
-         return;
-         }
-      }
-
-   if (previousOK == 2) { // back to last OK
-      r = rsave;
-      c = csave;
-      }
-
-   if (fname == "MATCH") {
-      value = c + r + 1; // only one may be <> 0
-      valuetype = "n";
-      }
-   else {
-      cr = SocialCalc.crToCoord(rangeinfo.col1num+c+(fname == "VLOOKUP" ? offsetvalue-1 : 0), rangeinfo.row1num+r+(fname == "HLOOKUP" ? offsetvalue-1 : 0));
-      cell = rangeinfo.sheetdata.GetAssuredCell(cr);
-      value = cell.datavalue;
-      valuetype = cell.valuetype;
-      }
-   PushOperand(valuetype, value);
-
-   return;
-
-   }
-
+      PushOperand("e#N/A", 0);
+      return;
+    }
+  }
+  if (previousOK == 2) {
+    // back to last OK
+    r = rsave;
+    c = csave;
+  }
+  if (fname == "MATCH") {
+    value = c + r + 1; // only one may be <> 0
+    valuetype = "n";
+  } else {
+    cr = SocialCalc.crToCoord(rangeinfo.col1num + c + (fname == "VLOOKUP" ? offsetvalue - 1 : 0), rangeinfo.row1num + r + (fname == "HLOOKUP" ? offsetvalue - 1 : 0));
+    cell = rangeinfo.sheetdata.GetAssuredCell(cr);
+    value = cell.datavalue;
+    valuetype = cell.valuetype;
+  }
+  PushOperand(valuetype, value);
+  return;
+};
 SocialCalc.Formula.FunctionList["HLOOKUP"] = [SocialCalc.Formula.LookupFunctions, -3, "hlookup", "", "lookup"];
 SocialCalc.Formula.FunctionList["MATCH"] = [SocialCalc.Formula.LookupFunctions, -2, "match", "", "lookup"];
 SocialCalc.Formula.FunctionList["VLOOKUP"] = [SocialCalc.Formula.LookupFunctions, -3, "vlookup", "", "lookup"];
@@ -17766,111 +18138,98 @@ SocialCalc.Formula.FunctionList["VLOOKUP"] = [SocialCalc.Formula.LookupFunctions
 #
 */
 
-SocialCalc.Formula.IndexFunction = function(fname, operand, foperand, sheet) {
-
-   var range, sheetname, indexinfo, rowindex, colindex, result, resulttype;
-
-   var scf = SocialCalc.Formula;
-
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
-
-   range = scf.TopOfStackValueAndType(sheet, foperand); // get range
-   if (range.type != "range") {
-      scf.FunctionArgsError(fname, operand);
-      return 0;
-      }
-   indexinfo = scf.DecodeRangeParts(sheet, range.value, range.type);
-   if (indexinfo.sheetname) {
-      sheetname = "!" + indexinfo.sheetname;
-      }
-   else {
-      sheetname = "";
-      }
-
-   rowindex = {value:0};
-   colindex = {value:0};
-
-   if (foperand.length) { // look for row number
-      rowindex = scf.OperandAsNumber(sheet, foperand);
-      if (rowindex.type.charAt(0) != "n" || rowindex.value < 0) {
-         PushOperand("e#VALUE!", 0);
-         return;
-         }
-      if (foperand.length) { // look for col number
-         colindex = scf.OperandAsNumber(sheet, foperand);
-         if (colindex.type.charAt(0) != "n" || colindex.value < 0) {
-            PushOperand("e#VALUE!", 0);
-            return;
-            }
-         if (foperand.length) {
-            scf.FunctionArgsError(fname, operand);
-            return 0;
-            }
-         }
-      else { // col number missing
-         if (indexinfo.nrows == 1) { // if only one row, then rowindex is really colindex
-            colindex.value = rowindex.value;
-            rowindex.value = 0;
-            }
-         }
-      }
-
-   if (rowindex.value > indexinfo.nrows || colindex.value > indexinfo.ncols) {
-      PushOperand("e#REF!", 0);
+SocialCalc.Formula.IndexFunction = function (fname, operand, foperand, sheet) {
+  var range, sheetname, indexinfo, rowindex, colindex, result, resulttype;
+  var scf = SocialCalc.Formula;
+  var PushOperand = function (t, v) {
+    operand.push({
+      type: t,
+      value: v
+    });
+  };
+  range = scf.TopOfStackValueAndType(sheet, foperand); // get range
+  if (range.type != "range") {
+    scf.FunctionArgsError(fname, operand);
+    return 0;
+  }
+  indexinfo = scf.DecodeRangeParts(sheet, range.value, range.type);
+  if (indexinfo.sheetname) {
+    sheetname = "!" + indexinfo.sheetname;
+  } else {
+    sheetname = "";
+  }
+  rowindex = {
+    value: 0
+  };
+  colindex = {
+    value: 0
+  };
+  if (foperand.length) {
+    // look for row number
+    rowindex = scf.OperandAsNumber(sheet, foperand);
+    if (rowindex.type.charAt(0) != "n" || rowindex.value < 0) {
+      PushOperand("e#VALUE!", 0);
       return;
+    }
+    if (foperand.length) {
+      // look for col number
+      colindex = scf.OperandAsNumber(sheet, foperand);
+      if (colindex.type.charAt(0) != "n" || colindex.value < 0) {
+        PushOperand("e#VALUE!", 0);
+        return;
       }
-
-   if (rowindex.value == 0) {
-      if (colindex.value == 0) {
-         if (indexinfo.nrows == 1 && indexinfo.ncols == 1) {
-            result = SocialCalc.crToCoord(indexinfo.col1num, indexinfo.row1num) + sheetname;
-            resulttype = "coord";
-            }
-         else {
-            result = SocialCalc.crToCoord(indexinfo.col1num, indexinfo.row1num) + sheetname + "|" +
-                     SocialCalc.crToCoord(indexinfo.col1num+indexinfo.ncols-1, indexinfo.row1num+indexinfo.nrows-1) + 
-                     "|";
-            resulttype = "range";
-            }
-         }
-      else {
-         if (indexinfo.nrows == 1) {
-            result = SocialCalc.crToCoord(indexinfo.col1num+colindex.value-1, indexinfo.row1num) + sheetname;
-            resulttype = "coord";
-            }
-         else {
-            result = SocialCalc.crToCoord(indexinfo.col1num+colindex.value-1, indexinfo.row1num) + sheetname + "|" +
-                     SocialCalc.crToCoord(indexinfo.col1num+colindex.value-1, indexinfo.row1num+indexinfo.nrows-1) +
-                     "|";
-            resulttype = "range";
-            }
-         }
+      if (foperand.length) {
+        scf.FunctionArgsError(fname, operand);
+        return 0;
       }
-   else {
-      if (colindex.value == 0) {
-         if (indexinfo.ncols == 1) {
-            result = SocialCalc.crToCoord(indexinfo.col1num, indexinfo.row1num+rowindex.value-1) + sheetname;
-            resulttype = "coord";
-            }
-         else {
-            result = SocialCalc.crToCoord(indexinfo.col1num, indexinfo.row1num+rowindex.value-1) + sheetname + "|" +
-                     SocialCalc.crToCoord(indexinfo.col1num+indexinfo.ncols-1, indexinfo.row1num+rowindex.value-1) +
-                     "|";
-            resulttype = "range";
-            }
-         }
-      else {
-         result = SocialCalc.crToCoord(indexinfo.col1num+colindex.value-1, indexinfo.row1num+rowindex.value-1) + sheetname;
-         resulttype = "coord";
-         }
+    } else {
+      // col number missing
+      if (indexinfo.nrows == 1) {
+        // if only one row, then rowindex is really colindex
+        colindex.value = rowindex.value;
+        rowindex.value = 0;
       }
-
-   PushOperand(resulttype, result);
-
-   return;
-
-   }
-
+    }
+  }
+  if (rowindex.value > indexinfo.nrows || colindex.value > indexinfo.ncols) {
+    PushOperand("e#REF!", 0);
+    return;
+  }
+  if (rowindex.value == 0) {
+    if (colindex.value == 0) {
+      if (indexinfo.nrows == 1 && indexinfo.ncols == 1) {
+        result = SocialCalc.crToCoord(indexinfo.col1num, indexinfo.row1num) + sheetname;
+        resulttype = "coord";
+      } else {
+        result = SocialCalc.crToCoord(indexinfo.col1num, indexinfo.row1num) + sheetname + "|" + SocialCalc.crToCoord(indexinfo.col1num + indexinfo.ncols - 1, indexinfo.row1num + indexinfo.nrows - 1) + "|";
+        resulttype = "range";
+      }
+    } else {
+      if (indexinfo.nrows == 1) {
+        result = SocialCalc.crToCoord(indexinfo.col1num + colindex.value - 1, indexinfo.row1num) + sheetname;
+        resulttype = "coord";
+      } else {
+        result = SocialCalc.crToCoord(indexinfo.col1num + colindex.value - 1, indexinfo.row1num) + sheetname + "|" + SocialCalc.crToCoord(indexinfo.col1num + colindex.value - 1, indexinfo.row1num + indexinfo.nrows - 1) + "|";
+        resulttype = "range";
+      }
+    }
+  } else {
+    if (colindex.value == 0) {
+      if (indexinfo.ncols == 1) {
+        result = SocialCalc.crToCoord(indexinfo.col1num, indexinfo.row1num + rowindex.value - 1) + sheetname;
+        resulttype = "coord";
+      } else {
+        result = SocialCalc.crToCoord(indexinfo.col1num, indexinfo.row1num + rowindex.value - 1) + sheetname + "|" + SocialCalc.crToCoord(indexinfo.col1num + indexinfo.ncols - 1, indexinfo.row1num + rowindex.value - 1) + "|";
+        resulttype = "range";
+      }
+    } else {
+      result = SocialCalc.crToCoord(indexinfo.col1num + colindex.value - 1, indexinfo.row1num + rowindex.value - 1) + sheetname;
+      resulttype = "coord";
+    }
+  }
+  PushOperand(resulttype, result);
+  return;
+};
 SocialCalc.Formula.FunctionList["INDEX"] = [SocialCalc.Formula.IndexFunction, -1, "index", "", "lookup"];
 
 /*
@@ -17880,93 +18239,85 @@ SocialCalc.Formula.FunctionList["INDEX"] = [SocialCalc.Formula.IndexFunction, -1
 #
 */
 
-SocialCalc.Formula.CountifSumifFunctions = function(fname, operand, foperand, sheet) {
-
-   var range, criteria, sumrange, f2operand, result, resulttype, value1, value2;
-   var sum = 0;
-   var resulttypesum = "";
-   var count = 0;
-
-   var scf = SocialCalc.Formula;
-   var operand_value_and_type = scf.OperandValueAndType;
-   var lookup_result_type = scf.LookupResultType;
-   var typelookupplus = scf.TypeLookupTable.plus;
-
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
-
-   range = scf.TopOfStackValueAndType(sheet, foperand); // get range or coord
-   criteria = scf.OperandAsText(sheet, foperand); // get criteria
-   if (fname == "SUMIF") {
-      if (foperand.length == 1) { // three arg form of SUMIF
-         sumrange = scf.TopOfStackValueAndType(sheet, foperand);
-         }
-      else if (foperand.length == 0) { // two arg form
-         sumrange = {value: range.value, type: range.type};
-         }
-      else {
-         scf.FunctionArgsError(fname, operand);
-         return 0;
-         }
-      }
-   else {
-      sumrange = {value: range.value, type: range.type};
-      }
-
-   if (criteria.type.charAt(0) == "n") {
-      criteria.value = criteria.value + ""; // make text
-      }
-   else if (criteria.type.charAt(0) == "e") { // error
-      criteria.value = null;
-      }
-   else if (criteria.type.charAt(0) == "b") { // blank here is undefined
-      criteria.value = null;
-      }
-
-   if (range.type != "coord" && range.type != "range") {
+SocialCalc.Formula.CountifSumifFunctions = function (fname, operand, foperand, sheet) {
+  var range, criteria, sumrange, f2operand, result, resulttype, value1, value2;
+  var sum = 0;
+  var resulttypesum = "";
+  var count = 0;
+  var scf = SocialCalc.Formula;
+  var operand_value_and_type = scf.OperandValueAndType;
+  var lookup_result_type = scf.LookupResultType;
+  var typelookupplus = scf.TypeLookupTable.plus;
+  var PushOperand = function (t, v) {
+    operand.push({
+      type: t,
+      value: v
+    });
+  };
+  range = scf.TopOfStackValueAndType(sheet, foperand); // get range or coord
+  criteria = scf.OperandAsText(sheet, foperand); // get criteria
+  if (fname == "SUMIF") {
+    if (foperand.length == 1) {
+      // three arg form of SUMIF
+      sumrange = scf.TopOfStackValueAndType(sheet, foperand);
+    } else if (foperand.length == 0) {
+      // two arg form
+      sumrange = {
+        value: range.value,
+        type: range.type
+      };
+    } else {
       scf.FunctionArgsError(fname, operand);
       return 0;
-      }
-
-   if (fname == "SUMIF" && sumrange.type != "coord" && sumrange.type != "range") {
-      scf.FunctionArgsError(fname, operand);
-      return 0;
-      }
-
-   foperand.push(range);
-   f2operand = []; // to allow for 3 arg form
-   f2operand.push(sumrange);
-
-   while (foperand.length) {
-      value1 = operand_value_and_type(sheet, foperand);
-      value2 = operand_value_and_type(sheet, f2operand);
-      if (!scf.TestCriteria(value1.value, value1.type, criteria.value)) {
-         continue;
-         }
-
-      count += 1;
-
-      if (value2.type.charAt(0) == "n") {
-         sum += value2.value-0;
-         resulttypesum = lookup_result_type(value2.type, resulttypesum || value2.type, typelookupplus);
-         }
-      else if (value2.type.charAt(0) == "e" && resulttypesum.charAt(0) != "e") {
-         resulttypesum = value2.type;
-         }
-      }
-
-   resulttypesum = resulttypesum || "n";
-
-   if (fname == "SUMIF") {
-      PushOperand(resulttypesum, sum);
-      }
-   else if (fname == "COUNTIF") {
-      PushOperand("n", count);
-      }
-
-   return;
-
-   }
-
+    }
+  } else {
+    sumrange = {
+      value: range.value,
+      type: range.type
+    };
+  }
+  if (criteria.type.charAt(0) == "n") {
+    criteria.value = criteria.value + ""; // make text
+  } else if (criteria.type.charAt(0) == "e") {
+    // error
+    criteria.value = null;
+  } else if (criteria.type.charAt(0) == "b") {
+    // blank here is undefined
+    criteria.value = null;
+  }
+  if (range.type != "coord" && range.type != "range") {
+    scf.FunctionArgsError(fname, operand);
+    return 0;
+  }
+  if (fname == "SUMIF" && sumrange.type != "coord" && sumrange.type != "range") {
+    scf.FunctionArgsError(fname, operand);
+    return 0;
+  }
+  foperand.push(range);
+  f2operand = []; // to allow for 3 arg form
+  f2operand.push(sumrange);
+  while (foperand.length) {
+    value1 = operand_value_and_type(sheet, foperand);
+    value2 = operand_value_and_type(sheet, f2operand);
+    if (!scf.TestCriteria(value1.value, value1.type, criteria.value)) {
+      continue;
+    }
+    count += 1;
+    if (value2.type.charAt(0) == "n") {
+      sum += value2.value - 0;
+      resulttypesum = lookup_result_type(value2.type, resulttypesum || value2.type, typelookupplus);
+    } else if (value2.type.charAt(0) == "e" && resulttypesum.charAt(0) != "e") {
+      resulttypesum = value2.type;
+    }
+  }
+  resulttypesum = resulttypesum || "n";
+  if (fname == "SUMIF") {
+    PushOperand(resulttypesum, sum);
+  } else if (fname == "COUNTIF") {
+    PushOperand("n", count);
+  }
+  return;
+};
 SocialCalc.Formula.FunctionList["COUNTIF"] = [SocialCalc.Formula.CountifSumifFunctions, 2, "rangec", "", "stat"];
 SocialCalc.Formula.FunctionList["SUMIF"] = [SocialCalc.Formula.CountifSumifFunctions, -2, "sumif", "", "stat"];
 
@@ -17976,78 +18327,75 @@ SocialCalc.Formula.FunctionList["SUMIF"] = [SocialCalc.Formula.CountifSumifFunct
 #
 */
 
-SocialCalc.Formula.SumifsFunction = function(fname, operand, foperand, sheet) {
-   var range, criteria, sumrange, f2operand, result, resulttype, value1, value2;
-   var sum = 0;
-   var resulttypesum = "";
-   var count = 0;
-
-   var scf = SocialCalc.Formula;
-   var operand_value_and_type = scf.OperandValueAndType;
-   var lookup_result_type = scf.LookupResultType;
-   var typelookupplus = scf.TypeLookupTable.plus;
-
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
-
-   sumrange = scf.TopOfStackValueAndType(sheet, foperand);
-   if (sumrange.type != "coord" && sumrange.type != "range") {
+SocialCalc.Formula.SumifsFunction = function (fname, operand, foperand, sheet) {
+  var range, criteria, sumrange, f2operand, result, resulttype, value1, value2;
+  var sum = 0;
+  var resulttypesum = "";
+  var count = 0;
+  var scf = SocialCalc.Formula;
+  var operand_value_and_type = scf.OperandValueAndType;
+  var lookup_result_type = scf.LookupResultType;
+  var typelookupplus = scf.TypeLookupTable.plus;
+  var PushOperand = function (t, v) {
+    operand.push({
+      type: t,
+      value: v
+    });
+  };
+  sumrange = scf.TopOfStackValueAndType(sheet, foperand);
+  if (sumrange.type != "coord" && sumrange.type != "range") {
+    scf.FunctionArgsError(fname, operand);
+    return 0;
+  }
+  var ranges = [],
+    criterias = [];
+  while (foperand.length) {
+    range = scf.TopOfStackValueAndType(sheet, foperand); // get range or coord
+    criteria = scf.OperandAsText(sheet, foperand); // get criteria
+    if (criteria.type.charAt(0) == "n") {
+      criteria.value = criteria.value + ""; // make text
+    } else if (criteria.type.charAt(0) == "e") {
+      // error
+      criteria.value = null;
+    } else if (criteria.type.charAt(0) == "b") {
+      // blank here is undefined
+      criteria.value = null;
+    }
+    if (range.type != "coord" && range.type != "range") {
       scf.FunctionArgsError(fname, operand);
       return 0;
+    }
+    ranges.push([range]);
+    criterias.push(criteria);
+  }
+  f2operand = [];
+  f2operand.push(sumrange);
+  while (f2operand.length) {
+    value2 = operand_value_and_type(sheet, f2operand);
+    var all_good = true;
+    for (var i = 0; i < ranges.length; i++) {
+      value1 = operand_value_and_type(sheet, ranges[i]); // get next condition - note this function increases the test range index
+      if (!all_good) {
+        continue;
+      } // skip test, but move to next cell in test range
+      if (!scf.TestCriteria(value1.value, value1.type, criterias[i].value)) {
+        all_good = false;
       }
-
-   var ranges = [], criterias = [];
-   while (foperand.length) {
-      range = scf.TopOfStackValueAndType(sheet, foperand); // get range or coord
-      criteria = scf.OperandAsText(sheet, foperand); // get criteria
-      if (criteria.type.charAt(0) == "n") {
-         criteria.value = criteria.value + ""; // make text
-         }
-      else if (criteria.type.charAt(0) == "e") { // error
-         criteria.value = null;
-         }
-      else if (criteria.type.charAt(0) == "b") { // blank here is undefined
-         criteria.value = null;
-         }
-      if (range.type != "coord" && range.type != "range") {
-         scf.FunctionArgsError(fname, operand);
-         return 0;
-         }
-      ranges.push([range]);
-      criterias.push(criteria);
-      }
-
-      f2operand = [];
-      f2operand.push(sumrange);
-
-   while (f2operand.length) {
-      value2 = operand_value_and_type(sheet, f2operand);
-
-      var all_good = true;
-      for (var i=0; i < ranges.length; i++) {
-         value1 = operand_value_and_type(sheet, ranges[i]); // get next condition - note this function increases the test range index
-         if (!all_good) { continue; }  // skip test, but move to next cell in test range
-         if (!scf.TestCriteria(value1.value, value1.type, criterias[i].value)) {
-            all_good = false;
-            }
-         }
-      if (!all_good) { continue; }
-
-      if (value2.type.charAt(0) == "n") {
-         sum += value2.value-0;
-         resulttypesum = lookup_result_type(value2.type, resulttypesum || value2.type, typelookupplus);
-         }
-      else if (value2.type.charAt(0) == "e" && resulttypesum.charAt(0) != "e") {
-         resulttypesum = value2.type;
-         }
-      }
-
-   resulttypesum = resulttypesum || "n";
-   PushOperand(resulttypesum, sum);
-   return;
-
-   }
-
-
+    }
+    if (!all_good) {
+      continue;
+    }
+    if (value2.type.charAt(0) == "n") {
+      sum += value2.value - 0;
+      resulttypesum = lookup_result_type(value2.type, resulttypesum || value2.type, typelookupplus);
+    } else if (value2.type.charAt(0) == "e" && resulttypesum.charAt(0) != "e") {
+      resulttypesum = value2.type;
+    }
+  }
+  resulttypesum = resulttypesum || "n";
+  PushOperand(resulttypesum, sum);
+  return;
+};
 SocialCalc.Formula.FunctionList["SUMIFS"] = [SocialCalc.Formula.SumifsFunction, -3, "sum_range, criteria_range1, criteria1, [criteria_range2, criteria2, ... criteria_range_n, criteria_n]", "", "stat"];
 
 /*
@@ -18056,36 +18404,33 @@ SocialCalc.Formula.FunctionList["SUMIFS"] = [SocialCalc.Formula.SumifsFunction, 
 #
 */
 
-SocialCalc.Formula.IfFunction = function(fname, operand, foperand, sheet) {
-
-   var cond, t;
-
-   var scf = SocialCalc.Formula;
-
-   cond = SocialCalc.Formula.OperandValueAndType(sheet, foperand);
-   t = cond.type.charAt(0);
-   if (t != "n" && t != "b") {
-      operand.push({type: "e#VALUE!", value: 0});
-      return;
-      }
-
-   var op1, op2;
-
-   op1 = foperand.pop();
-   if (foperand.length == 1) {
-      op2 = foperand.pop();
-      }
-   else if (foperand.length == 0) {
-      op2 = {type: "n", value: 0};
-      }
-   else {
-      scf.FunctionArgsError(fname, operand);
-      return;
-   }
-
-   operand.push(cond.value ? op1 : op2);
-
-   }
+SocialCalc.Formula.IfFunction = function (fname, operand, foperand, sheet) {
+  var cond, t;
+  var scf = SocialCalc.Formula;
+  cond = SocialCalc.Formula.OperandValueAndType(sheet, foperand);
+  t = cond.type.charAt(0);
+  if (t != "n" && t != "b") {
+    operand.push({
+      type: "e#VALUE!",
+      value: 0
+    });
+    return;
+  }
+  var op1, op2;
+  op1 = foperand.pop();
+  if (foperand.length == 1) {
+    op2 = foperand.pop();
+  } else if (foperand.length == 0) {
+    op2 = {
+      type: "n",
+      value: 0
+    };
+  } else {
+    scf.FunctionArgsError(fname, operand);
+    return;
+  }
+  operand.push(cond.value ? op1 : op2);
+};
 
 // Add to function list
 SocialCalc.Formula.FunctionList["IF"] = [SocialCalc.Formula.IfFunction, -2, "iffunc", "", "test"];
@@ -18096,26 +18441,21 @@ SocialCalc.Formula.FunctionList["IF"] = [SocialCalc.Formula.IfFunction, -2, "iff
 #
 */
 
-SocialCalc.Formula.DateFunction = function(fname, operand, foperand, sheet) {
-
-   var scf = SocialCalc.Formula;
-   var result = 0;
-   var year = scf.OperandAsNumber(sheet, foperand);
-   var month = scf.OperandAsNumber(sheet, foperand);
-   var day = scf.OperandAsNumber(sheet, foperand);
-   var resulttype = scf.LookupResultType(year.type, month.type, scf.TypeLookupTable.twoargnumeric);
-   resulttype = scf.LookupResultType(resulttype, day.type, scf.TypeLookupTable.twoargnumeric);
-   if (resulttype.charAt(0) == "n") {
-      result = SocialCalc.FormatNumber.convert_date_gregorian_to_julian(
-                  Math.floor(year.value), Math.floor(month.value), Math.floor(day.value)
-                  ) - SocialCalc.FormatNumber.datevalues.julian_offset;
-      resulttype = "nd";
-      }
-   scf.PushOperand(operand, resulttype, result);
-   return;
-
-   }
-
+SocialCalc.Formula.DateFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+  var result = 0;
+  var year = scf.OperandAsNumber(sheet, foperand);
+  var month = scf.OperandAsNumber(sheet, foperand);
+  var day = scf.OperandAsNumber(sheet, foperand);
+  var resulttype = scf.LookupResultType(year.type, month.type, scf.TypeLookupTable.twoargnumeric);
+  resulttype = scf.LookupResultType(resulttype, day.type, scf.TypeLookupTable.twoargnumeric);
+  if (resulttype.charAt(0) == "n") {
+    result = SocialCalc.FormatNumber.convert_date_gregorian_to_julian(Math.floor(year.value), Math.floor(month.value), Math.floor(day.value)) - SocialCalc.FormatNumber.datevalues.julian_offset;
+    resulttype = "nd";
+  }
+  scf.PushOperand(operand, resulttype, result);
+  return;
+};
 SocialCalc.Formula.FunctionList["DATE"] = [SocialCalc.Formula.DateFunction, 3, "date", "", "datetime"];
 
 /*
@@ -18124,24 +18464,21 @@ SocialCalc.Formula.FunctionList["DATE"] = [SocialCalc.Formula.DateFunction, 3, "
 #
 */
 
-SocialCalc.Formula.TimeFunction = function(fname, operand, foperand, sheet) {
-
-   var scf = SocialCalc.Formula;
-   var result = 0;
-   var hours = scf.OperandAsNumber(sheet, foperand);
-   var minutes = scf.OperandAsNumber(sheet, foperand);
-   var seconds = scf.OperandAsNumber(sheet, foperand);
-   var resulttype = scf.LookupResultType(hours.type, minutes.type, scf.TypeLookupTable.twoargnumeric);
-   resulttype = scf.LookupResultType(resulttype, seconds.type, scf.TypeLookupTable.twoargnumeric);
-   if (resulttype.charAt(0) == "n") {
-      result = ((hours.value * 60 * 60) + (minutes.value * 60) + seconds.value) / (24*60*60);
-      resulttype = "nt";
-      }
-   scf.PushOperand(operand, resulttype, result);
-   return;
-
-   }
-
+SocialCalc.Formula.TimeFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+  var result = 0;
+  var hours = scf.OperandAsNumber(sheet, foperand);
+  var minutes = scf.OperandAsNumber(sheet, foperand);
+  var seconds = scf.OperandAsNumber(sheet, foperand);
+  var resulttype = scf.LookupResultType(hours.type, minutes.type, scf.TypeLookupTable.twoargnumeric);
+  resulttype = scf.LookupResultType(resulttype, seconds.type, scf.TypeLookupTable.twoargnumeric);
+  if (resulttype.charAt(0) == "n") {
+    result = (hours.value * 60 * 60 + minutes.value * 60 + seconds.value) / (24 * 60 * 60);
+    resulttype = "nt";
+  }
+  scf.PushOperand(operand, resulttype, result);
+  return;
+};
 SocialCalc.Formula.FunctionList["TIME"] = [SocialCalc.Formula.TimeFunction, 3, "hms", "", "datetime"];
 
 /*
@@ -18153,58 +18490,52 @@ SocialCalc.Formula.FunctionList["TIME"] = [SocialCalc.Formula.TimeFunction, 3, "
 #
 */
 
-SocialCalc.Formula.DMYFunctions = function(fname, operand, foperand, sheet) {
-
-   var ymd, dtype, doffset;
-   var scf = SocialCalc.Formula;
-   var result = 0;
-
-   var datevalue = scf.OperandAsNumber(sheet, foperand);
-   var resulttype = scf.LookupResultType(datevalue.type, datevalue.type, scf.TypeLookupTable.oneargnumeric);
-
-   if (resulttype.charAt(0) == "n") {
-      ymd = SocialCalc.FormatNumber.convert_date_julian_to_gregorian(
-               Math.floor(datevalue.value + SocialCalc.FormatNumber.datevalues.julian_offset));
-      switch (fname) {
-         case "DAY":
-            result = ymd.day;
-            break;
-
-         case "MONTH":
-            result = ymd.month;
-            break;
-
-         case "YEAR":
-            result = ymd.year;
-            break;
-
-         case "WEEKDAY":
-            dtype = {value: 1};
-            if (foperand.length) { // get type if present
-               dtype = scf.OperandAsNumber(sheet, foperand);
-               if (dtype.type.charAt(0) != "n" || dtype.value < 1 || dtype.value > 3) {
-                  scf.PushOperand(operand, "e#VALUE!", 0);
-                  return;
-                  }
-               if (foperand.length) { // extra args
-                  scf.FunctionArgsError(fname, operand);
-                  return;
-                  }
-               }
-            doffset = 6;
-            if (dtype.value > 1) {
-               doffset -= 1;
-               }
-            result = Math.floor(datevalue.value+doffset) % 7 + (dtype.value < 3 ? 1 : 0);
-            break;
-         }
-      }
-
-   scf.PushOperand(operand, resulttype, result);
-   return;
-
-   }
-
+SocialCalc.Formula.DMYFunctions = function (fname, operand, foperand, sheet) {
+  var ymd, dtype, doffset;
+  var scf = SocialCalc.Formula;
+  var result = 0;
+  var datevalue = scf.OperandAsNumber(sheet, foperand);
+  var resulttype = scf.LookupResultType(datevalue.type, datevalue.type, scf.TypeLookupTable.oneargnumeric);
+  if (resulttype.charAt(0) == "n") {
+    ymd = SocialCalc.FormatNumber.convert_date_julian_to_gregorian(Math.floor(datevalue.value + SocialCalc.FormatNumber.datevalues.julian_offset));
+    switch (fname) {
+      case "DAY":
+        result = ymd.day;
+        break;
+      case "MONTH":
+        result = ymd.month;
+        break;
+      case "YEAR":
+        result = ymd.year;
+        break;
+      case "WEEKDAY":
+        dtype = {
+          value: 1
+        };
+        if (foperand.length) {
+          // get type if present
+          dtype = scf.OperandAsNumber(sheet, foperand);
+          if (dtype.type.charAt(0) != "n" || dtype.value < 1 || dtype.value > 3) {
+            scf.PushOperand(operand, "e#VALUE!", 0);
+            return;
+          }
+          if (foperand.length) {
+            // extra args
+            scf.FunctionArgsError(fname, operand);
+            return;
+          }
+        }
+        doffset = 6;
+        if (dtype.value > 1) {
+          doffset -= 1;
+        }
+        result = Math.floor(datevalue.value + doffset) % 7 + (dtype.value < 3 ? 1 : 0);
+        break;
+    }
+  }
+  scf.PushOperand(operand, resulttype, result);
+  return;
+};
 SocialCalc.Formula.FunctionList["DAY"] = [SocialCalc.Formula.DMYFunctions, 1, "v", "", "datetime"];
 SocialCalc.Formula.FunctionList["MONTH"] = [SocialCalc.Formula.DMYFunctions, 1, "v", "", "datetime"];
 SocialCalc.Formula.FunctionList["YEAR"] = [SocialCalc.Formula.DMYFunctions, 1, "v", "", "datetime"];
@@ -18218,45 +18549,37 @@ SocialCalc.Formula.FunctionList["WEEKDAY"] = [SocialCalc.Formula.DMYFunctions, -
 #
 */
 
-SocialCalc.Formula.HMSFunctions = function(fname, operand, foperand, sheet) {
-
-   var hours, minutes, seconds, fraction;
-   var scf = SocialCalc.Formula;
-   var result = 0;
-
-   var datetime = scf.OperandAsNumber(sheet, foperand);
-   var resulttype = scf.LookupResultType(datetime.type, datetime.type, scf.TypeLookupTable.oneargnumeric);
-
-   if (resulttype.charAt(0) == "n") {
-      if (datetime.value < 0) {
-         scf.PushOperand(operand, "e#NUM!", 0); // must be non-negative
-         return;
-         }
-      fraction = datetime.value - Math.floor(datetime.value); // fraction of a day
-      fraction *= 24;
-      hours = Math.floor(fraction);
-      fraction -= Math.floor(fraction);
-      fraction *= 60;
-      minutes = Math.floor(fraction);
-      fraction -= Math.floor(fraction);
-      fraction *= 60;
-      seconds = Math.floor(fraction + (datetime.value >= 0 ? 0.5: -0.5));
-      if (fname == "HOUR") {
-         result = hours;
-         }
-      else if (fname == "MINUTE") {
-         result = minutes;
-         }
-      else if (fname == "SECOND") {
-         result = seconds;
-         }
-      }
-
-   scf.PushOperand(operand, resulttype, result);
-   return;
-
-   }
-
+SocialCalc.Formula.HMSFunctions = function (fname, operand, foperand, sheet) {
+  var hours, minutes, seconds, fraction;
+  var scf = SocialCalc.Formula;
+  var result = 0;
+  var datetime = scf.OperandAsNumber(sheet, foperand);
+  var resulttype = scf.LookupResultType(datetime.type, datetime.type, scf.TypeLookupTable.oneargnumeric);
+  if (resulttype.charAt(0) == "n") {
+    if (datetime.value < 0) {
+      scf.PushOperand(operand, "e#NUM!", 0); // must be non-negative
+      return;
+    }
+    fraction = datetime.value - Math.floor(datetime.value); // fraction of a day
+    fraction *= 24;
+    hours = Math.floor(fraction);
+    fraction -= Math.floor(fraction);
+    fraction *= 60;
+    minutes = Math.floor(fraction);
+    fraction -= Math.floor(fraction);
+    fraction *= 60;
+    seconds = Math.floor(fraction + (datetime.value >= 0 ? 0.5 : -0.5));
+    if (fname == "HOUR") {
+      result = hours;
+    } else if (fname == "MINUTE") {
+      result = minutes;
+    } else if (fname == "SECOND") {
+      result = seconds;
+    }
+  }
+  scf.PushOperand(operand, resulttype, result);
+  return;
+};
 SocialCalc.Formula.FunctionList["HOUR"] = [SocialCalc.Formula.HMSFunctions, 1, "v", "", "datetime"];
 SocialCalc.Formula.FunctionList["MINUTE"] = [SocialCalc.Formula.HMSFunctions, 1, "v", "", "datetime"];
 SocialCalc.Formula.FunctionList["SECOND"] = [SocialCalc.Formula.HMSFunctions, 1, "v", "", "datetime"];
@@ -18267,81 +18590,60 @@ SocialCalc.Formula.FunctionList["SECOND"] = [SocialCalc.Formula.HMSFunctions, 1,
 #
 */
 
-SocialCalc.Formula.ExactFunction = function(fname, operand, foperand, sheet) {
-
-   var scf = SocialCalc.Formula;
-   var result = 0;
-   var resulttype = "nl";
-
-   var value1 = scf.OperandValueAndType(sheet, foperand);
-   var v1type = value1.type.charAt(0);
-   var value2 = scf.OperandValueAndType(sheet, foperand);
-   var v2type = value2.type.charAt(0);
-
-   if (v1type == "t") {
-      if (v2type == "t") {
-         result = value1.value == value2.value ? 1 : 0;
-         }
-      else if (v2type == "b") {
-         result = value1.value.length ? 0 : 1;
-         }
-      else if (v2type == "n") {
-         result = value1.value == value2.value+"" ? 1 : 0;
-         }
-      else if (v2type == "e") {
-         result = value2.value;
-         resulttype = value2.type;
-         }
-      else {
-         result = 0;
-         }
-      }
-   else if (v1type == "n") {
-      if (v2type == "n") {
-         result = value1.value-0 == value2.value-0 ? 1 : 0;
-         }
-      else if (v2type == "b") {
-         result = 0;
-         }
-      else if (v2type == "t") {
-         result = value1.value+"" == value2.value ? 1 : 0;
-         }
-      else if (v2type == "e") {
-         result = value2.value;
-         resulttype = value2.type;
-         }
-      else {
-         result = 0;
-         }
-      }
-   else if (v1type == "b") {
-      if (v2type == "t") {
-         result = value2.value.length ? 0 : 1;
-         }
-      else if (v2type == "b") {
-         result = 1;
-         }
-      else if (v2type == "n") {
-         result = 0;
-         }
-      else if (v2type == "e") {
-         result = value2.value;
-         resulttype = value2.type;
-         }
-      else {
-         result = 0;
-         }
-      }
-   else if (v1type == "e") {
-      result = value1.value;
-      resulttype = value1.type;
-      }
-
-   scf.PushOperand(operand, resulttype, result);
-   return;
-
-   }
-
+SocialCalc.Formula.ExactFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+  var result = 0;
+  var resulttype = "nl";
+  var value1 = scf.OperandValueAndType(sheet, foperand);
+  var v1type = value1.type.charAt(0);
+  var value2 = scf.OperandValueAndType(sheet, foperand);
+  var v2type = value2.type.charAt(0);
+  if (v1type == "t") {
+    if (v2type == "t") {
+      result = value1.value == value2.value ? 1 : 0;
+    } else if (v2type == "b") {
+      result = value1.value.length ? 0 : 1;
+    } else if (v2type == "n") {
+      result = value1.value == value2.value + "" ? 1 : 0;
+    } else if (v2type == "e") {
+      result = value2.value;
+      resulttype = value2.type;
+    } else {
+      result = 0;
+    }
+  } else if (v1type == "n") {
+    if (v2type == "n") {
+      result = value1.value - 0 == value2.value - 0 ? 1 : 0;
+    } else if (v2type == "b") {
+      result = 0;
+    } else if (v2type == "t") {
+      result = value1.value + "" == value2.value ? 1 : 0;
+    } else if (v2type == "e") {
+      result = value2.value;
+      resulttype = value2.type;
+    } else {
+      result = 0;
+    }
+  } else if (v1type == "b") {
+    if (v2type == "t") {
+      result = value2.value.length ? 0 : 1;
+    } else if (v2type == "b") {
+      result = 1;
+    } else if (v2type == "n") {
+      result = 0;
+    } else if (v2type == "e") {
+      result = value2.value;
+      resulttype = value2.type;
+    } else {
+      result = 0;
+    }
+  } else if (v1type == "e") {
+    result = value1.value;
+    resulttype = value1.type;
+  }
+  scf.PushOperand(operand, resulttype, result);
+  return;
+};
 SocialCalc.Formula.FunctionList["EXACT"] = [SocialCalc.Formula.ExactFunction, 2, "", "", "text"];
 
 /*
@@ -18368,227 +18670,194 @@ SocialCalc.Formula.FunctionList["EXACT"] = [SocialCalc.Formula.ExactFunction, 2,
 // Text values are manipulated as UTF-8, converting from and back to byte strings
 
 SocialCalc.Formula.ArgList = {
-                FIND: [1, 1, 0],
-                LEFT: [1, 0],
-                LEN: [1],
-                LOWER: [1],
-                MID: [1, 0, 0],
-                PROPER: [1],
-                REPLACE: [1, 0, 0, 1],
-                REPT: [1, 0],
-                RIGHT: [1, 0],
-                SUBSTITUTE: [1, 1, 1, 0],
-                TRIM: [1],
-                HEXCODE: [1],
-                UPPER: [1]
-               };
-
-SocialCalc.Formula.StringFunctions = function(fname, operand, foperand, sheet) {
-
-   var i, value, offset, len, start, count;
-   var scf = SocialCalc.Formula;
-   var result = 0;
-   var resulttype = "e#VALUE!";
-
-   var numargs = foperand.length;
-   var argdef = scf.ArgList[fname];
-   var operand_value = [];
-   var operand_type = [];
-
-   for (i=1; i <= numargs; i++) { // go through each arg, get value and type, and check for errors
-      if (i > argdef.length) { // too many args
-         scf.FunctionArgsError(fname, operand);
-         return;
-         }
-      if (argdef[i-1] == 0) {
-         value = scf.OperandAsNumber(sheet, foperand);
-         }
-      else if (argdef[i-1] == 1) {
-         value = scf.OperandAsText(sheet, foperand);
-         }
-      else if (argdef[i-1] == -1) {
-         value = scf.OperandValueAndType(sheet, foperand);
-         }
-      operand_value[i] = value.value;
-      operand_type[i] = value.type;
-      if (value.type.charAt(0) == "e") {
-         scf.PushOperand(operand, value.type, result);
-         return;
-         }
+  FIND: [1, 1, 0],
+  LEFT: [1, 0],
+  LEN: [1],
+  LOWER: [1],
+  MID: [1, 0, 0],
+  PROPER: [1],
+  REPLACE: [1, 0, 0, 1],
+  REPT: [1, 0],
+  RIGHT: [1, 0],
+  SUBSTITUTE: [1, 1, 1, 0],
+  TRIM: [1],
+  HEXCODE: [1],
+  UPPER: [1]
+};
+SocialCalc.Formula.StringFunctions = function (fname, operand, foperand, sheet) {
+  var i, value, offset, len, start, count;
+  var scf = SocialCalc.Formula;
+  var result = 0;
+  var resulttype = "e#VALUE!";
+  var numargs = foperand.length;
+  var argdef = scf.ArgList[fname];
+  var operand_value = [];
+  var operand_type = [];
+  for (i = 1; i <= numargs; i++) {
+    // go through each arg, get value and type, and check for errors
+    if (i > argdef.length) {
+      // too many args
+      scf.FunctionArgsError(fname, operand);
+      return;
+    }
+    if (argdef[i - 1] == 0) {
+      value = scf.OperandAsNumber(sheet, foperand);
+    } else if (argdef[i - 1] == 1) {
+      value = scf.OperandAsText(sheet, foperand);
+    } else if (argdef[i - 1] == -1) {
+      value = scf.OperandValueAndType(sheet, foperand);
+    }
+    operand_value[i] = value.value;
+    operand_type[i] = value.type;
+    if (value.type.charAt(0) == "e") {
+      scf.PushOperand(operand, value.type, result);
+      return;
+    }
+  }
+  switch (fname) {
+    case "FIND":
+      offset = operand_type[3] ? operand_value[3] - 1 : 0;
+      if (offset < 0) {
+        result = "Start is before string"; // !! not displayed, no need to translate
+      } else {
+        result = operand_value[2].indexOf(operand_value[1], offset); // (null string matches first char)
+        if (result >= 0) {
+          result += 1;
+          resulttype = "n";
+        } else {
+          result = "Not found"; // !! not displayed, error is e#VALUE!
+        }
       }
-
-   switch (fname) {
-      case "FIND":
-         offset = operand_type[3] ? operand_value[3]-1 : 0;
-         if (offset < 0) {
-            result = "Start is before string"; // !! not displayed, no need to translate
-            }
-         else {
-            result = operand_value[2].indexOf(operand_value[1], offset); // (null string matches first char)
-            if (result >= 0) {
-               result += 1;
-               resulttype = "n";
-               }
-            else {
-               result = "Not found"; // !! not displayed, error is e#VALUE!
-               }
-            }
-         break;
-
-      case "LEFT":
-         len = operand_type[2] ? operand_value[2]-0 : 1;
-         if (len < 0) {
-            result = "Negative length";
-            }
-         else {
-            result = operand_value[1].substring(0, len);
-            resulttype = "t";
-            }
-         break;
-
-      case "LEN":
-         result = operand_value[1].length;
-         resulttype = "n";
-         break;
-
-      case "LOWER":
-         result = operand_value[1].toLowerCase();
-         resulttype = "t";
-         break;
-
-      case "MID":
-         start = operand_value[2]-0;
-         len = operand_value[3]-0;
-         if (len < 1 || start < 1) {
-            result = "Bad arguments";
-            }
-         else {
-            result = operand_value[1].substring(start-1, start+len-1);
-            resulttype = "t";
-            }
-         break;
-
-      case "PROPER":
-         result = operand_value[1].replace(/\b\w+\b/g, function(word) {
-                     return word.substring(0,1).toUpperCase() + 
-                        word.substring(1);
-                     }); // uppercase first character of words (see JavaScript, Flanagan, 5th edition, page 704)
-         resulttype = "t";
-         break;
-
-      case "REPLACE":
-         start = operand_value[2]-0;
-         len = operand_value[3]-0;
-         if (len < 0 || start < 1) {
-            result = "Bad arguments";
-            }
-         else {
-            result = operand_value[1].substring(0, start-1) + operand_value[4] + 
-               operand_value[1].substring(start-1+len);
-            resulttype = "t";
-            }
-         break;
-
-      case "REPT":
-         count = operand_value[2]-0;
-         if (count < 0) {
-            result = "Negative count";
-            }
-         else {
-            result = "";
-            for (; count > 0; count--) {
-               result += operand_value[1];
-               }
-            resulttype = "t";
-            }
-         break;
-
-      case "RIGHT":
-         len = operand_type[2] ? operand_value[2]-0 : 1;
-         if (len < 0) {
-            result = "Negative length";
-            }
-         else {
-            result = operand_value[1].slice(-len);
-            resulttype = "t";
-            }
-         break;
-
-      case "SUBSTITUTE":
-         fulltext = operand_value[1];
-         oldtext = operand_value[2];
-         newtext = operand_value[3];
-         if (operand_value[4] != null) {
-            which = operand_value[4]-0;
-            if (which <= 0) {
-               result = "Non-positive instance number";
-               break;
-               }
-            }
-         else {
-            which = 0;
-            }
-         count = 0;
-         oldpos = 0;
-         result = "";
-         while (true) {
-            pos = fulltext.indexOf(oldtext, oldpos);
-            if (pos >= 0) {
-               count++; //!!!!!! old test just in case: if (count>1000) {alert(pos); break;}
-               result += fulltext.substring(oldpos, pos);
-               if (which==0) {
-                  result += newtext; // substitute
-                  }
-               else if (which==count) {
-                  result += newtext + fulltext.substring(pos+oldtext.length);
-                  break;
-                  }
-               else {
-                  result += oldtext; // leave as was
-                  }
-               oldpos = pos + oldtext.length;
-               }
-            else { // no more
-               result += fulltext.substring(oldpos);
-               break;
-               }
-            }
-         resulttype = "t";
-         break;
-
-      case "TRIM":
-         result = operand_value[1];
-         result = result.replace(/^ */, "");
-         result = result.replace(/ *$/, "");
-         result = result.replace(/ +/g, " ");
-         resulttype = "t";
-         break;
-
-      case "HEXCODE":
-         result = String(operand_value[1]);
-         var code = result.charCodeAt(0);
-         if (0xD800 <= code && code <= 0xDBFF) {
-             var next = result.charCodeAt(1);
-             if (0xDC00 <= next && next <= 0xDFFF) {
-                 code = ((code - 0xD800) * 0x400) + (next - 0xDC00) + 0x10000;
-             }
-         }
-         result = code.toString(16).toUpperCase();
-         resulttype = "t";
-         break;
-
-      case "UPPER":
-         result = operand_value[1].toUpperCase();
-         resulttype = "t";
-         break;
-
+      break;
+    case "LEFT":
+      len = operand_type[2] ? operand_value[2] - 0 : 1;
+      if (len < 0) {
+        result = "Negative length";
+      } else {
+        result = operand_value[1].substring(0, len);
+        resulttype = "t";
       }
-
-   scf.PushOperand(operand, resulttype, result);
-   return;
-
-   }
-
+      break;
+    case "LEN":
+      result = operand_value[1].length;
+      resulttype = "n";
+      break;
+    case "LOWER":
+      result = operand_value[1].toLowerCase();
+      resulttype = "t";
+      break;
+    case "MID":
+      start = operand_value[2] - 0;
+      len = operand_value[3] - 0;
+      if (len < 1 || start < 1) {
+        result = "Bad arguments";
+      } else {
+        result = operand_value[1].substring(start - 1, start + len - 1);
+        resulttype = "t";
+      }
+      break;
+    case "PROPER":
+      result = operand_value[1].replace(/\b\w+\b/g, function (word) {
+        return word.substring(0, 1).toUpperCase() + word.substring(1);
+      }); // uppercase first character of words (see JavaScript, Flanagan, 5th edition, page 704)
+      resulttype = "t";
+      break;
+    case "REPLACE":
+      start = operand_value[2] - 0;
+      len = operand_value[3] - 0;
+      if (len < 0 || start < 1) {
+        result = "Bad arguments";
+      } else {
+        result = operand_value[1].substring(0, start - 1) + operand_value[4] + operand_value[1].substring(start - 1 + len);
+        resulttype = "t";
+      }
+      break;
+    case "REPT":
+      count = operand_value[2] - 0;
+      if (count < 0) {
+        result = "Negative count";
+      } else {
+        result = "";
+        for (; count > 0; count--) {
+          result += operand_value[1];
+        }
+        resulttype = "t";
+      }
+      break;
+    case "RIGHT":
+      len = operand_type[2] ? operand_value[2] - 0 : 1;
+      if (len < 0) {
+        result = "Negative length";
+      } else {
+        result = operand_value[1].slice(-len);
+        resulttype = "t";
+      }
+      break;
+    case "SUBSTITUTE":
+      fulltext = operand_value[1];
+      oldtext = operand_value[2];
+      newtext = operand_value[3];
+      if (operand_value[4] != null) {
+        which = operand_value[4] - 0;
+        if (which <= 0) {
+          result = "Non-positive instance number";
+          break;
+        }
+      } else {
+        which = 0;
+      }
+      count = 0;
+      oldpos = 0;
+      result = "";
+      while (true) {
+        pos = fulltext.indexOf(oldtext, oldpos);
+        if (pos >= 0) {
+          count++; //!!!!!! old test just in case: if (count>1000) {alert(pos); break;}
+          result += fulltext.substring(oldpos, pos);
+          if (which == 0) {
+            result += newtext; // substitute
+          } else if (which == count) {
+            result += newtext + fulltext.substring(pos + oldtext.length);
+            break;
+          } else {
+            result += oldtext; // leave as was
+          }
+          oldpos = pos + oldtext.length;
+        } else {
+          // no more
+          result += fulltext.substring(oldpos);
+          break;
+        }
+      }
+      resulttype = "t";
+      break;
+    case "TRIM":
+      result = operand_value[1];
+      result = result.replace(/^ */, "");
+      result = result.replace(/ *$/, "");
+      result = result.replace(/ +/g, " ");
+      resulttype = "t";
+      break;
+    case "HEXCODE":
+      result = String(operand_value[1]);
+      var code = result.charCodeAt(0);
+      if (0xD800 <= code && code <= 0xDBFF) {
+        var next = result.charCodeAt(1);
+        if (0xDC00 <= next && next <= 0xDFFF) {
+          code = (code - 0xD800) * 0x400 + (next - 0xDC00) + 0x10000;
+        }
+      }
+      result = code.toString(16).toUpperCase();
+      resulttype = "t";
+      break;
+    case "UPPER":
+      result = operand_value[1].toUpperCase();
+      resulttype = "t";
+      break;
+  }
+  scf.PushOperand(operand, resulttype, result);
+  return;
+};
 SocialCalc.Formula.FunctionList["FIND"] = [SocialCalc.Formula.StringFunctions, -2, "find", "", "text"];
 SocialCalc.Formula.FunctionList["LEFT"] = [SocialCalc.Formula.StringFunctions, -2, "tc", "", "text"];
 SocialCalc.Formula.FunctionList["LEN"] = [SocialCalc.Formula.StringFunctions, 1, "txt", "", "text"];
@@ -18618,56 +18887,41 @@ SocialCalc.Formula.FunctionList["UPPER"] = [SocialCalc.Formula.StringFunctions, 
 #
 */
 
-SocialCalc.Formula.IsFunctions = function(fname, operand, foperand, sheet) {
-
-   var scf = SocialCalc.Formula;
-   var result = 0;
-   var resulttype = "nl";
-
-   var value = scf.OperandValueAndType(sheet, foperand);
-   var t = value.type.charAt(0);
-
-   switch (fname) {
-
-      case "ISBLANK":
-         result = value.type == "b" ? 1 : 0;
-         break;
-
-      case "ISERR":
-         result = t == "e" ? (value.type == "e#N/A" ? 0 : 1) : 0;
-         break;
-
-      case "ISERROR":
-         result = t == "e" ? 1 : 0;
-         break;
-
-      case "ISLOGICAL":
-         result = value.type == "nl" ? 1 : 0;
-         break;
-
-      case "ISNA":
-         result = value.type == "e#N/A" ? 1 : 0;
-         break;
-
-      case "ISNONTEXT":
-         result = t == "t" ? 0 : 1;
-         break;
-
-      case "ISNUMBER":
-         result = t == "n" ? 1 : 0;
-         break;
-
-      case "ISTEXT":
-         result = t == "t" ? 1 : 0;
-         break;
-      }
-
-   scf.PushOperand(operand, resulttype, result);
-
-   return;
-
-   }
-
+SocialCalc.Formula.IsFunctions = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+  var result = 0;
+  var resulttype = "nl";
+  var value = scf.OperandValueAndType(sheet, foperand);
+  var t = value.type.charAt(0);
+  switch (fname) {
+    case "ISBLANK":
+      result = value.type == "b" ? 1 : 0;
+      break;
+    case "ISERR":
+      result = t == "e" ? value.type == "e#N/A" ? 0 : 1 : 0;
+      break;
+    case "ISERROR":
+      result = t == "e" ? 1 : 0;
+      break;
+    case "ISLOGICAL":
+      result = value.type == "nl" ? 1 : 0;
+      break;
+    case "ISNA":
+      result = value.type == "e#N/A" ? 1 : 0;
+      break;
+    case "ISNONTEXT":
+      result = t == "t" ? 0 : 1;
+      break;
+    case "ISNUMBER":
+      result = t == "n" ? 1 : 0;
+      break;
+    case "ISTEXT":
+      result = t == "t" ? 1 : 0;
+      break;
+  }
+  scf.PushOperand(operand, resulttype, result);
+  return;
+};
 SocialCalc.Formula.FunctionList["ISBLANK"] = [SocialCalc.Formula.IsFunctions, 1, "v", "", "test"];
 SocialCalc.Formula.FunctionList["ISERR"] = [SocialCalc.Formula.IsFunctions, 1, "v", "", "test"];
 SocialCalc.Formula.FunctionList["ISERROR"] = [SocialCalc.Formula.IsFunctions, 1, "v", "", "test"];
@@ -18687,56 +18941,44 @@ SocialCalc.Formula.FunctionList["ISTEXT"] = [SocialCalc.Formula.IsFunctions, 1, 
 #
 */
 
-SocialCalc.Formula.NTVFunctions = function(fname, operand, foperand, sheet) {
-
-   var scf = SocialCalc.Formula;
-   var result = 0;
-   var resulttype = "e#VALUE!";
-
-   var value = scf.OperandValueAndType(sheet, foperand);
-   var t = value.type.charAt(0);
-
-   switch (fname) {
-
-      case "N":
-         result = t == "n" ? value.value-0 : 0;
-         resulttype = "n";
-         break;
-
-      case "T":
-         result = t == "t" ? value.value+"" : "";
-         resulttype = "t";
-         break;
-
-      case "VALUE":
-         if (t == "n" || t == "b") {
-            result = value.value || 0;
-            resulttype = "n";
-            }
-         else if (t == "t") {
-            value = SocialCalc.DetermineValueType(value.value);
-            if (value.type.charAt(0) != "n") {
-               result = 0;
-               resulttype = "e#VALUE!";
-               }
-            else {
-               result = value.value-0;
-               resulttype = "n";
-               }
-            }
-         break;
+SocialCalc.Formula.NTVFunctions = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+  var result = 0;
+  var resulttype = "e#VALUE!";
+  var value = scf.OperandValueAndType(sheet, foperand);
+  var t = value.type.charAt(0);
+  switch (fname) {
+    case "N":
+      result = t == "n" ? value.value - 0 : 0;
+      resulttype = "n";
+      break;
+    case "T":
+      result = t == "t" ? value.value + "" : "";
+      resulttype = "t";
+      break;
+    case "VALUE":
+      if (t == "n" || t == "b") {
+        result = value.value || 0;
+        resulttype = "n";
+      } else if (t == "t") {
+        value = SocialCalc.DetermineValueType(value.value);
+        if (value.type.charAt(0) != "n") {
+          result = 0;
+          resulttype = "e#VALUE!";
+        } else {
+          result = value.value - 0;
+          resulttype = "n";
+        }
       }
-
-   if (t == "e") { // error trumps
-      resulttype = value.type;
-      }
-
-   scf.PushOperand(operand, resulttype, result);
-
-   return;
-
-   }
-
+      break;
+  }
+  if (t == "e") {
+    // error trumps
+    resulttype = value.type;
+  }
+  scf.PushOperand(operand, resulttype, result);
+  return;
+};
 SocialCalc.Formula.FunctionList["N"] = [SocialCalc.Formula.NTVFunctions, 1, "v", "", "math"];
 SocialCalc.Formula.FunctionList["T"] = [SocialCalc.Formula.NTVFunctions, 1, "v", "", "text"];
 SocialCalc.Formula.FunctionList["VALUE"] = [SocialCalc.Formula.NTVFunctions, 1, "v", "", "text"];
@@ -18763,142 +19005,115 @@ SocialCalc.Formula.FunctionList["VALUE"] = [SocialCalc.Formula.NTVFunctions, 1, 
 #
 */
 
-SocialCalc.Formula.Math1Functions = function(fname, operand, foperand, sheet) {
-
-   var v1, value, f;
-   var result = {};
-
-   var scf = SocialCalc.Formula;
-
-   v1 = scf.OperandAsNumber(sheet, foperand);
-   value = v1.value;
-   result.type = scf.LookupResultType(v1.type, v1.type, scf.TypeLookupTable.oneargnumeric);
-
-   if (result.type == "n") {
-      switch (fname) {
-         case "ABS":
-            value = Math.abs(value);
-            break;
-
-         case "ACOS":
-            if (value >= -1 && value <= 1) {
-               value = Math.acos(value);
-               }
-            else {
-               result.type = "e#NUM!";
-               }
-            break;
-
-         case "ASIN":
-            if (value >= -1 && value <= 1) {
-               value = Math.asin(value);
-               }
-            else {
-               result.type = "e#NUM!";
-               }
-            break;
-
-         case "ATAN":
-            value = Math.atan(value);
-            break;
-
-         case "COS":
-            value = Math.cos(value);
-            break;
-
-         case "DEGREES":
-            value = value * 180/Math.PI;
-            break;
-
-         case "EVEN":
-            value = value < 0 ? -value : value;
-            if (value != Math.floor(value)) {
-               value = Math.floor(value + 1) + (Math.floor(value + 1) % 2);
-               }
-            else { // integer
-               value = value + (value % 2);
-               }
-            if (v1.value < 0) value = -value;
-            break;
-
-         case "EXP":
-            value = Math.exp(value);
-            break;
-
-         case "FACT":
-            f = 1;
-            value = Math.floor(value);
-            for (;value>0;value--) {
-               f *= value;
-               }
-            value = f;
-            break;
-
-         case "INT":
-            value = Math.floor(value); // spreadsheet INT is floor(), not int()
-            break;
-
-         case "LN":
-            if (value <= 0) {
-               result.type = "e#NUM!";
-               result.error = SocialCalc.Constants.s_sheetfunclnarg;
-               }
-            value = Math.log(value);
-            break;
-
-         case "LOG10":
-            if (value <= 0) {
-               result.type = "e#NUM!";
-               result.error = SocialCalc.Constants.s_sheetfunclog10arg;
-               }
-            value = Math.log(value)/Math.log(10);
-            break;
-
-         case "ODD":
-            value = value < 0 ? -value : value;
-            if (value != Math.floor(value)) {
-               value = Math.floor(value + 1) + (1 - (Math.floor(value + 1) % 2));
-               }
-            else { // integer
-               value = value + (1 - (value % 2));
-               }
-            if (v1.value < 0) value = -value;
-            break;
-
-         case "RADIANS":
-            value = value * Math.PI/180;
-            break;
-
-         case "SIN":
-            value = Math.sin(value);
-            break;
-
-         case "SQRT":
-            if (value >= 0) {
-               value = Math.sqrt(value);
-               }
-            else {
-               result.type = "e#NUM!";
-               }
-            break;
-
-         case "TAN":
-            if (Math.cos(value) != 0) {
-               value = Math.tan(value);
-               }
-            else {
-               result.type = "e#NUM!";
-               }
-            break;
-         }
-      }
-
-   result.value = value;
-   operand.push(result);
-
-   return null;
-
-   }
+SocialCalc.Formula.Math1Functions = function (fname, operand, foperand, sheet) {
+  var v1, value, f;
+  var result = {};
+  var scf = SocialCalc.Formula;
+  v1 = scf.OperandAsNumber(sheet, foperand);
+  value = v1.value;
+  result.type = scf.LookupResultType(v1.type, v1.type, scf.TypeLookupTable.oneargnumeric);
+  if (result.type == "n") {
+    switch (fname) {
+      case "ABS":
+        value = Math.abs(value);
+        break;
+      case "ACOS":
+        if (value >= -1 && value <= 1) {
+          value = Math.acos(value);
+        } else {
+          result.type = "e#NUM!";
+        }
+        break;
+      case "ASIN":
+        if (value >= -1 && value <= 1) {
+          value = Math.asin(value);
+        } else {
+          result.type = "e#NUM!";
+        }
+        break;
+      case "ATAN":
+        value = Math.atan(value);
+        break;
+      case "COS":
+        value = Math.cos(value);
+        break;
+      case "DEGREES":
+        value = value * 180 / Math.PI;
+        break;
+      case "EVEN":
+        value = value < 0 ? -value : value;
+        if (value != Math.floor(value)) {
+          value = Math.floor(value + 1) + Math.floor(value + 1) % 2;
+        } else {
+          // integer
+          value = value + value % 2;
+        }
+        if (v1.value < 0) value = -value;
+        break;
+      case "EXP":
+        value = Math.exp(value);
+        break;
+      case "FACT":
+        f = 1;
+        value = Math.floor(value);
+        for (; value > 0; value--) {
+          f *= value;
+        }
+        value = f;
+        break;
+      case "INT":
+        value = Math.floor(value); // spreadsheet INT is floor(), not int()
+        break;
+      case "LN":
+        if (value <= 0) {
+          result.type = "e#NUM!";
+          result.error = SocialCalc.Constants.s_sheetfunclnarg;
+        }
+        value = Math.log(value);
+        break;
+      case "LOG10":
+        if (value <= 0) {
+          result.type = "e#NUM!";
+          result.error = SocialCalc.Constants.s_sheetfunclog10arg;
+        }
+        value = Math.log(value) / Math.log(10);
+        break;
+      case "ODD":
+        value = value < 0 ? -value : value;
+        if (value != Math.floor(value)) {
+          value = Math.floor(value + 1) + (1 - Math.floor(value + 1) % 2);
+        } else {
+          // integer
+          value = value + (1 - value % 2);
+        }
+        if (v1.value < 0) value = -value;
+        break;
+      case "RADIANS":
+        value = value * Math.PI / 180;
+        break;
+      case "SIN":
+        value = Math.sin(value);
+        break;
+      case "SQRT":
+        if (value >= 0) {
+          value = Math.sqrt(value);
+        } else {
+          result.type = "e#NUM!";
+        }
+        break;
+      case "TAN":
+        if (Math.cos(value) != 0) {
+          value = Math.tan(value);
+        } else {
+          result.type = "e#NUM!";
+        }
+        break;
+    }
+  }
+  result.value = value;
+  operand.push(result);
+  return null;
+};
 
 // Add to function list
 SocialCalc.Formula.FunctionList["ABS"] = [SocialCalc.Formula.Math1Functions, 1, "v", "", "math"];
@@ -18919,7 +19134,6 @@ SocialCalc.Formula.FunctionList["SIN"] = [SocialCalc.Formula.Math1Functions, 1, 
 SocialCalc.Formula.FunctionList["SQRT"] = [SocialCalc.Formula.Math1Functions, 1, "v", "", "math"];
 SocialCalc.Formula.FunctionList["TAN"] = [SocialCalc.Formula.Math1Functions, 1, "v", "", "math"];
 
-
 /*
 #
 # ATAN2(x, y)
@@ -18929,75 +19143,63 @@ SocialCalc.Formula.FunctionList["TAN"] = [SocialCalc.Formula.Math1Functions, 1, 
 #
 */
 
-SocialCalc.Formula.Math2Functions = function(fname, operand, foperand, sheet) {
-
-   var xval, yval, value, quotient, decimalscale, i;
-   var result = {};
-
-   var scf = SocialCalc.Formula;
-
-   xval = scf.OperandAsNumber(sheet, foperand);
-   yval = scf.OperandAsNumber(sheet, foperand);
-   value = 0;
-   result.type = scf.LookupResultType(xval.type, yval.type, scf.TypeLookupTable.twoargnumeric);
-
-   if (result.type == "n") {
-      switch (fname) {
-         case "ATAN2":
-            if (xval.value == 0 && yval.value == 0) {
-               result.type = "e#DIV/0!";
-               }
-            else {
-               result.value = Math.atan2(yval.value, xval.value);
-               }
-            break;
-
-         case "POWER":
-            result.value = Math.pow(xval.value, yval.value);
-            if (isNaN(result.value)) {
-               result.value = 0;
-               result.type = "e#NUM!";
-               }
-            break;
-
-         case "MOD": // en.wikipedia.org/wiki/Modulo_operation, etc.
-            if (yval.value == 0) {
-               result.type = "e#DIV/0!";
-               }
-            else {
-               quotient = xval.value/yval.value;
-               quotient = Math.floor(quotient);
-               result.value = xval.value - (quotient * yval.value);
-               }
-            break;
-
-         case "TRUNC":
-            decimalscale = 1; // cut down to required number of decimal digits
-            if (yval.value >= 0) {
-               yval.value = Math.floor(yval.value);
-               for (i=0; i<yval.value; i++) {
-                  decimalscale *= 10;
-                  }
-               result.value = Math.floor(Math.abs(xval.value) * decimalscale) / decimalscale;
-               }
-            else if (yval.value < 0) {
-               yval.value = Math.floor(-yval.value);
-               for (i=0; i<yval.value; i++) {
-                  decimalscale *= 10;
-                  }
-               result.value = Math.floor(Math.abs(xval.value) / decimalscale) * decimalscale;
-               }
-            if (xval.value < 0) {
-               result.value = -result.value;
-               }
-            }
-         }
- 
-   operand.push(result);
-
-   return null;
-
-   }
+SocialCalc.Formula.Math2Functions = function (fname, operand, foperand, sheet) {
+  var xval, yval, value, quotient, decimalscale, i;
+  var result = {};
+  var scf = SocialCalc.Formula;
+  xval = scf.OperandAsNumber(sheet, foperand);
+  yval = scf.OperandAsNumber(sheet, foperand);
+  value = 0;
+  result.type = scf.LookupResultType(xval.type, yval.type, scf.TypeLookupTable.twoargnumeric);
+  if (result.type == "n") {
+    switch (fname) {
+      case "ATAN2":
+        if (xval.value == 0 && yval.value == 0) {
+          result.type = "e#DIV/0!";
+        } else {
+          result.value = Math.atan2(yval.value, xval.value);
+        }
+        break;
+      case "POWER":
+        result.value = Math.pow(xval.value, yval.value);
+        if (isNaN(result.value)) {
+          result.value = 0;
+          result.type = "e#NUM!";
+        }
+        break;
+      case "MOD":
+        // en.wikipedia.org/wiki/Modulo_operation, etc.
+        if (yval.value == 0) {
+          result.type = "e#DIV/0!";
+        } else {
+          quotient = xval.value / yval.value;
+          quotient = Math.floor(quotient);
+          result.value = xval.value - quotient * yval.value;
+        }
+        break;
+      case "TRUNC":
+        decimalscale = 1; // cut down to required number of decimal digits
+        if (yval.value >= 0) {
+          yval.value = Math.floor(yval.value);
+          for (i = 0; i < yval.value; i++) {
+            decimalscale *= 10;
+          }
+          result.value = Math.floor(Math.abs(xval.value) * decimalscale) / decimalscale;
+        } else if (yval.value < 0) {
+          yval.value = Math.floor(-yval.value);
+          for (i = 0; i < yval.value; i++) {
+            decimalscale *= 10;
+          }
+          result.value = Math.floor(Math.abs(xval.value) / decimalscale) * decimalscale;
+        }
+        if (xval.value < 0) {
+          result.value = -result.value;
+        }
+    }
+  }
+  operand.push(result);
+  return null;
+};
 
 // Add to function list
 SocialCalc.Formula.FunctionList["ATAN2"] = [SocialCalc.Formula.Math2Functions, 2, "xy", "", "math"];
@@ -19011,48 +19213,39 @@ SocialCalc.Formula.FunctionList["TRUNC"] = [SocialCalc.Formula.Math2Functions, 2
 #
 */
 
-SocialCalc.Formula.LogFunction = function(fname, operand, foperand, sheet) {
-
-   var value, value2;
-   var result = {};
-
-   var scf = SocialCalc.Formula;
-
-   result.value = 0;
-
-   value = scf.OperandAsNumber(sheet, foperand);
-   result.type = scf.LookupResultType(value.type, value.type, scf.TypeLookupTable.oneargnumeric);
-   if (foperand.length == 1) {
-      value2 = scf.OperandAsNumber(sheet, foperand);
-      if (value2.type.charAt(0) != "n" || value2.value <= 0) {
-         scf.FunctionSpecificError(fname, operand, "e#NUM!", SocialCalc.Constants.s_sheetfunclogsecondarg);
-         return 0;
-         }
-      }
-   else if (foperand.length != 0) {
-      scf.FunctionArgsError(fname, operand);
+SocialCalc.Formula.LogFunction = function (fname, operand, foperand, sheet) {
+  var value, value2;
+  var result = {};
+  var scf = SocialCalc.Formula;
+  result.value = 0;
+  value = scf.OperandAsNumber(sheet, foperand);
+  result.type = scf.LookupResultType(value.type, value.type, scf.TypeLookupTable.oneargnumeric);
+  if (foperand.length == 1) {
+    value2 = scf.OperandAsNumber(sheet, foperand);
+    if (value2.type.charAt(0) != "n" || value2.value <= 0) {
+      scf.FunctionSpecificError(fname, operand, "e#NUM!", SocialCalc.Constants.s_sheetfunclogsecondarg);
       return 0;
-      }
-   else {
-      value2 = {value: Math.E, type: "n"};
-      }
-
-   if (result.type == "n") {
-      if (value.value <= 0) {
-         scf.FunctionSpecificError(fname, operand, "e#NUM!", SocialCalc.Constants.s_sheetfunclogfirstarg);
-         return 0;
-         }
-      result.value = Math.log(value.value)/Math.log(value2.value);
-      }
-
-   operand.push(result);
-
-   return;
-
-   }
-
+    }
+  } else if (foperand.length != 0) {
+    scf.FunctionArgsError(fname, operand);
+    return 0;
+  } else {
+    value2 = {
+      value: Math.E,
+      type: "n"
+    };
+  }
+  if (result.type == "n") {
+    if (value.value <= 0) {
+      scf.FunctionSpecificError(fname, operand, "e#NUM!", SocialCalc.Constants.s_sheetfunclogfirstarg);
+      return 0;
+    }
+    result.value = Math.log(value.value) / Math.log(value2.value);
+  }
+  operand.push(result);
+  return;
+};
 SocialCalc.Formula.FunctionList["LOG"] = [SocialCalc.Formula.LogFunction, -1, "log", "", "math"];
-
 
 /*
 #
@@ -19060,63 +19253,53 @@ SocialCalc.Formula.FunctionList["LOG"] = [SocialCalc.Formula.LogFunction, -1, "l
 #
 */
 
-SocialCalc.Formula.RoundFunction = function(fname, operand, foperand, sheet) {
-
-   var value2, decimalscale, scaledvalue, i;
-
-   var scf = SocialCalc.Formula;
-   var result = 0;
-   var resulttype = "e#VALUE!";
-
-   var value = scf.OperandValueAndType(sheet, foperand);
-   var resulttype = scf.LookupResultType(value.type, value.type, scf.TypeLookupTable.oneargnumeric);
-
-   if (foperand.length == 1) {
-      value2 = scf.OperandValueAndType(sheet, foperand);
-      if (value2.type.charAt(0) != "n") {
-         scf.FunctionSpecificError(fname, operand, "e#NUM!", SocialCalc.Constants.s_sheetfuncroundsecondarg);
-         return 0;
-         }
-      }
-   else if (foperand.length != 0) {
-      scf.FunctionArgsError(fname, operand);
+SocialCalc.Formula.RoundFunction = function (fname, operand, foperand, sheet) {
+  var value2, decimalscale, scaledvalue, i;
+  var scf = SocialCalc.Formula;
+  var result = 0;
+  var resulttype = "e#VALUE!";
+  var value = scf.OperandValueAndType(sheet, foperand);
+  var resulttype = scf.LookupResultType(value.type, value.type, scf.TypeLookupTable.oneargnumeric);
+  if (foperand.length == 1) {
+    value2 = scf.OperandValueAndType(sheet, foperand);
+    if (value2.type.charAt(0) != "n") {
+      scf.FunctionSpecificError(fname, operand, "e#NUM!", SocialCalc.Constants.s_sheetfuncroundsecondarg);
       return 0;
+    }
+  } else if (foperand.length != 0) {
+    scf.FunctionArgsError(fname, operand);
+    return 0;
+  } else {
+    value2 = {
+      value: 0,
+      type: "n"
+    }; // if no second arg, assume 0 for simple round
+  }
+  if (resulttype == "n") {
+    value2.value = value2.value - 0;
+    if (value2.value == 0) {
+      result = Math.round(value.value);
+    } else if (value2.value > 0) {
+      decimalscale = 1; // cut down to required number of decimal digits
+      value2.value = Math.floor(value2.value);
+      for (i = 0; i < value2.value; i++) {
+        decimalscale *= 10;
       }
-   else {
-      value2 = {value: 0, type: "n"}; // if no second arg, assume 0 for simple round
+      scaledvalue = Math.round(value.value * decimalscale);
+      result = scaledvalue / decimalscale;
+    } else if (value2.value < 0) {
+      decimalscale = 1; // cut down to required number of decimal digits
+      value2.value = Math.floor(-value2.value);
+      for (i = 0; i < value2.value; i++) {
+        decimalscale *= 10;
       }
-
-   if (resulttype == "n") {
-      value2.value = value2.value-0;
-      if (value2.value == 0) {
-         result = Math.round(value.value);
-         }
-      else if (value2.value > 0) {
-         decimalscale = 1; // cut down to required number of decimal digits
-         value2.value = Math.floor(value2.value);
-         for (i=0; i<value2.value; i++) {
-            decimalscale *= 10;
-            }
-         scaledvalue = Math.round(value.value * decimalscale);
-         result = scaledvalue / decimalscale;
-         }
-      else if (value2.value < 0) {
-         decimalscale = 1; // cut down to required number of decimal digits
-         value2.value = Math.floor(-value2.value);
-         for (i=0; i<value2.value; i++) {
-            decimalscale *= 10;
-            }
-         scaledvalue = Math.round(value.value / decimalscale);
-         result = scaledvalue * decimalscale;
-         }
-      }
-
-   scf.PushOperand(operand, resulttype, result);
-
-   return;
-
-   }
-
+      scaledvalue = Math.round(value.value / decimalscale);
+      result = scaledvalue * decimalscale;
+    }
+  }
+  scf.PushOperand(operand, resulttype, result);
+  return;
+};
 SocialCalc.Formula.FunctionList["ROUND"] = [SocialCalc.Formula.RoundFunction, -1, "vp", "", "math"];
 
 /*
@@ -19126,61 +19309,59 @@ SocialCalc.Formula.FunctionList["ROUND"] = [SocialCalc.Formula.RoundFunction, -1
 #
 */
 
-SocialCalc.Formula.CeilingFloorFunctions = function(fname, operand, foperand, sheet) {
-
-   var scf = SocialCalc.Formula;
-   var val, sig, t;
-
-   var PushOperand = function(t, v) {operand.push({type: t, value: v});};
-
-   val = scf.OperandValueAndType(sheet, foperand);
-   t = val.type.charAt(0);
-   if (t != "n") {
+SocialCalc.Formula.CeilingFloorFunctions = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+  var val, sig, t;
+  var PushOperand = function (t, v) {
+    operand.push({
+      type: t,
+      value: v
+    });
+  };
+  val = scf.OperandValueAndType(sheet, foperand);
+  t = val.type.charAt(0);
+  if (t != "n") {
+    PushOperand("e#VALUE!", 0);
+    return;
+  }
+  if (val.value == 0) {
+    PushOperand("n", 0);
+    return;
+  }
+  if (foperand.length == 1) {
+    sig = scf.OperandValueAndType(sheet, foperand);
+    t = val.type.charAt(0);
+    if (t != "n") {
       PushOperand("e#VALUE!", 0);
       return;
-      }
-   if (val.value == 0) {
-      PushOperand("n", 0);
-      return;
-      }
-
-   if (foperand.length == 1) {
-      sig = scf.OperandValueAndType(sheet, foperand);
-      t = val.type.charAt(0);
-      if (t != "n") {
-         PushOperand("e#VALUE!", 0);
-         return;
-         }
-      }
-   else if (foperand.length == 0) {
-      sig = {type: "n", value: val.value > 0 ? 1 : -1};
-      }
-   else {
-      PushOperand("e#VALUE!", 0);
-      return;
-      }
-   if (sig.value == 0) {
-      PushOperand("n", 0);
-      return;
-      }
-   if (sig.value * val.value < 0) {
-      PushOperand("e#NUM!", 0);
-      return;
-      }
-
-   switch (fname) {
-      case "CEILING":
-         PushOperand("n", Math.ceil(val.value / sig.value) * sig.value);
-         break;
-      case "FLOOR":
-         PushOperand("n", Math.floor(val.value / sig.value) * sig.value);
-         break;
-      }
-
-   return;
-
-   }
-
+    }
+  } else if (foperand.length == 0) {
+    sig = {
+      type: "n",
+      value: val.value > 0 ? 1 : -1
+    };
+  } else {
+    PushOperand("e#VALUE!", 0);
+    return;
+  }
+  if (sig.value == 0) {
+    PushOperand("n", 0);
+    return;
+  }
+  if (sig.value * val.value < 0) {
+    PushOperand("e#NUM!", 0);
+    return;
+  }
+  switch (fname) {
+    case "CEILING":
+      PushOperand("n", Math.ceil(val.value / sig.value) * sig.value);
+      break;
+    case "FLOOR":
+      PushOperand("n", Math.floor(val.value / sig.value) * sig.value);
+      break;
+  }
+  return;
+};
 SocialCalc.Formula.FunctionList["CEILING"] = [SocialCalc.Formula.CeilingFloorFunctions, -1, "vsig", "", "math"];
 SocialCalc.Formula.FunctionList["FLOOR"] = [SocialCalc.Formula.CeilingFloorFunctions, -1, "vsig", "", "math"];
 
@@ -19191,47 +19372,36 @@ SocialCalc.Formula.FunctionList["FLOOR"] = [SocialCalc.Formula.CeilingFloorFunct
 #
 */
 
-SocialCalc.Formula.AndOrFunctions = function(fname, operand, foperand, sheet) {
-
-   var value1, result;
-
-   var scf = SocialCalc.Formula;
-   var resulttype = "";
-
-   if (fname == "AND") {
-      result = 1;
+SocialCalc.Formula.AndOrFunctions = function (fname, operand, foperand, sheet) {
+  var value1, result;
+  var scf = SocialCalc.Formula;
+  var resulttype = "";
+  if (fname == "AND") {
+    result = 1;
+  } else if (fname == "OR") {
+    result = 0;
+  }
+  while (foperand.length) {
+    value1 = scf.OperandValueAndType(sheet, foperand);
+    if (value1.type.charAt(0) == "n") {
+      value1.value = value1.value - 0;
+      if (fname == "AND") {
+        result = value1.value != 0 ? result : 0;
+      } else if (fname == "OR") {
+        result = value1.value != 0 ? 1 : result;
       }
-   else if (fname == "OR") {
-      result = 0;
-      }
-
-   while (foperand.length) {
-      value1 = scf.OperandValueAndType(sheet, foperand);
-      if (value1.type.charAt(0) == "n") {
-         value1.value = value1.value-0;
-         if (fname == "AND") {
-            result = value1.value != 0 ? result : 0;
-            }
-         else if (fname == "OR") {
-            result = value1.value != 0 ? 1 : result;
-            }
-         resulttype = scf.LookupResultType(value1.type, resulttype || "nl", scf.TypeLookupTable.propagateerror);
-         }
-      else if (value1.type.charAt(0) == "e" && resulttype.charAt(0) != "e") {
-         resulttype = value1.type;
-         }
-      }
-   if (resulttype.length < 1) {
-      resulttype = "e#VALUE!";
-      result = 0;
-      }
-
-   scf.PushOperand(operand, resulttype, result);
-
-   return;
-
-   }
-
+      resulttype = scf.LookupResultType(value1.type, resulttype || "nl", scf.TypeLookupTable.propagateerror);
+    } else if (value1.type.charAt(0) == "e" && resulttype.charAt(0) != "e") {
+      resulttype = value1.type;
+    }
+  }
+  if (resulttype.length < 1) {
+    resulttype = "e#VALUE!";
+    result = 0;
+  }
+  scf.PushOperand(operand, resulttype, result);
+  return;
+};
 SocialCalc.Formula.FunctionList["AND"] = [SocialCalc.Formula.AndOrFunctions, -1, "vn", "", "test"];
 SocialCalc.Formula.FunctionList["OR"] = [SocialCalc.Formula.AndOrFunctions, -1, "vn", "", "test"];
 
@@ -19241,27 +19411,20 @@ SocialCalc.Formula.FunctionList["OR"] = [SocialCalc.Formula.AndOrFunctions, -1, 
 #
 */
 
-SocialCalc.Formula.NotFunction = function(fname, operand, foperand, sheet) {
-
-   var result = 0;
-   var scf = SocialCalc.Formula;
-   var value = scf.OperandValueAndType(sheet, foperand);
-   var resulttype = scf.LookupResultType(value.type, value.type, scf.TypeLookupTable.propagateerror);
-
-   if (value.type.charAt(0) == "n" || value.type == "b") {
-      result = value.value-0 != 0 ? 0 : 1; // do the "not" operation
-      resulttype = "nl";
-      }
-   else if (value.type.charAt(0) == "t") {
-      resulttype = "e#VALUE!";
-      }
-
-   scf.PushOperand(operand, resulttype, result);
-
-   return;
-
-   }
-
+SocialCalc.Formula.NotFunction = function (fname, operand, foperand, sheet) {
+  var result = 0;
+  var scf = SocialCalc.Formula;
+  var value = scf.OperandValueAndType(sheet, foperand);
+  var resulttype = scf.LookupResultType(value.type, value.type, scf.TypeLookupTable.propagateerror);
+  if (value.type.charAt(0) == "n" || value.type == "b") {
+    result = value.value - 0 != 0 ? 0 : 1; // do the "not" operation
+    resulttype = "nl";
+  } else if (value.type.charAt(0) == "t") {
+    resulttype = "e#VALUE!";
+  }
+  scf.PushOperand(operand, resulttype, result);
+  return;
+};
 SocialCalc.Formula.FunctionList["NOT"] = [SocialCalc.Formula.NotFunction, 1, "v", "", "test"];
 
 /*
@@ -19270,40 +19433,33 @@ SocialCalc.Formula.FunctionList["NOT"] = [SocialCalc.Formula.NotFunction, 1, "v"
 #
 */
 
-SocialCalc.Formula.ChooseFunction = function(fname, operand, foperand, sheet) {
-
-   var resulttype, count, value1;
-   var result = 0;
-   var scf = SocialCalc.Formula;
-
-   var cindex = scf.OperandAsNumber(sheet, foperand);
-
-   if (cindex.type.charAt(0) != "n") {
-      cindex.value = 0;
-      }
-   cindex.value = Math.floor(cindex.value);
-
-   count = 0;
-   while (foperand.length) {
-      value1 = scf.TopOfStackValueAndType(sheet, foperand);
-      count += 1;
-      if (cindex.value == count) {
-         result = value1.value;
-         resulttype = value1.type;
-         break;
-         }
-      }
-   if (resulttype) { // found something
-      scf.PushOperand(operand, resulttype, result);
-      }
-   else {
-      scf.PushOperand(operand, "e#VALUE!", 0);
-      }
-
-   return;
-
-   }
-
+SocialCalc.Formula.ChooseFunction = function (fname, operand, foperand, sheet) {
+  var resulttype, count, value1;
+  var result = 0;
+  var scf = SocialCalc.Formula;
+  var cindex = scf.OperandAsNumber(sheet, foperand);
+  if (cindex.type.charAt(0) != "n") {
+    cindex.value = 0;
+  }
+  cindex.value = Math.floor(cindex.value);
+  count = 0;
+  while (foperand.length) {
+    value1 = scf.TopOfStackValueAndType(sheet, foperand);
+    count += 1;
+    if (cindex.value == count) {
+      result = value1.value;
+      resulttype = value1.type;
+      break;
+    }
+  }
+  if (resulttype) {
+    // found something
+    scf.PushOperand(operand, resulttype, result);
+  } else {
+    scf.PushOperand(operand, "e#VALUE!", 0);
+  }
+  return;
+};
 SocialCalc.Formula.FunctionList["CHOOSE"] = [SocialCalc.Formula.ChooseFunction, -2, "choose", "", "lookup"];
 
 /*
@@ -19313,43 +19469,31 @@ SocialCalc.Formula.FunctionList["CHOOSE"] = [SocialCalc.Formula.ChooseFunction, 
 #
 */
 
-SocialCalc.Formula.ColumnsRowsFunctions = function(fname, operand, foperand, sheet) {
-
-   var resulttype, rangeinfo;
-   var result = 0;
-   var scf = SocialCalc.Formula;
-
-   var value1 = scf.TopOfStackValueAndType(sheet, foperand);
-
-   if (value1.type == "coord") {
-      result = 1;
-      resulttype = "n";
-      }
-
-   else if (value1.type == "range") {
-      rangeinfo = scf.DecodeRangeParts(sheet, value1.value);
-      if (fname == "COLUMNS") {
-         result = rangeinfo.ncols;
-         }
-      else if (fname == "ROWS") {
-         result = rangeinfo.nrows;
-         }
-      resulttype = "n";
-      }
-   else {
-      result = 0;
-      resulttype = "e#VALUE!";
-      }
-
-   scf.PushOperand(operand, resulttype, result);
-
-   return;
-
-   }
-
+SocialCalc.Formula.ColumnsRowsFunctions = function (fname, operand, foperand, sheet) {
+  var resulttype, rangeinfo;
+  var result = 0;
+  var scf = SocialCalc.Formula;
+  var value1 = scf.TopOfStackValueAndType(sheet, foperand);
+  if (value1.type == "coord") {
+    result = 1;
+    resulttype = "n";
+  } else if (value1.type == "range") {
+    rangeinfo = scf.DecodeRangeParts(sheet, value1.value);
+    if (fname == "COLUMNS") {
+      result = rangeinfo.ncols;
+    } else if (fname == "ROWS") {
+      result = rangeinfo.nrows;
+    }
+    resulttype = "n";
+  } else {
+    result = 0;
+    resulttype = "e#VALUE!";
+  }
+  scf.PushOperand(operand, resulttype, result);
+  return;
+};
 SocialCalc.Formula.FunctionList["COLUMNS"] = [SocialCalc.Formula.ColumnsRowsFunctions, 1, "range", "", "lookup"];
 SocialCalc.Formula.FunctionList["ROWS"] = [SocialCalc.Formula.ColumnsRowsFunctions, 1, "range", "", "lookup"];
-
 
 /*
 #
@@ -19363,69 +19507,58 @@ SocialCalc.Formula.FunctionList["ROWS"] = [SocialCalc.Formula.ColumnsRowsFunctio
 #
 */
 
-SocialCalc.Formula.ZeroArgFunctions = function(fname, operand, foperand, sheet) {
-
-   var startval, tzoffset, start_1_1_1970, seconds_in_a_day, nowdays;
-   var result = {value: 0};
-   
-   switch (fname) {
-      case "FALSE":
-         result.type = "nl";
-         result.value = 0;
-         break;
-
-      case "NA":
-         result.type = "e#N/A";
-         break;
-
-      case "NOW":
-         startval = new Date();
-         tzoffset = startval.getTimezoneOffset();
-         startval = startval.getTime() / 1000; // convert to seconds
-         start_1_1_1970 = 25569; // Day number of 1/1/1970 starting with 1/1/1900 as 1
-         seconds_in_a_day = 24 * 60 * 60;
-         nowdays = start_1_1_1970 + startval / seconds_in_a_day - tzoffset/(24*60);
-         result.value = nowdays;
-         result.type = "ndt";
-         SocialCalc.Formula.FreshnessInfo.volatile.NOW = true; // remember
-         break;
-
-      case "PI":
-         result.type = "n";
-         result.value = Math.PI;
-         break;
-
-      case "TODAY":
-         startval = new Date();
-         tzoffset = startval.getTimezoneOffset();
-         startval = startval.getTime() / 1000; // convert to seconds
-         start_1_1_1970 = 25569; // Day number of 1/1/1970 starting with 1/1/1900 as 1
-         seconds_in_a_day = 24 * 60 * 60;
-         nowdays = start_1_1_1970 + startval / seconds_in_a_day - tzoffset/(24*60);
-         result.value = Math.floor(nowdays);
-         result.type = "nd";
-         SocialCalc.Formula.FreshnessInfo.volatile.TODAY = true; // remember
-         break;
-
-      case "TRUE":
-         result.type = "nl";
-         result.value = 1;
-         break;
-
-      case "RAND":
-         result.type = "n";
-         result.value = Math.random();
-         SocialCalc.Formula.FreshnessInfo.volatile.RAND = true; // remember
-         break;
-
-      }
-
-
-   operand.push(result);
-
-   return null;
-
-}
+SocialCalc.Formula.ZeroArgFunctions = function (fname, operand, foperand, sheet) {
+  var startval, tzoffset, start_1_1_1970, seconds_in_a_day, nowdays;
+  var result = {
+    value: 0
+  };
+  switch (fname) {
+    case "FALSE":
+      result.type = "nl";
+      result.value = 0;
+      break;
+    case "NA":
+      result.type = "e#N/A";
+      break;
+    case "NOW":
+      startval = new Date();
+      tzoffset = startval.getTimezoneOffset();
+      startval = startval.getTime() / 1000; // convert to seconds
+      start_1_1_1970 = 25569; // Day number of 1/1/1970 starting with 1/1/1900 as 1
+      seconds_in_a_day = 24 * 60 * 60;
+      nowdays = start_1_1_1970 + startval / seconds_in_a_day - tzoffset / (24 * 60);
+      result.value = nowdays;
+      result.type = "ndt";
+      SocialCalc.Formula.FreshnessInfo.volatile.NOW = true; // remember
+      break;
+    case "PI":
+      result.type = "n";
+      result.value = Math.PI;
+      break;
+    case "TODAY":
+      startval = new Date();
+      tzoffset = startval.getTimezoneOffset();
+      startval = startval.getTime() / 1000; // convert to seconds
+      start_1_1_1970 = 25569; // Day number of 1/1/1970 starting with 1/1/1900 as 1
+      seconds_in_a_day = 24 * 60 * 60;
+      nowdays = start_1_1_1970 + startval / seconds_in_a_day - tzoffset / (24 * 60);
+      result.value = Math.floor(nowdays);
+      result.type = "nd";
+      SocialCalc.Formula.FreshnessInfo.volatile.TODAY = true; // remember
+      break;
+    case "TRUE":
+      result.type = "nl";
+      result.value = 1;
+      break;
+    case "RAND":
+      result.type = "n";
+      result.value = Math.random();
+      SocialCalc.Formula.FreshnessInfo.volatile.RAND = true; // remember
+      break;
+  }
+  operand.push(result);
+  return null;
+};
 
 // Add to function list
 SocialCalc.Formula.FunctionList["FALSE"] = [SocialCalc.Formula.ZeroArgFunctions, 0, "", "", "test"];
@@ -19449,53 +19582,48 @@ SocialCalc.Formula.FunctionList["TRUE"] = [SocialCalc.Formula.ZeroArgFunctions, 
 #
 */
 
-SocialCalc.Formula.DDBFunction = function(fname, operand, foperand, sheet) {
+SocialCalc.Formula.DDBFunction = function (fname, operand, foperand, sheet) {
+  var method, depreciation, accumulateddepreciation, i;
+  var scf = SocialCalc.Formula;
+  var cost = scf.OperandAsNumber(sheet, foperand);
+  var salvage = scf.OperandAsNumber(sheet, foperand);
+  var lifetime = scf.OperandAsNumber(sheet, foperand);
+  var period = scf.OperandAsNumber(sheet, foperand);
+  if (scf.CheckForErrorValue(operand, cost)) return;
+  if (scf.CheckForErrorValue(operand, salvage)) return;
+  if (scf.CheckForErrorValue(operand, lifetime)) return;
+  if (scf.CheckForErrorValue(operand, period)) return;
+  if (lifetime.value < 1) {
+    scf.FunctionSpecificError(fname, operand, "e#NUM!", SocialCalc.Constants.s_sheetfuncddblife);
+    return 0;
+  }
+  method = {
+    value: 2,
+    type: "n"
+  };
+  if (foperand.length > 0) {
+    method = scf.OperandAsNumber(sheet, foperand);
+  }
+  if (foperand.length != 0) {
+    scf.FunctionArgsError(fname, operand);
+    return 0;
+  }
+  if (scf.CheckForErrorValue(operand, method)) return;
+  depreciation = 0; // calculated for each period
+  accumulateddepreciation = 0; // accumulated by adding each period's
 
-   var method, depreciation, accumulateddepreciation, i;
-   var scf = SocialCalc.Formula;
-
-   var cost = scf.OperandAsNumber(sheet, foperand);
-   var salvage = scf.OperandAsNumber(sheet, foperand);
-   var lifetime = scf.OperandAsNumber(sheet, foperand);
-   var period = scf.OperandAsNumber(sheet, foperand);
-
-   if (scf.CheckForErrorValue(operand, cost)) return;
-   if (scf.CheckForErrorValue(operand, salvage)) return;
-   if (scf.CheckForErrorValue(operand, lifetime)) return;
-   if (scf.CheckForErrorValue(operand, period)) return;
-
-   if (lifetime.value < 1) {
-      scf.FunctionSpecificError(fname, operand, "e#NUM!", SocialCalc.Constants.s_sheetfuncddblife);
-      return 0;
-      }
-
-   method = {value: 2, type: "n"};
-   if (foperand.length > 0 ) {
-      method = scf.OperandAsNumber(sheet, foperand);
-      }
-   if (foperand.length != 0) {
-      scf.FunctionArgsError(fname, operand);
-      return 0;
-      }
-   if (scf.CheckForErrorValue(operand, method)) return;
-
-   depreciation = 0; // calculated for each period
-   accumulateddepreciation = 0; // accumulated by adding each period's
-
-   for (i=1; i<=period.value-0 && i<=lifetime.value; i++) { // calculate for each period based on net from previous
-      depreciation = (cost.value - accumulateddepreciation) * (method.value / lifetime.value);
-      if (cost.value - accumulateddepreciation - depreciation < salvage.value) { // don't go lower than salvage value
-         depreciation = cost.value - accumulateddepreciation - salvage.value;
-         }
-      accumulateddepreciation += depreciation;
-      }
-
-   scf.PushOperand(operand, 'n$', depreciation);
-
-   return;
-
-   }
-
+  for (i = 1; i <= period.value - 0 && i <= lifetime.value; i++) {
+    // calculate for each period based on net from previous
+    depreciation = (cost.value - accumulateddepreciation) * (method.value / lifetime.value);
+    if (cost.value - accumulateddepreciation - depreciation < salvage.value) {
+      // don't go lower than salvage value
+      depreciation = cost.value - accumulateddepreciation - salvage.value;
+    }
+    accumulateddepreciation += depreciation;
+  }
+  scf.PushOperand(operand, 'n$', depreciation);
+  return;
+};
 SocialCalc.Formula.FunctionList["DDB"] = [SocialCalc.Formula.DDBFunction, -4, "ddb", "", "financial"];
 
 /*
@@ -19507,32 +19635,23 @@ SocialCalc.Formula.FunctionList["DDB"] = [SocialCalc.Formula.DDBFunction, -4, "d
 #
 */
 
-SocialCalc.Formula.SLNFunction = function(fname, operand, foperand, sheet) {
-
-   var depreciation;
-   var scf = SocialCalc.Formula;
-
-   var cost = scf.OperandAsNumber(sheet, foperand);
-   var salvage = scf.OperandAsNumber(sheet, foperand);
-   var lifetime = scf.OperandAsNumber(sheet, foperand);
-
-   if (scf.CheckForErrorValue(operand, cost)) return;
-   if (scf.CheckForErrorValue(operand, salvage)) return;
-   if (scf.CheckForErrorValue(operand, lifetime)) return;
-
-   if (lifetime.value < 1) {
-      scf.FunctionSpecificError(fname, operand, "e#NUM!", SocialCalc.Constants.s_sheetfuncslnlife);
-      return 0;
-      }
-
-   depreciation = (cost.value - salvage.value) / lifetime.value;
-
-   scf.PushOperand(operand, 'n$', depreciation);
-
-   return;
-
-   }
-
+SocialCalc.Formula.SLNFunction = function (fname, operand, foperand, sheet) {
+  var depreciation;
+  var scf = SocialCalc.Formula;
+  var cost = scf.OperandAsNumber(sheet, foperand);
+  var salvage = scf.OperandAsNumber(sheet, foperand);
+  var lifetime = scf.OperandAsNumber(sheet, foperand);
+  if (scf.CheckForErrorValue(operand, cost)) return;
+  if (scf.CheckForErrorValue(operand, salvage)) return;
+  if (scf.CheckForErrorValue(operand, lifetime)) return;
+  if (lifetime.value < 1) {
+    scf.FunctionSpecificError(fname, operand, "e#NUM!", SocialCalc.Constants.s_sheetfuncslnlife);
+    return 0;
+  }
+  depreciation = (cost.value - salvage.value) / lifetime.value;
+  scf.PushOperand(operand, 'n$', depreciation);
+  return;
+};
 SocialCalc.Formula.FunctionList["SLN"] = [SocialCalc.Formula.SLNFunction, 3, "csl", "", "financial"];
 
 /*
@@ -19543,35 +19662,27 @@ SocialCalc.Formula.FunctionList["SLN"] = [SocialCalc.Formula.SLNFunction, 3, "cs
 #
 */
 
-SocialCalc.Formula.SYDFunction = function(fname, operand, foperand, sheet) {
+SocialCalc.Formula.SYDFunction = function (fname, operand, foperand, sheet) {
+  var depreciation, sumperiods;
+  var scf = SocialCalc.Formula;
+  var cost = scf.OperandAsNumber(sheet, foperand);
+  var salvage = scf.OperandAsNumber(sheet, foperand);
+  var lifetime = scf.OperandAsNumber(sheet, foperand);
+  var period = scf.OperandAsNumber(sheet, foperand);
+  if (scf.CheckForErrorValue(operand, cost)) return;
+  if (scf.CheckForErrorValue(operand, salvage)) return;
+  if (scf.CheckForErrorValue(operand, lifetime)) return;
+  if (scf.CheckForErrorValue(operand, period)) return;
+  if (lifetime.value < 1 || period.value <= 0) {
+    scf.PushOperand(operand, "e#NUM!", 0);
+    return 0;
+  }
+  sumperiods = (lifetime.value + 1) * lifetime.value / 2; // add up 1 through lifetime
+  depreciation = (cost.value - salvage.value) * (lifetime.value - period.value + 1) / sumperiods; // calc depreciation
 
-   var depreciation, sumperiods;
-   var scf = SocialCalc.Formula;
-
-   var cost = scf.OperandAsNumber(sheet, foperand);
-   var salvage = scf.OperandAsNumber(sheet, foperand);
-   var lifetime = scf.OperandAsNumber(sheet, foperand);
-   var period = scf.OperandAsNumber(sheet, foperand);
-
-   if (scf.CheckForErrorValue(operand, cost)) return;
-   if (scf.CheckForErrorValue(operand, salvage)) return;
-   if (scf.CheckForErrorValue(operand, lifetime)) return;
-   if (scf.CheckForErrorValue(operand, period)) return;
-
-   if (lifetime.value < 1 || period.value <= 0) {
-      scf.PushOperand(operand, "e#NUM!", 0);
-      return 0;
-      }
-
-   sumperiods = ((lifetime.value + 1) * lifetime.value)/2; // add up 1 through lifetime
-   depreciation = (cost.value - salvage.value) * (lifetime.value - period.value + 1) / sumperiods; // calc depreciation
-
-   scf.PushOperand(operand, 'n$', depreciation);
-
-   return;
-
-   }
-
+  scf.PushOperand(operand, 'n$', depreciation);
+  return;
+};
 SocialCalc.Formula.FunctionList["SYD"] = [SocialCalc.Formula.SYDFunction, 4, "cslp", "", "financial"];
 
 /*
@@ -19592,175 +19703,170 @@ SocialCalc.Formula.FunctionList["SYD"] = [SocialCalc.Formula.SYDFunction, 4, "cs
 #
 */
 
-SocialCalc.Formula.InterestFunctions = function(fname, operand, foperand, sheet) {
-
-   var resulttype, result, dval, eval_, fval;
-   var pv, fv, rate, n, payment, paytype, guess, part1, part2, part3, part4, part5;
-   var olddelta, maxloop, tries, deltaepsilon, rate, oldrate, m;
-
-   var scf = SocialCalc.Formula;
-
-   var aval = scf.OperandAsNumber(sheet, foperand);
-   var bval = scf.OperandAsNumber(sheet, foperand);
-   var cval = scf.OperandAsNumber(sheet, foperand);
-
-   resulttype = scf.LookupResultType(aval.type, bval.type, scf.TypeLookupTable.twoargnumeric);
-   resulttype = scf.LookupResultType(resulttype, cval.type, scf.TypeLookupTable.twoargnumeric);
-   if (foperand.length) { // optional arguments
-      dval = scf.OperandAsNumber(sheet, foperand);
-      resulttype = scf.LookupResultType(resulttype, dval.type, scf.TypeLookupTable.twoargnumeric);
-      if (foperand.length) { // optional arguments
-         eval_ = scf.OperandAsNumber(sheet, foperand);
-         resulttype = scf.LookupResultType(resulttype, eval_.type, scf.TypeLookupTable.twoargnumeric);
-         if (foperand.length) { // optional arguments
-            if (fname != "RATE") { // only rate has 6 possible args
-               scf.FunctionArgsError(fname, operand);
-               return 0;
-               }
-            fval = scf.OperandAsNumber(sheet, foperand);
-            resulttype = scf.LookupResultType(resulttype, fval.type, scf.TypeLookupTable.twoargnumeric);
-            }
-         }
+SocialCalc.Formula.InterestFunctions = function (fname, operand, foperand, sheet) {
+  var resulttype, result, dval, eval_, fval;
+  var pv, fv, rate, n, payment, paytype, guess, part1, part2, part3, part4, part5;
+  var olddelta, maxloop, tries, deltaepsilon, rate, oldrate, m;
+  var scf = SocialCalc.Formula;
+  var aval = scf.OperandAsNumber(sheet, foperand);
+  var bval = scf.OperandAsNumber(sheet, foperand);
+  var cval = scf.OperandAsNumber(sheet, foperand);
+  resulttype = scf.LookupResultType(aval.type, bval.type, scf.TypeLookupTable.twoargnumeric);
+  resulttype = scf.LookupResultType(resulttype, cval.type, scf.TypeLookupTable.twoargnumeric);
+  if (foperand.length) {
+    // optional arguments
+    dval = scf.OperandAsNumber(sheet, foperand);
+    resulttype = scf.LookupResultType(resulttype, dval.type, scf.TypeLookupTable.twoargnumeric);
+    if (foperand.length) {
+      // optional arguments
+      eval_ = scf.OperandAsNumber(sheet, foperand);
+      resulttype = scf.LookupResultType(resulttype, eval_.type, scf.TypeLookupTable.twoargnumeric);
+      if (foperand.length) {
+        // optional arguments
+        if (fname != "RATE") {
+          // only rate has 6 possible args
+          scf.FunctionArgsError(fname, operand);
+          return 0;
+        }
+        fval = scf.OperandAsNumber(sheet, foperand);
+        resulttype = scf.LookupResultType(resulttype, fval.type, scf.TypeLookupTable.twoargnumeric);
       }
+    }
+  }
+  if (resulttype == "n") {
+    switch (fname) {
+      case "FV":
+        // FV(rate, n, payment, [pv, [paytype]])
+        rate = aval.value;
+        n = bval.value;
+        payment = cval.value;
+        pv = dval != null ? dval.value : 0; // get value if present, or use default
+        paytype = eval_ != null ? eval_.value ? 1 : 0 : 0;
+        if (rate == 0) {
+          // simple calculation if no interest
+          fv = -pv - payment * n;
+        } else {
+          fv = -(pv * Math.pow(1 + rate, n) + payment * (1 + rate * paytype) * (Math.pow(1 + rate, n) - 1) / rate);
+        }
+        result = fv;
+        resulttype = 'n$';
+        break;
+      case "NPER":
+        // NPER(rate, payment, pv, [fv, [paytype]])
+        rate = aval.value;
+        payment = bval.value;
+        pv = cval.value;
+        fv = dval != null ? dval.value : 0;
+        paytype = eval_ != null ? eval_.value ? 1 : 0 : 0;
+        if (rate == 0) {
+          // simple calculation if no interest
+          if (payment == 0) {
+            scf.PushOperand(operand, "e#NUM!", 0);
+            return;
+          }
+          n = (pv + fv) / -payment;
+        } else {
+          part1 = payment * (1 + rate * paytype) / rate;
+          part2 = pv + part1;
+          if (part2 == 0 || rate <= -1) {
+            scf.PushOperand(operand, "e#NUM!", 0);
+            return;
+          }
+          part3 = (part1 - fv) / part2;
+          if (part3 <= 0) {
+            scf.PushOperand(operand, "e#NUM!", 0);
+            return;
+          }
+          part4 = Math.log(part3);
+          part5 = Math.log(1 + rate); // rate > -1
+          n = part4 / part5;
+        }
+        result = n;
+        resulttype = 'n';
+        break;
+      case "PMT":
+        // PMT(rate, n, pv, [fv, [paytype]])
+        rate = aval.value;
+        n = bval.value;
+        pv = cval.value;
+        fv = dval != null ? dval.value : 0;
+        paytype = eval_ != null ? eval_.value ? 1 : 0 : 0;
+        if (n == 0) {
+          scf.PushOperand(operand, "e#NUM!", 0);
+          return;
+        } else if (rate == 0) {
+          // simple calculation if no interest
+          payment = (fv - pv) / n;
+        } else {
+          payment = (0 - fv - pv * Math.pow(1 + rate, n)) / ((1 + rate * paytype) * (Math.pow(1 + rate, n) - 1) / rate);
+        }
+        result = payment;
+        resulttype = 'n$';
+        break;
+      case "PV":
+        // PV(rate, n, payment, [fv, [paytype]])
+        rate = aval.value;
+        n = bval.value;
+        payment = cval.value;
+        fv = dval != null ? dval.value : 0;
+        paytype = eval_ != null ? eval_.value ? 1 : 0 : 0;
+        if (rate == -1) {
+          scf.PushOperand(operand, "e#DIV/0!", 0);
+          return;
+        } else if (rate == 0) {
+          // simple calculation if no interest
+          pv = -fv - payment * n;
+        } else {
+          pv = (-fv - payment * (1 + rate * paytype) * (Math.pow(1 + rate, n) - 1) / rate) / Math.pow(1 + rate, n);
+        }
+        result = pv;
+        resulttype = 'n$';
+        break;
+      case "RATE":
+        // RATE(n, payment, pv, [fv, [paytype, [guess]]])
+        n = aval.value;
+        payment = bval.value;
+        pv = cval.value;
+        fv = dval != null ? dval.value : 0;
+        paytype = eval_ != null ? eval_.value ? 1 : 0 : 0;
+        guess = fval != null ? fval.value : 0.1;
 
-   if (resulttype == "n") {
-      switch (fname) {
-         case "FV": // FV(rate, n, payment, [pv, [paytype]])
-            rate = aval.value;
-            n = bval.value;
-            payment = cval.value;
-            pv = dval!=null ? dval.value : 0; // get value if present, or use default
-            paytype = eval_!=null ? (eval_.value ? 1 : 0) : 0;
-            if (rate == 0) { // simple calculation if no interest
-               fv = -pv - (payment * n);
-               }
-            else {
-               fv = -(pv*Math.pow(1+rate,n) + payment * (1 + rate*paytype) * ( Math.pow(1+rate,n) -1)/rate);
-               }
-            result = fv;
-            resulttype = 'n$';
-            break;
+        // rate is calculated by repeated approximations
+        // The deltas are used to calculate new guesses
 
-         case "NPER": // NPER(rate, payment, pv, [fv, [paytype]])
-            rate = aval.value;
-            payment = bval.value;
-            pv = cval.value;
-            fv = dval!=null ? dval.value : 0;
-            paytype = eval_!=null ? (eval_.value ? 1 : 0) : 0;
-            if (rate == 0) { // simple calculation if no interest
-               if (payment == 0) {
-                  scf.PushOperand(operand, "e#NUM!", 0);
-                  return;
-                  }
-               n = (pv + fv)/(-payment);
-               }
-            else {
-               part1 = payment * (1 + rate * paytype) / rate;
-               part2 = pv + part1;
-               if (part2 == 0 || rate <= -1) {
-                  scf.PushOperand(operand, "e#NUM!", 0);
-                  return;
-                  }
-               part3 = (part1 - fv) / part2;
-               if (part3 <= 0) {
-                  scf.PushOperand(operand, "e#NUM!", 0);
-                  return;
-                  }
-               part4 = Math.log(part3);
-               part5 = Math.log(1 + rate); // rate > -1
-               n = part4/part5;
-               }
-            result = n;
-            resulttype = 'n';
-            break;
-
-         case "PMT": // PMT(rate, n, pv, [fv, [paytype]])
-            rate = aval.value;
-            n = bval.value;
-            pv = cval.value;
-            fv = dval!=null ? dval.value : 0;
-            paytype = eval_!=null ? (eval_.value ? 1 : 0) : 0;
-            if (n == 0) {
-               scf.PushOperand(operand, "e#NUM!", 0);
-               return;
-               }
-            else if (rate == 0) { // simple calculation if no interest
-               payment = (fv - pv)/n;
-               }
-            else {
-               payment = (0 - fv - pv*Math.pow(1+rate,n))/((1 + rate*paytype) * ( Math.pow(1+rate,n) -1)/rate);
-               }
-            result = payment;
-            resulttype = 'n$';
-            break;
-
-         case "PV": // PV(rate, n, payment, [fv, [paytype]])
-            rate = aval.value;
-            n = bval.value;
-            payment = cval.value;
-            fv = dval!=null ? dval.value : 0;
-            paytype = eval_!=null ? (eval_.value ? 1 : 0) : 0;
-            if (rate == -1) {
-               scf.PushOperand(operand, "e#DIV/0!", 0);
-               return;
-               }
-            else if (rate == 0) { // simple calculation if no interest
-               pv = -fv - (payment * n);
-               }
-            else {
-               pv = (-fv - payment * (1 + rate*paytype) * ( Math.pow(1+rate,n) -1)/rate)/(Math.pow(1+rate,n));
-               }
-            result = pv;
-            resulttype = 'n$';
-            break;
-
-            case "RATE": // RATE(n, payment, pv, [fv, [paytype, [guess]]])
-               n = aval.value;
-               payment = bval.value;
-               pv = cval.value;
-               fv = dval!=null ? dval.value : 0;
-               paytype = eval_!=null ? (eval_.value ? 1 : 0) : 0;
-               guess = fval!=null ? fval.value : 0.1;
-
-               // rate is calculated by repeated approximations
-               // The deltas are used to calculate new guesses
-
-               maxloop = 100;
-               tries = 0;
-               delta = 1;
-               epsilon = 0.0000001; // this is close enough
-               rate = guess || 0.00000001; // zero is not allowed
-               while ((delta >= 0 ? delta : -delta) > epsilon && (rate != oldrate)) {
-                  delta = fv + pv*Math.pow(1+rate,n) + payment * (1 + rate*paytype) * ( Math.pow(1+rate,n) -1)/rate;
-                  if (olddelta!=null) {
-                     m = (delta - olddelta)/(rate - oldrate) || .001; // get slope (not zero)
-                     oldrate = rate;
-                     rate = rate - delta / m; // look for zero crossing
-                     olddelta = delta;
-                     }
-                  else { // first time - no old values
-                     oldrate = rate;
-                     rate = 1.1 * rate;
-                     olddelta = delta;
-                     }
-                  tries++;
-                  if (tries >= maxloop) { // didn't converge yet
-                     scf.PushOperand(operand, "e#NUM!", 0);
-                     return;
-                     }
-                  }
-               result = rate;
-               resulttype = 'n%';
-               break;
-         }
-      }
- 
-   scf.PushOperand(operand, resulttype, result);
-
-   return;
-
-   }
-
+        maxloop = 100;
+        tries = 0;
+        delta = 1;
+        epsilon = 0.0000001; // this is close enough
+        rate = guess || 0.00000001; // zero is not allowed
+        while ((delta >= 0 ? delta : -delta) > epsilon && rate != oldrate) {
+          delta = fv + pv * Math.pow(1 + rate, n) + payment * (1 + rate * paytype) * (Math.pow(1 + rate, n) - 1) / rate;
+          if (olddelta != null) {
+            m = (delta - olddelta) / (rate - oldrate) || .001; // get slope (not zero)
+            oldrate = rate;
+            rate = rate - delta / m; // look for zero crossing
+            olddelta = delta;
+          } else {
+            // first time - no old values
+            oldrate = rate;
+            rate = 1.1 * rate;
+            olddelta = delta;
+          }
+          tries++;
+          if (tries >= maxloop) {
+            // didn't converge yet
+            scf.PushOperand(operand, "e#NUM!", 0);
+            return;
+          }
+        }
+        result = rate;
+        resulttype = 'n%';
+        break;
+    }
+  }
+  scf.PushOperand(operand, resulttype, result);
+  return;
+};
 SocialCalc.Formula.FunctionList["FV"] = [SocialCalc.Formula.InterestFunctions, -3, "fv", "", "financial"];
 SocialCalc.Formula.FunctionList["NPER"] = [SocialCalc.Formula.InterestFunctions, -3, "nper", "", "financial"];
 SocialCalc.Formula.FunctionList["PMT"] = [SocialCalc.Formula.InterestFunctions, -3, "pmt", "", "financial"];
@@ -19773,46 +19879,35 @@ SocialCalc.Formula.FunctionList["RATE"] = [SocialCalc.Formula.InterestFunctions,
 #
 */
 
-SocialCalc.Formula.NPVFunction = function(fname, operand, foperand, sheet) {
-
-   var resulttypenpv, rate, sum, factor, value1;
-
-   var scf = SocialCalc.Formula;
-
-   var rate = scf.OperandAsNumber(sheet, foperand);
-   if (scf.CheckForErrorValue(operand, rate)) return;
-
-   sum = 0;
-   resulttypenpv = "n";
-   factor = 1;
-
-   while (foperand.length) {
-      value1 = scf.OperandValueAndType(sheet, foperand);
-      if (value1.type.charAt(0) == "n") {
-         factor *= (1 + rate.value);
-         if (factor == 0) {
-            scf.PushOperand(operand, "e#DIV/0!", 0);
-            return;
-            }
-         sum += value1.value / factor;
-         resulttypenpv = scf.LookupResultType(value1.type, resulttypenpv || value1.type, scf.TypeLookupTable.plus);
-         }
-      else if (value1.type.charAt(0) == "e" && resulttypenpv.charAt(0) != "e") {
-         resulttypenpv = value1.type;
-         break;
-         }
+SocialCalc.Formula.NPVFunction = function (fname, operand, foperand, sheet) {
+  var resulttypenpv, rate, sum, factor, value1;
+  var scf = SocialCalc.Formula;
+  var rate = scf.OperandAsNumber(sheet, foperand);
+  if (scf.CheckForErrorValue(operand, rate)) return;
+  sum = 0;
+  resulttypenpv = "n";
+  factor = 1;
+  while (foperand.length) {
+    value1 = scf.OperandValueAndType(sheet, foperand);
+    if (value1.type.charAt(0) == "n") {
+      factor *= 1 + rate.value;
+      if (factor == 0) {
+        scf.PushOperand(operand, "e#DIV/0!", 0);
+        return;
       }
-
-   if (resulttypenpv.charAt(0) == "n") {
-      resulttypenpv = 'n$';
-      }
-
-   scf.PushOperand(operand, resulttypenpv, sum);
-
-   return;
-
-   }
-
+      sum += value1.value / factor;
+      resulttypenpv = scf.LookupResultType(value1.type, resulttypenpv || value1.type, scf.TypeLookupTable.plus);
+    } else if (value1.type.charAt(0) == "e" && resulttypenpv.charAt(0) != "e") {
+      resulttypenpv = value1.type;
+      break;
+    }
+  }
+  if (resulttypenpv.charAt(0) == "n") {
+    resulttypenpv = 'n$';
+  }
+  scf.PushOperand(operand, resulttypenpv, sum);
+  return;
+};
 SocialCalc.Formula.FunctionList["NPV"] = [SocialCalc.Formula.NPVFunction, -2, "npv", "", "financial"];
 
 /*
@@ -19821,96 +19916,86 @@ SocialCalc.Formula.FunctionList["NPV"] = [SocialCalc.Formula.NPVFunction, -2, "n
 #
 */
 
-SocialCalc.Formula.IRRFunction = function(fname, operand, foperand, sheet) {
+SocialCalc.Formula.IRRFunction = function (fname, operand, foperand, sheet) {
+  var value1, guess, oldsum, maxloop, tries, epsilon, rate, oldrate, m, sum, factor, i;
+  var rangeoperand = [];
+  var cashflows = [];
+  var scf = SocialCalc.Formula;
+  rangeoperand.push(foperand.pop()); // first operand is a range
 
-   var value1, guess, oldsum, maxloop, tries, epsilon, rate, oldrate, m, sum, factor, i;
-   var rangeoperand = [];
-   var cashflows = [];
+  while (rangeoperand.length) {
+    // get values from range so we can do iterative approximations
+    value1 = scf.OperandValueAndType(sheet, rangeoperand);
+    if (value1.type.charAt(0) == "n") {
+      cashflows.push(value1.value);
+    } else if (value1.type.charAt(0) == "e") {
+      scf.PushOperand(operand, "e#VALUE!", 0);
+      return;
+    }
+  }
+  if (!cashflows.length) {
+    scf.PushOperand(operand, "e#NUM!", 0);
+    return;
+  }
+  guess = {
+    value: 0
+  };
+  if (foperand.length) {
+    // guess is provided
+    guess = scf.OperandAsNumber(sheet, foperand);
+    if (guess.type.charAt(0) != "n" && guess.type.charAt(0) != "b") {
+      scf.PushOperand(operand, "e#VALUE!", 0);
+      return;
+    }
+    if (foperand.length) {
+      // should be no more args
+      scf.FunctionArgsError(fname, operand);
+      return;
+    }
+  }
+  guess.value = guess.value || 0.1;
 
-   var scf = SocialCalc.Formula;
+  // rate is calculated by repeated approximations
+  // The deltas are used to calculate new guesses
 
-   rangeoperand.push(foperand.pop()); // first operand is a range
-
-   while (rangeoperand.length) { // get values from range so we can do iterative approximations
-      value1 = scf.OperandValueAndType(sheet, rangeoperand);
-      if (value1.type.charAt(0) == "n") {
-         cashflows.push(value1.value);
-         }
-      else if (value1.type.charAt(0) == "e") {
-         scf.PushOperand(operand, "e#VALUE!", 0);
-         return;
-         }
+  maxloop = 20;
+  tries = 0;
+  epsilon = 0.0000001; // this is close enough
+  rate = guess.value;
+  sum = 1;
+  while ((sum >= 0 ? sum : -sum) > epsilon && rate != oldrate) {
+    sum = 0;
+    factor = 1;
+    for (i = 0; i < cashflows.length; i++) {
+      factor *= 1 + rate;
+      if (factor == 0) {
+        scf.PushOperand(operand, "e#DIV/0!", 0);
+        return;
       }
-
-   if (!cashflows.length) {
+      sum += cashflows[i] / factor;
+    }
+    if (oldsum != null) {
+      m = (sum - oldsum) / (rate - oldrate); // get slope
+      oldrate = rate;
+      rate = rate - sum / m; // look for zero crossing
+      oldsum = sum;
+    } else {
+      // first time - no old values
+      oldrate = rate;
+      rate = 1.1 * rate;
+      oldsum = sum;
+    }
+    tries++;
+    if (tries >= maxloop) {
+      // didn't converge yet
       scf.PushOperand(operand, "e#NUM!", 0);
       return;
-      }
-
-   guess = {value: 0};
-
-   if (foperand.length) { // guess is provided
-      guess = scf.OperandAsNumber(sheet, foperand);
-      if (guess.type.charAt(0) != "n" && guess.type.charAt(0) != "b") {
-         scf.PushOperand(operand, "e#VALUE!", 0);
-         return;
-         }
-      if (foperand.length) { // should be no more args
-         scf.FunctionArgsError(fname, operand);
-         return;
-         }
-      }
-
-   guess.value = guess.value || 0.1;
-
-   // rate is calculated by repeated approximations
-   // The deltas are used to calculate new guesses
-
-   maxloop = 20;
-   tries = 0;
-   epsilon = 0.0000001; // this is close enough
-   rate = guess.value;
-   sum = 1;
-
-   while ((sum >= 0 ? sum : -sum) > epsilon && (rate != oldrate)) {
-      sum = 0;
-      factor = 1;
-      for (i=0; i<cashflows.length; i++) {
-         factor *= (1 + rate);
-         if (factor == 0) {
-            scf.PushOperand(operand, "e#DIV/0!", 0);
-            return;
-            }
-         sum += cashflows[i] / factor;
-         }
-
-      if (oldsum!=null) {
-         m = (sum - oldsum)/(rate - oldrate); // get slope
-         oldrate = rate;
-         rate = rate - sum / m; // look for zero crossing
-         oldsum = sum;
-         }
-      else { // first time - no old values
-         oldrate = rate;
-         rate = 1.1 * rate;
-         oldsum = sum;
-         }
-      tries++;
-      if (tries >= maxloop) { // didn't converge yet
-         scf.PushOperand(operand, "e#NUM!", 0);
-         return;
-         }
-      }
-
-   scf.PushOperand(operand, 'n%', rate);
-
-   return;
-
-   }
-
+    }
+  }
+  scf.PushOperand(operand, 'n%', rate);
+  return;
+};
 SocialCalc.Formula.FunctionList["IRR"] = [SocialCalc.Formula.IRRFunction, -1, "irr", "", "financial"];
-
-
 
 // -----------------------------------------
 // eddy  BUTTON COPYVALUE COPYFORMULA {
@@ -19937,352 +20022,348 @@ SocialCalc.Formula.FunctionList["IRR"] = [SocialCalc.Formula.IRRFunction, -1, "i
 #
 */
 
+SocialCalc.Formula.IoFunctions = function (fname, operand, foperand, sheet, coord) {
+  // ArgList has an array for each function, one entry for each possible arg (up to max).
+  // Min args are specified in SocialCalc.Formula.FunctionList.
+  // Minus values are repeated parameters
+  //  -1 to -15  - repeated parameters
+  //  -1 - [number, ...]  - e.g. [2,-1,-2]  means (text, [number, text, number, text, ... ] - repeated parameters
+  //  1 - number 
+  //  2 - text 
+  //  3 - text | number 
+  //  4 - coord 
+  //  5 - coord | number 
+  //  6 - coord | text 
+  //  7 - coord | text | number 
+  //  8 - range 
+  //  9 - range | number 
+  //  10 - range | text 11 - range | text | number 
+  //  12 - range | coord 
+  //  13 - range | coord | number 
+  //  14 - range | coord | text 
+  //  15 - range | coord | text | number 
 
-SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord) {
+  var argList = {
+    BUTTON: [2],
+    IMAGEBUTTON: [2],
+    EMAIL: [14, 14, 14, 14],
+    EMAILIF: [13, 14, 14, 14, 14],
+    EMAILONEDIT: [14, 14, 14, 14, 14],
+    EMAILAT: [13, 14, 14, 14, 14],
+    EMAILONEDITIF: [14, 13, 14, 14, 14, 14],
+    EMAILATIF: [13, 13, 14, 14, 14, 14],
+    SUBMIT: [2],
+    TEXTBOX: [2],
+    AUTOCOMPLETE: [2, 14],
+    SELECT: [2, 14, 1, 1] // # SELECT(string, range [,size [,multiple]])
+    ,
+    CHECKBOX: [3],
+    RADIOBUTTON: [2, 2],
+    COPYVALUE: [4, 12, 15],
+    COPYFORMULA: [4, 12, 12],
+    INSERT: [4, 8, -12, -15] // change code to allow unlimited 
+    ,
+    DELETEIF: [4, 7, 8],
+    COMMAND: [4, 14],
+    COMMANDIF: [4, 13, 14],
+    PANEL: [15, -12] // # PANEL(indices_or_csv, panel1_range [, panel2_range , ...])  
+    ,
+    SPLASH: [12] // SPLASH(splash_panel_range)  // shows splash screen (range)
+    ,
+    STYLE: [6] // # STYLE(css)  
+  };
+  var i, parameter, offset, len, start, count;
+  var scf = SocialCalc.Formula;
+  var result = 0;
+  var resulttype = "e#VALUE!";
+  var numargs = foperand.length;
+  var argdef = argList[fname];
+  var operand_value = [];
+  var operand_type = [];
+  var repeatCount = -1; // number of repeated parameters
+  var repeatIndex; // index of begining of repeated parameters
+  var wantedType;
+  for (i = 1; i <= numargs; i++) {
+    // go through each arg, get value and type, and check for errors
+    //   IF started repeat parameters section 
+    if (repeatCount != -1) {
+      //     SET typeWanted = get type - adjust for repeted parameters
+      wantedType = Math.abs(argdef[repeatIndex + (i - 1 - repeatIndex) % repeatCount]);
+    } else {
+      if (i > argdef.length) {
+        // too many args
+        scf.FunctionArgsError(fname, operand);
+        return;
+      }
 
-  
-// ArgList has an array for each function, one entry for each possible arg (up to max).
-// Min args are specified in SocialCalc.Formula.FunctionList.
-// Minus values are repeated parameters
-//  -1 to -15  - repeated parameters
-//  -1 - [number, ...]  - e.g. [2,-1,-2]  means (text, [number, text, number, text, ... ] - repeated parameters
-//  1 - number 
-//  2 - text 
-//  3 - text | number 
-//  4 - coord 
-//  5 - coord | number 
-//  6 - coord | text 
-//  7 - coord | text | number 
-//  8 - range 
-//  9 - range | number 
-//  10 - range | text 11 - range | text | number 
-//  12 - range | coord 
-//  13 - range | coord | number 
-//  14 - range | coord | text 
-//  15 - range | coord | text | number 
+      //     typeWanted = type wanted list [ parameterIndex ]
+      wantedType = argdef[i - 1];
 
+      //     IF typeWanted < 0 && repeatCount == -1
+      if (wantedType < 0) {
+        //       SET repeatCount = wanted list length - parameterIndex
+        repeatCount = argdef.length - (i - 1);
+        //       SET repeatIndex =  parameterIndex
+        repeatIndex = i - 1;
+        //       wantedType = Math.abs(wantedType )          
+        wantedType = Math.abs(wantedType);
+      } //     END IF
+    } //   END IF
 
+    if (wantedType == 1) {
+      // 1 - number 
+      parameter = scf.OperandAsNumber(sheet, foperand);
+    } else if (wantedType == 2) {
+      // 2 - text 
+      parameter = scf.OperandAsText(sheet, foperand);
+    } else if (wantedType == 3) {
+      // 3 - text | number 
+      parameter = scf.OperandValueAndType(sheet, foperand);
+    } else {
+      //  typeWanted > 3  && < 16  - else invalid        
+      //        SET parameterType = type
+      var parameterType = foperand[foperand.length - 1].type; // param is end of stack
 
-   var argList = {
-				 BUTTON: [2]
-        ,IMAGEBUTTON: [2]
-   			,EMAIL: [14, 14, 14, 14]
-				,EMAILIF: [13, 14, 14, 14, 14]
-				,EMAILONEDIT: [14, 14, 14, 14, 14]
-				,EMAILAT: [13, 14, 14, 14, 14]
-				,EMAILONEDITIF: [14, 13, 14, 14, 14, 14]
-				,EMAILATIF: [13, 13, 14, 14, 14, 14]
-        ,SUBMIT: [2]
-        ,TEXTBOX: [2]
-        ,AUTOCOMPLETE: [2, 14]
-        ,SELECT: [2, 14, 1, 1]   // # SELECT(string, range [,size [,multiple]])
-        ,CHECKBOX: [3]
-        ,RADIOBUTTON: [2, 2]
-				,COPYVALUE: [4, 12, 15]
-				,COPYFORMULA: [4, 12, 12]
-        ,INSERT: [4, 8, -12, -15]  // change code to allow unlimited 
-        ,DELETEIF: [4,7,8]
-        ,COMMAND: [4, 14]
-        ,COMMANDIF: [4, 13, 14]
-        ,PANEL:[15, -12] // # PANEL(indices_or_csv, panel1_range [, panel2_range , ...])  
-        ,SPLASH:[12]  // SPLASH(splash_panel_range)  // shows splash screen (range)
-        ,STYLE:[6] // # STYLE(css)  
-   };
-   
-   var i, parameter, offset, len, start, count;
-   var scf = SocialCalc.Formula;
-   var result = 0;
-   var resulttype = "e#VALUE!";
+      //        SET validType = false  
+      var validParameterType = false;
 
-   var numargs = foperand.length;
-   var argdef = argList[fname];
-   var operand_value = [];
-   var operand_type = [];
-
-   var repeatCount = -1;  // number of repeated parameters
-   var repeatIndex;  // index of begining of repeated parameters
-   var wantedType;
-   
-   for (i=1; i <= numargs; i++) { // go through each arg, get value and type, and check for errors
-      //   IF started repeat parameters section 
-      if(repeatCount != -1) {
-        //     SET typeWanted = get type - adjust for repeted parameters
-        wantedType = Math.abs(argdef[ repeatIndex + (( (i-1) - repeatIndex) % repeatCount) ]);
-      } else {
-        
-        if (i > argdef.length) { // too many args
-          scf.FunctionArgsError(fname, operand);
-          return;
-          }
-        
-        //     typeWanted = type wanted list [ parameterIndex ]
-        wantedType = argdef[i-1];
-        
-        //     IF typeWanted < 0 && repeatCount == -1
-        if(wantedType < 0 ) {
-          //       SET repeatCount = wanted list length - parameterIndex
-          repeatCount = argdef.length - (i-1);
-          //       SET repeatIndex =  parameterIndex
-          repeatIndex = (i-1);
-          //       wantedType = Math.abs(wantedType )          
-          wantedType = Math.abs(wantedType );
-        }  //     END IF
-      
-      } //   END IF
-
-      if(wantedType == 1) { // 1 - number 
-        parameter = scf.OperandAsNumber(sheet, foperand);
-        
-      } else if(wantedType == 2) { // 2 - text 
-        parameter = scf.OperandAsText(sheet, foperand);
-      } else if(wantedType == 3) { // 3 - text | number 
+      //        IF type = number && wanted type == number || type = text && wanted type == text THEN
+      //                  1 - number   2 - text 
+      if (parameterType.charAt(0) == "n" && (wantedType & 1) != 0 || parameterType.charAt(0) == "t" && (wantedType & 2) != 0) {
+        //           valid
+        validParameterType = true;
+        //           get number type and value 
         parameter = scf.OperandValueAndType(sheet, foperand);
-      } else { //  typeWanted > 3  && < 16  - else invalid        
-        //        SET parameterType = type
-        var parameterType = foperand[foperand.length -1].type; // param is end of stack
-        
-        //        SET validType = false  
-        var validParameterType = false;
-        
-        //        IF type = number && wanted type == number || type = text && wanted type == text THEN
-        //                  1 - number   2 - text 
-        if( (parameterType.charAt(0) == "n" && (wantedType & 1) != 0) || (parameterType.charAt(0) == "t" && (wantedType & 2) != 0)) {
-          //           valid
-          validParameterType = true;
-          //           get number type and value 
-          parameter = scf.OperandValueAndType(sheet, foperand);
-        }  //        END IF
-        
-        //        IF type = coord && wanted type == coord THEN
-        if( parameterType == "coord" && (wantedType & 4) != 0) {  //  4 - coord 
-          //          valid
-          validParameterType = true;
-          parameter = scf.OperandAsCoord(sheet, foperand);
-          parameter.value = SocialCalc.Formula.PlainCoord(parameter.value); // remove absolute reference
-        } //        END IF
-        //        IF type = range && wanted type == range THEN
-        if( parameterType == "range" && (wantedType & 8) != 0) { // 8 - range 
-          //           valid
-          validParameterType = true;
-          // get range
-          parameter = scf.OperandAsRange(sheet, foperand);          
-          parameter.value = SocialCalc.Formula.PlainCoord(parameter.value);  // remove absolute reference
-        } //        END IF
-        
-        //        IF invalid param type
-        if(validParameterType == false) {
-          scf.FunctionArgsError(fname, operand);
-          return;          
-        }  //        END IF
-        
-      }
-      
-      
-      // value or range, e.g. "C9|C11"
-      operand_value[i] = parameter.value;
-      // type e.g. "t", "range"
-      operand_type[i] = parameter.type;
-      if (parameter.type.charAt(0) == "e") {
-         scf.PushOperand(operand, parameter.type, result);
-         return;
-      }
-   }
+      } //        END IF
 
-   
-   switch (fname) {
-     case "STYLE":  
-       var parameters = sheet.ioParameterList[coord];
-       if(parameters) {
-         var css = SocialCalc.Formula.getStandardizedList(sheet, {value: operand_value[1], type: operand_type[1]});
-         if(css.length > 0 ) {
-           parameters.css = css[0];
-           parameters.cssParameter = (operand_type[1] == "t") ? '"'+operand_value[1]+'"' : operand_value[1];
-         }
-         result = ""; // ensure return value does not get changed by style - will add this empty string to number or string
-         resulttype = "ni"; // important - allows widgets to keep type - use: TEXTBOX("")+STYLE(css)  - must add style to widget 
-       }
-       break;
-     case "SELECT":  // # SELECT(string, range [,size [,multiple]])
-         var parameters = sheet.ioParameterList[coord];
-         var optionSource = SocialCalc.Formula.getStandardizedList(sheet, parameters[1]);
-         
-         parameters.html = [];        
-         parameters.html[0] = (operand_value[4] == true) ? "multiple" : ""
-         parameters.html[1] = (operand_value[3]) ? ""+operand_value[3] : "1"
-         if(optionSource.length > 0 ) {
-           var options = "<option>" + optionSource.join("</option><option>") + "</option>";
-           var optionRegExp = new RegExp("<option>"+operand_value[1],'');
-           parameters.html[2] = options.replace(optionRegExp, "<option selected>"+operand_value[1] ); // select default, if any
-         }
-         result = operand_value[1];
-         resulttype = "ti"+fname;
-         break;
-     case "SUBMIT":
-       result = "Submit";
-     case "BUTTON":
-     case "IMAGEBUTTON":
-     case "TEXTBOX":
-     case "AUTOCOMPLETE":
-         if (numargs>0) result = operand_value[1];
-         resulttype = "ti"+fname; // (t)ext value with (i)nterface (BUTTON,IMAGEBUTTON,TEXTBOX,AUTOCOMPLETE, SELECT) 
-         break;
+      //        IF type = coord && wanted type == coord THEN
+      if (parameterType == "coord" && (wantedType & 4) != 0) {
+        //  4 - coord 
+        //          valid
+        validParameterType = true;
+        parameter = scf.OperandAsCoord(sheet, foperand);
+        parameter.value = SocialCalc.Formula.PlainCoord(parameter.value); // remove absolute reference
+      } //        END IF
+      //        IF type = range && wanted type == range THEN
+      if (parameterType == "range" && (wantedType & 8) != 0) {
+        // 8 - range 
+        //           valid
+        validParameterType = true;
+        // get range
+        parameter = scf.OperandAsRange(sheet, foperand);
+        parameter.value = SocialCalc.Formula.PlainCoord(parameter.value); // remove absolute reference
+      } //        END IF
 
-      case "EMAIL":
-      case "EMAILIF":
-          resulttype = "ti"+fname; // (t)ext value with (i)nterface (,) 
-          result = "Send";
-          break;
-      case "EMAILONEDIT":
-      case "EMAILONEDITIF":
-//    	  sheet.editEventCells === 'undefined') return;	
-//    	  if(typeof sheet.ioParameterList === 'undefined') return;
+      //        IF invalid param type
+      if (validParameterType == false) {
+        scf.FunctionArgsError(fname, operand);
+        return;
+      } //        END IF
+    }
 
-    	  
-      case "EMAILAT":
-      case "EMAILATIF":
-          resulttype = "ti"+fname; // (t)ext value with (i)nterface (,) 
-          result = "Send Now";
-          break;
-		 
-      case "CHECKBOX":
-      case "RADIOBUTTON":
-	     if(operand_type[1].charAt(0) == 't') {
-			result = (operand_value[1].toUpperCase() == 'TRUE') ? 1 : 0;
-			} else {
-			result = (operand_value[1] == 0) ? 0 : 1;
-			}
-		//result = "true"; 
-         resulttype = "ni"+fname; // (n)umber value with (i)nterface (CHECKBOX, RADIOBUTTON)
-
-         break;
-		 
-		 
-      case "COPYVALUE":
-      case "COPYFORMULA":
-      case "INSERT":
-      case "DELETEIF":
-      case "COMMAND":
-      case "COMMANDIF":
-         var cell = sheet.cells[operand_value[1]];
-         if(typeof cell === 'undefined') break; // invalid trigger cell, return error
-         result = cell.datavalue; // get trigger cell value
-         
-         result = String(result).split("/");  // Clean up - if image button trigger then show only image name 
-         result = result[result.length-1]; 
-         resulttype = "t";
-         break;
-      case "PANEL":
-      case "SPLASH":
-        
-        //  - code to show/hide panel
-        //  --- get list of panels to show - "showindex_or_csv" 
-        //  --- get param details 
-        var showindices;
-        var firstPanelIndex = 2;
-        if(fname == "SPLASH") {
-          result = "SPLASH:"+ operand_value[1]; 
-          resulttype = "t";
-          if (sheet.splashdone == true) break; // show splash scree onload, then skip
-          sheet.splashdone = true;
-          firstPanelIndex = 1;
-          showindices = [0]; // show panel at param 0 of splash formula
-          
-        } else {
-          // panel formula
-          showindices = SocialCalc.Formula.getStandardizedList(sheet, {value: operand_value[1], type: operand_type[1]});
-          result = fname+":"+ showindices; 
+    // value or range, e.g. "C9|C11"
+    operand_value[i] = parameter.value;
+    // type e.g. "t", "range"
+    operand_type[i] = parameter.type;
+    if (parameter.type.charAt(0) == "e") {
+      scf.PushOperand(operand, parameter.type, result);
+      return;
+    }
+  }
+  switch (fname) {
+    case "STYLE":
+      var parameters = sheet.ioParameterList[coord];
+      if (parameters) {
+        var css = SocialCalc.Formula.getStandardizedList(sheet, {
+          value: operand_value[1],
+          type: operand_type[1]
+        });
+        if (css.length > 0) {
+          parameters.css = css[0];
+          parameters.cssParameter = operand_type[1] == "t" ? '"' + operand_value[1] + '"' : operand_value[1];
         }
-        //  --- SET list of showrows TO empty
-        //  --- SET list of showcols TO empty
+        result = ""; // ensure return value does not get changed by style - will add this empty string to number or string
+        resulttype = "ni"; // important - allows widgets to keep type - use: TEXTBOX("")+STYLE(css)  - must add style to widget 
+      }
+      break;
+    case "SELECT":
+      // # SELECT(string, range [,size [,multiple]])
+      var parameters = sheet.ioParameterList[coord];
+      var optionSource = SocialCalc.Formula.getStandardizedList(sheet, parameters[1]);
+      parameters.html = [];
+      parameters.html[0] = operand_value[4] == true ? "multiple" : "";
+      parameters.html[1] = operand_value[3] ? "" + operand_value[3] : "1";
+      if (optionSource.length > 0) {
+        var options = "<option>" + optionSource.join("</option><option>") + "</option>";
+        var optionRegExp = new RegExp("<option>" + operand_value[1], '');
+        parameters.html[2] = options.replace(optionRegExp, "<option selected>" + operand_value[1]); // select default, if any
+      }
+      result = operand_value[1];
+      resulttype = "ti" + fname;
+      break;
+    case "SUBMIT":
+      result = "Submit";
+    case "BUTTON":
+    case "IMAGEBUTTON":
+    case "TEXTBOX":
+    case "AUTOCOMPLETE":
+      if (numargs > 0) result = operand_value[1];
+      resulttype = "ti" + fname; // (t)ext value with (i)nterface (BUTTON,IMAGEBUTTON,TEXTBOX,AUTOCOMPLETE, SELECT) 
+      break;
+    case "EMAIL":
+    case "EMAILIF":
+      resulttype = "ti" + fname; // (t)ext value with (i)nterface (,) 
+      result = "Send";
+      break;
+    case "EMAILONEDIT":
+    case "EMAILONEDITIF":
+    //    	  sheet.editEventCells === 'undefined') return;	
+    //    	  if(typeof sheet.ioParameterList === 'undefined') return;
+
+    case "EMAILAT":
+    case "EMAILATIF":
+      resulttype = "ti" + fname; // (t)ext value with (i)nterface (,) 
+      result = "Send Now";
+      break;
+    case "CHECKBOX":
+    case "RADIOBUTTON":
+      if (operand_type[1].charAt(0) == 't') {
+        result = operand_value[1].toUpperCase() == 'TRUE' ? 1 : 0;
+      } else {
+        result = operand_value[1] == 0 ? 0 : 1;
+      }
+      //result = "true"; 
+      resulttype = "ni" + fname; // (n)umber value with (i)nterface (CHECKBOX, RADIOBUTTON)
+
+      break;
+    case "COPYVALUE":
+    case "COPYFORMULA":
+    case "INSERT":
+    case "DELETEIF":
+    case "COMMAND":
+    case "COMMANDIF":
+      var cell = sheet.cells[operand_value[1]];
+      if (typeof cell === 'undefined') break; // invalid trigger cell, return error
+      result = cell.datavalue; // get trigger cell value
+
+      result = String(result).split("/"); // Clean up - if image button trigger then show only image name 
+      result = result[result.length - 1];
+      resulttype = "t";
+      break;
+    case "PANEL":
+    case "SPLASH":
+      //  - code to show/hide panel
+      //  --- get list of panels to show - "showindex_or_csv" 
+      //  --- get param details 
+      var showindices;
+      var firstPanelIndex = 2;
+      if (fname == "SPLASH") {
+        result = "SPLASH:" + operand_value[1];
         resulttype = "t";
-        if(SocialCalc._app) { // panel only works in live app
-          var showrows = [], showcols = [];
-          //  --- FOR each panel to show
-          for (var parameterIndex = firstPanelIndex; parameterIndex < operand_value.length; ++parameterIndex) { 
-            // show panel if its index is in the showindices list 
-            var showPanelFound = false;
-            for(var showIndex in showindices ) { 
-              if (showindices[showIndex] == parameterIndex-1) {
-                showPanelFound = true;
-                break;
+        if (sheet.splashdone == true) break; // show splash scree onload, then skip
+        sheet.splashdone = true;
+        firstPanelIndex = 1;
+        showindices = [0]; // show panel at param 0 of splash formula
+      } else {
+        // panel formula
+        showindices = SocialCalc.Formula.getStandardizedList(sheet, {
+          value: operand_value[1],
+          type: operand_type[1]
+        });
+        result = fname + ":" + showindices;
+      }
+      //  --- SET list of showrows TO empty
+      //  --- SET list of showcols TO empty
+      resulttype = "t";
+      if (SocialCalc._app) {
+        // panel only works in live app
+        var showrows = [],
+          showcols = [];
+        //  --- FOR each panel to show
+        for (var parameterIndex = firstPanelIndex; parameterIndex < operand_value.length; ++parameterIndex) {
+          // show panel if its index is in the showindices list 
+          var showPanelFound = false;
+          for (var showIndex in showindices) {
+            if (showindices[showIndex] == parameterIndex - 1) {
+              showPanelFound = true;
+              break;
+            }
+          }
+          if (showPanelFound === false) continue;
+
+          //  ----- get panel range rows & cols only
+          var panelCoordData = SocialCalc.Formula.getStandardizedCoords(sheet, {
+            value: operand_value[parameterIndex],
+            type: operand_type[parameterIndex]
+          });
+          //  ----- FOR each row/col -- create function to do the loop
+          for (var i = 0; i < panelCoordData.ncols; i++) {
+            //  ------- set showrows/col row/col to true
+            showcols[panelCoordData.col1num + i] = true;
+          } //  ----- END FOR                        
+          for (var j = 0; j < panelCoordData.nrows; j++) {
+            //  ------- set showrows/col row/col to true
+            showrows[panelCoordData.row1num + j] = true;
+          }
+        } //  --- END FOR
+
+        var spreadsheet = window.spreadsheet;
+        if (spreadsheet == null) spreadsheet = window.ss;
+        var forceRender = false;
+        var lastShowDimension = 0;
+        var showGridDimension = function (sheet, lastIndex, sheetHideList, showList, getIndexOf) {
+          //  --- hide all rows/col    up to sheet.attribs.lastrow/col         
+          //  --- FOR each row/col -- create function to do the loop          
+          for (var arrayIndex = 1; arrayIndex <= lastIndex; arrayIndex++) {
+            // start at col/row 1
+            //  ----- IF row hide/show state need updating
+            var sheetHideIndex = getIndexOf(arrayIndex); // gets col name if col
+            if (typeof sheetHideList[sheetHideIndex] == 'undefined') {
+              // row/col is visible
+              if (showList[arrayIndex] !== true) {
+                // if hide
+                //  ------- SET the row state  
+                sheetHideList[sheetHideIndex] = "yes";
+                //  ------- SET repaint flag
+                forceRender = true;
+              } else {
+                lastShowDimension = arrayIndex;
+              }
+            } else {
+              // row/col is hidden 
+              if (showList[arrayIndex] === true) {
+                // if show 
+                //  ------- SET the row state  
+                delete sheetHideList[sheetHideIndex];
+                //  ------- SET repaint flag
+                forceRender = true;
+                lastShowDimension = arrayIndex;
               }
             }
-            if(showPanelFound === false) continue;
-            
-          
-            //  ----- get panel range rows & cols only
-            var panelCoordData = SocialCalc.Formula.getStandardizedCoords(sheet, {value: operand_value[parameterIndex], type: operand_type[parameterIndex]});
-            //  ----- FOR each row/col -- create function to do the loop
-            for (var i=0; i<panelCoordData.ncols; i++) {
-              //  ------- set showrows/col row/col to true
-              showcols[panelCoordData.col1num + i] = true;
-            }  //  ----- END FOR                        
-            for (var j=0; j<panelCoordData.nrows; j++) {
-              //  ------- set showrows/col row/col to true
-              showrows[panelCoordData.row1num + j] = true;
-            }
-          }   //  --- END FOR
-          
-          var spreadsheet =  window.spreadsheet;
-          if (spreadsheet == null) spreadsheet = window.ss
-
-          var forceRender = false;
-          var lastShowDimension = 0;
-          var showGridDimension =  function(sheet, lastIndex, sheetHideList, showList, getIndexOf) {
-            //  --- hide all rows/col    up to sheet.attribs.lastrow/col         
-            //  --- FOR each row/col -- create function to do the loop          
-            for(var arrayIndex = 1; arrayIndex <= lastIndex; arrayIndex ++ ) { // start at col/row 1
-              //  ----- IF row hide/show state need updating
-              var sheetHideIndex = getIndexOf(arrayIndex); // gets col name if col
-              if(typeof sheetHideList[sheetHideIndex] == 'undefined') { 
-                // row/col is visible
-                if(showList[arrayIndex] !== true) { // if hide
-                  //  ------- SET the row state  
-                  sheetHideList[sheetHideIndex] ="yes";                
-                  //  ------- SET repaint flag
-                  forceRender = true;
-                } else {lastShowDimension = arrayIndex;}
-              } else {
-                // row/col is hidden 
-                if(showList[arrayIndex] === true) { // if show 
-                  //  ------- SET the row state  
-                  delete sheetHideList[sheetHideIndex];                
-                  //  ------- SET repaint flag
-                  forceRender = true;
-                  lastShowDimension = arrayIndex;
-                }
-              }              
-              
-            }            
-          };
-
-          
-          var getRowIndex = function(row) { return row };
-          showGridDimension(sheet,  sheet.attribs.lastrow,  sheet.rowattribs.hide, showrows, getRowIndex);
-          lastShowDimension = 0;
-          showGridDimension(sheet,  sheet.attribs.lastcol,  sheet.colattribs.hide, showcols, SocialCalc.rcColname );
-          // control width of html - for mobile app - as better to use native scroll rather than SocialCalc scroll bar - colpanes[length].last = usermaxcol - see FitToEditTable
-          sheet.attribs.usermaxcol = lastShowDimension;
-          
-          if(forceRender) {
-            sheet.renderneeded = true;
-            sheet.widgetsClean = false; //  force widgets to repaint - update cell reference in widget HTML    
-            spreadsheet.editor.context.rowpanes[0].first = 1; // reset scroll bar to first row  
-            spreadsheet.editor.context.CalculateColWidthData();
-            
-            spreadsheet.width = spreadsheet.editor.context.totalwidth;
-            spreadsheet.height = 2500;
-            spreadsheet.editor.ResizeTableEditor(spreadsheet.editor.context.totalwidth,2500);  // 2500 is page height constant - fix issue with mobile device - Used constant because could not see an easy way to pre-calculate height 
           }
-          
+        };
+        var getRowIndex = function (row) {
+          return row;
+        };
+        showGridDimension(sheet, sheet.attribs.lastrow, sheet.rowattribs.hide, showrows, getRowIndex);
+        lastShowDimension = 0;
+        showGridDimension(sheet, sheet.attribs.lastcol, sheet.colattribs.hide, showcols, SocialCalc.rcColname);
+        // control width of html - for mobile app - as better to use native scroll rather than SocialCalc scroll bar - colpanes[length].last = usermaxcol - see FitToEditTable
+        sheet.attribs.usermaxcol = lastShowDimension;
+        if (forceRender) {
+          sheet.renderneeded = true;
+          sheet.widgetsClean = false; //  force widgets to repaint - update cell reference in widget HTML    
+          spreadsheet.editor.context.rowpanes[0].first = 1; // reset scroll bar to first row  
+          spreadsheet.editor.context.CalculateColWidthData();
+          spreadsheet.width = spreadsheet.editor.context.totalwidth;
+          spreadsheet.height = 2500;
+          spreadsheet.editor.ResizeTableEditor(spreadsheet.editor.context.totalwidth, 2500); // 2500 is page height constant - fix issue with mobile device - Used constant because could not see an easy way to pre-calculate height 
         }
-         
       }
-
-   scf.PushOperand(operand, resulttype, result);
-   return;
-
-   }
+  }
+  scf.PushOperand(operand, resulttype, result);
+  return;
+};
 
 //*********************
 //
@@ -20290,233 +20371,207 @@ SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord
 // 
 //*********************
 
-
-
-SocialCalc.Formula.FunctionList["BUTTON"] = [SocialCalc.Formula.IoFunctions, 1, "label", "", "gui", "<button type='button' onclick=\"SocialCalc.TriggerIoAction.Button('<%=cell_reference%>');\"><%=formated_value%></button>" , "ParameterList" ];
-SocialCalc.Formula.FunctionList["IMAGEBUTTON"] = [SocialCalc.Formula.IoFunctions, 1, "imageurl", "", "gui", "<input type='image' src='<%=display_value%>' alt='Submit' onclick=\"SocialCalc.TriggerIoAction.Button('<%=cell_reference%>');\">", "ParameterList"  ];
-SocialCalc.Formula.FunctionList["EMAIL"] = [SocialCalc.Formula.IoFunctions, -3, "to_range subject_range, body_range", "", "action", "<button type='button' onclick=\"SocialCalc.TriggerIoAction.Email('<%=cell_reference%>');\"><%=formated_value%></button>", "ParameterList" ];
-SocialCalc.Formula.FunctionList["EMAILIF"] = [SocialCalc.Formula.IoFunctions, -4, "condition_range, to_range subject_range, body_range", "", "action", "<button type='button' onclick=\"SocialCalc.TriggerIoAction.Email('<%=cell_reference%>');\"><%=formated_value%></button>", "ParameterList" ];
+SocialCalc.Formula.FunctionList["BUTTON"] = [SocialCalc.Formula.IoFunctions, 1, "label", "", "gui", "<button type='button' onclick=\"SocialCalc.TriggerIoAction.Button('<%=cell_reference%>');\"><%=formated_value%></button>", "ParameterList"];
+SocialCalc.Formula.FunctionList["IMAGEBUTTON"] = [SocialCalc.Formula.IoFunctions, 1, "imageurl", "", "gui", "<input type='image' src='<%=display_value%>' alt='Submit' onclick=\"SocialCalc.TriggerIoAction.Button('<%=cell_reference%>');\">", "ParameterList"];
+SocialCalc.Formula.FunctionList["EMAIL"] = [SocialCalc.Formula.IoFunctions, -3, "to_range subject_range, body_range", "", "action", "<button type='button' onclick=\"SocialCalc.TriggerIoAction.Email('<%=cell_reference%>');\"><%=formated_value%></button>", "ParameterList"];
+SocialCalc.Formula.FunctionList["EMAILIF"] = [SocialCalc.Formula.IoFunctions, -4, "condition_range, to_range subject_range, body_range", "", "action", "<button type='button' onclick=\"SocialCalc.TriggerIoAction.Email('<%=cell_reference%>');\"><%=formated_value%></button>", "ParameterList"];
 SocialCalc.Formula.FunctionList["EMAILONEDIT"] = [SocialCalc.Formula.IoFunctions, -4, "editRange, to_range subject_range, body_range", "", "action", "<button type='button' onclick=\"SocialCalc.TriggerIoAction.Email('<%=cell_reference%>');\"><%=formated_value%></button>", "EventTree"];
-SocialCalc.Formula.FunctionList["EMAILAT"] = [SocialCalc.Formula.IoFunctions, -4, "datetime_value, to_range subject_range, body_range", "", "action", "<button type='button' onclick=\"SocialCalc.TriggerIoAction.Email('<%=cell_reference%>');\"><%=formated_value%></button>", "TimeTrigger" ];
-SocialCalc.Formula.FunctionList["EMAILONEDITIF"] = [SocialCalc.Formula.IoFunctions, -5, "editRange, condition, to_range subject_range, body_range", "", "action", "<button type='button' onclick=\"SocialCalc.TriggerIoAction.Email('<%=cell_reference%>');\"><%=formated_value%></button>", "EventTree" ];
-SocialCalc.Formula.FunctionList["EMAILATIF"] = [SocialCalc.Formula.IoFunctions, -5, "datetime_value, condition, to_range subject_range, body_range", "", "action", "<button type='button' onclick=\"SocialCalc.TriggerIoAction.Email('<%=cell_reference%>');\"><%=formated_value%></button>", "TimeTrigger" ];
-SocialCalc.Formula.FunctionList["SUBMIT"] = [SocialCalc.Formula.IoFunctions, 100, "[label]", "", "action", "<button type='button' onclick=\"SocialCalc.TriggerIoAction.Submit('<%=cell_reference%>');\"><%=formated_value%></button>", "ParameterList" ];
-SocialCalc.Formula.FunctionList["TEXTBOX"] = [SocialCalc.Formula.IoFunctions, 1, "value", "", "gui", "<input type='text' id='TEXTBOX_<%=cell_reference%>' onblur='SocialCalc.CmdGotFocus(null);' oninput=\"SocialCalc.TriggerIoAction.TextBox('<%=cell_reference%>')\" value='<%=display_value%>' >", "Input" ];
-SocialCalc.Formula.FunctionList["AUTOCOMPLETE"] = [SocialCalc.Formula.IoFunctions, 2, "value, range or csv_text", "", "gui", "<input type='text' id='AUTOCOMPLETE_<%=cell_reference%>' onfocus=\"SocialCalc.TriggerIoAction.AddAutocomplete('<%=cell_reference%>');\" onblur='SocialCalc.CmdGotFocus(null);' value='<%=display_value%>' >", "Input" ];
-SocialCalc.Formula.FunctionList["SELECT"] = [SocialCalc.Formula.IoFunctions, -2, "value, range or csv_text [,size]", "", "gui", "<select size='<%=html1_value%>' id='SELECT_<%=cell_reference%>' onchange=\"SocialCalc.TriggerIoAction.SelectList('<%=cell_reference%>')\" <%=html0_value%>><%=html2_value%></select>", "Input" ];
-SocialCalc.Formula.FunctionList["CHECKBOX"] = [SocialCalc.Formula.IoFunctions, 1, "value", "", "gui", "<input type='checkbox' id='CHECKBOX_<%=cell_reference%>' <%=checked%> onblur='SocialCalc.CmdGotFocus(null);' onchange=\"SocialCalc.TriggerIoAction.CheckBox('<%=cell_reference%>')\" >", "Input" ];
-SocialCalc.Formula.FunctionList["RADIOBUTTON"] = [SocialCalc.Formula.IoFunctions, 2, "value, groupname", "", "gui", "<input type='radio' value='<%=cell_reference%>' id='RADIOBUTTON_<%=cell_reference%>' <%=checked%> name='<%=parameter1_value%>' onblur=\"SocialCalc.CmdGotFocus(null);\" onclick=\"SocialCalc.TriggerIoAction.RadioButton('<%=parameter1_value%>');\" >", "Input" ];
-
+SocialCalc.Formula.FunctionList["EMAILAT"] = [SocialCalc.Formula.IoFunctions, -4, "datetime_value, to_range subject_range, body_range", "", "action", "<button type='button' onclick=\"SocialCalc.TriggerIoAction.Email('<%=cell_reference%>');\"><%=formated_value%></button>", "TimeTrigger"];
+SocialCalc.Formula.FunctionList["EMAILONEDITIF"] = [SocialCalc.Formula.IoFunctions, -5, "editRange, condition, to_range subject_range, body_range", "", "action", "<button type='button' onclick=\"SocialCalc.TriggerIoAction.Email('<%=cell_reference%>');\"><%=formated_value%></button>", "EventTree"];
+SocialCalc.Formula.FunctionList["EMAILATIF"] = [SocialCalc.Formula.IoFunctions, -5, "datetime_value, condition, to_range subject_range, body_range", "", "action", "<button type='button' onclick=\"SocialCalc.TriggerIoAction.Email('<%=cell_reference%>');\"><%=formated_value%></button>", "TimeTrigger"];
+SocialCalc.Formula.FunctionList["SUBMIT"] = [SocialCalc.Formula.IoFunctions, 100, "[label]", "", "action", "<button type='button' onclick=\"SocialCalc.TriggerIoAction.Submit('<%=cell_reference%>');\"><%=formated_value%></button>", "ParameterList"];
+SocialCalc.Formula.FunctionList["TEXTBOX"] = [SocialCalc.Formula.IoFunctions, 1, "value", "", "gui", "<input type='text' id='TEXTBOX_<%=cell_reference%>' onblur='SocialCalc.CmdGotFocus(null);' oninput=\"SocialCalc.TriggerIoAction.TextBox('<%=cell_reference%>')\" value='<%=display_value%>' >", "Input"];
+SocialCalc.Formula.FunctionList["AUTOCOMPLETE"] = [SocialCalc.Formula.IoFunctions, 2, "value, range or csv_text", "", "gui", "<input type='text' id='AUTOCOMPLETE_<%=cell_reference%>' onfocus=\"SocialCalc.TriggerIoAction.AddAutocomplete('<%=cell_reference%>');\" onblur='SocialCalc.CmdGotFocus(null);' value='<%=display_value%>' >", "Input"];
+SocialCalc.Formula.FunctionList["SELECT"] = [SocialCalc.Formula.IoFunctions, -2, "value, range or csv_text [,size]", "", "gui", "<select size='<%=html1_value%>' id='SELECT_<%=cell_reference%>' onchange=\"SocialCalc.TriggerIoAction.SelectList('<%=cell_reference%>')\" <%=html0_value%>><%=html2_value%></select>", "Input"];
+SocialCalc.Formula.FunctionList["CHECKBOX"] = [SocialCalc.Formula.IoFunctions, 1, "value", "", "gui", "<input type='checkbox' id='CHECKBOX_<%=cell_reference%>' <%=checked%> onblur='SocialCalc.CmdGotFocus(null);' onchange=\"SocialCalc.TriggerIoAction.CheckBox('<%=cell_reference%>')\" >", "Input"];
+SocialCalc.Formula.FunctionList["RADIOBUTTON"] = [SocialCalc.Formula.IoFunctions, 2, "value, groupname", "", "gui", "<input type='radio' value='<%=cell_reference%>' id='RADIOBUTTON_<%=cell_reference%>' <%=checked%> name='<%=parameter1_value%>' onblur=\"SocialCalc.CmdGotFocus(null);\" onclick=\"SocialCalc.TriggerIoAction.RadioButton('<%=parameter1_value%>');\" >", "Input"];
 SocialCalc.Formula.FunctionList["COPYVALUE"] = [SocialCalc.Formula.IoFunctions, 3, "trigger_cell, destinationCell, value_or_range", "", "action", "", "EventTree"];
 SocialCalc.Formula.FunctionList["COPYFORMULA"] = [SocialCalc.Formula.IoFunctions, 3, "trigger_cell, destinationCell, formula_range", "", "action", "", "EventTree"];
 SocialCalc.Formula.FunctionList["INSERT"] = [SocialCalc.Formula.IoFunctions, -2, "trigger_cell, destination_range [,formula_range,value_or_range,formula_range, ...]", "", "action", "", "EventTree"];
 SocialCalc.Formula.FunctionList["DELETEIF"] = [SocialCalc.Formula.IoFunctions, -1, "trigger_cell, criteria , test_range", "", "action", "", "EventTree"];
 SocialCalc.Formula.FunctionList["COMMAND"] = [SocialCalc.Formula.IoFunctions, -1, "trigger_cell, commands", "", "action", "", "EventTree"];
 SocialCalc.Formula.FunctionList["COMMANDIF"] = [SocialCalc.Formula.IoFunctions, -1, "trigger_cell, conditions, commands", "", "action", "", "EventTree"];
-
 SocialCalc.Formula.FunctionList["PANEL"] = [SocialCalc.Formula.IoFunctions, -1, "showindices_range_or_csv, panel1_range [, panel2_range , ...]", "", "gui", ""];
 SocialCalc.Formula.FunctionList["SPLASH"] = [SocialCalc.Formula.IoFunctions, -1, "splash_panel_range", "", "gui", ""];
-
 SocialCalc.Formula.FunctionList["STYLE"] = [SocialCalc.Formula.IoFunctions, -1, "css", "", "gui", ""];
 
 // on enter input box refresh the auto complete list
-SocialCalc.TriggerIoAction.AddAutocomplete = function(triggerCellId) {
-  var spreadsheet =  window.spreadsheet;
-  if (spreadsheet == null) spreadsheet = window.ss
+SocialCalc.TriggerIoAction.AddAutocomplete = function (triggerCellId) {
+  var spreadsheet = window.spreadsheet;
+  if (spreadsheet == null) spreadsheet = window.ss;
   var sheet = spreadsheet.sheet;
-  var scf = SocialCalc.Formula; 
-  
+  var scf = SocialCalc.Formula;
   var parameters = sheet.ioParameterList[triggerCellId];
-  if(typeof parameters === 'undefined') return;
-  
-  var autocompleteSource = SocialCalc.Formula.getStandardizedList(sheet, parameters[1])
+  if (typeof parameters === 'undefined') return;
+  var autocompleteSource = SocialCalc.Formula.getStandardizedList(sheet, parameters[1]);
 
   //Overrides the default autocomplete filter function to search only from the beginning of the string
   $.ui.autocomplete.filter = function (array, term) {
     // * RegEx Unit Test - https://regex101.com/r/kO6eC4/1
     var matcher = new RegExp("\\b" + $.ui.autocomplete.escapeRegex(term), "i");
     return $.grep(array, function (value) {
-        return matcher.test(value.label || value.value || value);
+      return matcher.test(value.label || value.value || value);
     });
   };
-
-  
-  $("#AUTOCOMPLETE_"+triggerCellId).autocomplete({
+  $("#AUTOCOMPLETE_" + triggerCellId).autocomplete({
     source: autocompleteSource,
     minLength: 1,
     autoFocus: true,
-    select: function(event, ui) {
+    select: function (event, ui) {
       $(this).val(ui.item.label);
       SocialCalc.TriggerIoAction.AutoComplete(triggerCellId);
     },
     change: function (event, ui) {
       if (ui.item === null) {
-          $(this).val('');
+        $(this).val('');
       }
       SocialCalc.TriggerIoAction.AutoComplete(triggerCellId);
     }
-  });  
-}
+  });
+};
 // Event triggered, e.g. button/imagebutton clicked. - call linked action formulas 
 // eddy TriggerIoAction {
-SocialCalc.TriggerIoAction.Button = function(triggerCellId) {
- var spreadsheet =  window.spreadsheet;
- if (spreadsheet == null) spreadsheet = window.ss
- var sheet = spreadsheet.sheet;
- var scf = SocialCalc.Formula; 
- //spreadsheet.editor.EditorScheduleSheetCommands('set A2 value n 10',  true, false);
- 
- //spreadsheet.editor.EditorScheduleSheetCommands('sendemail to eddy.nihon',  false, false); 
- 
- if(typeof sheet.ioEventTree === 'undefined') return;	
- if(typeof sheet.ioParameterList === 'undefined') return;
- if( sheet.ioEventTree[triggerCellId] === 'undefined' ) return;
- 
- for(var actionCellId in sheet.ioEventTree[triggerCellId]) {
- 
-	var parameters = sheet.ioParameterList[actionCellId];
-	var conditionsParameter = null;
-	
-	switch(parameters.function_name) {
-	  
-	  case "COPYVALUE" :	    
-	    var parameterdata = SocialCalc.Formula.getStandardizedValues(sheet, parameters[2]);
+SocialCalc.TriggerIoAction.Button = function (triggerCellId) {
+  var spreadsheet = window.spreadsheet;
+  if (spreadsheet == null) spreadsheet = window.ss;
+  var sheet = spreadsheet.sheet;
+  var scf = SocialCalc.Formula;
+  //spreadsheet.editor.EditorScheduleSheetCommands('set A2 value n 10',  true, false);
 
-      // get row and col of dest cell
-   	  var destcr = SocialCalc.coordToCr(parameters[1].value);
-   	  
-   	  var sheetCommandList = SocialCalc.TriggerIoAction.CopyValueToRange(parameterdata, destcr);
-   	  spreadsheet.editor.EditorScheduleSheetCommands(sheetCommandList,  true, false);   	  
-   	 
-	    break;
-	  case "COPYFORMULA" : 
-      var parameterdata = SocialCalc.Formula.getStandardizedValues(sheet, parameters[2]);
+  //spreadsheet.editor.EditorScheduleSheetCommands('sendemail to eddy.nihon',  false, false); 
 
-      // get row and col of dest cell
-      var destcr = SocialCalc.coordToCr(parameters[1].value);
-      
-      var sheetCommandList = SocialCalc.TriggerIoAction.CopyFormulaToRange(parameterdata, destcr);
-        
-      spreadsheet.editor.EditorScheduleSheetCommands(sheetCommandList,  true, false);
-      break;
-    case "INSERT" :  
-      //       # INSERT(trigger_cell, destination_range ,formula_range,value_range,formula_range, ...) // 
-      //       insertrow A1      
-      //       insertcol A1
-      var parameterdata = SocialCalc.Formula.getStandardizedValues(sheet, parameters[1]); // destination_range
-      if(parameterdata.type != "range") break; // invalid insert, requires range
-      var insertCommand;
-      var colOffset, rowOffset;
-      if (parameterdata.ncols > 1) {  // insert column
-        colOffset = 1;
-        rowOffset = 0;
-        insertCommand = "insertcol";
-      }
-      if (parameterdata.nrows > 1) {  // insert row
-        colOffset = 0;
-        rowOffset = 1;
-        insertCommand = "insertrow";
-      }
-      var insertcellCoord = parameterdata.cellcoord[colOffset][rowOffset];
-      var sheetCommandList = insertCommand + " " + insertcellCoord;
-      var destcr = SocialCalc.coordToCr(insertcellCoord);
-      var sourceDataIndex = 2; 
-      while(sourceDataIndex < parameters.length ) {
-        
-        if(parameters[sourceDataIndex].type == "range" || parameters[sourceDataIndex].type == "coord" || sourceDataIndex % 2 == 1) {
-          copyCellRange = SocialCalc.Formula.getStandardizedValues(sheet, parameters[sourceDataIndex]); // formulas to insert
-          
-          if (sourceDataIndex % 2 == 0) {
-            sheetCommandList = sheetCommandList + "\n" + SocialCalc.TriggerIoAction.CopyFormulaToRange(copyCellRange, destcr);
-          } else {
-            sheetCommandList = sheetCommandList + "\n" + SocialCalc.TriggerIoAction.CopyValueToRange(copyCellRange, destcr);            
+  if (typeof sheet.ioEventTree === 'undefined') return;
+  if (typeof sheet.ioParameterList === 'undefined') return;
+  if (sheet.ioEventTree[triggerCellId] === 'undefined') return;
+  for (var actionCellId in sheet.ioEventTree[triggerCellId]) {
+    var parameters = sheet.ioParameterList[actionCellId];
+    var conditionsParameter = null;
+    switch (parameters.function_name) {
+      case "COPYVALUE":
+        var parameterdata = SocialCalc.Formula.getStandardizedValues(sheet, parameters[2]);
+
+        // get row and col of dest cell
+        var destcr = SocialCalc.coordToCr(parameters[1].value);
+        var sheetCommandList = SocialCalc.TriggerIoAction.CopyValueToRange(parameterdata, destcr);
+        spreadsheet.editor.EditorScheduleSheetCommands(sheetCommandList, true, false);
+        break;
+      case "COPYFORMULA":
+        var parameterdata = SocialCalc.Formula.getStandardizedValues(sheet, parameters[2]);
+
+        // get row and col of dest cell
+        var destcr = SocialCalc.coordToCr(parameters[1].value);
+        var sheetCommandList = SocialCalc.TriggerIoAction.CopyFormulaToRange(parameterdata, destcr);
+        spreadsheet.editor.EditorScheduleSheetCommands(sheetCommandList, true, false);
+        break;
+      case "INSERT":
+        //       # INSERT(trigger_cell, destination_range ,formula_range,value_range,formula_range, ...) // 
+        //       insertrow A1      
+        //       insertcol A1
+        var parameterdata = SocialCalc.Formula.getStandardizedValues(sheet, parameters[1]); // destination_range
+        if (parameterdata.type != "range") break; // invalid insert, requires range
+        var insertCommand;
+        var colOffset, rowOffset;
+        if (parameterdata.ncols > 1) {
+          // insert column
+          colOffset = 1;
+          rowOffset = 0;
+          insertCommand = "insertcol";
+        }
+        if (parameterdata.nrows > 1) {
+          // insert row
+          colOffset = 0;
+          rowOffset = 1;
+          insertCommand = "insertrow";
+        }
+        var insertcellCoord = parameterdata.cellcoord[colOffset][rowOffset];
+        var sheetCommandList = insertCommand + " " + insertcellCoord;
+        var destcr = SocialCalc.coordToCr(insertcellCoord);
+        var sourceDataIndex = 2;
+        while (sourceDataIndex < parameters.length) {
+          if (parameters[sourceDataIndex].type == "range" || parameters[sourceDataIndex].type == "coord" || sourceDataIndex % 2 == 1) {
+            copyCellRange = SocialCalc.Formula.getStandardizedValues(sheet, parameters[sourceDataIndex]); // formulas to insert
+
+            if (sourceDataIndex % 2 == 0) {
+              sheetCommandList = sheetCommandList + "\n" + SocialCalc.TriggerIoAction.CopyFormulaToRange(copyCellRange, destcr);
+            } else {
+              sheetCommandList = sheetCommandList + "\n" + SocialCalc.TriggerIoAction.CopyValueToRange(copyCellRange, destcr);
+            }
+            if (parameterdata.nrows > 1) destcr.col += copyCellRange.ncols;
+            if (parameterdata.ncols > 1) destcr.row += copyCellRange.nrows;
           }
-          if (parameterdata.nrows > 1) destcr.col += copyCellRange.ncols;
-          if (parameterdata.ncols > 1) destcr.row += copyCellRange.nrows;
-          
-        }        
-        sourceDataIndex ++;
-        
-      }
-      spreadsheet.editor.EditorScheduleSheetCommands(sheetCommandList,  true, false);        
-      
-   		 break;
-    case "DELETEIF" :  //     # DELETEIF(trigger_cell, criteria , test_range) // 
-      var criteriaParameter = SocialCalc.Formula.getStandardizedValues(sheet, parameters[1]); // criteria 
-      var testRangeParameter = SocialCalc.Formula.getStandardizedValues(sheet, parameters[2]); // test_range - ignore first and last, as it would produce ref error
+          sourceDataIndex++;
+        }
+        spreadsheet.editor.EditorScheduleSheetCommands(sheetCommandList, true, false);
+        break;
+      case "DELETEIF":
+        //     # DELETEIF(trigger_cell, criteria , test_range) // 
+        var criteriaParameter = SocialCalc.Formula.getStandardizedValues(sheet, parameters[1]); // criteria 
+        var testRangeParameter = SocialCalc.Formula.getStandardizedValues(sheet, parameters[2]); // test_range - ignore first and last, as it would produce ref error
 
-      // set command list to empty
-      var sheetCommandList = "";
+        // set command list to empty
+        var sheetCommandList = "";
+        var colOffset, rowOffset, deleteCommand;
+        if (testRangeParameter.ncols > 1 && testRangeParameter.nrows > 1) return; // error invalid range, only one cell wide/high
+        if (testRangeParameter.ncols > 1) {
+          // delete column
+          colOffset = 1;
+          rowOffset = 0;
+          deleteCommand = "deletecol";
+        }
+        if (testRangeParameter.nrows > 1) {
+          // delete row
+          colOffset = 0;
+          rowOffset = 1;
+          deleteCommand = "deleterow";
+        }
+        var criteriaValue = criteriaParameter.celldata[0][0].datavalue;
+        // FOR each source cell
+        for (var i = testRangeParameter.ncols - colOffset - 1; i >= colOffset; i--) {
+          // ignore first and last cell, as it would produce ref error
+          for (var j = testRangeParameter.nrows - rowOffset - 1; j >= rowOffset; j--) {
+            // IF after first source cell THEN  add new line to command list
 
-      var colOffset, rowOffset, deleteCommand;
-      if (testRangeParameter.ncols > 1 && testRangeParameter.nrows > 1) return; // error invalid range, only one cell wide/high
-      if (testRangeParameter.ncols > 1) {  // delete column
-        colOffset = 1;
-        rowOffset = 0;
-        deleteCommand = "deletecol";
-      }
-      if (testRangeParameter.nrows > 1) {  // delete row
-        colOffset = 0;
-        rowOffset = 1;
-        deleteCommand = "deleterow";
-      }
-      
-      var criteriaValue = criteriaParameter.celldata[0][0].datavalue;
-      // FOR each source cell
-      for (var i=(testRangeParameter.ncols - colOffset) - 1; i>=colOffset; i--) {  // ignore first and last cell, as it would produce ref error
-        for (var j=(testRangeParameter.nrows - rowOffset) -1 ; j>=rowOffset; j--) {
-          
-          // IF after first source cell THEN  add new line to command list
-      
-          var cell = testRangeParameter.celldata[i][j];
-          if(SocialCalc.Formula.TestCriteria(cell.datavalue, cell.valuetype, criteriaValue) == true) {
-            if (sheetCommandList != "" ) sheetCommandList = sheetCommandList + "\n";
-            sheetCommandList = sheetCommandList + deleteCommand + " " + testRangeParameter.cellcoord[i][j]; // Note cell.coord becomes invalid when row/coll are inserted/deleted
+            var cell = testRangeParameter.celldata[i][j];
+            if (SocialCalc.Formula.TestCriteria(cell.datavalue, cell.valuetype, criteriaValue) == true) {
+              if (sheetCommandList != "") sheetCommandList = sheetCommandList + "\n";
+              sheetCommandList = sheetCommandList + deleteCommand + " " + testRangeParameter.cellcoord[i][j]; // Note cell.coord becomes invalid when row/coll are inserted/deleted
+            }
           }
         }
-      }
-      
-      if (sheetCommandList != "" ) spreadsheet.editor.EditorScheduleSheetCommands(sheetCommandList,  true, false);        
-      
-      break;
-    case "COMMANDIF" :  //    # COMMANDIF(trigger_cell, condition, commands) 
-      conditionsParameter = SocialCalc.Formula.getStandardizedValues(sheet, parameters[1]); // commands 
+        if (sheetCommandList != "") spreadsheet.editor.EditorScheduleSheetCommands(sheetCommandList, true, false);
+        break;
+      case "COMMANDIF":
+        //    # COMMANDIF(trigger_cell, condition, commands) 
+        conditionsParameter = SocialCalc.Formula.getStandardizedValues(sheet, parameters[1]);
+      // commands 
 
-      
-    case "COMMAND" :  // COMMAND(trigger_cell, commands) 
-      var commandsParameter;
-      // set command list to empty
-      var sheetCommandList = "";
-      if( conditionsParameter != null) {
-        var commandsParameter = SocialCalc.Formula.getStandardizedValues(sheet, parameters[2]); // commands 
-        if (conditionsParameter.ncols != commandsParameter.ncols || conditionsParameter.nrows != commandsParameter.nrows) break;
-      } else {
-        commandsParameter = SocialCalc.Formula.getStandardizedValues(sheet, parameters[1]); // commands         
-      }
-      
-      for (var i=0; i<commandsParameter.ncols; i++) {
-        for (var j=0; j<commandsParameter.nrows; j++) {
-
-          if( conditionsParameter != null) {
-            var conditionCell = conditionsParameter.celldata[i][j];
-            if(conditionCell.datavalue == false) continue;
-          }
-          if (sheetCommandList != "" ) sheetCommandList = sheetCommandList + "\n";
-          var cellCommand = commandsParameter.celldata[i][j];  
-          sheetCommandList = sheetCommandList + cellCommand.datavalue.toString().trim();
-          
+      case "COMMAND":
+        // COMMAND(trigger_cell, commands) 
+        var commandsParameter;
+        // set command list to empty
+        var sheetCommandList = "";
+        if (conditionsParameter != null) {
+          var commandsParameter = SocialCalc.Formula.getStandardizedValues(sheet, parameters[2]); // commands 
+          if (conditionsParameter.ncols != commandsParameter.ncols || conditionsParameter.nrows != commandsParameter.nrows) break;
+        } else {
+          commandsParameter = SocialCalc.Formula.getStandardizedValues(sheet, parameters[1]); // commands         
         }
-      }
-      if (sheetCommandList != "" ) spreadsheet.editor.EditorScheduleSheetCommands(sheetCommandList,  true, false);        
-
-      break;
-      
+        for (var i = 0; i < commandsParameter.ncols; i++) {
+          for (var j = 0; j < commandsParameter.nrows; j++) {
+            if (conditionsParameter != null) {
+              var conditionCell = conditionsParameter.celldata[i][j];
+              if (conditionCell.datavalue == false) continue;
+            }
+            if (sheetCommandList != "") sheetCommandList = sheetCommandList + "\n";
+            var cellCommand = commandsParameter.celldata[i][j];
+            sheetCommandList = sheetCommandList + cellCommand.datavalue.toString().trim();
+          }
+        }
+        if (sheetCommandList != "") spreadsheet.editor.EditorScheduleSheetCommands(sheetCommandList, true, false);
+        break;
+    }
   }
-
- } 
-
-}
-
+};
 
 /******************************
  * CopyFormulaToRange
@@ -20540,50 +20595,42 @@ SocialCalc.TriggerIoAction.Button = function(triggerCellId) {
  *  set B3  formula TEXTBOX("")             ... coord: "B3", datavalue: "william", datatype: "f", formula: "TEXTBOX("william")", valuetype: "tiTEXTBOX"
  */
 
-SocialCalc.TriggerIoAction.CopyFormulaToRange = function(formulaData, destcr) {
-
+SocialCalc.TriggerIoAction.CopyFormulaToRange = function (formulaData, destcr) {
   // set command list to empty
   var sheetCommandList = "";
   var sheetCommand;
-  
+
   // FOR each source cell
-  for (var i=0; i<formulaData.ncols; i++) {
-    for (var j=0; j<formulaData.nrows; j++) {
-  
+  for (var i = 0; i < formulaData.ncols; i++) {
+    for (var j = 0; j < formulaData.nrows; j++) {
       var cell = formulaData.celldata[i][j];
       // destination cell coord
       var destCellCoord = SocialCalc.crToCoord(destcr.col + i, destcr.row + j);
-  
-  
+
       // IF after first source cell THEN  add new line to command list
-      if (i != 0 || j != 0 ) sheetCommandList = sheetCommandList + "\n";
-  
-  
-      if (typeof cell !== 'undefined' && cell.valuetype != 'b') { // if not blank get cell data
+      if (i != 0 || j != 0) sheetCommandList = sheetCommandList + "\n";
+      if (typeof cell !== 'undefined' && cell.valuetype != 'b') {
+        // if not blank get cell data
         var cellDataType = cell.datatype;
-        var cellValueType = cell.valuetype;     
-        var cellDataValue = cell.datavalue;   
+        var cellValueType = cell.valuetype;
+        var cellDataValue = cell.datavalue;
         var cellFormula = cell.formula;
-        
-        if(cellDataType == 'f') {
-          cellFormula = SocialCalc.OffsetFormulaCoords(cellFormula, destcr.col -  formulaData.col1num, destcr.row -  formulaData.row1num);
+        if (cellDataType == 'f') {
+          cellFormula = SocialCalc.OffsetFormulaCoords(cellFormula, destcr.col - formulaData.col1num, destcr.row - formulaData.row1num);
           cellDataValue = "";
-          cellValueType = "";  
-        } else { 
-          if(cellDataType != "c") cellFormula = "";  // clear text and number types   but not constant type like date/time      
+          cellValueType = "";
+        } else {
+          if (cellDataType != "c") cellFormula = ""; // clear text and number types   but not constant type like date/time      
         }
-        
-        sheetCommand = 'set '+destCellCoord+ ' ' + SocialCalc.Constants.cellDataType[cellDataType] + ' ' +cellValueType + ' '+ SocialCalc.encodeForSave(cellDataValue) + ' ' + cellFormula;            
-      } else { 
-        sheetCommand = 'set '+destCellCoord+ ' empty';        
-      }          
+        sheetCommand = 'set ' + destCellCoord + ' ' + SocialCalc.Constants.cellDataType[cellDataType] + ' ' + cellValueType + ' ' + SocialCalc.encodeForSave(cellDataValue) + ' ' + cellFormula;
+      } else {
+        sheetCommand = 'set ' + destCellCoord + ' empty';
+      }
       sheetCommandList += sheetCommand.trim();
     }
   }
-
   return sheetCommandList;
-
-}
+};
 
 /******************************
  * CopyValueToRange
@@ -20594,328 +20641,288 @@ SocialCalc.TriggerIoAction.CopyFormulaToRange = function(formulaData, destcr) {
  * @return commands to execute to do the copy.  - String of sheet commands, \n between each command -  
  *   
  ******************************/
-SocialCalc.TriggerIoAction.CopyValueToRange = function(sourceData, destcr) {
+SocialCalc.TriggerIoAction.CopyValueToRange = function (sourceData, destcr) {
+  //----------------------
+  // set command list to empty
+  var sheetCommandList = "";
+  var sheetCommand;
 
+  // FOR each source cell
+  for (var i = 0; i < sourceData.ncols; i++) {
+    for (var j = 0; j < sourceData.nrows; j++) {
+      var cell = sourceData.celldata[i][j];
+      // destination cell coord
+      var destCellCoord = SocialCalc.crToCoord(destcr.col + i, destcr.row + j);
 
-    //----------------------
-    // set command list to empty
-    var sheetCommandList = "";
-    var sheetCommand;
-    
-    // FOR each source cell
-    for (var i=0; i<sourceData.ncols; i++) {
-      for (var j=0; j<sourceData.nrows; j++) {
-    
-        var cell = sourceData.celldata[i][j];
-        // destination cell coord
-        var destCellCoord = SocialCalc.crToCoord(destcr.col + i, destcr.row + j);
-    
-    
-        // IF after first source cell THEN  add new line to command list
-        if (i != 0 || j != 0 ) sheetCommandList = sheetCommandList + "\n";
-    
-    
-        // copyvalue to set command
-        // take the cell from copyvalue source and convert it to a set command to set the destination
-        // e.g. set D3 text t push me 
-        // e.g. set D3 value v 10   
-        // e.g. set D5 constant n% 0.1 10%
-        // e.g. set D6 constant nd 41922 10/10/2014
-        if (typeof cell !== 'undefined' && cell.valuetype != 'b') { // if not blank get cell data
-          var cellDataType = cell.datatype;
-          var cellValueType = cell.valuetype;     
-          var cellDataValue = cell.datavalue;   
-          var cellFormula = cell.formula;
-          
-          if(cellDataType == 'f') {
-            cellFormula = "";
-            cellDataType = cellValueType;
-            if(cellValueType != "n" && cellValueType.charAt(0) != "t") {
-              cellDataType = "c"; // for Date type etc 
-              cellFormula = cell.displaystring;
-            }
-            if(cellValueType.charAt(0) == "t") cellDataType = "t";          
-          } else {
-            if(cellDataType != "c") cellFormula = "";  // clear text and number types   but not constant type like date/time      
+      // IF after first source cell THEN  add new line to command list
+      if (i != 0 || j != 0) sheetCommandList = sheetCommandList + "\n";
+
+      // copyvalue to set command
+      // take the cell from copyvalue source and convert it to a set command to set the destination
+      // e.g. set D3 text t push me 
+      // e.g. set D3 value v 10   
+      // e.g. set D5 constant n% 0.1 10%
+      // e.g. set D6 constant nd 41922 10/10/2014
+      if (typeof cell !== 'undefined' && cell.valuetype != 'b') {
+        // if not blank get cell data
+        var cellDataType = cell.datatype;
+        var cellValueType = cell.valuetype;
+        var cellDataValue = cell.datavalue;
+        var cellFormula = cell.formula;
+        if (cellDataType == 'f') {
+          cellFormula = "";
+          cellDataType = cellValueType;
+          if (cellValueType != "n" && cellValueType.charAt(0) != "t") {
+            cellDataType = "c"; // for Date type etc 
+            cellFormula = cell.displaystring;
           }
-          
-    
-          sheetCommand = 'set '+destCellCoord+ ' ' + SocialCalc.Constants.cellDataType[cellDataType] + ' ' +cellValueType + ' '+ SocialCalc.encodeForSave(cellDataValue) + ' ' + cellFormula;
-          
-      } else { 
-        sheetCommand = 'set '+destCellCoord+ ' empty';        
+          if (cellValueType.charAt(0) == "t") cellDataType = "t";
+        } else {
+          if (cellDataType != "c") cellFormula = ""; // clear text and number types   but not constant type like date/time      
+        }
+        sheetCommand = 'set ' + destCellCoord + ' ' + SocialCalc.Constants.cellDataType[cellDataType] + ' ' + cellValueType + ' ' + SocialCalc.encodeForSave(cellDataValue) + ' ' + cellFormula;
+      } else {
+        sheetCommand = 'set ' + destCellCoord + ' empty';
       }
       sheetCommandList += sheetCommand.trim();
     }
   }
-  
-  return sheetCommandList;  
-
-}
+  return sheetCommandList;
+};
 //----------------------
-
 
 // optionalTriggerCellId - edited cell - used by EMAILONEDIT and EMAILONEDITIF
 //onClick=EMAIL 
-SocialCalc.TriggerIoAction.Email = function(emailFormulaCellId, optionalTriggerCellId) {
-     optionalTriggerCellId = typeof optionalTriggerCellId !== 'undefined' ? optionalTriggerCellId : null;
-	 var scf = SocialCalc.Formula;	
-	 var spreadsheet =  window.spreadsheet;
-	 if (spreadsheet == null) spreadsheet = window.ss
+SocialCalc.TriggerIoAction.Email = function (emailFormulaCellId, optionalTriggerCellId) {
+  optionalTriggerCellId = typeof optionalTriggerCellId !== 'undefined' ? optionalTriggerCellId : null;
+  var scf = SocialCalc.Formula;
+  var spreadsheet = window.spreadsheet;
+  if (spreadsheet == null) spreadsheet = window.ss;
+  var sheet = spreadsheet.sheet;
+  var cell = sheet.cells[emailFormulaCellId];
+  if (typeof sheet.ioParameterList === 'undefined') return;
+  var parameters = sheet.ioParameterList[emailFormulaCellId];
+  if (typeof parameters === 'undefined') return;
+  //var debugLog = "debug TriggerIoAction.Email\n"; //eddy
 
-	 var sheet = spreadsheet.sheet;
-	 var cell = sheet.cells[emailFormulaCellId];
-	 
-	 if(typeof sheet.ioParameterList === 'undefined') return;
-	 
-	 var parameters = sheet.ioParameterList[emailFormulaCellId];
-   if(typeof parameters === 'undefined') return;
-   //var debugLog = "debug TriggerIoAction.Email\n"; //eddy
-
-	 //spreadsheet.editor.EditorScheduleSheetCommands('sendemail to eddy.nihon',  false, false); 
-	 // grab array for TO, SUBJECT and BODY 
-	 var parameterValues = [];
-	 var parameterCellRefs = []; // OnEdit uses to workout what row/col was edited
-	 var maxRangeSize = 1;
-	 for(var index=0; index < parameters.length; index ++) {
-		 if(parameters[index].type.charAt(0) == 't') {
-			 parameterValues[index] = [String(parameters[index].value).replace(/ /g, "%20")];
-		 }
-		 if(parameters[index].type == 'coord') {
-			 parameterValues[index] = [String(sheet.GetAssuredCell(parameters[index].value).datavalue).replace(/ /g, "%20")];
-
-		 }
-		 if(parameters[index].type == 'range') {
-		      var rangeinfo = scf.DecodeRangeParts(sheet, parameters[index].value);
-		      parameterValues[index] = [];
-		      parameterCellRefs[index] = [];
-		      var rangeSizeCounter = 0;
-		      for (var i=0; i<rangeinfo.ncols; i++) {
-		         for (var j=0; j<rangeinfo.nrows; j++) {
-
-		            var cellcr = SocialCalc.crToCoord(rangeinfo.col1num + i, rangeinfo.row1num + j);
-		            var cell = rangeinfo.sheetdata.GetAssuredCell(cellcr);
-		            parameterValues[index].push(cell.datavalue.toString().replace(/ /g, "%20"));
-		            parameterCellRefs[index].push(cellcr);
-		            rangeSizeCounter++;
-		         }
-		      }
-		      if(rangeSizeCounter > maxRangeSize) maxRangeSize = rangeSizeCounter;			 
-		 }
-	 }
-
-	 
-    var conditionIndex = -1; // check if email formula is conditional, -1 = not conditional 
-    var toAddressParamOffset = 0;
-    switch (parameters.function_name) {
-
-      case "EMAILIF":
-    	  conditionIndex = 0;
-      case "EMAILAT":
-      case "EMAILONEDIT":
-    	  toAddressParamOffset = 1;
-    	  break;
-      case "EMAILONEDITIF":
-      case "EMAILATIF":
-       	  conditionIndex = 1;
-    	  toAddressParamOffset = 2;
-    	  break;
-    	  
-      case "EMAIL":
-    	  break;
-    }	 
-
-    
-    switch (parameters.function_name) {
-        case "EMAILONEDIT":
-        case "EMAILONEDITIF":
-	       if(optionalTriggerCellId && parameters[0].type == 'coord' && parameters[0].value == optionalTriggerCellId ) optionalTriggerCellId = null;
-	       break;
-	   default :
-		   optionalTriggerCellId = null;
+  //spreadsheet.editor.EditorScheduleSheetCommands('sendemail to eddy.nihon',  false, false); 
+  // grab array for TO, SUBJECT and BODY 
+  var parameterValues = [];
+  var parameterCellRefs = []; // OnEdit uses to workout what row/col was edited
+  var maxRangeSize = 1;
+  for (var index = 0; index < parameters.length; index++) {
+    if (parameters[index].type.charAt(0) == 't') {
+      parameterValues[index] = [String(parameters[index].value).replace(/ /g, "%20")];
     }
-
-     var setStatusBarMessage = false;
-
-   var emailContentsList = [];
-
-	 for(var rangeIndex = maxRangeSize -1; rangeIndex > -1; rangeIndex-- ) {
-		 
-		 // if email formula is conditional && condition is false then skip 
-		 if(conditionIndex != -1) {
-			 var conditionRangeIndex = (rangeIndex >= parameterValues[conditionIndex].length) ? 0 : rangeIndex;
-			 if(parameterValues[conditionIndex][conditionRangeIndex] == false) continue;			 
-		 }
-
-		 if(optionalTriggerCellId && optionalTriggerCellId != parameterCellRefs[0][rangeIndex]) continue;
-		 // send: to, subject, body to server 		 
-		 var toaddressRangeIndex = (rangeIndex >= parameterValues[toAddressParamOffset].length) ? 0 : rangeIndex;
-		 var subjectsRangeIndex = (rangeIndex >= parameterValues[toAddressParamOffset+1].length) ? 0 : rangeIndex;
-		 var bodyRangeIndex = (rangeIndex >= parameterValues[toAddressParamOffset+2].length) ? 0 : rangeIndex;
-		 
-		 var emailContents = parameterValues[toAddressParamOffset][toaddressRangeIndex]+' '+parameterValues[toAddressParamOffset+1][subjectsRangeIndex]+' '+parameterValues[toAddressParamOffset+2][bodyRangeIndex];
-		 setStatusBarMessage = true;
-		 sheet.ScheduleSheetCommands('sendemail '+emailContents,  false); 
-		 // cron job email - ignores ScheduleSheetCommands so send via return value
-		 emailContentsList.push([parameterValues[toAddressParamOffset][toaddressRangeIndex], parameterValues[toAddressParamOffset+1][subjectsRangeIndex], parameterValues[toAddressParamOffset+2][bodyRangeIndex]]);
-		 //debugLog = debugLog + "emailContents "+emailContents+"\n"; //eddy
-		 
-	 }
-	 //console.log( "log formula1.js Email");
-	 // update status bar to indicate email is being sent
-	 if(setStatusBarMessage) SocialCalc.EditorSheetStatusCallback(null, "emailing", null, spreadsheet.editor);	 
-   return emailContentsList; // cron job email
-
-}
+    if (parameters[index].type == 'coord') {
+      parameterValues[index] = [String(sheet.GetAssuredCell(parameters[index].value).datavalue).replace(/ /g, "%20")];
+    }
+    if (parameters[index].type == 'range') {
+      var rangeinfo = scf.DecodeRangeParts(sheet, parameters[index].value);
+      parameterValues[index] = [];
+      parameterCellRefs[index] = [];
+      var rangeSizeCounter = 0;
+      for (var i = 0; i < rangeinfo.ncols; i++) {
+        for (var j = 0; j < rangeinfo.nrows; j++) {
+          var cellcr = SocialCalc.crToCoord(rangeinfo.col1num + i, rangeinfo.row1num + j);
+          var cell = rangeinfo.sheetdata.GetAssuredCell(cellcr);
+          parameterValues[index].push(cell.datavalue.toString().replace(/ /g, "%20"));
+          parameterCellRefs[index].push(cellcr);
+          rangeSizeCounter++;
+        }
+      }
+      if (rangeSizeCounter > maxRangeSize) maxRangeSize = rangeSizeCounter;
+    }
+  }
+  var conditionIndex = -1; // check if email formula is conditional, -1 = not conditional 
+  var toAddressParamOffset = 0;
+  switch (parameters.function_name) {
+    case "EMAILIF":
+      conditionIndex = 0;
+    case "EMAILAT":
+    case "EMAILONEDIT":
+      toAddressParamOffset = 1;
+      break;
+    case "EMAILONEDITIF":
+    case "EMAILATIF":
+      conditionIndex = 1;
+      toAddressParamOffset = 2;
+      break;
+    case "EMAIL":
+      break;
+  }
+  switch (parameters.function_name) {
+    case "EMAILONEDIT":
+    case "EMAILONEDITIF":
+      if (optionalTriggerCellId && parameters[0].type == 'coord' && parameters[0].value == optionalTriggerCellId) optionalTriggerCellId = null;
+      break;
+    default:
+      optionalTriggerCellId = null;
+  }
+  var setStatusBarMessage = false;
+  var emailContentsList = [];
+  for (var rangeIndex = maxRangeSize - 1; rangeIndex > -1; rangeIndex--) {
+    // if email formula is conditional && condition is false then skip 
+    if (conditionIndex != -1) {
+      var conditionRangeIndex = rangeIndex >= parameterValues[conditionIndex].length ? 0 : rangeIndex;
+      if (parameterValues[conditionIndex][conditionRangeIndex] == false) continue;
+    }
+    if (optionalTriggerCellId && optionalTriggerCellId != parameterCellRefs[0][rangeIndex]) continue;
+    // send: to, subject, body to server 		 
+    var toaddressRangeIndex = rangeIndex >= parameterValues[toAddressParamOffset].length ? 0 : rangeIndex;
+    var subjectsRangeIndex = rangeIndex >= parameterValues[toAddressParamOffset + 1].length ? 0 : rangeIndex;
+    var bodyRangeIndex = rangeIndex >= parameterValues[toAddressParamOffset + 2].length ? 0 : rangeIndex;
+    var emailContents = parameterValues[toAddressParamOffset][toaddressRangeIndex] + ' ' + parameterValues[toAddressParamOffset + 1][subjectsRangeIndex] + ' ' + parameterValues[toAddressParamOffset + 2][bodyRangeIndex];
+    setStatusBarMessage = true;
+    sheet.ScheduleSheetCommands('sendemail ' + emailContents, false);
+    // cron job email - ignores ScheduleSheetCommands so send via return value
+    emailContentsList.push([parameterValues[toAddressParamOffset][toaddressRangeIndex], parameterValues[toAddressParamOffset + 1][subjectsRangeIndex], parameterValues[toAddressParamOffset + 2][bodyRangeIndex]]);
+    //debugLog = debugLog + "emailContents "+emailContents+"\n"; //eddy
+  }
+  //console.log( "log formula1.js Email");
+  // update status bar to indicate email is being sent
+  if (setStatusBarMessage) SocialCalc.EditorSheetStatusCallback(null, "emailing", null, spreadsheet.editor);
+  return emailContentsList; // cron job email
+};
 
 /*
  * creates command on form: submitform \rtimestamp\rB2value\rC2value ...
  */
 
-SocialCalc.TriggerIoAction.Submit = function(triggerCellId) {
-  var formDataViewer = (SocialCalc.CurrentSpreadsheetControlObject != null) 
-  ? SocialCalc.CurrentSpreadsheetControlObject.formDataViewer 
-  : SocialCalc.CurrentSpreadsheetViewerObject.formDataViewer;
-
-  if(formDataViewer != null && formDataViewer.loaded == true) {
-
-    var spreadsheet =  window.spreadsheet;
-    if (spreadsheet == null) spreadsheet = window.ss
+SocialCalc.TriggerIoAction.Submit = function (triggerCellId) {
+  var formDataViewer = SocialCalc.CurrentSpreadsheetControlObject != null ? SocialCalc.CurrentSpreadsheetControlObject.formDataViewer : SocialCalc.CurrentSpreadsheetViewerObject.formDataViewer;
+  if (formDataViewer != null && formDataViewer.loaded == true) {
+    var spreadsheet = window.spreadsheet;
+    if (spreadsheet == null) spreadsheet = window.ss;
     var sheet = spreadsheet.sheet;
-    
-    
     var date = new Date();
-    var formDataValues = ""+date.getFullYear()  + "-" + (date.getMonth() +1 )    + "-" +  date.getDate() 
-       + " " +  date.getHours()     + ":" +  date.getMinutes()     + ":" +  date.getSeconds();
-    
-    for(var colIndex = 2; colIndex <= formDataViewer.formFieldsLength +1 ; colIndex++) {
+    var formDataValues = "" + date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate() + " " + date.getHours() + ":" + date.getMinutes() + ":" + date.getSeconds();
+    for (var colIndex = 2; colIndex <= formDataViewer.formFieldsLength + 1; colIndex++) {
       var valueCoord = SocialCalc.crToCoord(colIndex, 2);
       formDataValues += "\r" + formDataViewer.sheet.cells[valueCoord].datavalue;
-    }  
-    
-    sheet.ScheduleSheetCommands('submitform \r'+formDataValues,  false);
+    }
+    sheet.ScheduleSheetCommands('submitform \r' + formDataValues, false);
   }
-}
+};
 
 //onChange=select tag (combobox) 
-SocialCalc.TriggerIoAction.SelectList = function(selectListCellId) {
-  var getHTMLselectListCellValue = function( selectListWidget ) { return selectListWidget.value; };
+SocialCalc.TriggerIoAction.SelectList = function (selectListCellId) {
+  var getHTMLselectListCellValue = function (selectListWidget) {
+    return selectListWidget.value;
+  };
   var function_name = "SELECT";
-  SocialCalc.TriggerIoAction.updateInputWidgetFormula(function_name, selectListCellId, getHTMLselectListCellValue );
-}
+  SocialCalc.TriggerIoAction.updateInputWidgetFormula(function_name, selectListCellId, getHTMLselectListCellValue);
+};
 
 //onKeyUp=AutoComplete
-SocialCalc.TriggerIoAction.AutoComplete = function(autoCompleteCellId) {
-  var getHTMLAutoCompleteCellValue = function( autoCompleteWidget ) { return autoCompleteWidget.value; };
+SocialCalc.TriggerIoAction.AutoComplete = function (autoCompleteCellId) {
+  var getHTMLAutoCompleteCellValue = function (autoCompleteWidget) {
+    return autoCompleteWidget.value;
+  };
   var function_name = "AUTOCOMPLETE";
-  SocialCalc.TriggerIoAction.updateInputWidgetFormula(function_name, autoCompleteCellId, getHTMLAutoCompleteCellValue );
-}
+  SocialCalc.TriggerIoAction.updateInputWidgetFormula(function_name, autoCompleteCellId, getHTMLAutoCompleteCellValue);
+};
 
 // onKeyUp=TextBox 
-SocialCalc.TriggerIoAction.TextBox = function(textBoxCellId) {
-  var getHTMLTextBoxCellValue = function( textBoxWidget ) { return textBoxWidget.value; };
+SocialCalc.TriggerIoAction.TextBox = function (textBoxCellId) {
+  var getHTMLTextBoxCellValue = function (textBoxWidget) {
+    return textBoxWidget.value;
+  };
   var function_name = "TEXTBOX";
-  SocialCalc.TriggerIoAction.updateInputWidgetFormula(function_name, textBoxCellId, getHTMLTextBoxCellValue );
-}
+  SocialCalc.TriggerIoAction.updateInputWidgetFormula(function_name, textBoxCellId, getHTMLTextBoxCellValue);
+};
 
 //onKeyUp=CheckBox 
-SocialCalc.TriggerIoAction.CheckBox = function(checkBoxCellId) {
-  var getHTMLCheckBoxCellValue = function( checkBoxWidget ) { return (checkBoxWidget.checked ? "TRUE" : "FALSE") };
-  var function_name = "CHECKBOX"
-  SocialCalc.TriggerIoAction.updateInputWidgetFormula(function_name, checkBoxCellId, getHTMLCheckBoxCellValue );
-}
+SocialCalc.TriggerIoAction.CheckBox = function (checkBoxCellId) {
+  var getHTMLCheckBoxCellValue = function (checkBoxWidget) {
+    return checkBoxWidget.checked ? "TRUE" : "FALSE";
+  };
+  var function_name = "CHECKBOX";
+  SocialCalc.TriggerIoAction.updateInputWidgetFormula(function_name, checkBoxCellId, getHTMLCheckBoxCellValue);
+};
 
 //Radio Button state changed
 // onclick when selected
 // update true/false in formula param
-SocialCalc.TriggerIoAction.RadioButton = function(radioButtonGroupName) {
-  var getHTMLRadioButtonValue = function( radioButtonWidget ) { return (radioButtonWidget.checked ? "TRUE" : "FALSE") };
-  var function_name = "RADIOBUTTON"
+SocialCalc.TriggerIoAction.RadioButton = function (radioButtonGroupName) {
+  var getHTMLRadioButtonValue = function (radioButtonWidget) {
+    return radioButtonWidget.checked ? "TRUE" : "FALSE";
+  };
+  var function_name = "RADIOBUTTON";
   // for each radio button in group
-  $('input[name="'+radioButtonGroupName+'"]').each(function () {
-     SocialCalc.TriggerIoAction.updateInputWidgetFormula(function_name,  $(this).attr('id').replace(/RADIOBUTTON_/,''), getHTMLRadioButtonValue );
+  $('input[name="' + radioButtonGroupName + '"]').each(function () {
+    SocialCalc.TriggerIoAction.updateInputWidgetFormula(function_name, $(this).attr('id').replace(/RADIOBUTTON_/, ''), getHTMLRadioButtonValue);
   });
-}
+};
+SocialCalc.TriggerIoAction.updateInputWidgetFormula = function (function_name, widgetCellId, getHTMLWidgetCellValue) {
+  var spreadsheet = window.spreadsheet;
+  if (spreadsheet == null) spreadsheet = window.ss;
+  var sheet = spreadsheet.sheet;
+  var cell = sheet.cells[widgetCellId];
+  var parameters = sheet.ioParameterList[widgetCellId];
+  if (typeof parameters === 'undefined') return;
+  var cell_widget = document.getElementById(function_name + '_' + widgetCellId);
+  var inputValue = getHTMLWidgetCellValue(cell_widget);
+  inputValue = SocialCalc.encodeForSave(inputValue);
+  var sheetCommand = 'set ' + widgetCellId + ' formula ' + function_name + '("' + inputValue + '"';
+  for (var paramIndex = 1; paramIndex < parameters.length; paramIndex++) {
+    if (parameters[paramIndex].type.charAt(0) == 'n') {
+      sheetCommand += ',' + parameters[paramIndex].value;
+    }
+    if (parameters[paramIndex].type.charAt(0) == 't') {
+      sheetCommand += ',"' + parameters[paramIndex].value + '"';
+    }
+    if (parameters[paramIndex].type == 'range') {
+      // convert:     E5!TO0DB4GSXZJ3|E8|   -> TO0DB4GSXZJ3!E5:E8
+      // convert:     E5|E8|   -> E5:E8
 
+      // * RegEx Unit Test **  https://regex101.com/r/zF1dA8/1
+      sheetCommand += ',' + parameters[paramIndex].value.toString().replace(/(\$?[A-Z]+\$?[0-9]+)([!]?)([^|]*)[|](\$?[A-Z]+\$?[0-9]+)[|]/i, "$3$2$1:$4");
+      ;
+    }
+    if (parameters[paramIndex].type == 'coord') {
+      sheetCommand += ',' + parameters[paramIndex].value;
+    }
+  }
 
-SocialCalc.TriggerIoAction.updateInputWidgetFormula = function(function_name, widgetCellId, getHTMLWidgetCellValue ) {
+  // for(var parseIndex = 3; parseIndex < cell.parseinfo.length -1; parseIndex++) {
+  //   if(cell.parseinfo[parseIndex].type == 6)   sheetCommand += '"' + cell.parseinfo[parseIndex].text + '"';
+  //   else sheetCommand +=  cell.parseinfo[parseIndex].text ;
+  // }
+  sheetCommand += ')';
+  // add style formula if css has been added
+  if (parameters.cssParameter) {
+    sheetCommand += "+style(" + parameters.cssParameter + ")";
+  }
+  //SocialCalc.CmdGotFocus(cell_widget);
 
- var spreadsheet =  window.spreadsheet;
- if (spreadsheet == null) spreadsheet = window.ss
- var sheet = spreadsheet.sheet;
- var cell = sheet.cells[widgetCellId];
- var parameters = sheet.ioParameterList[widgetCellId];
- if(typeof parameters === 'undefined') return;
- 
- var cell_widget=document.getElementById(function_name+'_'+widgetCellId);
- var inputValue = getHTMLWidgetCellValue(cell_widget);
- inputValue = SocialCalc.encodeForSave(inputValue);
-
- var sheetCommand = 'set '+widgetCellId+ ' formula '+ function_name+'("' +inputValue+'"';
- for(var paramIndex = 1; paramIndex < parameters.length; paramIndex++) {
-   if(parameters[paramIndex].type.charAt(0) == 'n') {
-     sheetCommand += ',' + parameters[paramIndex].value;
-   }
-   if(parameters[paramIndex].type.charAt(0) == 't') {
-     sheetCommand += ',"' + parameters[paramIndex].value + '"';
-   }
-   if(parameters[paramIndex].type == 'range') {
-     // convert:     E5!TO0DB4GSXZJ3|E8|   -> TO0DB4GSXZJ3!E5:E8
-     // convert:     E5|E8|   -> E5:E8
-     
-     // * RegEx Unit Test **  https://regex101.com/r/zF1dA8/1
-     sheetCommand += ',' + parameters[paramIndex].value.toString().replace(/(\$?[A-Z]+\$?[0-9]+)([!]?)([^|]*)[|](\$?[A-Z]+\$?[0-9]+)[|]/i,"$3$2$1:$4"); ;
-   }
-   if(parameters[paramIndex].type == 'coord') {
-     sheetCommand += ',' + parameters[paramIndex].value;
-   }   
- }
-
-   // for(var parseIndex = 3; parseIndex < cell.parseinfo.length -1; parseIndex++) {
-//   if(cell.parseinfo[parseIndex].type == 6)   sheetCommand += '"' + cell.parseinfo[parseIndex].text + '"';
-//   else sheetCommand +=  cell.parseinfo[parseIndex].text ;
-// }
- sheetCommand += ')';
- // add style formula if css has been added
- if(parameters.cssParameter) {
-   sheetCommand += "+style("+  parameters.cssParameter+ ")"; 
- }
- //SocialCalc.CmdGotFocus(cell_widget);
-
- spreadsheet.editor.EditorScheduleSheetCommands(sheetCommand,  true, false);
- 
- SocialCalc.TriggerIoAction.UpdateFormDataSheet(function_name, widgetCellId, inputValue);
-}
+  spreadsheet.editor.EditorScheduleSheetCommands(sheetCommand, true, false);
+  SocialCalc.TriggerIoAction.UpdateFormDataSheet(function_name, widgetCellId, inputValue);
+};
 
 // On edit of Form Input widget - Update form data sheet 
-SocialCalc.TriggerIoAction.UpdateFormDataSheet = function(function_name, formCellId, inputValue) {
-  var formDataViewer = (SocialCalc.CurrentSpreadsheetControlObject != null) 
-       ? SocialCalc.CurrentSpreadsheetControlObject.formDataViewer 
-       : SocialCalc.CurrentSpreadsheetViewerObject.formDataViewer; 
+SocialCalc.TriggerIoAction.UpdateFormDataSheet = function (function_name, formCellId, inputValue) {
+  var formDataViewer = SocialCalc.CurrentSpreadsheetControlObject != null ? SocialCalc.CurrentSpreadsheetControlObject.formDataViewer : SocialCalc.CurrentSpreadsheetViewerObject.formDataViewer;
   if (formDataViewer == null) return;
-
-  var formFieldName = (function_name+formCellId).toLowerCase();
-  if(formDataViewer.formFields[formFieldName] != null) {       
+  var formFieldName = (function_name + formCellId).toLowerCase();
+  if (formDataViewer.formFields[formFieldName] != null) {
     var valueCoord = SocialCalc.crToCoord(formDataViewer.formFields[formFieldName], 2);
-    formDataViewer.sheet.ScheduleSheetCommands("set "+valueCoord+" text t "+inputValue, false);    
+    formDataViewer.sheet.ScheduleSheetCommands("set " + valueCoord + " text t " + inputValue, false);
   }
-}
-
-
+};
 
 //getStandardizedValues(parameterData)  
 // gets cell data of range/coord OR param value as cell data - also get coord data as cell.coord is invalid when rows deleted
 // CALL getProcessedParameter  with request for values 
-SocialCalc.Formula.getStandardizedValues = function(sheet, parameterData) {
+SocialCalc.Formula.getStandardizedValues = function (sheet, parameterData) {
   return SocialCalc.Formula.getStandardizedParameter(sheet, parameterData, true, true);
-}  
-
+};
 
 // getStandardizedCoords(parameterData)  // gets coord(s) of range/coord
 // CALL getProcessedParameter  with request for coord info
-SocialCalc.Formula.getStandardizedCoords = function(sheet, parameterData) {
+SocialCalc.Formula.getStandardizedCoords = function (sheet, parameterData) {
   return SocialCalc.Formula.getStandardizedParameter(sheet, parameterData, true, false);
-}  
+};
 
 /***************
  * getStandardizedList
@@ -20923,23 +20930,21 @@ SocialCalc.Formula.getStandardizedCoords = function(sheet, parameterData) {
  * @listParameter csv or array or single value - convert into single array
  * @return array of values - one dimension
  ****************/
-SocialCalc.Formula.getStandardizedList = function(sheet, listParameter) {
-  
+SocialCalc.Formula.getStandardizedList = function (sheet, listParameter) {
   var listValues = [];
   var parameterdata = SocialCalc.Formula.getStandardizedValues(sheet, listParameter);
-  
-  if(parameterdata.ncols == 1 && parameterdata.nrows == 1) {
+  if (parameterdata.ncols == 1 && parameterdata.nrows == 1) {
     listValues = String(parameterdata.celldata[0][0].datavalue).split(',');
   } else {
-    for (var i=0; i<parameterdata.ncols; i++) {
-      for (var j=0; j<parameterdata.nrows; j++) {
-         var cell = parameterdata.celldata[i][j];
-         listValues.push(cell.datavalue.toString());
+    for (var i = 0; i < parameterdata.ncols; i++) {
+      for (var j = 0; j < parameterdata.nrows; j++) {
+        var cell = parameterdata.celldata[i][j];
+        listValues.push(cell.datavalue.toString());
       }
-   }    
+    }
   }
   return listValues;
-}
+};
 
 /**************************
  * getStandardizedParameter(parameterData, includeCellCoord, includeCellData)
@@ -20973,30 +20978,32 @@ SocialCalc.Formula.getStandardizedList = function(sheet, listParameter) {
  *
  *
  *******************************/
-SocialCalc.Formula.getStandardizedParameter = function(sheet, parameterData, includeCellCoord, includeCellData) {
-  
+SocialCalc.Formula.getStandardizedParameter = function (sheet, parameterData, includeCellCoord, includeCellData) {
   //SET result = {}
   //SET store param values in result (.value .type)
-  var result = { type: parameterData.type, value:parameterData.value};
-  if(includeCellData) result.celldata = [];
-           
+  var result = {
+    type: parameterData.type,
+    value: parameterData.value
+  };
+  if (includeCellData) result.celldata = [];
+
   //IF parameter is not a cell reference i.e.  type is: "tw", "th", "t", "n", "nt"  THEN    
-  if(parameterData.type != 'coord' && parameterData.type != 'range') {
+  if (parameterData.type != 'coord' && parameterData.type != 'range') {
     // Setup dummy cell reference information
     // SET rows and cols to 1 cell   
     result.ncols = 1;
     result.nrows = 1;
     result.col1num = 1;
     result.row1num = 1;
-    
+
     // IF requested: cell coord value THEN
-    if(includeCellCoord) {
+    if (includeCellCoord) {
       // SET coord to default empty value - 
-      result.cellcoord = null; 
+      result.cellcoord = null;
     } // END IF
-    
+
     // IF requested: cell data  THEN
-    if(includeCellData) {
+    if (includeCellData) {
       // SET data values to dummy cell data using parameter 
       // result.celldata = [[ 
       //   coord to default null value - as illegal request
@@ -21006,103 +21013,93 @@ SocialCalc.Formula.getStandardizedParameter = function(sheet, parameterData, inc
       //   formula set to empty -  because not range/coord
       // ] ] 
       result.celldata[0] = [];
-      var constantDatatype = (parameterData.type=="n") ? "v" : ((parameterData.type=="t") ? parameterData.type : "c");
-      result.celldata[0][0] = {coord:null,datatype:constantDatatype,valuetype: parameterData.type,datavalue:parameterData.value };
+      var constantDatatype = parameterData.type == "n" ? "v" : parameterData.type == "t" ? parameterData.type : "c";
+      result.celldata[0][0] = {
+        coord: null,
+        datatype: constantDatatype,
+        valuetype: parameterData.type,
+        datavalue: parameterData.value
+      };
     } // END IF
-    
   } else {
     // param type is "coord" or "range" 
 
-    var scf = SocialCalc.Formula; 
-    
+    var scf = SocialCalc.Formula;
     var sourcerangeinfo;
-    if(parameterData.type == 'coord') { 
+    if (parameterData.type == 'coord') {
       var sourceCoord = SocialCalc.Formula.PlainCoord(parameterData.value);
-      sourcerangeinfo = scf.DecodeRangeParts(sheet, sourceCoord + "|"+ sourceCoord +"|" );
+      sourcerangeinfo = scf.DecodeRangeParts(sheet, sourceCoord + "|" + sourceCoord + "|");
     }
-    
-    if(parameterData.type == 'range') {
+    if (parameterData.type == 'range') {
       sourcerangeinfo = scf.DecodeRangeParts(sheet, parameterData.value);
     }
-    
-    // if coords requested,  init coord array
-    if(includeCellCoord) result.cellcoord = []; 
-    
-    for (var i=0; i<sourcerangeinfo.ncols; i++) {
-        for (var j=0; j<sourcerangeinfo.nrows; j++) {
-          var cellcoord = SocialCalc.crToCoord(sourcerangeinfo.col1num + i, sourcerangeinfo.row1num + j);
-           // IF requested: cell coord value THEN
-          if(includeCellCoord) {           
-             // SET coord in array to coord of cell
-            if(typeof result.cellcoord[i] === 'undefined') result.cellcoord[i] = [];            
-            result.cellcoord[i][j] = cellcoord;            
-          } // END IF
 
-          // IF requested: cell data  THEN
-          if(includeCellData) {
-          
-            // SET get cell from sheet and store values 
-            if(typeof result.celldata[i] === 'undefined') result.celldata[i] = [];                        
-            var cell = sourcerangeinfo.sheetdata.GetAssuredCell(cellcoord);
-            result.celldata[i][j] = cell; 
-          } // END IF
-        }
+    // if coords requested,  init coord array
+    if (includeCellCoord) result.cellcoord = [];
+    for (var i = 0; i < sourcerangeinfo.ncols; i++) {
+      for (var j = 0; j < sourcerangeinfo.nrows; j++) {
+        var cellcoord = SocialCalc.crToCoord(sourcerangeinfo.col1num + i, sourcerangeinfo.row1num + j);
+        // IF requested: cell coord value THEN
+        if (includeCellCoord) {
+          // SET coord in array to coord of cell
+          if (typeof result.cellcoord[i] === 'undefined') result.cellcoord[i] = [];
+          result.cellcoord[i][j] = cellcoord;
+        } // END IF
+
+        // IF requested: cell data  THEN
+        if (includeCellData) {
+          // SET get cell from sheet and store values 
+          if (typeof result.celldata[i] === 'undefined') result.celldata[i] = [];
+          var cell = sourcerangeinfo.sheetdata.GetAssuredCell(cellcoord);
+          result.celldata[i][j] = cell;
+        } // END IF
+      }
     }
     // SET rows and cols to range - i.e. sourcerangeinfo -   ncols:n,       nrows:n       col1num:n      row1num:n
     result.ncols = sourcerangeinfo.ncols;
     result.nrows = sourcerangeinfo.nrows;
     result.col1num = sourcerangeinfo.col1num;
     result.row1num = sourcerangeinfo.row1num;
-    
-  }  //END IF
-    
+  } //END IF
+
   //RETURN 
   return result;
-}
-
-
-
-
-
+};
 
 // -----------------------------------------
 // }
 // -----------------------------------------
-
-
-
 
 //
 // SHEET CACHE
 //
 
 SocialCalc.Formula.SheetCache = {
+  // Sheet data: Attributes are each sheet in the cache with values of an object with:
+  //
+  //    sheet: sheet-obj (or null, meaning not found)
+  //    recalcstate: constants.asloaded = as loaded
+  //                 constants.recalcing = being recalced now
+  //                 constants.recalcdone = recalc done
+  //    name: name of sheet (in case just have object and don't know name)
+  //
 
-   // Sheet data: Attributes are each sheet in the cache with values of an object with:
-   //
-   //    sheet: sheet-obj (or null, meaning not found)
-   //    recalcstate: constants.asloaded = as loaded
-   //                 constants.recalcing = being recalced now
-   //                 constants.recalcdone = recalc done
-   //    name: name of sheet (in case just have object and don't know name)
-   //
+  sheets: {},
+  // Waiting for loading:
+  // If sheet is not in cache, this is set to the sheetname being loaded
+  // so it can be tested in the recalc loop to start load and then wait until restarted.
+  // Reset to null before restarting.
 
-   sheets: {},
+  waitingForLoading: null,
+  // Constants to use for setting sheets[*].recalcstate:
 
-   // Waiting for loading:
-   // If sheet is not in cache, this is set to the sheetname being loaded
-   // so it can be tested in the recalc loop to start load and then wait until restarted.
-   // Reset to null before restarting.
-
-   waitingForLoading: null,
-
-   // Constants to use for setting sheets[*].recalcstate:
-
-   constants: {asloaded: 0, recalcing: 1, recalcdone: 2},
-
-   loadsheet: null // (deprecated - use SocialCalc.RecalcInfo.LoadSheet)
-
-   };
+  constants: {
+    asloaded: 0,
+    recalcing: 1,
+    recalcdone: 2
+  },
+  loadsheet: null // (deprecated - use SocialCalc.RecalcInfo.LoadSheet)
+};
 
 //
 // othersheet = SocialCalc.Formula.FindInSheetCache(sheetname)
@@ -21114,31 +21111,28 @@ SocialCalc.Formula.SheetCache = {
 // Loading is handled elsewhere, e.g., in the recalc loop.
 //
 
-SocialCalc.Formula.FindInSheetCache = function(sheetname) {
+SocialCalc.Formula.FindInSheetCache = function (sheetname) {
+  var str;
+  var sfsc = SocialCalc.Formula.SheetCache;
+  var nsheetname = SocialCalc.Formula.NormalizeSheetName(sheetname); // normalize different versions
 
-   var str;
-   var sfsc = SocialCalc.Formula.SheetCache;
+  if (sfsc.sheets[nsheetname]) {
+    // a sheet by that name is in the cache already
+    return sfsc.sheets[nsheetname].sheet; // return it.
+  }
+  if (sfsc.waitingForLoading) {
+    // waiting already - only queue up one
+    return null; // return not found
+  }
+  if (sfsc.loadsheet) {
+    // Deprecated old format synchronous callback
+    alert("Using SocialCalc.Formula.SheetCache.loadsheet - deprecated");
+    return SocialCalc.Formula.AddSheetToCache(nsheetname, sfsc.loadsheet(nsheetname));
+  }
+  sfsc.waitingForLoading = nsheetname; // let recalc loop know that we have a sheet to load
 
-   var nsheetname = SocialCalc.Formula.NormalizeSheetName(sheetname); // normalize different versions
-
-   if (sfsc.sheets[nsheetname]) { // a sheet by that name is in the cache already
-      return sfsc.sheets[nsheetname].sheet; // return it.
-      }
-
-   if (sfsc.waitingForLoading) { // waiting already - only queue up one
-      return null; // return not found
-      }
-
-   if (sfsc.loadsheet) { // Deprecated old format synchronous callback
-alert("Using SocialCalc.Formula.SheetCache.loadsheet - deprecated");
-      return SocialCalc.Formula.AddSheetToCache(nsheetname, sfsc.loadsheet(nsheetname));
-      }
-
-   sfsc.waitingForLoading = nsheetname; // let recalc loop know that we have a sheet to load
-
-   return null; // return not found
-
-   }
+  return null; // return not found
+};
 
 //
 // newsheet = SocialCalc.Formula.AddSheetToCache(sheetname, str, live)
@@ -21147,54 +21141,48 @@ alert("Using SocialCalc.Formula.SheetCache.loadsheet - deprecated");
 // Returns the sheet object filled out with the str (a saved sheet).
 //
 
-SocialCalc.Formula.AddSheetToCache = function(sheetname, str, live) {
-
-   var newsheet = null;
-   var sfsc = SocialCalc.Formula.SheetCache;
-   var sfscc = sfsc.constants;
-   var newsheetname = SocialCalc.Formula.NormalizeSheetName(sheetname);
-
-   if (str) {
-      newsheet = new SocialCalc.Sheet();
-      newsheet.ParseSheetSave(str);
-      }
-
-   sfsc.sheets[newsheetname] = {sheet: newsheet, recalcstate: sfscc.asloaded, name: newsheetname};
-
-   SocialCalc.Formula.FreshnessInfo.sheets[newsheetname] = (typeof(live) == "undefined" || live === false);
-
-   return newsheet;
-
-   }
+SocialCalc.Formula.AddSheetToCache = function (sheetname, str, live) {
+  var newsheet = null;
+  var sfsc = SocialCalc.Formula.SheetCache;
+  var sfscc = sfsc.constants;
+  var newsheetname = SocialCalc.Formula.NormalizeSheetName(sheetname);
+  if (str) {
+    newsheet = new SocialCalc.Sheet();
+    newsheet.ParseSheetSave(str);
+  }
+  sfsc.sheets[newsheetname] = {
+    sheet: newsheet,
+    recalcstate: sfscc.asloaded,
+    name: newsheetname
+  };
+  SocialCalc.Formula.FreshnessInfo.sheets[newsheetname] = typeof live == "undefined" || live === false;
+  return newsheet;
+};
 
 //
 // nsheet = SocialCalc.Formula.NormalizeSheetName(sheetname)
 //
 
-SocialCalc.Formula.NormalizeSheetName = function(sheetname) {
-
-   if (SocialCalc.Callbacks.NormalizeSheetName) {
-      return SocialCalc.Callbacks.NormalizeSheetName(sheetname);
-      }
-   else {
-      return sheetname.toLowerCase();
-      }
-   }
+SocialCalc.Formula.NormalizeSheetName = function (sheetname) {
+  if (SocialCalc.Callbacks.NormalizeSheetName) {
+    return SocialCalc.Callbacks.NormalizeSheetName(sheetname);
+  } else {
+    return sheetname.toLowerCase();
+  }
+};
 
 //
 // REMOTE FUNCTION INFO
 //
 
 SocialCalc.Formula.RemoteFunctionInfo = {
+  // Waiting for server:
+  // If waiting for an XHR response from the server, this is set to some non-blank status text
+  // so it can be tested in the recalc loop to start load and then wait until restarted.
+  // Reset to null before restarting.
 
-   // Waiting for server:
-   // If waiting for an XHR response from the server, this is set to some non-blank status text
-   // so it can be tested in the recalc loop to start load and then wait until restarted.
-   // Reset to null before restarting.
-
-   waitingForServer: null
-
-   };
+  waitingForServer: null
+};
 
 //
 // FRESHNESS INFO
@@ -21206,42 +21194,35 @@ SocialCalc.Formula.RemoteFunctionInfo = {
 // "Dependent on sheet 'FOO' which was updated more recently than this printout"
 
 SocialCalc.Formula.FreshnessInfo = {
+  // For each external sheet referenced successfully an attribute of that name with value true to keep the sheet cached.
+  // Value false means the sheet is reloaded at each recalc.
 
-   // For each external sheet referenced successfully an attribute of that name with value true to keep the sheet cached.
-   // Value false means the sheet is reloaded at each recalc.
+  sheets: {},
+  // For each volatile function that is called an attribute of that name with value true.
 
-   sheets: {},
+  volatile: {},
+  // Set to false when started and true when recalc completes
 
-   // For each volatile function that is called an attribute of that name with value true.
+  recalc_completed: false
+};
+SocialCalc.Formula.FreshnessInfoReset = function () {
+  var scffi = SocialCalc.Formula.FreshnessInfo;
+  var scfsc = SocialCalc.Formula.SheetCache;
 
-   volatile: {},
+  // Loop through sheets freshness, deleting cached sheets that should be reloaded.
 
-   // Set to false when started and true when recalc completes
+  for (var sheet in scffi.sheets) {
+    if (scffi.sheets[sheet] === false) {
+      delete scfsc.sheets[sheet];
+    }
+  }
 
-   recalc_completed: false
+  // Reset freshness info.
 
-   };
-
-SocialCalc.Formula.FreshnessInfoReset = function() {
-
-   var scffi = SocialCalc.Formula.FreshnessInfo;
-   var scfsc = SocialCalc.Formula.SheetCache;
-
-   // Loop through sheets freshness, deleting cached sheets that should be reloaded.
-
-   for (var sheet in scffi.sheets) {
-      if (scffi.sheets[sheet] === false) {
-         delete scfsc.sheets[sheet];
-         }
-      }
-   
-   // Reset freshness info.
-
-   scffi.sheets = {};
-   scffi.volatile = {};
-   scffi.recalc_completed = false;
-
-   }
+  scffi.sheets = {};
+  scffi.volatile = {};
+  scffi.recalc_completed = false;
+};
 
 //
 // MISC ROUTINES
@@ -21253,13 +21234,10 @@ SocialCalc.Formula.FreshnessInfoReset = function() {
 // Returns: coord without any $'s
 //
 
-SocialCalc.Formula.PlainCoord = function(coord) {
-
-   if (coord.indexOf("$") == -1) return coord;
-
-   return coord.replace(/\$/g, ""); // remove any $'s
-
-   }
+SocialCalc.Formula.PlainCoord = function (coord) {
+  if (coord.indexOf("$") == -1) return coord;
+  return coord.replace(/\$/g, ""); // remove any $'s
+};
 
 //
 // result = SocialCalc.Formula.OrderRangeParts(coord1, coord2)
@@ -21267,21 +21245,27 @@ SocialCalc.Formula.PlainCoord = function(coord) {
 // Returns: {c1: col, r1: row, c2: col, r2 = row} with c1/r1 upper left
 //
 
-SocialCalc.Formula.OrderRangeParts = function(coord1, coord2) {
-
-   var cr1, cr2;
-   var result = {};
-
-   cr1 = SocialCalc.coordToCr(coord1);
-   cr2 = SocialCalc.coordToCr(coord2);
-   if (cr1.col > cr2.col) { result.c1 = cr2.col; result.c2 = cr1.col; }
-   else { result.c1 = cr1.col; result.c2 = cr2.col; }
-   if (cr1.row > cr2.row) { result.r1 = cr2.row; result.r2 = cr1.row; }
-   else { result.r1 = cr1.row; result.r2 = cr2.row; }
-
-   return result;
-
-   }
+SocialCalc.Formula.OrderRangeParts = function (coord1, coord2) {
+  var cr1, cr2;
+  var result = {};
+  cr1 = SocialCalc.coordToCr(coord1);
+  cr2 = SocialCalc.coordToCr(coord2);
+  if (cr1.col > cr2.col) {
+    result.c1 = cr2.col;
+    result.c2 = cr1.col;
+  } else {
+    result.c1 = cr1.col;
+    result.c2 = cr2.col;
+  }
+  if (cr1.row > cr2.row) {
+    result.r1 = cr2.row;
+    result.r2 = cr1.row;
+  } else {
+    result.r1 = cr1.row;
+    result.r2 = cr2.row;
+  }
+  return result;
+};
 
 //
 // cond = SocialCalc.Formula.TestCriteria(value, type, criteria)
@@ -21293,166 +21277,147 @@ SocialCalc.Formula.OrderRangeParts = function(coord1, coord2) {
 // Returns true or false
 //
 
-SocialCalc.Formula.TestCriteria = function(value, type, criteria) {
-
-   var comparitor, basestring, basevalue, cond, testvalue;
-
-   if (criteria == null) { // undefined (e.g., error value) is always false
-      return false;
-      }
-
-   criteria = criteria + "";
-   comparitor = criteria.charAt(0); // look for comparitor
-   if (comparitor == "=" || comparitor == "<" || comparitor == ">") {
-      basestring = criteria.substring(1);
-      }
-   else {
-      // check for '*' or '?' in search string - wildcard
-      if (criteria.search(/([^~]\*|^\*)/) != -1 || criteria.search(/([^~]\?|^\?)/) != -1) {
-         comparitor = "regex";
-         if (criteria == "*") {
-            // "*" means cell contains 'anything'
-            basestring = ".+";
-         } else {
-             // convert Excel syntax to regex syntax. * -> .*    ? -> .?    ~* -> \*    ~? -> \?
-             // there are no negative lookbehinds in Javascript. Reverse the string and do negative lookaheads on ~? and ~*
-             basestring = criteria.split("").reverse().join("");
-             basestring = basestring.replace(/\?(?=[^~])|\?$/g, "?.").replace(/\?~/g, "?\\").replace(/\*(?=[^~])|\*$/g, "*.").replace(/\*~/, "*\\");
-             basestring = basestring.split("").reverse().join("");
-         }
-         basestring = "^" + basestring + "$";
+SocialCalc.Formula.TestCriteria = function (value, type, criteria) {
+  var comparitor, basestring, basevalue, cond, testvalue;
+  if (criteria == null) {
+    // undefined (e.g., error value) is always false
+    return false;
+  }
+  criteria = criteria + "";
+  comparitor = criteria.charAt(0); // look for comparitor
+  if (comparitor == "=" || comparitor == "<" || comparitor == ">") {
+    basestring = criteria.substring(1);
+  } else {
+    // check for '*' or '?' in search string - wildcard
+    if (criteria.search(/([^~]\*|^\*)/) != -1 || criteria.search(/([^~]\?|^\?)/) != -1) {
+      comparitor = "regex";
+      if (criteria == "*") {
+        // "*" means cell contains 'anything'
+        basestring = ".+";
       } else {
-          comparitor = criteria.substring(0,2);
-          if (comparitor == "<=" || comparitor == "<>" || comparitor == ">=") {
-             basestring = criteria.substring(2);
-          } else {
-             comparitor = "none";
-             basestring = criteria;
-          }
+        // convert Excel syntax to regex syntax. * -> .*    ? -> .?    ~* -> \*    ~? -> \?
+        // there are no negative lookbehinds in Javascript. Reverse the string and do negative lookaheads on ~? and ~*
+        basestring = criteria.split("").reverse().join("");
+        basestring = basestring.replace(/\?(?=[^~])|\?$/g, "?.").replace(/\?~/g, "?\\").replace(/\*(?=[^~])|\*$/g, "*.").replace(/\*~/, "*\\");
+        basestring = basestring.split("").reverse().join("");
       }
-   }
-
-   basevalue = SocialCalc.DetermineValueType(basestring); // get type of value being compared
-   if (!basevalue.type) { // no criteria base value given
-      if (comparitor == "none") { // blank criteria matches nothing
-         return false;
-         }
-      if (type.charAt(0) == "b") { // comparing to empty cell
-         if (comparitor == "=") { // empty equals empty
-            return true;
-            }
-         }
-      else {
-         if (comparitor == "<>") { // "something" does not equal empty
-            return true;
-            }
-         }
-      return false; // otherwise false
+      basestring = "^" + basestring + "$";
+    } else {
+      comparitor = criteria.substring(0, 2);
+      if (comparitor == "<=" || comparitor == "<>" || comparitor == ">=") {
+        basestring = criteria.substring(2);
+      } else {
+        comparitor = "none";
+        basestring = criteria;
       }
-
-   cond = false;
-
-   if (basevalue.type.charAt(0) == "n" && type.charAt(0) == "t") { // criteria is number, but value is text
-      testvalue = SocialCalc.DetermineValueType(value);
-      if (testvalue.type.charAt(0) == "n") { // could be number - make it one
-         value = testvalue.value;
-         type = testvalue.type;
-         }
+    }
+  }
+  basevalue = SocialCalc.DetermineValueType(basestring); // get type of value being compared
+  if (!basevalue.type) {
+    // no criteria base value given
+    if (comparitor == "none") {
+      // blank criteria matches nothing
+      return false;
+    }
+    if (type.charAt(0) == "b") {
+      // comparing to empty cell
+      if (comparitor == "=") {
+        // empty equals empty
+        return true;
       }
-
-   if (type.charAt(0) == "n" && basevalue.type.charAt(0) == "n") { // compare two numbers
-      value = value - 0; // make sure numbers
-      basevalue.value = basevalue.value - 0;
-      switch (comparitor) {
-         case "<":
-            cond = value < basevalue.value;
-            break;
-
-         case "<=":
-            cond = value <= basevalue.value;
-            break;
-
-         case "=":
-         case "none":
-            cond = value == basevalue.value;
-            break;
-
-         case ">=":
-            cond = value >= basevalue.value;
-            break;
-
-         case ">":
-            cond = value > basevalue.value;
-            break;
-
-         case "<>":
-            cond = value != basevalue.value;
-            break;
-         }
+    } else {
+      if (comparitor == "<>") {
+        // "something" does not equal empty
+        return true;
       }
-
-   else if (type.charAt(0) == "e") { // error on left
-      cond = false;
-      }
-
-   else if (basevalue.type.charAt(0) == "e") { // error on right
-      cond = false;
-      }
-
-   else { // text, maybe mixed with number or blank
-      if (type.charAt(0) == "n") {
-         value = SocialCalc.format_number_for_display(value, "n", "");
-         }
-      if (basevalue.type.charAt(0) == "n") {
-         return false; // if number and didn't match already, isn't a match
-         }
-
-      value = value ? value.toLowerCase() : "";
-      basevalue.value = basevalue.value ? basevalue.value.toLowerCase() : "";
-
-      switch (comparitor) {
-         case "<":
-            cond = value < basevalue.value;
-            break;
-
-         case "<=":
-            cond = value <= basevalue.value;
-            break;
-
-         case "=":
-            cond = value == basevalue.value;
-            break;
-
-         case "none":
-            cond = value.substring(0, basevalue.value.length) == basevalue.value;
-            break;
-
-         case ">=":
-            cond = value >= basevalue.value;
-            break;
-
-         case ">":
-            cond = value > basevalue.value;
-            break;
-
-         case "<>":
-            cond = value != basevalue.value;
-            break;
-
-         case "regex":
-            try {
-              cond = value.search(new RegExp(basevalue.value)) != -1;
-            } catch(e) {
-              cond = false; // regex invalid (e.g., error value) is always false
-            }
-            break;
-         }
-      }
-
-   return cond;
-
-   }
-
+    }
+    return false; // otherwise false
+  }
+  cond = false;
+  if (basevalue.type.charAt(0) == "n" && type.charAt(0) == "t") {
+    // criteria is number, but value is text
+    testvalue = SocialCalc.DetermineValueType(value);
+    if (testvalue.type.charAt(0) == "n") {
+      // could be number - make it one
+      value = testvalue.value;
+      type = testvalue.type;
+    }
+  }
+  if (type.charAt(0) == "n" && basevalue.type.charAt(0) == "n") {
+    // compare two numbers
+    value = value - 0; // make sure numbers
+    basevalue.value = basevalue.value - 0;
+    switch (comparitor) {
+      case "<":
+        cond = value < basevalue.value;
+        break;
+      case "<=":
+        cond = value <= basevalue.value;
+        break;
+      case "=":
+      case "none":
+        cond = value == basevalue.value;
+        break;
+      case ">=":
+        cond = value >= basevalue.value;
+        break;
+      case ">":
+        cond = value > basevalue.value;
+        break;
+      case "<>":
+        cond = value != basevalue.value;
+        break;
+    }
+  } else if (type.charAt(0) == "e") {
+    // error on left
+    cond = false;
+  } else if (basevalue.type.charAt(0) == "e") {
+    // error on right
+    cond = false;
+  } else {
+    // text, maybe mixed with number or blank
+    if (type.charAt(0) == "n") {
+      value = SocialCalc.format_number_for_display(value, "n", "");
+    }
+    if (basevalue.type.charAt(0) == "n") {
+      return false; // if number and didn't match already, isn't a match
+    }
+    value = value ? value.toLowerCase() : "";
+    basevalue.value = basevalue.value ? basevalue.value.toLowerCase() : "";
+    switch (comparitor) {
+      case "<":
+        cond = value < basevalue.value;
+        break;
+      case "<=":
+        cond = value <= basevalue.value;
+        break;
+      case "=":
+        cond = value == basevalue.value;
+        break;
+      case "none":
+        cond = value.substring(0, basevalue.value.length) == basevalue.value;
+        break;
+      case ">=":
+        cond = value >= basevalue.value;
+        break;
+      case ">":
+        cond = value > basevalue.value;
+        break;
+      case "<>":
+        cond = value != basevalue.value;
+        break;
+      case "regex":
+        try {
+          cond = value.search(new RegExp(basevalue.value)) != -1;
+        } catch (e) {
+          cond = false; // regex invalid (e.g., error value) is always false
+        }
+        break;
+    }
+  }
+  return cond;
+};
+// @ts-nocheck
 //
 /*
 // The module of the SocialCalc package for the optional popup menus in socialcalcspreadsheetcontrol.js
@@ -23074,6 +23039,7 @@ SocialCalc.Popup.Types.ColorChooser.CloseOK = function(e) {
    }
 
 
+// @ts-nocheck
 //
 // SocialCalcSpreadsheetControl
 //
@@ -26974,7 +26940,8 @@ SocialCalc.CtrlSEditorDone = function(idprefix, whichpart) {
    }
 
 
-// @ts-check
+// @ts-nocheck
+// 
 //
 // SocialCalcViewer
 //
@@ -27062,7 +27029,7 @@ See the comments in the main SocialCalc code module file of the SocialCalc packa
 */
 
    /** @type {any} */
-   // @ts-ignore - SocialCalc is declared ambiently; runtime re-declaration is intentional.
+   //  - SocialCalc is declared ambiently; runtime re-declaration is intentional.
    var SocialCalc;
    if (!SocialCalc) {
       alert("Main SocialCalc code module needed");
@@ -27312,7 +27279,7 @@ SocialCalc.SpreadsheetViewerLoadSave = function(spreadsheet, savestr) {
          rmstr = rmstr.replace("\r", ""); // make sure no CR, only LF
          pos = rmstr.indexOf("\n");
          if (pos > 0) {
-            // @ts-ignore - intentional "string - 0" numeric coercion idiom; NaN handled by guard below
+            //  - intentional "string - 0" numeric coercion idiom; NaN handled by guard below
             t = rmstr.substring(0, pos)-0; // get number
             t2 = t;
 //            if (!(t > 0)) t = 60; // handles NAN, too
@@ -27751,6 +27718,7 @@ str = str.replace(/([^\n])\r([^\n])/g, "$1\r\n$2");
 // END OF FILE
 
 
+// @ts-nocheck
 if('undefined' === typeof document) {
     // We don't really need a DOM-based presentation layer on the server
     SocialCalc.GetEditorCellElement = function () {};

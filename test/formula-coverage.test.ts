@@ -4756,3 +4756,166 @@ test("OperandValueAndType: named range stepping", async () => {
     const r2 = SC.Formula.OperandValueAndType(sheet, op);
     expect(r2.value).toBe(4);
 });
+
+// --------------------------------------------------------------------------
+// Precise comparison-boundary kills
+// --------------------------------------------------------------------------
+
+test("text comparison: equal strings '<' boundary (L785)", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    // '"x"<"x"' — original: 0 (not less). Mutation '<=': 1 (equal).
+    const r = SC.Formula.evaluate_parsed_formula(
+        SC.Formula.ParseFormulaIntoTokens('"x"<"x"'),
+        sheet, false);
+    expect(r.value).toBe(0);
+});
+
+test("text comparison: equal strings '>' boundary (L789)", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    const r = SC.Formula.evaluate_parsed_formula(
+        SC.Formula.ParseFormulaIntoTokens('"x">"x"'),
+        sheet, false);
+    expect(r.value).toBe(0);
+});
+
+test("number vs percent: charAt(0) allows n% in numeric compare (L751 val2)", async () => {
+    const SC = await loadSocialCalc();
+    resetFormulaGlobals(SC);
+    const sheet = new SC.Sheet();
+    // Build a scenario where value2 is "n%" (not plain "n") so that
+    // dropping .charAt(0) on value2.type fails to pass numeric compare.
+    // A1 = 10 (n), A2 = 2 n% (0.02)
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 10",
+        "set A2 value n% 0.5",
+        "set B1 formula A1>A2",
+    ]);
+    await recalcSheet(SC, sheet);
+    // Original: numeric compare 10 > 0.5 = 1.
+    // Mutant drop charAt on value2: value2.type=="n" is false (it's "n%"),
+    // so falls into text comparison. String "10" > "0.5" is 1 (char '1' > '0').
+    // Actually both give 1 — Hmm. Need to find boundary where numeric vs
+    // lexicographic give different answers.
+    expect(sheet.GetAssuredCell("B1").datavalue).toBe(1);
+
+    // Try: 5 > 10 → numeric 0, lexical 1
+    await scheduleCommands(SC, sheet, [
+        "set A3 value n 5",
+        "set A4 value n% 10",  // 10 as percent = 0.1
+        "set B2 formula A3>A4",
+    ]);
+    await recalcSheet(SC, sheet);
+    // 5 > 0.1 = 1 numerically. A4's string format is "10" or "1000%".
+    // Not divergent; both likely 1.
+    // Instead: negative test where order matters.
+    // A: 2 vs B: 10 (n%). numeric: 2 > 0.1 = 1. lexical "2">"10": "2">"1" yes = 1.
+    // Diverging: 9 vs 10 (n%). Numerically 9 < 10 = 1. Lexically "9" < "10"
+    // compares '9'(0x39) vs '1'(0x31): '9' > '1' so "9" < "10" = 0.
+    // Under L751 mutation (dropping .charAt(0) on value2), type "n%" != "n",
+    // comparison falls to text branch yielding 0. Original numeric branch: 1.
+    await scheduleCommands(SC, sheet, [
+        "set A5 value n 9",
+        "set A6 value n% 10",
+        "set B3 formula A5<A6",
+    ]);
+    await recalcSheet(SC, sheet);
+    expect(sheet.GetAssuredCell("B3").datavalue).toBe(1);
+});
+
+// --------------------------------------------------------------------------
+// Text vs number in format_number_for_display branch (L776)
+// --------------------------------------------------------------------------
+
+test("comparison text-vs-number triggers L776 format branch", async () => {
+    const SC = await loadSocialCalc();
+    resetFormulaGlobals(SC);
+    const sheet = new SC.Sheet();
+    // value1 = text, value2 = number. L776 converts value2.
+    const r = SC.Formula.evaluate_parsed_formula(
+        SC.Formula.ParseFormulaIntoTokens('"a"<5'),
+        sheet, false);
+    // Number 5 formats to "5". Text "a" < "5" ? "a" (0x61) < "5" (0x35) = 0.
+    expect(r.value).toBe(0);
+
+    // Another: "3" < 5 — value1 is text "3" vs number 5→"5": "3" < "5" = 1.
+    const r2 = SC.Formula.evaluate_parsed_formula(
+        SC.Formula.ParseFormulaIntoTokens('"3"<5'),
+        sheet, false);
+    expect(r2.value).toBe(1);
+});
+
+// --------------------------------------------------------------------------
+// Kill L798: operand.length <= 1 boundary
+// --------------------------------------------------------------------------
+
+test("arithmetic op with exactly 1 operand → missing operand error (L798)", async () => {
+    const SC = await loadSocialCalc();
+    resetFormulaGlobals(SC);
+    const sheet = new SC.Sheet();
+    // Build parseinfo with exactly 1 operand then arithmetic op.
+    const tokens = [
+        { text: "5", type: SC.Formula.TokenType.num, opcode: 0 },
+        { text: "+", type: SC.Formula.TokenType.op, opcode: "+" },
+    ];
+    const r = SC.Formula.EvaluatePolish(tokens, [0, 1], sheet, false);
+    // Original: operand.length==1, goes into missing-op branch → errortext set.
+    // Mutant "<": operand.length==1 < 1 is false, skips error, continues
+    // with just one operand → likely crashes or produces unexpected result.
+    expect(r.type.charAt(0)).toBe("e");
+});
+
+// --------------------------------------------------------------------------
+// More L751/L768/L769 charAt coverage
+// --------------------------------------------------------------------------
+
+test("comparison: tostype='n', tostype2='t' routes via text branch (L768/L769)", async () => {
+    const SC = await loadSocialCalc();
+    resetFormulaGlobals(SC);
+    const sheet = new SC.Sheet();
+    // Force value1 type is "n%" and value2 type is "t" — hits text branch.
+    // Then tostype=value1.type.charAt(0)="n" — mutation drops charAt(0):
+    // tostype="n%", which doesn't match "n" so format_number_for_display not applied.
+    // Original: value1.value becomes formatted number (e.g., "50%" or "0.5").
+    // Mutation: value1.value stays as the raw numeric value (0.5) which has
+    // no toLowerCase method → would throw.
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n% 0.5",
+        'set B1 formula A1<"z"',
+    ]);
+    await recalcSheet(SC, sheet);
+    // This should not error
+    expect(sheet.GetAssuredCell("B1").datavalue).toBe(1);
+});
+
+// --------------------------------------------------------------------------
+// Kill L1026 `t == "n"` with n% check via direct operand (extending)
+// --------------------------------------------------------------------------
+
+test("OperandAsNumber on n% operand uses charAt (L1026)", async () => {
+    const SC = await loadSocialCalc();
+    resetFormulaGlobals(SC);
+    const sheet = new SC.Sheet();
+    // Push an n% operand
+    const op = [{ type: "n%", value: 0.5 }];
+    const r = SC.Formula.OperandAsNumber(sheet, op);
+    // Original: charAt(0)=="n" so value-=0 coerces. Type preserved as n%.
+    expect(r.type).toBe("n%");
+    expect(r.value).toBe(0.5);
+});
+
+// --------------------------------------------------------------------------
+// Kill L1069 charAt "t" with multi-char text types (th, tw, tl, tr)
+// --------------------------------------------------------------------------
+
+test("OperandAsText on 'th' (html) keeps type (L1069)", async () => {
+    const SC = await loadSocialCalc();
+    resetFormulaGlobals(SC);
+    const sheet = new SC.Sheet();
+    const op = [{ type: "th", value: "<b>hi</b>" }];
+    const r = SC.Formula.OperandAsText(sheet, op);
+    // Original: passthrough since charAt(0)=="t"
+    expect(r.type).toBe("th");
+    expect(r.value).toBe("<b>hi</b>");
+});
