@@ -14,7 +14,7 @@ import {
 // that rely on `SocialCalc.GetSpreadsheetControlObject().editor` (fill, pane) can
 // execute in a headless harness.
 function installEditorMock(SC: any) {
-    const fakeEditor = {
+    const fakeEditor: any = {
         range2: { hasrange: false },
         Range2Remove() {
             this.range2 = { hasrange: false };

@@ -21724,7 +21724,7 @@ SocialCalc.TriggerIoAction.RadioButton = function(radioButtonGroupName) {
   var getHTMLRadioButtonValue = function(/** @type {any} */ radioButtonWidget ) { return (radioButtonWidget.checked ? "TRUE" : "FALSE") };
   var function_name = "RADIOBUTTON"
   // for each radio button in group
-  $('input[name="'+radioButtonGroupName+'"]').each(function () {
+  $('input[name="'+radioButtonGroupName+'"]').each(/** @this {any} */ function () {
      SocialCalc.TriggerIoAction.updateInputWidgetFormula(function_name,  $(this).attr('id').replace(/RADIOBUTTON_/,''), getHTMLRadioButtonValue );
   });
 }

@@ -5,6 +5,16 @@
   "main": "dist/SocialCalc.js",
   "types": "dist/SocialCalc.d.ts",
   "type": "module",
+  "files": [
+    "dist/SocialCalc.js",
+    "dist/SocialCalc.d.ts",
+    "dist/socialcalc.css",
+    "js/*.d.ts",
+    "css/socialcalc.css",
+    "LICENSE.txt",
+    "LEGAL.txt",
+    "README.md"
+  ],
   "scripts": {
     "build": "bun run build.ts",
     "build:min": "bun run build.ts --minify",
