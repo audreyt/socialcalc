@@ -5,6 +5,16 @@
   "main": "dist/SocialCalc.js",
   "types": "dist/SocialCalc.d.ts",
   "type": "module",
+  "files": [
+    "dist/SocialCalc.js",
+    "dist/SocialCalc.d.ts",
+    "dist/socialcalc.css",
+    "js/*.d.ts",
+    "css/socialcalc.css",
+    "LICENSE.txt",
+    "LEGAL.txt",
+    "README.md"
+  ],
   "scripts": {
     "build": "bun run build.ts",
     "build:min": "bun run build.ts --minify",
@@ -16,7 +26,9 @@
     "mutate:file": "bun run stryker-file.mjs",
     "mutate:format": "bun run stryker-file.mjs js/formatnumber2.js",
     "mutate:sheet": "bun run stryker-file.mjs js/socialcalc-3.js",
-    "mutate:formula": "bun run stryker-file.mjs js/formula1.js"
+    "mutate:formula": "bun run stryker-file.mjs js/formula1.js",
+    "docs": "typedoc",
+    "docs:watch": "typedoc --watch"
   },
   "repository": {
     "type": "git",
@@ -45,6 +57,7 @@
     "@stryker-mutator/core": "^9.6.1",
     "@types/bun": "latest",
     "@typescript/native-preview": "^7.0.0-dev.20260419.1",
+    "typedoc": "^0.28.19",
     "typescript": "^6.0.3"
   }
 }

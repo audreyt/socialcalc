@@ -51,7 +51,7 @@ test("recalculates a broad mix of numeric, logical, text, and date formulas", as
     await scheduleCommands(SC, sheet, commands, true, 3000);
     await recalcSheet(SC, sheet, 3000);
 
-    const expectedValues = new Map([
+    const expectedValues = new Map<string, number | string>([
         ["B1", 14],
         ["B2", 64],
         ["B3", 8],

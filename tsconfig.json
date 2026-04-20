@@ -7,10 +7,10 @@
 
     "strict": true,
     "alwaysStrict": true,
-    "noImplicitAny": false,
-    "noImplicitThis": false,
-    "strictNullChecks": false,
-    "strictFunctionTypes": false,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
     "strictBindCallApply": true,
     "strictPropertyInitialization": false,
 
@@ -29,7 +29,7 @@
   "include": [
     "build.ts",
     "js/**/*.js",
-    "test/types.smoke.test.ts",
+    "test/**/*.ts",
     "dist/SocialCalc.d.ts"
   ],
   "exclude": [

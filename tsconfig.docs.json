@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "checkJs": false,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "dist/SocialCalc.d.ts",
+    "js/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "test",
+    "build.ts",
+    "js/**/*.js",
+    "js/module-wrapper-top.js",
+    "js/module-wrapper-bottom.js"
+  ]
+}
