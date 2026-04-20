@@ -1,3 +1,8 @@
+// Closing half of a UMD IIFE; see module-wrapper-top.js. Standalone it
+// starts with a dangling `}))` and references `SocialCalc` without a
+// local binding. Excluded from tsconfig.json's `include` for that
+// reason; brace balance is correct after concat by build.ts.
+
 if('undefined' === typeof document) {
     // We don't really need a DOM-based presentation layer on the server
     SocialCalc.GetEditorCellElement = function () {};
