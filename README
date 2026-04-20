@@ -5,7 +5,7 @@
                             .oO( Advertisement for EtherCalc )Oo.
 
     Please note that this repository hosts a proof-of-concept that provides
-    no capability to save/load spreadsheetgs.
+    no capability to save/load spreadsheets.
 
     However, a Node.js port with Redis storage backend is now available at:
 
