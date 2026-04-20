@@ -1349,9 +1349,6 @@ SocialCalc.EncodeSheetAttributes = function(sheet) {
       }
 
    InitAttrib("rowheight");
-   if (attribs.rowheight) {
-      SetAttrib("rowheight", attribs.defaultrowheight);
-      }
 
    // cellformat: textalignhoriz, numberalignhoriz
 

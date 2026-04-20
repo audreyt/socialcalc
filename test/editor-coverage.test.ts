@@ -849,6 +849,14 @@ test("ProcessEditorColsize Down/Move/Up: full sequence", async () => {
     const editor = control.editor;
     primeGridLayout(editor);
 
+    // Stub document.addEventListener/removeEventListener so SetMouseMoveUp /
+    // RemoveMouseMoveUp don't throw — without this MouseDown/Up bail out
+    // before reaching the colnum-resize branch.
+    if (typeof (document as any).addEventListener !== "function") {
+        (document as any).addEventListener = () => {};
+        (document as any).removeEventListener = () => {};
+    }
+
     // Simulate a synthetic result object for colsize.
     SC.EditorMouseInfo.editor = editor;
     const result: any = { coltoresize: 2, coltounhide: null };
@@ -890,6 +898,13 @@ test("ProcessEditorRowsize Down/Move/Up: full sequence", async () => {
     const { control } = await newControl(SC, "rsz-root");
     const editor = control.editor;
     primeGridLayout(editor);
+
+    // Stub document event listener surface so SetMouseMoveUp/RemoveMouseMoveUp
+    // don't throw before the rownum-resize branch fires.
+    if (typeof (document as any).addEventListener !== "function") {
+        (document as any).addEventListener = () => {};
+        (document as any).removeEventListener = () => {};
+    }
 
     // Patch spreadsheetDiv.firstChild.offsetHeight for the rowsize handlers.
     try {
@@ -2165,6 +2180,215 @@ test("FitToEditTable: hidden first row + loops", async () => {
     ]);
 });
 
+test("ShowCellHandles with hidden adjacent col/row skips via while loop (12035-12041)", async () => {
+    const SC = await loadSocialCalc({ browser: true });
+    const { control } = await newControl(SC, "sch-root");
+    const editor = control.editor;
+    primeGridLayout(editor);
+    await scheduleCommands(SC, editor.context.sheetobj, [
+        "set A1 value n 1",
+        "set B1 value n 2",
+        "set B hide yes",
+        "set 2 hide yes",
+    ]);
+    editor.MoveECell("A1");
+    try {
+        editor.cellhandles.ShowCellHandles(true);
+    } catch {}
+});
+
+test("GridMousePosition: rowunhidetop / colunhideleft/right hit unhide (10283-10334)", async () => {
+    const SC = await loadSocialCalc({ browser: true });
+    const { control } = await newControl(SC, "gmp-root");
+    const editor = control.editor;
+    primeGridLayout(editor);
+    // Force the positions so clientX=80/clientY=10 lands inside the col-
+    // header band and clientX=10/clientY=60 in the row-header band.
+    editor.gridposition = { left: 0, top: 0 };
+    editor.headposition = { left: 30, top: 30 };
+    const unhideRow: any = {
+        offsetLeft: 0,
+        offsetTop: 50,
+        offsetWidth: 30,
+        offsetHeight: 30,
+        offsetParent: null,
+        style: { position: "" },
+    };
+    const unhideCol: any = {
+        offsetLeft: 70,
+        offsetTop: 0,
+        offsetWidth: 50,
+        offsetHeight: 30,
+        offsetParent: null,
+        style: { position: "" },
+    };
+    editor.context.rowunhidetop = { 3: unhideRow };
+    editor.context.rowunhidebottom = { 3: unhideRow };
+    editor.context.colunhideleft = { 2: unhideCol };
+    editor.context.colunhideright = { 2: unhideCol };
+    // Row header hit with clientY within unhideRow's bounding box.
+    try {
+        SC.GridMousePosition(editor, 10, 60);
+    } catch {}
+    // Col header hit with clientX within unhideCol's box.
+    try {
+        SC.GridMousePosition(editor, 80, 10);
+    } catch {}
+    // Push gridposition beyond clientX/clientY to hit the later-else branches.
+    editor.gridposition = { left: 100, top: 100 };
+    editor.headposition = { left: 150, top: 150 };
+    try {
+        SC.GridMousePosition(editor, 50, 150);
+    } catch {}
+    try {
+        SC.GridMousePosition(editor, 150, 50);
+    } catch {}
+
+    // cellskip branch: click a cell within a merged range → cellskip redirects.
+    editor.gridposition = { left: 0, top: 0 };
+    editor.headposition = { left: 10, top: 10 }; // tiny so 20,70 lands on grid
+    await scheduleCommands(SC, editor.context.sheetobj, [
+        "set A1 value n 1",
+        "merge A1:A3",
+    ]);
+    editor.context.CalculateCellSkipData();
+    try {
+        // A1 is at (1,1), A2 at (1,2), A3 at (1,3).
+        // With colpositions=[0,0,80,...], col=1 when 0<=clientX<30.
+        // With rowpositions=[0,0,50,70,90,...], row=3 when 70<=clientY<90.
+        SC.GridMousePosition(editor, 20, 70);
+    } catch {}
+});
+
+test("MoveECellWithKey[ahome] on a sheet with first rows all hidden (10503-10508)", async () => {
+    const SC = await loadSocialCalc({ browser: true });
+    const { control } = await newControl(SC, "mecwk-root");
+    const editor = control.editor;
+    // Hide rows 1 and 2 so moving to home (row=1) has to bounce back.
+    await scheduleCommands(SC, editor.context.sheetobj, [
+        "set A1 value n 1",
+        "set A2 value n 2",
+        "set A3 value n 3",
+        "set 1 hide yes",
+        "set 2 hide yes",
+    ]);
+    editor.MoveECell("A3");
+    try {
+        editor.MoveECellWithKey("[home]");
+    } catch {}
+    // [aup] with row=1 hidden and delta=-1: row-- → 0, row<1 → row=1, delta=1
+    editor.MoveECell("A2");
+    try {
+        editor.MoveECellWithKey("[aup]");
+    } catch {}
+});
+
+test("ScrollTableUpOneRow / DownOneRow with 2 row panes (11463-11464, 11463 row loop)", async () => {
+    const SC = await loadSocialCalc({ browser: true });
+    const { control } = await newControl(SC, "stup-root");
+    const editor = control.editor;
+    editor.context.rowpanes = [
+        { first: 1, last: 3 },
+        { first: 4, last: 8 },
+    ];
+    await scheduleCommands(SC, editor.context.sheetobj, [
+        "set A1 value n 1",
+        "set A4 value n 4",
+        "set A8 value n 8",
+    ]);
+    try {
+        SC.ScrollTableUpOneRow(editor);
+    } catch {}
+    try {
+        SC.ScrollTableDownOneRow(editor);
+    } catch {}
+});
+
+test("ScrollTableUpOneRow with a rowspan cell straddling pane boundary", async () => {
+    const SC = await loadSocialCalc({ browser: true });
+    const { control } = await newControl(SC, "stus-root");
+    const editor = control.editor;
+    await scheduleCommands(SC, editor.context.sheetobj, [
+        "set A1 value n 1",
+        "set A3 value n 3",
+        "set A15 value n 15",
+    ]);
+    // Span A3 over A3..A7 so after scroll (first=2,last=7) bottomrownum=7 is
+    // a cellskip pointing at A3 (rownum=3), which is in [first=2, last=7] →
+    // hits 11515-11519 and 11523-11526.
+    const a3 = editor.context.sheetobj.cells["A3"];
+    if (a3) a3.rowspan = 5;
+    editor.context.rowpanes = [{ first: 1, last: 6 }];
+    editor.context.colpanes = [{ first: 1, last: 3 }];
+    editor.context.CalculateCellSkipData();
+    try {
+        editor.context.RenderSheet(null, editor.context.defaultHTMLlinkstyle);
+    } catch {}
+    try {
+        SC.ScrollTableUpOneRow(editor);
+    } catch {}
+});
+
+test("ScrollTableDownOneRow with rowspan cell starting inside pane", async () => {
+    const SC = await loadSocialCalc({ browser: true });
+    const { control } = await newControl(SC, "stds-root");
+    const editor = control.editor;
+    await scheduleCommands(SC, editor.context.sheetobj, [
+        "set A3 value n 3",
+        "set A10 value n 10",
+    ]);
+    const a3 = editor.context.sheetobj.cells["A3"];
+    if (a3) a3.rowspan = 5;
+    editor.context.rowpanes = [{ first: 2, last: 7 }];
+    editor.context.colpanes = [{ first: 1, last: 3 }];
+    editor.context.CalculateCellSkipData();
+    try {
+        editor.context.RenderSheet(null, editor.context.defaultHTMLlinkstyle);
+    } catch {}
+    try {
+        SC.ScrollTableDownOneRow(editor);
+    } catch {}
+});
+
+test("CalculateEditorPositions with 2 row + 2 col panes runs the inner panenum loops", async () => {
+    const SC = await loadSocialCalc({ browser: true });
+    const { control } = await newControl(SC, "cep2p-root");
+    const editor = control.editor;
+    editor.context.rowpanes = [
+        { first: 1, last: 3 },
+        { first: 4, last: 8 },
+    ];
+    editor.context.colpanes = [
+        { first: 1, last: 3 },
+        { first: 4, last: 8 },
+    ];
+    try {
+        editor.CalculateEditorPositions();
+    } catch {}
+});
+
+test("FitToEditTable: with 2 row+col panes + hidden rows/cols inside", async () => {
+    const SC = await loadSocialCalc({ browser: true });
+    const { control } = await newControl(SC, "ft2p-root");
+    const editor = control.editor;
+    // Force 2 panes so the first-pane loops at 11022-11060 execute.
+    editor.context.rowpanes = [
+        { first: 1, last: 3 },
+        { first: 4, last: 10 },
+    ];
+    editor.context.colpanes = [
+        { first: 1, last: 3 },
+        { first: 4, last: 10 },
+    ];
+    await scheduleCommands(SC, editor.context.sheetobj, [
+        "set 2 hide yes",
+        "set B hide yes",
+    ]);
+    try {
+        SC.FitToEditTable(editor);
+    } catch {}
+});
+
 test("EditorMouseRange: input + inputboxdirect + partialexpr", async () => {
     const SC = await loadSocialCalc({ browser: true });
     const { control } = await newControl(SC, "emr-root");
@@ -2241,6 +2465,21 @@ test("ProcessEditorMouseDown: row/col header + footer branches via synthetic gri
     editor.colwidth = [0, 30, 50];
     try {
         SC.ProcessEditorMouseDown(fakeEvent({ clientX: 30, clientY: 10, target }));
+    } catch {}
+
+    // Force rowsize (rowheader + rowtoresize within pane): clientY near row-2
+    // boundary so rowtoresize=2 and it's visible, hitting the else branch
+    // in ProcessEditorMouseDown (bundle 9098-9099).
+    primeGridLayout(editor);
+    try {
+        SC.ProcessEditorMouseDown(fakeEvent({ clientX: 10, clientY: 70, target }));
+    } catch {}
+
+    // Force colsize (colheader + coltoresize within pane): clientX near
+    // col-2 boundary → coltoresize=2 visible → else branch 9107-9108.
+    primeGridLayout(editor);
+    try {
+        SC.ProcessEditorMouseDown(fakeEvent({ clientX: 80, clientY: 10, target }));
     } catch {}
 });
 

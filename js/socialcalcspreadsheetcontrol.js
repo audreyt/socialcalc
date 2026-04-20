@@ -1301,92 +1301,9 @@ SocialCalc.SetSpreadsheetControlObject = function(spreadsheet) {
    }
 
 
-//
-// SocialCalc.DoOnResize(spreadsheet)
-//
-// Processes an onResize event, setting the different views.
-//
-
-/** @param {any} spreadsheet */
-SocialCalc.DoOnResize = function(spreadsheet) {
-
-   var v;
-   var vname;
-   var views = spreadsheet.views;
-
-   var needresize = spreadsheet.SizeSSDiv();
-   if (!needresize) return;
-
-   for (vname in views) {
-      v = views[vname].element;
-      v.style.width = spreadsheet.width + "px";
-      v.style.height = (spreadsheet.height-spreadsheet.nonviewheight) + "px";
-      }
-
-   spreadsheet.editor.ResizeTableEditor(spreadsheet.width, spreadsheet.height-spreadsheet.nonviewheight);
-
-   }
-
-
-//
-// resized = SocialCalc.SizeSSDiv(spreadsheet)
-//
-// Figures out a reasonable size for the spreadsheet, given any requested values and viewport.
-// Sets ssdiv to that.
-// Return true if different than existing values.
-//
-
-/** @param {any} spreadsheet */
-SocialCalc.SizeSSDiv = function(spreadsheet) {
-
-   var sizes, pos, resized, nodestyle, newval;
-   var fudgefactorX = 10; // for IE
-   var fudgefactorY = 10;
-
-   resized = false;
-
-   sizes = SocialCalc.GetViewportInfo();
-   pos = SocialCalc.GetElementPosition(spreadsheet.parentNode);
-   pos.bottom = 0;
-   pos.right = 0;
-
-   nodestyle = spreadsheet.parentNode.style;
-
-   if (nodestyle.marginTop) {
-      pos.top += nodestyle.marginTop.slice(0,-2)-0;
-      }
-   if (nodestyle.marginBottom) {
-      pos.bottom += nodestyle.marginBottom.slice(0,-2)-0;
-      }
-   if (nodestyle.marginLeft) {
-      pos.left += nodestyle.marginLeft.slice(0,-2)-0;
-      }
-   if (nodestyle.marginRight) {
-      pos.right += nodestyle.marginRight.slice(0,-2)-0;
-      }
-
-   newval = spreadsheet.requestedHeight ||
-            sizes.height - (pos.top + pos.bottom + fudgefactorY) -
-               (spreadsheet.requestedSpaceBelow || 0);
-   if (spreadsheet.height != newval) {
-      spreadsheet.height = newval;
-      spreadsheet.spreadsheetDiv.style.height = newval + "px";
-      resized = true;
-      }
-   newval = spreadsheet.requestedWidth ||
-            sizes.width - (pos.left + pos.right + fudgefactorX) || 700;
-   if (spreadsheet.width != newval) {
-      spreadsheet.width = newval;
-      spreadsheet.spreadsheetDiv.style.width = newval + "px";
-      resized = true;
-      }
-
-   spreadsheet.spreadsheetDiv.style.position = "relative";
-
-   return resized;
-
-   }
-
+// SocialCalc.DoOnResize and SocialCalc.SizeSSDiv are defined in
+// socialcalcviewer.js (which overrides them at bundle time); the earlier
+// duplicates here have been removed to eliminate dead code.
 
 //
 // SocialCalc.SetTab(obj)

@@ -1225,6 +1225,102 @@ test("Popup EnsurePosition: exercises multiple layout branches", async () => {
     SC.Popup.Close();
 });
 
+test("Popup EnsurePosition: covers layout cases 5-8 by configuring element sizes", async () => {
+    const SC = await fresh();
+
+    // Helper that builds a fresh popup+container, dials main/popup/container
+    // sizes, then calls EnsurePosition. We directly set offsetTop/Left/Width/
+    // Height on the firstChild (the popup's "main" reference) and on the
+    // popupele so GetLayoutValues returns what we want.
+    function runCase(id: string, dial: (main: any, popup: any, container: any) => void) {
+        const container = document.createElement("div");
+        container.id = `${id}-c`;
+        (document as any).body.appendChild(container);
+        const host = document.createElement("span");
+        host.id = id;
+        container.appendChild(host);
+        SC.Popup.Create("List", id, { title: "t", ensureWithin: container });
+        SC.Popup.Initialize(id, {
+            attribs: {},
+            value: "",
+            options: [{ o: "A", v: "a" }, { o: "B", v: "b" }],
+        });
+        SC.Popup.CClick(id);
+        const data = SC.Popup.Controls[id].data;
+        const main = data.mainele.firstChild;
+        const popup = data.popupele;
+        if (main && popup) {
+            dial(main, popup, container);
+            SC.Popup.EnsurePosition(id, container);
+        }
+        SC.Popup.Close();
+    }
+
+    // Case 5: m.bottom+p.height < c.bottom && p.width < c.width, but
+    // main.left+p.width >= c.right (main at right) and m.right-p.width <= c.left.
+    // Requires p.width > m.width and a specific geometry — with c=0..400,
+    // m.width=50, p.width=225, m.left must satisfy 175 <= m.left < 175 (edge).
+    // Use strict inequality: m.left=175 ⇒ 175+225=400 = c.right (fail case 1).
+    runCase("ep5", (main, popup, container) => {
+        container.offsetWidth = 400;
+        container.offsetHeight = 600;
+        container.offsetTop = 0;
+        container.offsetLeft = 0;
+        main.offsetTop = 10;
+        main.offsetLeft = 175;
+        main.offsetWidth = 50;
+        main.offsetHeight = 20;
+        popup.offsetWidth = 225;
+        popup.offsetHeight = 80;
+    });
+
+    // Case 6: m.top-p.height > c.top && p.width < c.width, but NOT cases 2 or 4.
+    // Mirror of case 5 but main near bottom (p.height must fit above main).
+    runCase("ep6", (main, popup, container) => {
+        container.offsetWidth = 400;
+        container.offsetHeight = 600;
+        container.offsetTop = 0;
+        container.offsetLeft = 0;
+        main.offsetTop = 500;
+        main.offsetLeft = 175;
+        main.offsetWidth = 50;
+        main.offsetHeight = 20;
+        popup.offsetWidth = 225;
+        popup.offsetHeight = 80;
+    });
+
+    // Case 7: p.height < c.height && m.right+p.width < c.right
+    // Need m is tall (so case 1 m.bottom+p.height>=c.bottom fails),
+    // narrow enough so p fits to right of main.
+    runCase("ep7", (main, popup, container) => {
+        container.offsetWidth = 400;
+        container.offsetHeight = 200;
+        container.offsetTop = 0;
+        container.offsetLeft = 0;
+        main.offsetTop = 0;
+        main.offsetLeft = 50;
+        main.offsetWidth = 100;
+        main.offsetHeight = 190;
+        popup.offsetWidth = 100;
+        popup.offsetHeight = 50;
+    });
+
+    // Case 8: p.height < c.height && m.left-p.width > c.left
+    // Need tall m positioned so space on left for popup, but NOT case 7.
+    runCase("ep8", (main, popup, container) => {
+        container.offsetWidth = 400;
+        container.offsetHeight = 200;
+        container.offsetTop = 0;
+        container.offsetLeft = 0;
+        main.offsetTop = 0;
+        main.offsetLeft = 300;
+        main.offsetWidth = 50;
+        main.offsetHeight = 190;
+        popup.offsetWidth = 200;
+        popup.offsetHeight = 50;
+    });
+});
+
 test("Popup EnsurePosition: no main element firstChild → alert and return", async () => {
     const SC = await fresh();
     const container = document.createElement("div");

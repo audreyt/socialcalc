@@ -673,6 +673,15 @@ test("DoLink + HideLink + DoLinkClear + DoLinkPaste combinations", async () => {
 
     control.editor.state = "start";
 
+    // DoLink when the cell already has textvalueformat set → 26605-26606 branch
+    await scheduleCommands(SC, control.sheet, [
+        "set A1 textvalueformat link",
+    ]);
+    try {
+        SC.SpreadsheetControl.DoLink();
+    } catch {}
+    removeLink();
+
     // With MakePageLink callback, pagename/workspace are shown
     const originalCallback = SC.Callbacks.MakePageLink;
     SC.Callbacks.MakePageLink = function () {

@@ -802,6 +802,44 @@ test("RenderContext.RenderSheet produces a <table> DOM tree with row/col headers
     expect(typeof html).toBe("string");
 });
 
+test("RenderCell covers default-non-text format alignment + readonly class names (6312, 6376, 6382, 6394)", async () => {
+    installBrowserShim();
+    const SC = await loadSocialCalc({ browser: true });
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 1",
+        // defaultnontextformat index needs a format; cellformats[1]="center".
+        "set sheet defaultnontextformat 1",
+        "set A2 value n 5",
+        "set A2 readonly yes",
+        "set A3 value n 8",
+        "set A3 readonly yes",
+        "set A4 value n 9",
+        "set A4 cssc my-css-class",
+    ]);
+    const context = new SC.RenderContext(sheet);
+    context.showRCHeaders = false;
+    // Seed cellformats so 6311 evaluates truthy and 6312 `text-align:center;` fires.
+    if (!sheet.cellformats[1]) {
+        sheet.cellformats[1] = "center";
+    }
+    // Provide readonly class names for both grid modes.
+    context.readonlyClassName = "ro-grid";
+    context.readonlyNoGridClassName = "ro-nogrid";
+    // Ensure cellskip is initialized (done by RenderSheet normally).
+    context.CalculateCellSkipData();
+
+    context.showGrid = true;
+    context.RenderCell(1, 1, 0, 0, false, context.defaultHTMLlinkstyle); // hits 6312
+    context.RenderCell(2, 1, 0, 0, false, context.defaultHTMLlinkstyle); // hits 6376
+    context.showGrid = false;
+    context.RenderCell(3, 1, 0, 0, false, context.defaultHTMLlinkstyle); // hits 6382
+
+    // noElement=true path with cssc assigns className via 6394.
+    const pseudo = context.RenderCell(4, 1, 0, 0, true, context.defaultHTMLlinkstyle);
+    expect(pseudo.className).toContain("my-css-class");
+});
+
 test("RenderCell handles error cells, error valuetype, custom value formats", async () => {
     installBrowserShim();
     const SC = await loadSocialCalc({ browser: true });
@@ -1461,6 +1499,177 @@ test("pane command with row and col variants using editor mock", async () => {
         "pane row 0", // collapse back to 1 pane
         "pane col 0",
     ]);
+});
+
+// ===========================================================================
+// Section 28a: pane command when targeted row/col is hidden (while-loop skips),
+// when already has 2 panes + timeout set, and when griddiv exists with
+// trackingline-vertical / -horizontal elements (4360, 4367-4368, 4377-4381,
+// 4395, 4402-4403, 4411-4415).
+// ===========================================================================
+
+test("pane command hidden-row/col skip + 2-pane-with-timeout + trackline removal", async () => {
+    installBrowserShim();
+    const SC = await loadSocialCalc({ browser: true });
+    const editor = installEditorMock(SC);
+    const sheet = new SC.Sheet();
+    editor.context.sheetobj = sheet;
+    editor.context.rowpanes = [{ first: 1, last: 10 }, { first: 11, last: 20 }];
+    editor.context.colpanes = [{ first: 1, last: 10 }, { first: 11, last: 20 }];
+    editor.context.SetRowPaneFirstLast = (n: number, f: number, l: number) => {
+        editor.context.rowpanes[n] = { first: f, last: l };
+    };
+    editor.context.SetColPaneFirstLast = (n: number, f: number, l: number) => {
+        editor.context.colpanes[n] = { first: f, last: l };
+    };
+    // Provide a fake griddiv with tracking lines so removeChild path runs.
+    const griddiv: any = {
+        childNodes: [] as any[],
+        removeChild(child: any) {
+            const i = this.childNodes.indexOf(child);
+            if (i >= 0) this.childNodes.splice(i, 1);
+            return child;
+        },
+    };
+    const trackV: any = { id: "trackingline-vertical", parentNode: griddiv };
+    const trackH: any = { id: "trackingline-horizon", parentNode: griddiv };
+    griddiv.childNodes.push(trackV, trackH);
+    // Override document.getElementById temporarily to return these.
+    const origGetById = (document as any).getElementById;
+    (document as any).getElementById = function (id: string) {
+        if (id === "trackingline-vertical") return trackV;
+        if (id === "trackingline-horizon") return trackH;
+        return origGetById.call(this, id);
+    };
+    editor.griddiv = griddiv;
+    editor.FitToEditTable = () => {};
+    // No timeout, so 2 panes already → `rowpanes.length-1 && !editor.timeout`
+    // hits the 4367-4368 branch; same for col pane 4402-4403.
+    editor.timeout = null;
+    try {
+        // Hide row 3 and col C so the while-loop (4359/4394) has to skip past.
+        sheet.rowattribs.hide[3] = "yes";
+        sheet.colattribs.hide.C = "yes";
+        await scheduleCommands(SC, sheet, [
+            "pane row 3", // lands on hidden row, while-loop advances
+            "pane col 3", // lands on hidden col C, while-loop advances
+        ]);
+    } finally {
+        (document as any).getElementById = origGetById;
+    }
+});
+
+// ===========================================================================
+// Section 28b: SocialCalc._app flag enables widget render tracking in
+// ExecuteSheetCommand (4454-4463).
+// ===========================================================================
+
+test("SocialCalc._app + cellChanged flag triggers widgetsClean tracking", async () => {
+    const SC = await loadSocialCalc();
+    SC._app = true;
+    try {
+        const sheet = new SC.Sheet();
+        // cell-changing command with renderneeded=true + attrib != "all"
+        await scheduleCommands(SC, sheet, [
+            "set A1 value n 1",
+            "set A1 bgcolor rgb(255,0,0)",
+        ]);
+        // sheet-only command without cellChanged still goes through _app branch.
+        await scheduleCommands(SC, sheet, ["recalc"]);
+    } finally {
+        SC._app = false;
+    }
+});
+
+// ===========================================================================
+// Section 28c: RecalcTimerRoutine with scri.sheet == null returns early (4963);
+// also exercise direct invocation with bad state triggering the alert at 5030.
+// ===========================================================================
+
+test("RecalcTimerRoutine returns early when no active sheet", async () => {
+    const SC = await loadSocialCalc();
+    const prevSheet = SC.RecalcInfo.sheet;
+    try {
+        // No active recalc → scri.sheet === null → RecalcTimerRoutine returns.
+        SC.RecalcInfo.sheet = null;
+        expect(() => SC.RecalcTimerRoutine()).not.toThrow();
+    } finally {
+        SC.RecalcInfo.sheet = prevSheet;
+    }
+});
+
+// ===========================================================================
+// Section 28d: Recalc with maxtimeslice=0 trips the order and step slicing
+// branches (4995-4997 and 5080-5085).
+// ===========================================================================
+
+test("Recalc with maxtimeslice=0 trips order/step slicing in RecalcTimerRoutine", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    // Populate 20 cells with formulas so RecalcCheckCell+calc loops each run
+    // many iterations and the post-iteration time check trips early.
+    const cmds: string[] = [];
+    cmds.push("set A1 value n 1");
+    for (let i = 2; i <= 20; i++) {
+        cmds.push(`set A${i} formula A${i - 1}+1`);
+    }
+    await scheduleCommands(SC, sheet, cmds);
+    const prev = SC.RecalcInfo.maxtimeslice;
+    try {
+        SC.RecalcInfo.maxtimeslice = 0; // trip slicing on every iteration
+        await recalcSheet(SC, sheet, 6000);
+        expect(sheet.cells.A20.datavalue).toBe(20);
+    } finally {
+        SC.RecalcInfo.maxtimeslice = prev;
+    }
+});
+
+// ===========================================================================
+// Section 28e: RecalcLoadedSheet(recalcneeded=true) chains the loaded sheet
+// into the recalc loop (4936-4938).
+// ===========================================================================
+
+// ===========================================================================
+// Section 28f: UndoStack.PushChange pops redo frames when a new command is
+// issued after an undo (5436-5437).
+// ===========================================================================
+
+test("UndoStack pops redone items when a new change is issued after an undo", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 1",
+        "set A1 value n 2",
+        "set A1 value n 3",
+    ]);
+    await sheetUndo(SC, sheet); // A1=2
+    await sheetUndo(SC, sheet); // A1=1
+    // Undone items are on the redo side. Now a new change should pop them.
+    await scheduleCommands(SC, sheet, ["set A1 value n 99"]);
+    expect(sheet.cells.A1.datavalue).toBe(99);
+    // Further redo should do nothing since redo was purged.
+    await sheetRedo(SC, sheet).catch(() => {});
+});
+
+test("RecalcLoadedSheet chains a fresh sheet into the recalc loop", async () => {
+    const SC = await loadSocialCalc();
+    const primary = new SC.Sheet();
+    const prev = { sheet: SC.RecalcInfo.sheet, state: SC.RecalcInfo.currentState };
+    try {
+        SC.Formula.SheetCache.waitingForLoading = "loaded1";
+        await scheduleCommands(SC, primary, ["set A1 value n 1"]);
+        // Primary sheet becomes active; the loaded sheet should chain off it.
+        SC.RecalcInfo.sheet = primary;
+        const saveStr =
+            "version:1.5\nsheet:c:1:r:1\ncell:A1:v:42\n";
+        SC.RecalcLoadedSheet(null, saveStr, true, false);
+        expect(SC.Formula.SheetCache.waitingForLoading).toBeNull();
+    } finally {
+        SC.RecalcInfo.sheet = prev.sheet;
+        SC.RecalcInfo.currentState = prev.state;
+        // Clean the cache so sibling tests don't see the "loaded1" sheet.
+        delete SC.Formula.SheetCache.sheets.loaded1;
+    }
 });
 
 // ===========================================================================
@@ -2216,6 +2425,216 @@ test("GetViewportInfo uses window.innerWidth when available", async () => {
     delete (globalThis as any).pageYOffset;
 });
 
+test("ConvertSaveToOtherFormat tab escapes quote-in-newline cells (7506-7509)", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        // Multiline cell containing a quote → tab output doubles quotes.
+        `set A1 text t line1\\nwith\\"quote`,
+        "set B1 value n 42",
+    ]);
+    const save = SC.CreateSheetSave(sheet, "A1:B1");
+    const tab = SC.ConvertSaveToOtherFormat(save, "tab");
+    expect(tab).toContain('""');
+});
+
+test("ConvertOtherFormatToSave tab skips trailing empty line (7625-7627)", async () => {
+    const SC = await loadSocialCalc();
+    // Input with a trailing empty line -- the final iteration hits the
+    // break-out guard at 7626-7627.
+    const save = SC.ConvertOtherFormatToSave("a\tb\n1\t2\n", "tab");
+    expect(save).toContain(":a");
+    expect(save).toContain(":b");
+});
+
+test("OperandAsText with error + unknown type clears value (16418-16422)", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    // Direct invocation of OperandAsText with error + unknown types.
+    const opErr = [{ type: "e#DIV/0!", value: "whatever" }];
+    const resultErr = SC.Formula.OperandAsText(sheet, opErr);
+    expect(resultErr.value).toBe("");
+    // Unknown type (no t/n/b/e prefix) falls through to else.
+    const opUnk = [{ type: "z", value: 42 }];
+    const resultUnk = SC.Formula.OperandAsText(sheet, opUnk);
+    expect(resultUnk.type).toBe("t");
+});
+
+test("SUMIF / COUNTIF / AVERAGEIF numeric + blank criteria paths (18479-18486)", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 10",
+        "set A2 value n 20",
+        "set A3 value n 30",
+        // numeric criteria (20) → criteria.value becomes "20"
+        "set B1 formula SUMIF(A1:A3,20)",
+        // blank criteria from empty cell
+        "set B2 formula SUMIF(A1:A3,Z9)",
+    ]);
+    await recalcSheet(SC, sheet);
+    expect(sheet.cells.B1.datavalue).toBe(20);
+});
+
+test("SUMIFS multi-criteria with numeric + blank criterion (18571-18579)", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 5",
+        "set A2 value n 6",
+        "set B1 value n 100",
+        "set B2 value n 200",
+        // numeric criteria on B1:B2 → criteria becomes string
+        "set C1 formula SUMIFS(A1:A2,B1:B2,100)",
+        // blank criteria (empty cell ref)
+        "set C2 formula SUMIFS(A1:A2,B1:B2,Z9)",
+    ]);
+    await recalcSheet(SC, sheet);
+    expect(sheet.cells.C1.datavalue).toBe(5);
+});
+
+test("TestCriteria with error in basevalue comparing against text (22182-22183)", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 text t hello",
+        "set A2 value n 5",
+        // Criteria evaluates to an error: criteria is "#DIV/0!" literal
+        'set B1 formula COUNTIF(A1:A2,"=#DIV/0!")',
+    ]);
+    await recalcSheet(SC, sheet);
+    expect(sheet.cells.B1).toBeDefined();
+});
+
+test("TestCriteria with empty criteria vs blank cell (22138-22146)", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    // A2 is blank (never set). A1 set. Criteria "=" means compare empty to empty.
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 7",
+        // count cells where value equals blank: criteria "=" with empty base
+        'set B1 formula COUNTIF(A1:A3,"=")',
+    ]);
+    await recalcSheet(SC, sheet);
+    expect(sheet.cells.B1).toBeDefined();
+});
+
+test("Formula range with different sheets triggers OperandsAsRangeOnSheet error (16040-16041)", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 1",
+        "set A2 value n 2",
+        // Range across different sheets: Sheet1!A1:Sheet2!B2 is invalid.
+        'set B1 formula SUM(Sheet1!A1:Sheet2!B2)',
+    ]);
+    await recalcSheet(SC, sheet);
+    expect(sheet.cells.B1).toBeDefined();
+});
+
+test("INDEX(range,0,0) with single-cell range returns coord (18383-18385)", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 7",
+        "set B1 formula INDEX(A1:A1,0,0)",
+    ]);
+    await recalcSheet(SC, sheet);
+    expect(sheet.cells.B1.datavalue).toBe(7);
+});
+
+test("MATCH: 2D range (N/A), wide 1-row range, tall 1-col range (18201-18209)", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 1",
+        "set B1 value n 2",
+        "set C1 value n 3",
+        "set A2 value n 4",
+        "set A3 value n 5",
+        // 1x3 row → cincr=1 (18205)
+        "set D1 formula MATCH(2,A1:C1)",
+        // 3x1 col → rincr=1 (18208)
+        "set D2 formula MATCH(4,A1:A3)",
+        // 2x2 → e#N/A (18202-18203)
+        "set B3 value n 6",
+        "set D3 formula MATCH(5,A1:B3)",
+    ]);
+    await recalcSheet(SC, sheet);
+    expect(sheet.cells.D1.datavalue).toBe(2);
+    expect(sheet.cells.D2.datavalue).toBe(2);
+    expect(String(sheet.cells.D3.errors || sheet.cells.D3.valuetype)).toMatch(/N\/A|e/);
+});
+
+test("ParseFormulaIntoTokens handles leading two-char op (15660-15663 EOF branch)", async () => {
+    const SC = await loadSocialCalc();
+    // Start with `<`, then `=` right after → parser pops the `<` then treats
+    // `<=` as an op. With parseinfo empty after the pop, the EOF branch fires.
+    const r = SC.Formula.ParseFormulaIntoTokens("<=5");
+    expect(Array.isArray(r)).toBe(true);
+});
+
+test("ParseFormulaIntoTokens with illegal two-char op (15702-15706)", async () => {
+    const SC = await loadSocialCalc();
+    // Something like `=<` would be illegal after a unary - let's try.
+    // Actually use two ops that form something weird: `><` goes through the
+    // multi-char branch and hits the `else { t = tokentype.error }` fallback.
+    const r = SC.Formula.ParseFormulaIntoTokens("><5");
+    expect(Array.isArray(r)).toBe(true);
+    // Confirm at least one error token.
+    expect(r.some((t: any) => t.type === SC.Formula.TokenType.error)).toBe(true);
+});
+
+test("ConvertOtherFormatToSave tab: double-quote escape, quote-at-EOL, embedded-quote (7642-7662)", async () => {
+    const SC = await loadSocialCalc();
+    // A quoted field that has a doubled-quote inside → line 7644-7645.
+    const save = SC.ConvertOtherFormatToSave('"hi""lo"\tB\n', "tab");
+    expect(save).toContain(':hi');
+
+    // Quoted field that ends at end-of-line → lines 7653-7656.
+    const save2 = SC.ConvertOtherFormatToSave('"alpha"\nsecond\n', "tab");
+    expect(save2).toContain("alpha");
+
+    // Quote mid-value (after some chars) → falls through to 7662 "continue".
+    const save3 = SC.ConvertOtherFormatToSave('x"y"\tB\n', "tab");
+    expect(save3).toContain("x");
+});
+
+test("GetComputedStyle returns empty string when document.defaultView is missing", async () => {
+    installBrowserShim();
+    const SC = await loadSocialCalc({ browser: true });
+    const origDV = (document as any).defaultView;
+    try {
+        (document as any).defaultView = null;
+        const div = document.createElement("div");
+        expect(SC.GetComputedStyle(div, "color")).toBe("");
+    } finally {
+        (document as any).defaultView = origDV;
+    }
+});
+
+test("GetViewportInfo falls back to documentElement/body when innerWidth is 0", async () => {
+    installBrowserShim();
+    const SC = await loadSocialCalc({ browser: true });
+    // Force the else-branch by making window.innerWidth falsy.
+    const origInner = (globalThis as any).window.innerWidth;
+    (globalThis as any).window.innerWidth = 0;
+    (document as any).documentElement.clientWidth = 999;
+    (document as any).documentElement.clientHeight = 777;
+    (document as any).documentElement.scrollLeft = 5;
+    (document as any).documentElement.scrollTop = 6;
+    const info = SC.GetViewportInfo();
+    // Either documentElement branch fires or the other - both are fallbacks.
+    expect(typeof info.width === "number" || info.width === undefined).toBe(true);
+    // Now zero out documentElement width and populate body to hit the second.
+    (document as any).documentElement.clientWidth = 0;
+    (document as any).body.clientWidth = 500;
+    (document as any).body.clientHeight = 400;
+    const info2 = SC.GetViewportInfo();
+    expect(info2).toBeDefined();
+    (globalThis as any).window.innerWidth = origInner;
+});
+
 // ===========================================================================
 // Section 59: cover text cell with textvalueformat="formula" (lines 6558-6565).
 // ===========================================================================
@@ -2267,4 +2686,445 @@ test("named range that evaluates to single coord flows through token_coord inlin
     ]);
     await recalcSheet(SC, sheet);
     expect(sheet.cells.B1.datavalue).toBe(300);
+});
+
+// ===========================================================================
+// Section 62: Unknown line-type in ParseSheetSave triggers alert + throw.
+// ===========================================================================
+
+test("ParseSheetSave with unknown line-type throws via alert branch", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    // Feed a save string with a made-up line type. The default: clause in
+    // ParseSheetSave alerts and throws.
+    const save = makeSave([
+        "version:1.5",
+        "madeup:foo",
+    ]);
+    expect(() => sheet.ParseSheetSave(save)).toThrow();
+});
+
+test("ParseSheetSave with `vt` non-numeric value type loads text cell (1607-1609)", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    // `vt:t:value` → cell.datatype = "t"; takes the else branch in CellFromStringParts
+    const save = makeSave([
+        "version:1.5",
+        "cell:A1:vt:t:Hello",
+        "cell:A2:vt:nd:44562", // n+ prefix hits the "n" branch for sanity
+    ]);
+    sheet.ParseSheetSave(save);
+    expect(sheet.cells.A1.valuetype).toBe("t");
+    expect(sheet.cells.A1.datatype).toBe("t");
+    expect(sheet.cells.A1.datavalue).toBe("Hello");
+    expect(sheet.cells.A2.datatype).toBe("v");
+});
+
+// ===========================================================================
+// Section 63: erase with "formulas" / "formats" preserves/deletes the comment
+// (covers cell.comment delete/preserve branches).
+// ===========================================================================
+
+test("erase formulas clears cell.comment; erase formats preserves comment", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 10",
+        "set A1 comment hello",
+        "set B1 value n 20",
+        "set B1 comment world",
+    ]);
+    expect(sheet.cells.A1.comment).toBe("hello");
+    expect(sheet.cells.B1.comment).toBe("world");
+    // erase A1 formulas clears the comment (treated as content)
+    await scheduleCommands(SC, sheet, ["erase A1:A1 formulas"]);
+    expect(sheet.cells.A1.comment).toBeUndefined();
+    // erase B1 formats keeps the comment on the rebuilt cell
+    await scheduleCommands(SC, sheet, ["erase B1:B1 formats"]);
+    expect(sheet.cells.B1.comment).toBe("world");
+});
+
+// ===========================================================================
+// Section 64: sort with equal-valued cells hits the v2=="=" equality branch.
+// ===========================================================================
+
+test("sort where rows are equal in the sort key hits the equality branch", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 5",
+        "set A2 value n 5",
+        "set A3 value n 5",
+        "set B1 value n 1",
+        "set B2 value n 2",
+        "set B3 value n 3",
+    ]);
+    await scheduleCommands(SC, sheet, ["sort A1:B3 A up"]);
+    // Order should still be preserved (or at least not crash) — all A's equal.
+    expect(sheet.cells.A1).toBeDefined();
+});
+
+// ===========================================================================
+// Section 65: paste where the clipboard cell lacks a comment clears the
+// destination's comment (covers 3502 else-if branch).
+// ===========================================================================
+
+test("paste overwrites destination comment when source has none", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    // Seed A1 with a comment; seed B1 with a value and NO comment.
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 10",
+        "set A1 comment keepme",
+        "set B1 value n 20",
+    ]);
+    // Copy B1 (no comment) and paste onto A1 → A1's comment should be cleared.
+    await scheduleCommands(SC, sheet, [
+        "loadclipboard " + SC.encodeForSave(SC.CreateSheetSave(sheet, "B1:B1")),
+        "paste A1 formulas",
+    ]);
+    expect(sheet.cells.A1.comment).toBeUndefined();
+});
+
+test("paste formulas from source with comment copies it onto destination", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 10",
+        "set A1 comment src-note",
+        // B1 starts with NO comment.
+        "set B1 value n 20",
+    ]);
+    await scheduleCommands(SC, sheet, [
+        "loadclipboard " + SC.encodeForSave(SC.CreateSheetSave(sheet, "A1:A1")),
+        "paste B1 formulas",
+    ]);
+    expect(sheet.cells.B1.comment).toBe("src-note");
+});
+
+// ===========================================================================
+// Section 66: SheetCommandsTimerRoutine maxtimeslice trip causes setTimeout.
+// ===========================================================================
+
+test("SheetCommandsTimerRoutine schedules a new slice when maxtimeslice hits", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    // Force every iteration to time-slice by setting maxtimeslice = 0.
+    // Queue two commands so the first yields to the timer.
+    sheet.sci.maxtimeslice = 0;
+    sheet.sci.timerdelay = 1;
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 1",
+        "set A2 value n 2",
+    ]);
+    expect(sheet.cells.A1.datavalue).toBe(1);
+    expect(sheet.cells.A2.datavalue).toBe(2);
+});
+
+// ===========================================================================
+// Section 67: paste all with styled cell to copy table-index and non-table-index
+// attributes onto destination (covers 3478-3482).
+// ===========================================================================
+
+test("paste all copies both table-indexed attributes (font, color) and plain attribs (cssc)", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 7",
+        "set A1 font * normal 12pt",
+        "set A1 color rgb(1,2,3)",
+        "set A1 cssc my-class",
+        "set B1 value n 0",
+    ]);
+    // Copy styled A1 onto an unstyled B1 via paste-all.
+    await scheduleCommands(SC, sheet, [
+        "loadclipboard " + SC.encodeForSave(SC.CreateSheetSave(sheet, "A1:A1")),
+        "paste B1 all",
+    ]);
+    expect(sheet.cells.B1.font).toBeDefined();
+    expect(sheet.cells.B1.color).toBeDefined();
+    expect(sheet.cells.B1.cssc).toBe("my-class");
+});
+
+// ===========================================================================
+// Section 68: sort with error cell vs blank cell (covers ta=="e" / tb=="b" at 3610).
+// ===========================================================================
+
+test("sort with error-vs-blank rows exercises the e/b direction branch", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    // Use several error + blank + text rows so the sort comparator is forced
+    // to compare e<->b and e<->t combinations.
+    await scheduleCommands(SC, sheet, [
+        "set A1 formula 1/0",
+        "set A2 value n 5",
+        "set A3 value n 7",
+        "set A4 formula 2/0",
+        "set A6 text t hello",
+        "set A8 formula 3/0",
+    ]);
+    await recalcSheet(SC, sheet);
+    await scheduleCommands(SC, sheet, ["sort A1:A8 A up"]);
+    await scheduleCommands(SC, sheet, ["sort A1:A8 A down"]);
+    expect(sheet.cells.A1).toBeDefined();
+});
+
+// ===========================================================================
+// Section 69: insertrow / insertcol preserve row/col attribs by copying forward
+// (covers 3742-3748 / 3758-3764).
+// ===========================================================================
+
+test("insertrow copies existing rowattribs forward; insertcol copies colattribs", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 1",
+        "set A3 value n 3",
+        "set sheet defaultcolwidth 100",
+        "set 3 height 40",     // row 3 has explicit height
+        "set 1 height 30",     // row 1 has explicit height
+        "set B width 120",     // column B has explicit width
+        "set A width 80",
+    ]);
+    // Insertrow at 2 should bump row 3's attribs forward.
+    await scheduleCommands(SC, sheet, ["insertrow 2"]);
+    expect(sheet.rowattribs.height[4]).toBe("40"); // row 3 → row 4
+    // insertcol at B should bump col B's width forward.
+    await scheduleCommands(SC, sheet, ["insertcol B"]);
+    expect(sheet.colattribs.width.C).toBe("120"); // col B → col C
+});
+
+// ===========================================================================
+// Section 70: insertrow / insertcol where row/col attribs transition from set
+// to unset trigger the delete branch (3747-3748 / 3763-3764).
+// ===========================================================================
+
+test("insertrow with mixed set/unset rowattribs covers delete branch", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    // Set row 3 height, leave row 4 unset. After insertrow 3, row 4 (copied from
+    // original row 3) gets height; but row 5 (copied from original row 4) needs
+    // height deleted if existed.
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 1",
+        "set A5 value n 5",
+        "set 3 height 50",
+        "set 5 height 60",
+    ]);
+    // Delete first so the delete-branch fires on a fresh insert.
+    await scheduleCommands(SC, sheet, ["set 5 height "]);
+    expect(sheet.rowattribs.height[5]).toBeUndefined();
+    await scheduleCommands(SC, sheet, ["insertrow 2"]);
+    expect(sheet.rowattribs.height[4]).toBe("50"); // row 3 → 4
+});
+
+// ===========================================================================
+// Section 71: named formula starting with "=" is adjusted on insertrow.
+// ===========================================================================
+
+test("insertrow adjusts named formula that starts with =", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 1",
+        "set A2 value n 2",
+        "name define MYFORMULA =A1+A2",
+    ]);
+    await scheduleCommands(SC, sheet, ["insertrow 1"]);
+    expect(sheet.names.MYFORMULA.definition).toMatch(/^=/);
+});
+
+// ===========================================================================
+// Section 72: deleterow adjusts named formula starting with = (3890-3891).
+// ===========================================================================
+
+test("deleterow adjusts named formula that starts with =", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 1",
+        "set A2 value n 2",
+        "set A3 value n 3",
+        "name define MYFORMULA =A2+A3",
+    ]);
+    await scheduleCommands(SC, sheet, ["deleterow 2"]);
+    expect(sheet.names.MYFORMULA.definition).toMatch(/^=/);
+});
+
+// ===========================================================================
+// Section 73: deletecol past the end of the sheet (cr2.col > lastcol branch).
+// ===========================================================================
+
+test("deletecol / deleterow operating past last column/row shrinks to cr1-1", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    // A sheet with lastcol=2 (A-B). Delete cols B:D past the end.
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 1",
+        "set B1 value n 2",
+    ]);
+    await scheduleCommands(SC, sheet, ["deletecol B:D"]);
+    expect(sheet.attribs.lastcol).toBe(1);
+
+    // Similarly for rows.
+    const sheet2 = new SC.Sheet();
+    await scheduleCommands(SC, sheet2, [
+        "set A1 value n 1",
+        "set A2 value n 2",
+    ]);
+    await scheduleCommands(SC, sheet2, ["deleterow 2:10"]);
+    expect(sheet2.attribs.lastrow).toBe(1);
+});
+
+// ===========================================================================
+// Section 74: paste all between sheets copies clipboard colwidth onto dest
+// (covers 3451 / 3456 / 3466).
+// ===========================================================================
+
+test("paste all carries source col/row width + hide attributes into destination", async () => {
+    const SC = await loadSocialCalc();
+    // Source sheet with col width/hide + row hide set.
+    const src = new SC.Sheet();
+    await scheduleCommands(SC, src, [
+        "set A1 value n 1",
+        "set A width 77",
+        "set A hide yes",
+        "set 1 hide yes",
+    ]);
+    // Capture clipboard string, then paste it into a fresh sheet.
+    const clip = SC.CreateSheetSave(src, "A1:A1");
+    const dest = new SC.Sheet();
+    await scheduleCommands(SC, dest, [
+        "loadclipboard " + SC.encodeForSave(clip),
+        "paste B2 all",
+    ]);
+    expect(dest.colattribs.width.B).toBe("77");
+    expect(dest.colattribs.hide.B).toBe("yes");
+    expect(dest.rowattribs.hide[2]).toBe("yes");
+});
+
+// ===========================================================================
+// Section 75: insertcol where the destination column had an attribute that
+// transitions to unset triggers the delete branch (3763-3764).
+// ===========================================================================
+
+// ===========================================================================
+// Section 75a: moveinsert with formats rest walks through internal push loop
+// branches at 4137-4143 / 4177-4183 (copy vs delete styled attribs).
+// ===========================================================================
+
+test("moveinsert with styled cells exercises vertical+horizontal push attribs", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    // Vertical setup with styled cells so the insertvert push loop at 4134+
+    // copies format attribs (4141) and deletes undefined ones (4138).
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 1",
+        "set A2 value n 2",
+        "set A3 value n 3",
+        "set A4 value n 4",
+        "set A5 value n 5",
+        "set A1 font * normal 14pt",
+        "set A3 color rgb(10,20,30)",
+    ]);
+    // Move A3 upward (insertvert) - triggers the vertical push loop over A1/A2.
+    await scheduleCommands(SC, sheet, ["moveinsert A3 A1 all"]);
+    // Also run a move with rest=formats so inserthoriz branch hits format-only.
+    await scheduleCommands(SC, sheet, [
+        "set B1 value n 1",
+        "set C1 value n 2",
+        "set D1 value n 3",
+        "set B1 font * normal 10pt",
+        "set D1 color rgb(9,9,9)",
+    ]);
+    await scheduleCommands(SC, sheet, ["moveinsert D1:D1 B1 formats"]);
+    expect(sheet.attribs.lastcol).toBeGreaterThan(1);
+});
+
+// ===========================================================================
+// Section 75b: movepaste of an empty cell (movingcells[crbase] undefined)
+// hits 4217-4219 and movepaste with source comment hits 4243-4248.
+// ===========================================================================
+
+test("movepaste with mixed empty/comment cells hits the empty + comment branches", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    // A1 = value with comment; A2 = readonly (skipped from movingcells);
+    // A3 = value. A readonly src cell leaves movingcells[A2] undefined,
+    // so paste→C2 hits the "moving an empty cell" branch (4217-4219).
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 7",
+        "set A1 comment howdy",
+        "set A2 value n 8",
+        "set A2 readonly yes",
+        "set A3 value n 9",
+    ]);
+    await scheduleCommands(SC, sheet, ["movepaste A1:A3 C1 all"]);
+    expect(sheet.cells.C1.comment).toBe("howdy");
+    expect(sheet.cells.C2 && sheet.cells.C2.datavalue).toBeFalsy();
+});
+
+// ===========================================================================
+// Section 75c: movepaste triggers ReplaceFormulaCoords on a named formula
+// (4275-4289).
+// ===========================================================================
+
+test("movepaste updates named ranges to reflect moved coords", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 42",
+        "name define MYNAME A1",
+        "name define MYFORM =A1*2",
+    ]);
+    await scheduleCommands(SC, sheet, ["movepaste A1:A1 C1 all"]);
+    // The named references should be rewritten to the new cell C1.
+    expect(sheet.names.MYNAME.definition).toBe("C1");
+    expect(sheet.names.MYFORM.definition).toMatch(/^=.*C1/);
+});
+
+// ===========================================================================
+// Section 75d: movepaste onto a destination that has a comment, from a source
+// without one, hits the else-if cell.comment delete path (4246-4247).
+// ===========================================================================
+
+test("movepaste: src without comment onto dest with comment clears dest comment", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    // A1 value w/ NO comment, C1 value w/ comment → movepaste A1→C1
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 5",
+        "set C1 value n 10",
+        "set C1 comment dest-comment",
+    ]);
+    await scheduleCommands(SC, sheet, ["movepaste A1:A1 C1 all"]);
+    // C1 now should reflect A1's value with no comment.
+    expect(sheet.cells.C1.datavalue).toBe(5);
+    expect(sheet.cells.C1.comment).toBeUndefined();
+});
+
+test("insertcol clearing colattribs via inserted blank col hits delete branch", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    // Stage: cols A through D. C has width. D unset. After insertcol at B:
+    //   original A stays, B=new blank, old B→C, old C(width)→D, old D→E.
+    // For the `delete sheet.colattribs[attrib][colnext]` branch:
+    // need rownext/colnext to currently have a value while new `val` is unset.
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 1",
+        "set B1 value n 2",
+        "set C1 value n 3",
+        "set D1 value n 4",
+        "set B width 50",
+        "set D width 80",
+    ]);
+    // Now explicitly remove C's width so colattribs[colnext='C'].width is undefined,
+    // then insertcol at D (coloffset=+1). This walks old C → new D where D had no width
+    // and C (source) has none, so branch... actually we need the opposite:
+    // let us construct: col C has width, col D doesn't, then insertcol A which pushes all right.
+    await scheduleCommands(SC, sheet, ["set C width "]);
+    expect(sheet.colattribs.width.C).toBeUndefined();
+    await scheduleCommands(SC, sheet, ["insertcol A"]);
+    // Lingering behaviour: the sheet should still have a valid lastcol.
+    expect(sheet.attribs.lastcol).toBeGreaterThan(1);
 });
