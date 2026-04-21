@@ -5552,7 +5552,7 @@ SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord
         //  - code to show/hide panel
         //  --- get list of panels to show - "showindex_or_csv" 
         //  --- get param details 
-        var showindices;
+        /** @type {any[]} */ var showindices = [];
         var firstPanelIndex = 2;
         if(fname == "SPLASH") {
           result = "SPLASH:"+ operand_value[1]; 
@@ -5576,7 +5576,7 @@ SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord
           for (var parameterIndex = firstPanelIndex; parameterIndex < operand_value.length; ++parameterIndex) {
             // show panel if its index is in the showindices list
             var wanted = parameterIndex - 1;
-            var showPanelFound = Object.keys(showindices).some(/** @param {string} k */ function (k) { return showindices[k] == wanted; });
+            var showPanelFound = showindices.some(/** @param {any} v */ function (v) { return v == wanted; });
             if (!showPanelFound) continue;
             
           
@@ -6774,11 +6774,7 @@ SocialCalc.Formula.TestCriteria = function(value, type, criteria) {
       if (comparitor == "none") { // blank criteria matches nothing
          return false;
          }
-      if (type.charAt(0) == "b") { // comparing to empty cell
-         if (comparitor == "=") { // empty equals empty
-            return true;
-            }
-         }
+      if (type.charAt(0) == "b" && comparitor == "=") return true; // empty equals empty
       return false; // otherwise false
       }
 
