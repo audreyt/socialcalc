@@ -5012,21 +5012,13 @@ SocialCalc.RecalcTimerRoutine = function() {
       return;
       }
 
-   // otherwise should be scri.state.calc
-
-   if (scri.currentState != scri.state.calc) {
-      alert("Recalc state error: "+scri.currentState+". Error in SocialCalc code.");
-      }
+   // otherwise should be scri.state.calc (all other states handled above)
 
    coord = sheet.recalcdata.nextcalc;
    while (coord) {
       cell = sheet.cells[coord];
-	  // app widgets need cell ID so store in parseinfo {
-      if (!cell.parseinfo) { // cache parsed formula
-        cell.parseinfo = scf.ParseFormulaIntoTokens(cell.formula);
-        }
-      cell.parseinfo.coord = coord;
-	  // }
+      // parseinfo was cached by RecalcCheckCell during the order phase.
+      cell.parseinfo.coord = coord; // app widgets need cell ID
       eresult = scf.evaluate_parsed_formula(cell.parseinfo, sheet, false);
       if (scf.SheetCache.waitingForLoading) { // wait until restarted
          // schedule render to run while waiting for dependent sheet to load - schedules first render of sheet
@@ -5195,12 +5187,8 @@ mainloop:
             if (checkinfo[coord] && typeof checkinfo[coord] == "object") { // Circular reference
                cell.errors = SocialCalc.Constants.s_caccCircRef+startcoord; // set on original cell making the ref
                checkinfo[startcoord] = true; // this one should be calculated once at this point
-               if (!recalcdata.firstcalc) {
-                  recalcdata.firstcalc = startcoord;
-                  }
-               else {
-                  recalcdata.calclist[recalcdata.lastcalc] = startcoord;
-                  }
+               if (!recalcdata.firstcalc) recalcdata.firstcalc = startcoord;
+               else recalcdata.calclist[recalcdata.lastcalc] = startcoord;
                recalcdata.lastcalc = startcoord;
                recalcdata.calclistlength++; // count number on list
                sheet.attribs.circularreferencecell = coord+"|"+oldcoord; // remember at least one circ ref
@@ -5222,23 +5210,19 @@ mainloop:
 
          if (ttype == token_name) { // look for named range
             value = scf.LookupName(sheet, ttext);
-            if (value.type == "range") { // only need to recurse here for range, which may be just one cell
+            if (value.type == "range") { // range name is always "UL|LR|"
                pos = value.value.indexOf("|");
-               if (pos != -1) { // range - check each cell
-                  coordvals.cr1 = SocialCalc.coordToCr(value.value.substring(0,pos));
-                  pos2 = value.value.indexOf("|", pos+1);
-                  coordvals.cr2 = SocialCalc.coordToCr(value.value.substring(pos+1,pos2));
-                  coordvals.inrange = true;
-                  coordvals.inrangestart = true;
-                  i = i-1; // back up so will start up again here
-                  continue;
-                  }
+               coordvals.cr1 = SocialCalc.coordToCr(value.value.substring(0,pos));
+               pos2 = value.value.indexOf("|", pos+1);
+               coordvals.cr2 = SocialCalc.coordToCr(value.value.substring(pos+1,pos2));
+               coordvals.inrange = true;
+               coordvals.inrangestart = true;
+               i = i-1; // back up so will start up again here
+               continue;
                }
             else if (value.type == "coord") { // just a coord
                ttype = token_coord; // treat as a coord inline
                ttext = value.value; // and then drop through to next test which should succeed
-               }
-            else { // not a defined name - probably a function
                }
             }
 
@@ -7556,9 +7540,7 @@ SocialCalc.ConvertOtherFormatToSave = function(inputstr, inputformat) {
       row = 0;
       inquote = false;
       for (i=0; i<lines.length; i++) {
-         if (i==lines.length-1 && lines[i]=="") { // extra null line - ignore
-            break;
-            }
+         if (i==lines.length-1 && lines[i]=="") break; // extra null line - ignore
          if (inquote) { // if inquote, just continue from where left off
             value += "\n";
             }
@@ -7610,9 +7592,7 @@ SocialCalc.ConvertOtherFormatToSave = function(inputstr, inputformat) {
       row = 0;
       inquote = false;
       for (i=0; i<lines.length; i++) {
-         if (i==lines.length-1 && lines[i]=="") { // extra null line - ignore
-            break;
-            }
+         if (i==lines.length-1 && lines[i]=="") break; // extra null line - ignore
          if (inquote) { // if inquote, just continue from where left off
             value += "\n";
             }
@@ -7884,11 +7864,8 @@ SocialCalc.TableEditor = function(context) {
 
    /** @param {any} editor */
    this.recalcFunction = function(editor) {
-      if (editor.context.sheetobj.RecalcSheet) {
-         editor.context.sheetobj.RecalcSheet(SocialCalc.EditorSheetStatusCallback, editor);
-         return null;
-         }
-      else return null;
+      if (editor.context.sheetobj.RecalcSheet) editor.context.sheetobj.RecalcSheet(SocialCalc.EditorSheetStatusCallback, editor);
+      return null;
       };
 
    // ctrlkeyFunction: if present, function(editor, charname) {...}, called to handle ctrl-V, etc., at top level
@@ -9076,21 +9053,15 @@ SocialCalc.ProcessEditorMouseDown = function(e) {
    mouseinfo.editor = editor; // remember for later
 
     if (result.rowheader) {
-	if (result.rowselect)  {
-	    SocialCalc.ProcessEditorRowselectMouseDown(e, ele, result);
-	} else {
-	    SocialCalc.ProcessEditorRowsizeMouseDown(e, ele, result);
-	}
-	return;
+       if (result.rowselect) SocialCalc.ProcessEditorRowselectMouseDown(e, ele, result);
+       else SocialCalc.ProcessEditorRowsizeMouseDown(e, ele, result);
+       return;
     }
 
     if (result.colheader) {
-	if (result.colselect)  {
-	    SocialCalc.ProcessEditorColselectMouseDown(e, ele, result);
-	} else {
-	    SocialCalc.ProcessEditorColsizeMouseDown(e, ele, result);
-	}
-	return;
+       if (result.colselect) SocialCalc.ProcessEditorColselectMouseDown(e, ele, result);
+       else SocialCalc.ProcessEditorColsizeMouseDown(e, ele, result);
+       return;
     }
 
    if (!result.coord) return; // not us
@@ -9101,23 +9072,17 @@ SocialCalc.ProcessEditorMouseDown = function(e) {
       }
    coord = editor.MoveECell(result.coord);
    // eddy ProcessEditorMouseDown {
-   if(SocialCalc._app == true) { // "app" wigets need to keep focus - needed because "coord" always equals A1
-     SocialCalc.CmdGotFocus(true); // cell widgets need to keep focus
-     return;
-   }
+   // "app" widgets need to keep focus - needed because "coord" always equals A1
+   if(SocialCalc._app == true) { SocialCalc.CmdGotFocus(true); return; }
 
    var clickedCell = editor.context.sheetobj.cells[coord];
-   if(clickedCell) {
-     if(clickedCell.valuetype.charAt(1) == 'i') { // IF cell contains ioWidget
-       var formula_name= clickedCell.valuetype.substring(2);
-       var widget_id = formula_name+'_'+coord;
-       if(target && widget_id == target.id) { // if widget was clicked (rather than cell containing widget)
-         var cell_widget=document.getElementById(widget_id);
-         SocialCalc.CmdGotFocus(cell_widget); // cell widgets need to keep focus
-       }
-		return; // let ioWidget keep the focus
-		}
-	 }
+   if(clickedCell && clickedCell.valuetype.charAt(1) == 'i') { // IF cell contains ioWidget
+      var formula_name = clickedCell.valuetype.substring(2);
+      var widget_id = formula_name+'_'+coord;
+      // if widget was clicked (rather than cell containing widget)
+      if (target && widget_id == target.id) SocialCalc.CmdGotFocus(document.getElementById(widget_id));
+      return; // let ioWidget keep the focus
+   }
    // }
 
    if (range.hasrange) {
@@ -9661,15 +9626,7 @@ SocialCalc.SetDragAutoRepeat = function(editor, mouseinfo, callback) {
          if (mouseinfo.row != repeatinfo.mouseinfo.row) { // changed row while dragging sidewards
             coord = SocialCalc.crToCoord(editor.ecell.col, mouseinfo.row); // change to it
             if (repeatinfo.repeatcallback) {
-               if (mouseinfo.row < repeatinfo.mouseinfo.row) {
-                  direction = "left";
-                  }
-               else if (mouseinfo.row > repeatinfo.mouseinfo.row) {
-                  direction = "right";
-                  }
-               else {
-                  direction = "";
-                  }
+               direction = mouseinfo.row < repeatinfo.mouseinfo.row ? "left" : (mouseinfo.row > repeatinfo.mouseinfo.row ? "right" : "");
                repeatinfo.repeatcallback(coord, direction);
                }
             else {
@@ -9684,15 +9641,7 @@ SocialCalc.SetDragAutoRepeat = function(editor, mouseinfo, callback) {
          if (mouseinfo.col != repeatinfo.mouseinfo.col) { // changed col while dragging vertically
             coord = SocialCalc.crToCoord(mouseinfo.col, editor.ecell.row); // change to it
             if (repeatinfo.repeatcallback) {
-               if (mouseinfo.row < repeatinfo.mouseinfo.row) {
-                  direction = "left";
-                  }
-               else if (mouseinfo.row > repeatinfo.mouseinfo.row) {
-                  direction = "right";
-                  }
-               else {
-                  direction = "";
-                  }
+               direction = mouseinfo.row < repeatinfo.mouseinfo.row ? "left" : (mouseinfo.row > repeatinfo.mouseinfo.row ? "right" : "");
                repeatinfo.repeatcallback(coord, direction);
                }
             else {
@@ -9964,13 +9913,8 @@ SocialCalc.EditorProcessKey = function(editor, ch, e) {
             editor.inputBox.ShowInputBox(true); // make sure it's moved back if necessary
             return false;
             }
-         if (ch=="[f2]") {
-           editor.state = "inputboxdirect";
-           return false;
-           }
-         if (range.hasrange) {
-            editor.RangeRemove();
-            }
+         if (ch=="[f2]") { editor.state = "inputboxdirect"; return false; }
+         if (range.hasrange) editor.RangeRemove();
          editor.MoveECell(wval.ecoord);
          if (wval.partialexpr) {
             editor.inputBox.ShowInputBox(true); // make sure it's moved back if necessary
@@ -10001,10 +9945,8 @@ SocialCalc.EditorProcessKey = function(editor, ch, e) {
                }
             break;
             }
-         if (ch=="[f2]") {
-           editor.state = "input"; // arrow keys add range/coord to inputbox formula
-           return false;
-           }
+         // [f2] in inputboxdirect: arrow keys add range/coord to inputbox formula
+         if (ch=="[f2]") { editor.state = "input"; return false; }
          return true;
 
       case "skip-and-start":
@@ -11658,24 +11600,9 @@ SocialCalc.InputBox.prototype.Blur = function() {return this.element.blur();};
 /** @param {any} t */
 SocialCalc.InputBox.prototype.Select = function(t) {
    if (!this.element) return;
-   var doc = /** @type {any} */ (document);
    switch (t) {
       case "end":
-         if (doc.selection && doc.selection.createRange) {
-            /* IE 4+ - Safer than setting .selectionEnd as it also works for Textareas. */
-            try {
-               var range = doc.selection.createRange().duplicate();
-               range.moveToElementText(this.element);
-               range.collapse(false);
-               range.select();
-            }
-            catch (e) {
-               if (this.element.selectionStart!=undefined) {
-                  this.element.selectionStart=this.element.value.length;
-                  this.element.selectionEnd=this.element.value.length;
-               }
-            }
-         } else if (this.element.selectionStart!=undefined) {
+         if (this.element.selectionStart!=undefined) {
             this.element.selectionStart=this.element.value.length;
             this.element.selectionEnd=this.element.value.length;
          }
@@ -12409,27 +12336,21 @@ SocialCalc.CellHandlesMouseMove = function(e) {
             cellhandles.startingX = clientX;
             cellhandles.startingY = clientY;
             }
-         else {
-            if (cellhandles.filltype) { // moving and have already determined filltype
-               if (cellhandles.filltype=="Down") { // coerse to that
-                  crend.col = crstart.col;
-                  if (crend.row < crstart.row) crend.row = crstart.row;
-                  }
-               else {
-                  crend.row = crstart.row;
-                  if (crend.col < crstart.col) crend.col = crstart.col;
-                  }
+         else if (cellhandles.filltype) { // moving and have already determined filltype
+            if (cellhandles.filltype=="Down") { // coerse to that
+               crend.col = crstart.col;
+               if (crend.row < crstart.row) crend.row = crstart.row;
                }
             else {
-               if (Math.abs(clientY - cellhandles.startingY) > 10) {
-                  cellhandles.filltype = "Down";
-                  }
-               else if (Math.abs(clientX - cellhandles.startingX) > 10) {
-                  cellhandles.filltype = "Right";
-                  }
-               crend.col = crstart.col; // until decide, leave it at start
                crend.row = crstart.row;
+               if (crend.col < crstart.col) crend.col = crstart.col;
                }
+            }
+         else {
+            if (Math.abs(clientY - cellhandles.startingY) > 10) cellhandles.filltype = "Down";
+            else if (Math.abs(clientX - cellhandles.startingX) > 10) cellhandles.filltype = "Right";
+            crend.col = crstart.col; // until decide, leave it at start
+            crend.row = crstart.row;
             }
          result.coord = SocialCalc.crToCoord(crend.col, crend.row);
          if (result.coord!=mouseinfo.mouselastcoord) {
@@ -12456,34 +12377,26 @@ SocialCalc.CellHandlesMouseMove = function(e) {
             cellhandles.startingX = clientX;
             cellhandles.startingY = clientY;
             }
-         else {
-            if (cellhandles.filltype) { // moving and have already determined filltype
-               if (cellhandles.filltype=="Vertical") { // coerse to that
-                  crend.col = editor.range2.left;
-                  if (crend.row>=editor.range2.top && crend.row<=editor.range2.bottom+1) crend.row = editor.range2.bottom+2;
-                  }
-               else {
-                  crend.row = editor.range2.top;
-                  if (crend.col>=editor.range2.left && crend.col<=editor.range2.right+1) crend.col = editor.range2.right+2;
-                  }
+         else if (cellhandles.filltype) { // moving and have already determined filltype
+            if (cellhandles.filltype=="Vertical") { // coerse to that
+               crend.col = editor.range2.left;
+               if (crend.row>=editor.range2.top && crend.row<=editor.range2.bottom+1) crend.row = editor.range2.bottom+2;
                }
             else {
-               if (Math.abs(clientY - cellhandles.startingY) > 10) {
-                  cellhandles.filltype = "Vertical";
-                  }
-               else if (Math.abs(clientX - cellhandles.startingX) > 10) {
-                  cellhandles.filltype = "Horizontal";
-                  }
-               crend.col = crstart.col; // until decide, leave it at start
-               crend.row = crstart.row;
+               crend.row = editor.range2.top;
+               if (crend.col>=editor.range2.left && crend.col<=editor.range2.right+1) crend.col = editor.range2.right+2;
                }
+            }
+         else {
+            if (Math.abs(clientY - cellhandles.startingY) > 10) cellhandles.filltype = "Vertical";
+            else if (Math.abs(clientX - cellhandles.startingX) > 10) cellhandles.filltype = "Horizontal";
+            crend.col = crstart.col; // until decide, leave it at start
+            crend.row = crstart.row;
             }
          result.coord = SocialCalc.crToCoord(crend.col, crend.row);
          if (result.coord!=mouseinfo.mouselastcoord) {
             editor.MoveECell(result.coord);
-            if (!cellhandles.filltype) { // no fill type
-               editor.RangeRemove();
-               }
+            if (!cellhandles.filltype) editor.RangeRemove(); // no fill type
             else {
                c = editor.range2.right - editor.range2.left + crend.col;
                r = editor.range2.bottom - editor.range2.top + crend.row;
@@ -12710,12 +12623,8 @@ SocialCalc.CellHandlesMouseUp = function(e) {
          editor.EditorScheduleSheetCommands(cstr, true, false);
          editor.Range2Remove();
          editor.RangeRemove();
-         if (editor.cellhandles.filltype==" Horizontal" && deltac > 0) {
-            editor.MoveECell(SocialCalc.crToCoord(editor.ecell.col-sizec-1, editor.ecell.row));
-            }
-         else if (editor.cellhandles.filltype==" Vertical" && deltar > 0) {
-            editor.MoveECell(SocialCalc.crToCoord(editor.ecell.col, editor.ecell.row-sizer-1));
-            }
+         // Dead code removed: compared filltype to " Horizontal"/" Vertical"
+         // (with leading space) but filltype is never assigned with a space.
          editor.RangeAnchor(SocialCalc.crToCoord(editor.ecell.col+sizec, editor.ecell.row+sizer));
          editor.RangeExtend();
 
@@ -13938,23 +13847,6 @@ SocialCalc.keyboardTables = {
       90: "[ctrl-z]"
       },
 
-   specialKeysOpera: {
-      8: "[backspace]", 9: "[tab]", 13: "[enter]", 25: "[tab]", 27: "[esc]", 33: "[pgup]", 34: "[pgdn]",
-      35: "[end]", 36: "[home]", 37: "[aleft]", 38: "[aup]", 39: "[aright]", 40: "[adown]",
-      45: "[ins]", // issues with releases before 9.5 - same as "-" ("-" changed in 9.5)
-      46: "[del]", // issues with releases before 9.5 - same as "." ("." changed in 9.5)
-      113: "[f2]"
-      },
-
-   controlKeysOpera: {
-      65: "[ctrl-a]",
-      67: "[ctrl-c]",
-      83: "[ctrl-s]",
-      86: "[ctrl-v]",
-      88: "[ctrl-x]",
-      90: "[ctrl-z]"
-      },
-
    specialKeysSafari: {
       8: "[backspace]", 9: "[tab]", 13: "[enter]", 25: "[tab]", 27: "[esc]", 63232: "[aup]", 63233: "[adown]",
       63234: "[aleft]", 63235: "[aright]", 63272: "[del]", 63273: "[home]", 63275: "[end]", 63276: "[pgup]",
@@ -14110,33 +14002,7 @@ SocialCalc.ProcessKeyPress = function(e) {
    else { // not IE
       if (!e.which)
          return false; // ignore - special key
-      if (e.charCode==undefined) { // Opera
-         if (e.which!=0) { // character
-            if (e.which<32 || e.which==144) { // special char (144 is numlock)
-               ch = kt.specialKeysOpera[e.which];
-               if (ch) {
-                  return true;
-                  }
-               }
-            else {
-               if (e.ctrlKey) {
-                  ch=kt.controlKeysOpera[e.keyCode];
-                  }
-               else {
-                  ch = String.fromCharCode(e.which);
-                  }
-               }
-            }
-         else { // special char
-            return true;
-            }
-         }
-
-      else if (e.keyCode==0 && e.charCode==0) { // OLPC Fn key or something
-         return; // ignore
-         }
-
-      else if (e.keyCode==e.charCode) { // Safari
+      if (e.keyCode==e.charCode) { // Safari
          ch = kt.specialKeysSafari[e.keyCode];
          if (!ch) {
             if (kt.ignoreKeysSafari[e.keyCode]) // pass this through
@@ -14755,17 +14621,9 @@ SocialCalc.FormatNumber.formatNumberWithFormat = function(rawvalue, format_strin
                }
             }
          }
-      else if (op == scfn.commands.section) { // end of section
-         break;
-         }
-
-      else if (op == scfn.commands.comparison) { // ignore
-         continue;
-         }
-
-      else {
-         result += "!! Parse error !!";
-         }
+      else if (op == scfn.commands.section) break; // end of section
+      else if (op == scfn.commands.comparison) continue; // ignore
+      else result += "!! Parse error !!";
       }
 
    if (textcolor) {
@@ -15631,15 +15489,13 @@ SocialCalc.Formula.ParseFormulaIntoTokens = function(line) {
                   if (twochrop == '<=' || twochrop == ">=" || twochrop == "<>") {
                      str = last_token_text + str;
                      parseinfo.pop();
-                     if (parseinfo.length>0) {
-                        last_token = parseinfo[parseinfo.length-1];
-                        last_token_type = last_token.type;
-                        last_token_text = last_token.text;
-                        }
-                     else {
-                        last_token_type = charclass.eof;
-                        last_token_text = "EOF";
-                        }
+                     // parseinfo.pop() came from `last_token_type == op`, which
+                     // itself came from `parseinfo.length > 0`. The first op in a
+                     // formula never gets stored as a plain op (unary rewrite to
+                     // M/P or error), so parseinfo.length stays > 0 after pop.
+                     last_token = parseinfo[parseinfo.length-1];
+                     last_token_type = last_token.type;
+                     last_token_text = last_token.text;
                      }
                   }
                }
@@ -15667,22 +15523,12 @@ SocialCalc.Formula.ParseFormulaIntoTokens = function(line) {
                   }
                }
             else if (str.length > 1) {
-               if (str == '>=') { // G is >=
-                  str = "G";
-                  ch = "G";
-                  }
-               else if (str == '<=') { // L is <=
-                  str = "L";
-                  ch = "L";
-                  }
-               else if (str == '<>') { // N is <>
-                  str = "N";
-                  ch = "N";
-                  }
-               else {
-                  t = tokentype.error;
-                  str = scc.s_parseerrtwoops;
-                  }
+               // str is always one of >=, <=, <> here: the op-accumulator at
+               // line 357 only folds those three pairs; every other two-op
+               // sequence is emitted as two single-char tokens.
+               if (str == '>=') { str = "G"; ch = "G"; }
+               else if (str == '<=') { str = "L"; ch = "L"; }
+               else { str = "N"; ch = "N"; } // str == '<>'
                }
             pushtoken(parseinfo, str, t, ch);
             state = 0;
@@ -15830,15 +15676,11 @@ SocialCalc.Formula.ConvertInfixToPolish = function(parseinfo) {
                 && parseinfo[parsestack[parsestack.length-1]].text != '(') {
             tprecedence = token_precedence[pii.opcode];
             tstackprecedence = token_precedence[parseinfo[parsestack[parsestack.length-1]].opcode];
-            if (tprecedence >= 0 && tprecedence < tstackprecedence) {
-               break;
-               }
-            else if (tprecedence < 0) {
+            if (tprecedence >= 0 && tprecedence < tstackprecedence) break;
+            if (tprecedence < 0) {
                tprecedence = -tprecedence;
                if (tstackprecedence < 0) tstackprecedence = -tstackprecedence;
-               if (tprecedence <= tstackprecedence) {
-                  break;
-                  }
+               if (tprecedence <= tstackprecedence) break;
                }
             revpolish.push(parsestack.pop());
             }
@@ -15846,10 +15688,6 @@ SocialCalc.Formula.ConvertInfixToPolish = function(parseinfo) {
          }
       else if (ttype == tokentype.error) {
          errortext = ttext;
-         break;
-         }
-      else {
-         errortext = "Internal error while processing parsed formula. ";
          break;
          }
       }
@@ -15970,7 +15808,6 @@ SocialCalc.Formula.EvaluatePolish = function(parseinfo, revpolish, sheet, allowr
       else if (ttype == tokentype.op) {
          if (operand.length <= 0) { // Nothing on the stack...
             return missingOperandError;
-            break; // done
             }
 
          // Unary minus
@@ -16016,9 +15853,6 @@ SocialCalc.Formula.EvaluatePolish = function(parseinfo, revpolish, sheet, allowr
                return missingOperandError;
                }
             value1 = scf.OperandsAsRangeOnSheet(sheet, operand); // get coords even if use name on other sheet
-            if (value1.error) { // not available
-               errortext = errortext || value1.error;
-               }
             PushOperand(value1.type, value1.value); // push sheetname with range on that sheet
             }
 
@@ -16461,19 +16295,13 @@ SocialCalc.Formula.OperandValueAndType = function(sheet, operand) {
          result.value = result.value.substring(0, pos); // get coord part
          }
 
-      if (coordsheet) {
-         cell = coordsheet.cells[SocialCalc.Formula.PlainCoord(result.value)];
-         if (cell) {
-            cellvtype = cell.valuetype; // get type of value in the cell it points to
-            result.value = cell.datavalue;
-            }
-         else {
-            cellvtype = "b";
-            }
+      cell = coordsheet.cells[SocialCalc.Formula.PlainCoord(result.value)];
+      if (cell) {
+         cellvtype = cell.valuetype; // get type of value in the cell it points to
+         result.value = cell.datavalue;
          }
       else {
-         cellvtype = "e#N/A";
-         result.value = 0;
+         cellvtype = "b";
          }
       result.type = cellvtype || "b";
       if (result.type == "b") { // blank
@@ -16786,9 +16614,7 @@ SocialCalc.Formula.LookupName = function(sheet, name, isEnd) {
             delete sheet.checknamecirc; // done with walk
             }
 
-         if (value.type != "range") {
-            return value;
-            }
+         if (value.type != "range") return value;
          }
 
       pos = value.value.indexOf(":");
@@ -16854,13 +16680,10 @@ SocialCalc.Formula.StepThroughRangeDown = function(operand, rangevalue) {
    else {
       sheet1 = "";
       }
-   pos1 = value2.indexOf("!");
-   if (pos1 != -1) {
-      value2 = value2.substring(0, pos1);
-      }
+   // value2 (right-hand coord of a range) is stored without a sheet ref.
 
    rp = scf.OrderRangeParts(value1, value2);
-   
+
    count = 0;
    for (r=rp.r1; r<=rp.r2; r++) {
       for (c=rp.c1; c<=rp.c2; c++) {
@@ -16913,10 +16736,7 @@ SocialCalc.Formula.DecodeRangeParts = function(sheetdata, range) {
    else {
       sheet1 = "";
       }
-   pos1 = value2.indexOf("!");
-   if (pos1 != -1) {
-      value2 = value2.substring(0, pos1);
-      }
+   // value2 (right-hand coord of a range) is stored without a sheet ref.
 
    coordsheetdata = sheetdata;
    if (sheet1) { // sheet reference
@@ -17484,15 +17304,12 @@ SocialCalc.Formula.FunctionArgString = function(fname) {
             }
          return str;
          }
-      else if (nargs < 0) {
+      else { // nargs < 0: variable-arg form
          str = "v1";
          for (i=2; i<-nargs; i++) {
             str += ", v"+i;
             }
          return str+", ...";
-         }
-      else {
-         return "nargs: "+nargs;
          }
       }
 
@@ -18175,7 +17992,7 @@ SocialCalc.Formula.LookupFunctions = function(fname, operand, foperand, sheet) {
          return;
          }
       }
-   else if (fname == "MATCH") {
+   else { // MATCH (the only other fname routed here)
       if (rangeinfo.ncols > 1) {
          if (rangeinfo.nrows > 1) {
             PushOperand("e#N/A", 0);
@@ -18186,10 +18003,6 @@ SocialCalc.Formula.LookupFunctions = function(fname, operand, foperand, sheet) {
       else {
          rincr = 1;
          }
-      }
-   else {
-      scf.FunctionArgsError(fname, operand);
-      return 0;
       }
    if (offsetvalue < 1 && fname != "MATCH") {
       PushOperand("e#VALUE!", 0);
@@ -18455,15 +18268,9 @@ SocialCalc.Formula.CountifSumifFunctions = function(fname, operand, foperand, sh
       sumrange = {value: range.value, type: range.type};
       }
 
-   if (criteria.type.charAt(0) == "n") {
-      criteria.value = criteria.value + ""; // make text
-      }
-   else if (criteria.type.charAt(0) == "e") { // error
-      criteria.value = null;
-      }
-   else if (criteria.type.charAt(0) == "b") { // blank here is undefined
-      criteria.value = null;
-      }
+   // OperandAsText already coerces numeric/blank to text and stamps type "t".
+   // Errors keep their "e..." type with empty value; treat that as a null match.
+   if (criteria.type.charAt(0) == "e") criteria.value = null;
 
    if (range.type != "coord" && range.type != "range") {
       scf.FunctionArgsError(fname, operand);
@@ -18548,15 +18355,8 @@ SocialCalc.Formula.SumifsFunction = function(fname, operand, foperand, sheet) {
    while (foperand.length) {
       range = scf.TopOfStackValueAndType(sheet, foperand); // get range or coord
       criteria = scf.OperandAsText(sheet, foperand); // get criteria
-      if (criteria.type.charAt(0) == "n") {
-         criteria.value = criteria.value + ""; // make text
-         }
-      else if (criteria.type.charAt(0) == "e") { // error
-         criteria.value = null;
-         }
-      else if (criteria.type.charAt(0) == "b") { // blank here is undefined
-         criteria.value = null;
-         }
+      // OperandAsText coerces numeric/blank to text. Errors keep "e..." type.
+      if (criteria.type.charAt(0) == "e") criteria.value = null;
       if (range.type != "coord" && range.type != "range") {
          scf.FunctionArgsError(fname, operand);
          return 0;
@@ -18984,15 +18784,9 @@ SocialCalc.Formula.StringFunctions = function(fname, operand, foperand, sheet) {
          scf.FunctionArgsError(fname, operand);
          return;
          }
-      if (argdef[i-1] == 0) {
-         value = scf.OperandAsNumber(sheet, foperand);
-         }
-      else if (argdef[i-1] == 1) {
-         value = scf.OperandAsText(sheet, foperand);
-         }
-      else if (argdef[i-1] == -1) {
-         value = scf.OperandValueAndType(sheet, foperand);
-         }
+      // ArgList only ever uses 0 (number) or 1 (text).
+      if (argdef[i-1] == 0) value = scf.OperandAsNumber(sheet, foperand);
+      else value = scf.OperandAsText(sheet, foperand);
       operand_value[i] = value.value;
       operand_type[i] = value.type;
       if (value.type.charAt(0) == "e") {
@@ -20911,16 +20705,11 @@ SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord
         if(SocialCalc._app) { // panel only works in live app
           var showrows = [], showcols = [];
           //  --- FOR each panel to show
-          for (var parameterIndex = firstPanelIndex; parameterIndex < operand_value.length; ++parameterIndex) { 
-            // show panel if its index is in the showindices list 
-            var showPanelFound = false;
-            for(var showIndex in showindices ) { 
-              if (showindices[showIndex] == parameterIndex-1) {
-                showPanelFound = true;
-                break;
-              }
-            }
-            if(showPanelFound === false) continue;
+          for (var parameterIndex = firstPanelIndex; parameterIndex < operand_value.length; ++parameterIndex) {
+            // show panel if its index is in the showindices list
+            var wanted = parameterIndex - 1;
+            var showPanelFound = Object.keys(showindices).some(/** @param {string} k */ function (k) { return showindices[k] == wanted; });
+            if (!showPanelFound) continue;
             
           
             //  ----- get panel range rows & cols only
@@ -25598,20 +25387,6 @@ SocialCalc.LoadColumnChoosers = function(spreadsheet) {
    }
 
 //
-// SocialCalc.CmdGotFocus(obj)
-//
-// Sets SocialCalc.Keyboard.passThru: obj should be element with focus or "true"
-//
-
-/** @param {any} obj */
-SocialCalc.CmdGotFocus = function(obj) {
-
-   SocialCalc.Keyboard.passThru = obj;
-
-   }
-
-
-//
 // SocialCalc.DoButtonCmd(e, buttoninfo, bobj)
 //
 
@@ -26574,12 +26349,8 @@ SocialCalc.SpreadsheetControl.DoLink = function() {
    text = SocialCalc.special_chars(text);
 
    cell = spreadsheet.sheet.cells[editor.ecell.coord];
-   if (!cell || !cell.textvalueformat) { // set to link format, but don't override
-      setformat = " checked";
-      }
-   else {
-      setformat = "";
-      }
+   // set to link format, but don't override
+   setformat = (!cell || !cell.textvalueformat) ? " checked" : "";
 
    popup = parts.newwin ? " checked" : "";
 

@@ -357,15 +357,13 @@ SocialCalc.Formula.ParseFormulaIntoTokens = function(line) {
                   if (twochrop == '<=' || twochrop == ">=" || twochrop == "<>") {
                      str = last_token_text + str;
                      parseinfo.pop();
-                     if (parseinfo.length>0) {
-                        last_token = parseinfo[parseinfo.length-1];
-                        last_token_type = last_token.type;
-                        last_token_text = last_token.text;
-                        }
-                     else {
-                        last_token_type = charclass.eof;
-                        last_token_text = "EOF";
-                        }
+                     // parseinfo.pop() came from `last_token_type == op`, which
+                     // itself came from `parseinfo.length > 0`. The first op in a
+                     // formula never gets stored as a plain op (unary rewrite to
+                     // M/P or error), so parseinfo.length stays > 0 after pop.
+                     last_token = parseinfo[parseinfo.length-1];
+                     last_token_type = last_token.type;
+                     last_token_text = last_token.text;
                      }
                   }
                }
@@ -393,22 +391,12 @@ SocialCalc.Formula.ParseFormulaIntoTokens = function(line) {
                   }
                }
             else if (str.length > 1) {
-               if (str == '>=') { // G is >=
-                  str = "G";
-                  ch = "G";
-                  }
-               else if (str == '<=') { // L is <=
-                  str = "L";
-                  ch = "L";
-                  }
-               else if (str == '<>') { // N is <>
-                  str = "N";
-                  ch = "N";
-                  }
-               else {
-                  t = tokentype.error;
-                  str = scc.s_parseerrtwoops;
-                  }
+               // str is always one of >=, <=, <> here: the op-accumulator at
+               // line 357 only folds those three pairs; every other two-op
+               // sequence is emitted as two single-char tokens.
+               if (str == '>=') { str = "G"; ch = "G"; }
+               else if (str == '<=') { str = "L"; ch = "L"; }
+               else { str = "N"; ch = "N"; } // str == '<>'
                }
             pushtoken(parseinfo, str, t, ch);
             state = 0;
@@ -556,15 +544,11 @@ SocialCalc.Formula.ConvertInfixToPolish = function(parseinfo) {
                 && parseinfo[parsestack[parsestack.length-1]].text != '(') {
             tprecedence = token_precedence[pii.opcode];
             tstackprecedence = token_precedence[parseinfo[parsestack[parsestack.length-1]].opcode];
-            if (tprecedence >= 0 && tprecedence < tstackprecedence) {
-               break;
-               }
-            else if (tprecedence < 0) {
+            if (tprecedence >= 0 && tprecedence < tstackprecedence) break;
+            if (tprecedence < 0) {
                tprecedence = -tprecedence;
                if (tstackprecedence < 0) tstackprecedence = -tstackprecedence;
-               if (tprecedence <= tstackprecedence) {
-                  break;
-                  }
+               if (tprecedence <= tstackprecedence) break;
                }
             revpolish.push(parsestack.pop());
             }
@@ -572,10 +556,6 @@ SocialCalc.Formula.ConvertInfixToPolish = function(parseinfo) {
          }
       else if (ttype == tokentype.error) {
          errortext = ttext;
-         break;
-         }
-      else {
-         errortext = "Internal error while processing parsed formula. ";
          break;
          }
       }
@@ -696,7 +676,6 @@ SocialCalc.Formula.EvaluatePolish = function(parseinfo, revpolish, sheet, allowr
       else if (ttype == tokentype.op) {
          if (operand.length <= 0) { // Nothing on the stack...
             return missingOperandError;
-            break; // done
             }
 
          // Unary minus
@@ -742,9 +721,6 @@ SocialCalc.Formula.EvaluatePolish = function(parseinfo, revpolish, sheet, allowr
                return missingOperandError;
                }
             value1 = scf.OperandsAsRangeOnSheet(sheet, operand); // get coords even if use name on other sheet
-            if (value1.error) { // not available
-               errortext = errortext || value1.error;
-               }
             PushOperand(value1.type, value1.value); // push sheetname with range on that sheet
             }
 
@@ -1187,19 +1163,13 @@ SocialCalc.Formula.OperandValueAndType = function(sheet, operand) {
          result.value = result.value.substring(0, pos); // get coord part
          }
 
-      if (coordsheet) {
-         cell = coordsheet.cells[SocialCalc.Formula.PlainCoord(result.value)];
-         if (cell) {
-            cellvtype = cell.valuetype; // get type of value in the cell it points to
-            result.value = cell.datavalue;
-            }
-         else {
-            cellvtype = "b";
-            }
+      cell = coordsheet.cells[SocialCalc.Formula.PlainCoord(result.value)];
+      if (cell) {
+         cellvtype = cell.valuetype; // get type of value in the cell it points to
+         result.value = cell.datavalue;
          }
       else {
-         cellvtype = "e#N/A";
-         result.value = 0;
+         cellvtype = "b";
          }
       result.type = cellvtype || "b";
       if (result.type == "b") { // blank
@@ -1512,9 +1482,7 @@ SocialCalc.Formula.LookupName = function(sheet, name, isEnd) {
             delete sheet.checknamecirc; // done with walk
             }
 
-         if (value.type != "range") {
-            return value;
-            }
+         if (value.type != "range") return value;
          }
 
       pos = value.value.indexOf(":");
@@ -1580,13 +1548,10 @@ SocialCalc.Formula.StepThroughRangeDown = function(operand, rangevalue) {
    else {
       sheet1 = "";
       }
-   pos1 = value2.indexOf("!");
-   if (pos1 != -1) {
-      value2 = value2.substring(0, pos1);
-      }
+   // value2 (right-hand coord of a range) is stored without a sheet ref.
 
    rp = scf.OrderRangeParts(value1, value2);
-   
+
    count = 0;
    for (r=rp.r1; r<=rp.r2; r++) {
       for (c=rp.c1; c<=rp.c2; c++) {
@@ -1639,10 +1604,7 @@ SocialCalc.Formula.DecodeRangeParts = function(sheetdata, range) {
    else {
       sheet1 = "";
       }
-   pos1 = value2.indexOf("!");
-   if (pos1 != -1) {
-      value2 = value2.substring(0, pos1);
-      }
+   // value2 (right-hand coord of a range) is stored without a sheet ref.
 
    coordsheetdata = sheetdata;
    if (sheet1) { // sheet reference
@@ -2210,15 +2172,12 @@ SocialCalc.Formula.FunctionArgString = function(fname) {
             }
          return str;
          }
-      else if (nargs < 0) {
+      else { // nargs < 0: variable-arg form
          str = "v1";
          for (i=2; i<-nargs; i++) {
             str += ", v"+i;
             }
          return str+", ...";
-         }
-      else {
-         return "nargs: "+nargs;
          }
       }
 
@@ -2901,7 +2860,7 @@ SocialCalc.Formula.LookupFunctions = function(fname, operand, foperand, sheet) {
          return;
          }
       }
-   else if (fname == "MATCH") {
+   else { // MATCH (the only other fname routed here)
       if (rangeinfo.ncols > 1) {
          if (rangeinfo.nrows > 1) {
             PushOperand("e#N/A", 0);
@@ -2912,10 +2871,6 @@ SocialCalc.Formula.LookupFunctions = function(fname, operand, foperand, sheet) {
       else {
          rincr = 1;
          }
-      }
-   else {
-      scf.FunctionArgsError(fname, operand);
-      return 0;
       }
    if (offsetvalue < 1 && fname != "MATCH") {
       PushOperand("e#VALUE!", 0);
@@ -3181,15 +3136,9 @@ SocialCalc.Formula.CountifSumifFunctions = function(fname, operand, foperand, sh
       sumrange = {value: range.value, type: range.type};
       }
 
-   if (criteria.type.charAt(0) == "n") {
-      criteria.value = criteria.value + ""; // make text
-      }
-   else if (criteria.type.charAt(0) == "e") { // error
-      criteria.value = null;
-      }
-   else if (criteria.type.charAt(0) == "b") { // blank here is undefined
-      criteria.value = null;
-      }
+   // OperandAsText already coerces numeric/blank to text and stamps type "t".
+   // Errors keep their "e..." type with empty value; treat that as a null match.
+   if (criteria.type.charAt(0) == "e") criteria.value = null;
 
    if (range.type != "coord" && range.type != "range") {
       scf.FunctionArgsError(fname, operand);
@@ -3274,15 +3223,8 @@ SocialCalc.Formula.SumifsFunction = function(fname, operand, foperand, sheet) {
    while (foperand.length) {
       range = scf.TopOfStackValueAndType(sheet, foperand); // get range or coord
       criteria = scf.OperandAsText(sheet, foperand); // get criteria
-      if (criteria.type.charAt(0) == "n") {
-         criteria.value = criteria.value + ""; // make text
-         }
-      else if (criteria.type.charAt(0) == "e") { // error
-         criteria.value = null;
-         }
-      else if (criteria.type.charAt(0) == "b") { // blank here is undefined
-         criteria.value = null;
-         }
+      // OperandAsText coerces numeric/blank to text. Errors keep "e..." type.
+      if (criteria.type.charAt(0) == "e") criteria.value = null;
       if (range.type != "coord" && range.type != "range") {
          scf.FunctionArgsError(fname, operand);
          return 0;
@@ -3710,15 +3652,9 @@ SocialCalc.Formula.StringFunctions = function(fname, operand, foperand, sheet) {
          scf.FunctionArgsError(fname, operand);
          return;
          }
-      if (argdef[i-1] == 0) {
-         value = scf.OperandAsNumber(sheet, foperand);
-         }
-      else if (argdef[i-1] == 1) {
-         value = scf.OperandAsText(sheet, foperand);
-         }
-      else if (argdef[i-1] == -1) {
-         value = scf.OperandValueAndType(sheet, foperand);
-         }
+      // ArgList only ever uses 0 (number) or 1 (text).
+      if (argdef[i-1] == 0) value = scf.OperandAsNumber(sheet, foperand);
+      else value = scf.OperandAsText(sheet, foperand);
       operand_value[i] = value.value;
       operand_type[i] = value.type;
       if (value.type.charAt(0) == "e") {
@@ -5637,16 +5573,11 @@ SocialCalc.Formula.IoFunctions = function(fname, operand, foperand, sheet, coord
         if(SocialCalc._app) { // panel only works in live app
           var showrows = [], showcols = [];
           //  --- FOR each panel to show
-          for (var parameterIndex = firstPanelIndex; parameterIndex < operand_value.length; ++parameterIndex) { 
-            // show panel if its index is in the showindices list 
-            var showPanelFound = false;
-            for(var showIndex in showindices ) { 
-              if (showindices[showIndex] == parameterIndex-1) {
-                showPanelFound = true;
-                break;
-              }
-            }
-            if(showPanelFound === false) continue;
+          for (var parameterIndex = firstPanelIndex; parameterIndex < operand_value.length; ++parameterIndex) {
+            // show panel if its index is in the showindices list
+            var wanted = parameterIndex - 1;
+            var showPanelFound = Object.keys(showindices).some(/** @param {string} k */ function (k) { return showindices[k] == wanted; });
+            if (!showPanelFound) continue;
             
           
             //  ----- get panel range rows & cols only

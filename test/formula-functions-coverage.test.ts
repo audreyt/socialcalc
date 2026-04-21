@@ -208,6 +208,27 @@ test("TRUNC / MOD sign combinations", async () => {
     expect(getDV("A9")).toBe(-2);
 });
 
+test("SUMIF/COUNTIF criteria coercion: numeric, blank, and error", async () => {
+    const { getDV } = await buildSheet([
+        "set A1 value n 1",
+        "set A2 value n 2",
+        "set A3 value n 3",
+        "set A4 value n 2",
+        // Numeric criteria (not text) — coerced to "2" string at L18337.
+        "set B1 formula COUNTIF(A1:A4,2)",
+        // Blank criteria (no value cell) — coerced to null at L18343.
+        // C1 is blank; passing it in matches blanks (none), result = 0.
+        "set B2 formula COUNTIF(A1:A4,C1)",
+        // Error criteria — coerced to null at L18340 (already covered) but
+        // confirming SUMIF treats it the same way.
+        "set D1 formula 1/0",
+        "set B3 formula COUNTIF(A1:A4,D1)",
+    ]);
+    expect(getDV("B1")).toBe(2);
+    expect(getDV("B2")).toBe(0);
+    expect(getDV("B3")).toBe(0);
+});
+
 test("SUMIF/COUNTIF with single-char wildcard `?` and mixed types", async () => {
     const { getDV } = await buildSheet([
         "set A1 text t cat",
@@ -767,6 +788,29 @@ test("DSeries: criteria field not found and error value in data", async () => {
     expect(getVT("E2").charAt(0)).toBe("e");
 });
 
+test("SumProduct + Lookup: DecodeRangeParts null returns e#REF!", async () => {
+    const { SC, sheet } = await buildSheet([
+        "set A1 value n 1",
+        "set A2 value n 2",
+    ]);
+    // Directly invoke with a foperand whose range points to a missing sheet.
+    const operand: any[] = [];
+    const foperand = [{ type: "range", value: "A1!nosheet|A2|" }];
+    SC.Formula.SumProductFunction("SUMPRODUCT", operand, foperand, sheet);
+    expect(operand[operand.length - 1].type).toBe("e#REF!");
+
+    // LookupFunctions (VLOOKUP/HLOOKUP/MATCH) uses the same DecodeRangeParts.
+    // Foperand stack (popped right-to-left): [range, offset, lookup].
+    const op2: any[] = [];
+    const fop2 = [
+        { type: "n", value: 1 },
+        { type: "n", value: 1 },
+        { type: "range", value: "A1!nosheet|A2|" },
+    ];
+    SC.Formula.LookupFunctions("VLOOKUP", op2, fop2, sheet);
+    expect(op2[op2.length - 1].type).toBe("e#REF!");
+});
+
 test("SUMPRODUCT: cross-sheet range to missing sheet and differing ncols", async () => {
     const { getDV, getVT } = await buildSheet([
         "set A1 value n 1",
@@ -1085,6 +1129,22 @@ test("IoFunctions EMAIL family returns 'Send'/'Send Now' resulttype", async () =
     );
     expect(op[0].value).toBe("Send Now");
     expect(op[0].type).toBe("tiEMAILAT");
+
+    // EMAILONEDIT falls through to the EMAILAT arm ("Send Now").
+    op = [];
+    SC.Formula.IoFunctions(
+        "EMAILONEDIT",
+        op,
+        [
+            { type: "range", value: "A3|A3|" },
+            { type: "range", value: "A2|A2|" },
+            { type: "range", value: "A1|A1|" },
+        ],
+        sheet,
+        "D3",
+    );
+    expect(op[0].value).toBe("Send Now");
+    expect(op[0].type).toBe("tiEMAILONEDIT");
 });
 
 test("IoFunctions COPYVALUE/COMMAND read trigger cell value", async () => {

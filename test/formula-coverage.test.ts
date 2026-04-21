@@ -1195,6 +1195,12 @@ test("StepThroughRangeDown walks coords and DecodeRangeParts handles missing she
     const only = SC.Formula.StepThroughRangeDown(op2, "A1|A1|");
     expect(only.value).toBe("A1");
     expect(op2.length).toBe(0);
+
+    // Sequence already past the end → both loops complete without a return,
+    // so the function returns undefined.
+    const op3: any[] = [];
+    const past = SC.Formula.StepThroughRangeDown(op3, "A1|A1|99");
+    expect(past).toBeUndefined();
 });
 
 test("CalculateFunction: unknown function fallback, too-few/too-many args, LN specific", async () => {
@@ -4918,4 +4924,19 @@ test("OperandAsText on 'th' (html) keeps type (L1069)", async () => {
     // Original: passthrough since charAt(0)=="t"
     expect(r.type).toBe("th");
     expect(r.value).toBe("<b>hi</b>");
+});
+
+// RecalcCheckCell: a formula references a name that resolves to a single coord.
+// Hits the `value.type == "coord"` branch that rewrites the token inline.
+test("RecalcCheckCell: formula using coord-named reference recalcs correctly", async () => {
+    const SC = await loadSocialCalc();
+    resetFormulaGlobals(SC);
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 7",
+        "name define MYCELL A1",
+        "set B1 formula MYCELL*2",
+    ]);
+    await recalcSheet(SC, sheet);
+    expect(sheet.cells.B1.datavalue).toBe(14);
 });

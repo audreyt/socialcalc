@@ -370,8 +370,6 @@ declare namespace SocialCalc {
    const keyboardTables: {
       specialKeysCommon: { [key: number]: string };
       controlKeysIE: { [key: number]: string };
-      specialKeysOpera: { [key: number]: string };
-      controlKeysOpera: { [key: number]: string };
       specialKeysSafari: { [key: number]: string };
       controlKeysSafari: { [key: number]: string };
       ignoreKeysSafari: { [key: number]: string };

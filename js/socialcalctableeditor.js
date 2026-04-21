@@ -177,11 +177,8 @@ SocialCalc.TableEditor = function(context) {
 
    /** @param {any} editor */
    this.recalcFunction = function(editor) {
-      if (editor.context.sheetobj.RecalcSheet) {
-         editor.context.sheetobj.RecalcSheet(SocialCalc.EditorSheetStatusCallback, editor);
-         return null;
-         }
-      else return null;
+      if (editor.context.sheetobj.RecalcSheet) editor.context.sheetobj.RecalcSheet(SocialCalc.EditorSheetStatusCallback, editor);
+      return null;
       };
 
    // ctrlkeyFunction: if present, function(editor, charname) {...}, called to handle ctrl-V, etc., at top level
@@ -1369,21 +1366,15 @@ SocialCalc.ProcessEditorMouseDown = function(e) {
    mouseinfo.editor = editor; // remember for later
 
     if (result.rowheader) {
-	if (result.rowselect)  {
-	    SocialCalc.ProcessEditorRowselectMouseDown(e, ele, result);
-	} else {
-	    SocialCalc.ProcessEditorRowsizeMouseDown(e, ele, result);
-	}
-	return;
+       if (result.rowselect) SocialCalc.ProcessEditorRowselectMouseDown(e, ele, result);
+       else SocialCalc.ProcessEditorRowsizeMouseDown(e, ele, result);
+       return;
     }
 
     if (result.colheader) {
-	if (result.colselect)  {
-	    SocialCalc.ProcessEditorColselectMouseDown(e, ele, result);
-	} else {
-	    SocialCalc.ProcessEditorColsizeMouseDown(e, ele, result);
-	}
-	return;
+       if (result.colselect) SocialCalc.ProcessEditorColselectMouseDown(e, ele, result);
+       else SocialCalc.ProcessEditorColsizeMouseDown(e, ele, result);
+       return;
     }
 
    if (!result.coord) return; // not us
@@ -1394,23 +1385,17 @@ SocialCalc.ProcessEditorMouseDown = function(e) {
       }
    coord = editor.MoveECell(result.coord);
    // eddy ProcessEditorMouseDown {
-   if(SocialCalc._app == true) { // "app" wigets need to keep focus - needed because "coord" always equals A1
-     SocialCalc.CmdGotFocus(true); // cell widgets need to keep focus
-     return;
-   }
+   // "app" widgets need to keep focus - needed because "coord" always equals A1
+   if(SocialCalc._app == true) { SocialCalc.CmdGotFocus(true); return; }
 
    var clickedCell = editor.context.sheetobj.cells[coord];
-   if(clickedCell) {
-     if(clickedCell.valuetype.charAt(1) == 'i') { // IF cell contains ioWidget
-       var formula_name= clickedCell.valuetype.substring(2);
-       var widget_id = formula_name+'_'+coord;
-       if(target && widget_id == target.id) { // if widget was clicked (rather than cell containing widget)
-         var cell_widget=document.getElementById(widget_id);
-         SocialCalc.CmdGotFocus(cell_widget); // cell widgets need to keep focus
-       }
-		return; // let ioWidget keep the focus
-		}
-	 }
+   if(clickedCell && clickedCell.valuetype.charAt(1) == 'i') { // IF cell contains ioWidget
+      var formula_name = clickedCell.valuetype.substring(2);
+      var widget_id = formula_name+'_'+coord;
+      // if widget was clicked (rather than cell containing widget)
+      if (target && widget_id == target.id) SocialCalc.CmdGotFocus(document.getElementById(widget_id));
+      return; // let ioWidget keep the focus
+   }
    // }
 
    if (range.hasrange) {
@@ -1954,15 +1939,7 @@ SocialCalc.SetDragAutoRepeat = function(editor, mouseinfo, callback) {
          if (mouseinfo.row != repeatinfo.mouseinfo.row) { // changed row while dragging sidewards
             coord = SocialCalc.crToCoord(editor.ecell.col, mouseinfo.row); // change to it
             if (repeatinfo.repeatcallback) {
-               if (mouseinfo.row < repeatinfo.mouseinfo.row) {
-                  direction = "left";
-                  }
-               else if (mouseinfo.row > repeatinfo.mouseinfo.row) {
-                  direction = "right";
-                  }
-               else {
-                  direction = "";
-                  }
+               direction = mouseinfo.row < repeatinfo.mouseinfo.row ? "left" : (mouseinfo.row > repeatinfo.mouseinfo.row ? "right" : "");
                repeatinfo.repeatcallback(coord, direction);
                }
             else {
@@ -1977,15 +1954,7 @@ SocialCalc.SetDragAutoRepeat = function(editor, mouseinfo, callback) {
          if (mouseinfo.col != repeatinfo.mouseinfo.col) { // changed col while dragging vertically
             coord = SocialCalc.crToCoord(mouseinfo.col, editor.ecell.row); // change to it
             if (repeatinfo.repeatcallback) {
-               if (mouseinfo.row < repeatinfo.mouseinfo.row) {
-                  direction = "left";
-                  }
-               else if (mouseinfo.row > repeatinfo.mouseinfo.row) {
-                  direction = "right";
-                  }
-               else {
-                  direction = "";
-                  }
+               direction = mouseinfo.row < repeatinfo.mouseinfo.row ? "left" : (mouseinfo.row > repeatinfo.mouseinfo.row ? "right" : "");
                repeatinfo.repeatcallback(coord, direction);
                }
             else {
@@ -2257,13 +2226,8 @@ SocialCalc.EditorProcessKey = function(editor, ch, e) {
             editor.inputBox.ShowInputBox(true); // make sure it's moved back if necessary
             return false;
             }
-         if (ch=="[f2]") {
-           editor.state = "inputboxdirect";
-           return false;
-           }
-         if (range.hasrange) {
-            editor.RangeRemove();
-            }
+         if (ch=="[f2]") { editor.state = "inputboxdirect"; return false; }
+         if (range.hasrange) editor.RangeRemove();
          editor.MoveECell(wval.ecoord);
          if (wval.partialexpr) {
             editor.inputBox.ShowInputBox(true); // make sure it's moved back if necessary
@@ -2294,10 +2258,8 @@ SocialCalc.EditorProcessKey = function(editor, ch, e) {
                }
             break;
             }
-         if (ch=="[f2]") {
-           editor.state = "input"; // arrow keys add range/coord to inputbox formula
-           return false;
-           }
+         // [f2] in inputboxdirect: arrow keys add range/coord to inputbox formula
+         if (ch=="[f2]") { editor.state = "input"; return false; }
          return true;
 
       case "skip-and-start":
@@ -3951,24 +3913,9 @@ SocialCalc.InputBox.prototype.Blur = function() {return this.element.blur();};
 /** @param {any} t */
 SocialCalc.InputBox.prototype.Select = function(t) {
    if (!this.element) return;
-   var doc = /** @type {any} */ (document);
    switch (t) {
       case "end":
-         if (doc.selection && doc.selection.createRange) {
-            /* IE 4+ - Safer than setting .selectionEnd as it also works for Textareas. */
-            try {
-               var range = doc.selection.createRange().duplicate();
-               range.moveToElementText(this.element);
-               range.collapse(false);
-               range.select();
-            }
-            catch (e) {
-               if (this.element.selectionStart!=undefined) {
-                  this.element.selectionStart=this.element.value.length;
-                  this.element.selectionEnd=this.element.value.length;
-               }
-            }
-         } else if (this.element.selectionStart!=undefined) {
+         if (this.element.selectionStart!=undefined) {
             this.element.selectionStart=this.element.value.length;
             this.element.selectionEnd=this.element.value.length;
          }
@@ -4702,27 +4649,21 @@ SocialCalc.CellHandlesMouseMove = function(e) {
             cellhandles.startingX = clientX;
             cellhandles.startingY = clientY;
             }
-         else {
-            if (cellhandles.filltype) { // moving and have already determined filltype
-               if (cellhandles.filltype=="Down") { // coerse to that
-                  crend.col = crstart.col;
-                  if (crend.row < crstart.row) crend.row = crstart.row;
-                  }
-               else {
-                  crend.row = crstart.row;
-                  if (crend.col < crstart.col) crend.col = crstart.col;
-                  }
+         else if (cellhandles.filltype) { // moving and have already determined filltype
+            if (cellhandles.filltype=="Down") { // coerse to that
+               crend.col = crstart.col;
+               if (crend.row < crstart.row) crend.row = crstart.row;
                }
             else {
-               if (Math.abs(clientY - cellhandles.startingY) > 10) {
-                  cellhandles.filltype = "Down";
-                  }
-               else if (Math.abs(clientX - cellhandles.startingX) > 10) {
-                  cellhandles.filltype = "Right";
-                  }
-               crend.col = crstart.col; // until decide, leave it at start
                crend.row = crstart.row;
+               if (crend.col < crstart.col) crend.col = crstart.col;
                }
+            }
+         else {
+            if (Math.abs(clientY - cellhandles.startingY) > 10) cellhandles.filltype = "Down";
+            else if (Math.abs(clientX - cellhandles.startingX) > 10) cellhandles.filltype = "Right";
+            crend.col = crstart.col; // until decide, leave it at start
+            crend.row = crstart.row;
             }
          result.coord = SocialCalc.crToCoord(crend.col, crend.row);
          if (result.coord!=mouseinfo.mouselastcoord) {
@@ -4749,34 +4690,26 @@ SocialCalc.CellHandlesMouseMove = function(e) {
             cellhandles.startingX = clientX;
             cellhandles.startingY = clientY;
             }
-         else {
-            if (cellhandles.filltype) { // moving and have already determined filltype
-               if (cellhandles.filltype=="Vertical") { // coerse to that
-                  crend.col = editor.range2.left;
-                  if (crend.row>=editor.range2.top && crend.row<=editor.range2.bottom+1) crend.row = editor.range2.bottom+2;
-                  }
-               else {
-                  crend.row = editor.range2.top;
-                  if (crend.col>=editor.range2.left && crend.col<=editor.range2.right+1) crend.col = editor.range2.right+2;
-                  }
+         else if (cellhandles.filltype) { // moving and have already determined filltype
+            if (cellhandles.filltype=="Vertical") { // coerse to that
+               crend.col = editor.range2.left;
+               if (crend.row>=editor.range2.top && crend.row<=editor.range2.bottom+1) crend.row = editor.range2.bottom+2;
                }
             else {
-               if (Math.abs(clientY - cellhandles.startingY) > 10) {
-                  cellhandles.filltype = "Vertical";
-                  }
-               else if (Math.abs(clientX - cellhandles.startingX) > 10) {
-                  cellhandles.filltype = "Horizontal";
-                  }
-               crend.col = crstart.col; // until decide, leave it at start
-               crend.row = crstart.row;
+               crend.row = editor.range2.top;
+               if (crend.col>=editor.range2.left && crend.col<=editor.range2.right+1) crend.col = editor.range2.right+2;
                }
+            }
+         else {
+            if (Math.abs(clientY - cellhandles.startingY) > 10) cellhandles.filltype = "Vertical";
+            else if (Math.abs(clientX - cellhandles.startingX) > 10) cellhandles.filltype = "Horizontal";
+            crend.col = crstart.col; // until decide, leave it at start
+            crend.row = crstart.row;
             }
          result.coord = SocialCalc.crToCoord(crend.col, crend.row);
          if (result.coord!=mouseinfo.mouselastcoord) {
             editor.MoveECell(result.coord);
-            if (!cellhandles.filltype) { // no fill type
-               editor.RangeRemove();
-               }
+            if (!cellhandles.filltype) editor.RangeRemove(); // no fill type
             else {
                c = editor.range2.right - editor.range2.left + crend.col;
                r = editor.range2.bottom - editor.range2.top + crend.row;
@@ -5003,12 +4936,8 @@ SocialCalc.CellHandlesMouseUp = function(e) {
          editor.EditorScheduleSheetCommands(cstr, true, false);
          editor.Range2Remove();
          editor.RangeRemove();
-         if (editor.cellhandles.filltype==" Horizontal" && deltac > 0) {
-            editor.MoveECell(SocialCalc.crToCoord(editor.ecell.col-sizec-1, editor.ecell.row));
-            }
-         else if (editor.cellhandles.filltype==" Vertical" && deltar > 0) {
-            editor.MoveECell(SocialCalc.crToCoord(editor.ecell.col, editor.ecell.row-sizer-1));
-            }
+         // Dead code removed: compared filltype to " Horizontal"/" Vertical"
+         // (with leading space) but filltype is never assigned with a space.
          editor.RangeAnchor(SocialCalc.crToCoord(editor.ecell.col+sizec, editor.ecell.row+sizer));
          editor.RangeExtend();
 
@@ -6231,23 +6160,6 @@ SocialCalc.keyboardTables = {
       90: "[ctrl-z]"
       },
 
-   specialKeysOpera: {
-      8: "[backspace]", 9: "[tab]", 13: "[enter]", 25: "[tab]", 27: "[esc]", 33: "[pgup]", 34: "[pgdn]",
-      35: "[end]", 36: "[home]", 37: "[aleft]", 38: "[aup]", 39: "[aright]", 40: "[adown]",
-      45: "[ins]", // issues with releases before 9.5 - same as "-" ("-" changed in 9.5)
-      46: "[del]", // issues with releases before 9.5 - same as "." ("." changed in 9.5)
-      113: "[f2]"
-      },
-
-   controlKeysOpera: {
-      65: "[ctrl-a]",
-      67: "[ctrl-c]",
-      83: "[ctrl-s]",
-      86: "[ctrl-v]",
-      88: "[ctrl-x]",
-      90: "[ctrl-z]"
-      },
-
    specialKeysSafari: {
       8: "[backspace]", 9: "[tab]", 13: "[enter]", 25: "[tab]", 27: "[esc]", 63232: "[aup]", 63233: "[adown]",
       63234: "[aleft]", 63235: "[aright]", 63272: "[del]", 63273: "[home]", 63275: "[end]", 63276: "[pgup]",
@@ -6403,33 +6315,7 @@ SocialCalc.ProcessKeyPress = function(e) {
    else { // not IE
       if (!e.which)
          return false; // ignore - special key
-      if (e.charCode==undefined) { // Opera
-         if (e.which!=0) { // character
-            if (e.which<32 || e.which==144) { // special char (144 is numlock)
-               ch = kt.specialKeysOpera[e.which];
-               if (ch) {
-                  return true;
-                  }
-               }
-            else {
-               if (e.ctrlKey) {
-                  ch=kt.controlKeysOpera[e.keyCode];
-                  }
-               else {
-                  ch = String.fromCharCode(e.which);
-                  }
-               }
-            }
-         else { // special char
-            return true;
-            }
-         }
-
-      else if (e.keyCode==0 && e.charCode==0) { // OLPC Fn key or something
-         return; // ignore
-         }
-
-      else if (e.keyCode==e.charCode) { // Safari
+      if (e.keyCode==e.charCode) { // Safari
          ch = kt.specialKeysSafari[e.keyCode];
          if (!ch) {
             if (kt.ignoreKeysSafari[e.keyCode]) // pass this through

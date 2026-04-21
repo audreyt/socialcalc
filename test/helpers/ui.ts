@@ -5,14 +5,6 @@
 //
 // Do NOT modify test/helpers/socialcalc.ts; this helper augments globals after
 // installBrowserShim() has been called.
-//
-// It also exposes `loadSocialCalcFresh()` which re-evaluates the bundled
-// SocialCalc.js source in the current context. Unlike `await import(url)`
-// (which Bun caches by URL even with a nonce query string), this guarantees
-// a fresh evaluation — useful when a test needs a clean SocialCalc state.
-
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 type AnyRec = Record<string, unknown>;
 
@@ -31,22 +23,7 @@ function tokenize(html: string): Array<{ type: "open" | "close" | "void" | "text
             out.push({ type: "text", text: html.slice(i, lt) });
         }
         const gt = html.indexOf(">", lt + 1);
-        if (gt === -1) {
-            // malformed — treat remainder as text
-            out.push({ type: "text", text: html.slice(lt) });
-            break;
-        }
         const raw = html.slice(lt + 1, gt).trim();
-        if (raw.startsWith("!--")) {
-            // comment
-            i = gt + 1;
-            continue;
-        }
-        if (raw.startsWith("!")) {
-            // doctype/etc - ignore
-            i = gt + 1;
-            continue;
-        }
         if (raw.startsWith("/")) {
             out.push({ type: "close", tag: raw.slice(1).trim().toLowerCase() });
             i = gt + 1;
@@ -210,10 +187,6 @@ export function installUiShim(): void {
                     } else if (tokens.length === 2) {
                         top = bottom = tokens[0];
                         right = left = tokens[1];
-                    } else if (tokens.length === 3) {
-                        top = tokens[0];
-                        right = left = tokens[1];
-                        bottom = tokens[2];
                     } else if (tokens.length >= 4) {
                         top = tokens[0];
                         right = tokens[1];
@@ -326,67 +299,22 @@ export function installUiShim(): void {
             };
         };
 
-        // querySelector / querySelectorAll minimal (supports #id and tag)
-        bodyProto.querySelector = function (sel: string) {
-            if (sel.startsWith("#")) {
-                return this.ownerDocument.getElementById(sel.slice(1));
-            }
-            const all = this.getElementsByTagName(sel);
-            return all[0] ?? null;
-        };
-        bodyProto.querySelectorAll = function (sel: string) {
-            if (sel.startsWith("#")) {
-                const el = this.ownerDocument.getElementById(sel.slice(1));
-                return el ? [el] : [];
-            }
-            return this.getElementsByTagName(sel);
-        };
-
-        // scrollIntoView and contains no-ops
-        bodyProto.scrollIntoView = function () {};
-        bodyProto.contains = function (other: any) {
-            let cur = other;
-            while (cur) {
-                if (cur === this) return true;
-                cur = cur.parentNode;
-            }
-            return false;
-        };
-
-        // attachEvent / dispatchEvent minimal so code paths touching them work
-        if (!bodyProto.attachEvent) {
-            bodyProto.attachEvent = function () {};
-            bodyProto.detachEvent = function () {};
-        }
-        bodyProto.dispatchEvent = function () {
-            return true;
-        };
         bodyProto.click = function () {};
         bodyProto.select = function () {};
 
-        // Options setter shim for HTMLSelectElement-like behavior used by DoCmd
+        // Options shim for HTMLSelectElement-like behavior used by DoCmd
         // e.g. clele.options[i] = new Option(...); clele.length = 0;
         if (!bodyProto.__selectShim) {
             Object.defineProperty(bodyProto, "options", {
                 configurable: true,
                 get(this: any) {
-                    if (!this.__options) {
-                        this.__options = [];
-                    }
-                    return this.__options;
-                },
-                set(this: any, val: any) {
-                    this.__options = val;
+                    return (this.__options ??= []);
                 },
             });
             Object.defineProperty(bodyProto, "length", {
                 configurable: true,
-                get(this: any) {
-                    return this.__options ? this.__options.length : 0;
-                },
                 set(this: any, val: number) {
-                    if (!this.__options) this.__options = [];
-                    this.__options.length = val;
+                    (this.__options ??= []).length = val;
                 },
             });
             Object.defineProperty(bodyProto, "selectedIndex", {
@@ -449,70 +377,21 @@ export function installUiShim(): void {
             (globalThis as any)[key] = win[key];
         }
     }
-    if (typeof (globalThis as any).focus !== "function") {
-        (globalThis as any).focus = () => {};
-    }
-    if (typeof (globalThis as any).blur !== "function") {
-        (globalThis as any).blur = () => {};
-    }
-    if (typeof (globalThis as any).scrollTo !== "function") {
-        (globalThis as any).scrollTo = () => {};
-    }
-}
-
-// Re-evaluate the SocialCalc bundle source in the current global context.
-// Call this AFTER installBrowserShim() / installUiShim() so the
-// module-wrapper-bottom no-op guard does not stub out DOM functions.
-// Returns the newly-constructed SocialCalc object.
-let cachedSource: string | null = null;
-
-export function loadSocialCalcFresh(): any {
-    if (!cachedSource) {
-        const p = join(import.meta.dir, "..", "..", "dist", "SocialCalc.js");
-        let source = readFileSync(p, "utf8");
-        // The bundled source contains `"use strict"` directives inside the
-        // UMD factory. A few functions in the legacy source assign to
-        // undeclared variables (e.g. `colpane = 0` without `var`), which
-        // throws under strict mode. Bun's ESM loader apparently runs the
-        // module without enforcing the inner-factory "use strict" for
-        // implicit globals; to match that behavior when we evaluate via
-        // `new Function`, strip the "use strict" directives.
-        source = source.replace(/"use strict";/g, "");
-        cachedSource = source;
-    }
-    // Create a throwaway module object so the UMD wrapper picks the
-    // `module.exports = factory.call(root, root)` branch and returns the
-    // fresh SocialCalc object to us.
-    const fakeModule: any = { exports: {} };
-    const fn = new Function("module", "exports", cachedSource);
-    fn.call(globalThis, fakeModule, fakeModule.exports);
-    return fakeModule.exports;
 }
 
 function makeJqStub() {
-    function q(selOrHtml: string | any) {
+    function q(selOrHtml: string) {
         const doc = (globalThis as any).document;
-        if (selOrHtml && typeof selOrHtml === "object" && selOrHtml.nodeType) {
-            return wrap([selOrHtml]);
+        const trimmed = selOrHtml.trim();
+        if (trimmed.startsWith("<")) {
+            // Create element from HTML string by parsing via a detached div.
+            const div = doc.createElement("div");
+            div.innerHTML = trimmed;
+            return wrap([...div.childNodes]);
         }
-        if (typeof selOrHtml === "string") {
-            const trimmed = selOrHtml.trim();
-            if (trimmed.startsWith("<")) {
-                // Create element from HTML string by parsing via a detached div.
-                const div = doc.createElement("div");
-                div.innerHTML = trimmed;
-                const children = [...div.childNodes];
-                return wrap(children);
-            }
-            if (trimmed.startsWith("#")) {
-                const el = doc.getElementById(trimmed.slice(1));
-                return wrap(el ? [el] : []);
-            }
-            // tag selector
-            const els = doc.getElementsByTagName(trimmed);
-            return wrap(els as any[]);
-        }
-        return wrap([]);
+        // #id selector
+        const el = doc.getElementById(trimmed.slice(1));
+        return wrap(el ? [el] : []);
     }
     function wrap(nodes: any[]) {
         const obj: any = Object.assign(Object.create(null), {
@@ -526,47 +405,21 @@ function makeJqStub() {
                     const div = doc.createElement("div");
                     div.innerHTML = child;
                     for (const n of [...div.childNodes]) parent.appendChild(n);
-                } else if (child && child.length !== undefined) {
+                } else {
                     for (let i = 0; i < child.length; i++) parent.appendChild(child[i]);
-                } else if (child) {
-                    parent.appendChild(child);
                 }
                 return obj;
             },
-            on() {
+            on(event: string, fn: any) {
+                if (nodes[0]) (nodes[0].__jqHandlers ??= {})[event] = fn;
                 return obj;
             },
-            off() {
-                return obj;
-            },
-            keyup() {
-                return obj;
-            },
-            focus() {
-                return obj;
-            },
-            blur() {
+            keyup(fn: any) {
+                if (nodes[0]) (nodes[0].__jqHandlers ??= {}).keyup = fn;
                 return obj;
             },
             text(val: string) {
-                if (val === undefined) return nodes[0]?.textContent ?? "";
                 for (const n of nodes) n.textContent = val;
-                return obj;
-            },
-            val(val: string) {
-                if (val === undefined) return nodes[0]?.value ?? "";
-                for (const n of nodes) n.value = val;
-                return obj;
-            },
-            addClass() {
-                return obj;
-            },
-            removeClass() {
-                return obj;
-            },
-            attr(name: string, value?: string) {
-                if (value === undefined) return nodes[0]?.getAttribute(name);
-                for (const n of nodes) n.setAttribute(name, value);
                 return obj;
             },
         });

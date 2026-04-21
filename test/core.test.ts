@@ -7,6 +7,7 @@ import {
     scheduleCommands,
     sheetRedo,
     sheetUndo,
+    waitForStatus,
 } from "./helpers/socialcalc";
 
 test("loads the SocialCalc bundle through Bun's module loader", async () => {
@@ -116,4 +117,13 @@ test("covers coordinate, escaping, and import-export helpers", async () => {
     expect(csvSave).toContain("cell:B2:v:42");
     expect(SC.ConvertSaveToOtherFormat(csvSave, "csv")).toBe("name,score\nAda,42\n");
     expect(SC.ConvertSaveToOtherFormat(csvSave, "tab")).toBe("name\tscore\nAda\t42\n");
+});
+
+test("waitForStatus rejects when the expected status never arrives", async () => {
+    const fakeSheet: any = { statuscallback: null };
+    await expect(
+        waitForStatus(fakeSheet, "never-fires", () => {}, 5),
+    ).rejects.toThrow(/timed out/);
+    // The timeout handler restores the previous (null) callback.
+    expect(fakeSheet.statuscallback).toBeNull();
 });

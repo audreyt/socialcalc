@@ -712,6 +712,28 @@ test("DoLink + HideLink + DoLinkClear + DoLinkPaste combinations", async () => {
 // -------------------------------------------------------------------
 // Test 13: DoSum in both range and column-above modes
 // -------------------------------------------------------------------
+test("DoSum: foundvalue+text break path stops at first text above values", async () => {
+    const SC = await loadSocialCalc();
+    const { control } = await newControl(SC);
+    SC.SetSpreadsheetControlObject(control);
+    await scheduleCommands(SC, control.sheet, [
+        "set Z1 text t hdr",
+        "set Z2 value n 5",
+        "set Z3 value n 7",
+    ]);
+    await recalcSheet(SC, control.sheet);
+    control.editor.MoveECell("Z4");
+    let captured = "";
+    const orig = control.editor.EditorScheduleSheetCommands;
+    control.editor.EditorScheduleSheetCommands = function (cmd: any, ...rest: any[]) {
+        captured = cmd;
+        return orig.call(this, cmd, ...rest);
+    };
+    SC.SpreadsheetControl.DoSum();
+    control.editor.EditorScheduleSheetCommands = orig;
+    expect(captured).toBe("set Z4 formula sum(Z2:Z3)");
+});
+
 test("DoSum: range, column-above with gap, top of column", async () => {
     const SC = await loadSocialCalc();
     const { control } = await newControl(SC);
@@ -853,6 +875,24 @@ test("FindInSheet + SearchUp/SearchDown wrap correctly", async () => {
     control.sheet.search_cells = [];
     SC.SpreadsheetControl.SearchDown();
     SC.SpreadsheetControl.SearchUp();
+
+    // Exercise the search-bar input handlers that were captured on the
+    // element by the jQuery-stub's `on`/`keyup` registration.
+    const input: any = document.getElementById("searchbarinput");
+    expect(input).toBeTruthy();
+    const handlers = input.__jqHandlers;
+    handlers.focus();
+    expect(SC.Keyboard.passThru).toBe(true);
+    handlers.blur();
+    expect(SC.Keyboard.passThru).toBe(false);
+    // Enter triggers SearchDown
+    control.sheet.search_cells = [{ coord: "A1" }, { coord: "A2" }];
+    control.sheet.selected_search_cell = 0;
+    handlers.keyup({ keyCode: 13, shiftKey: false });
+    // Shift+Enter triggers SearchUp
+    handlers.keyup({ keyCode: 13, shiftKey: true });
+    // Non-Enter key is ignored
+    handlers.keyup({ keyCode: 65 });
 });
 
 // -------------------------------------------------------------------
@@ -2258,9 +2298,13 @@ test("SetTab: onclickFocus element path (settings tab)", async () => {
 
     // settings tab has onclickFocus: true (non-string), exercises else branch
     // clipboard tab has onclickFocus: "clipboardtext" (string), exercises if branch
+    // Pre-select a range so settings onclick hits the hasrange branch.
+    control.editor.RangeAnchor("A1");
+    control.editor.RangeExtend("B2");
     try {
         SC.SetTab("settings");
     } catch {}
+    control.editor.RangeRemove();
     try {
         SC.SetTab("clipboard");
     } catch {}
@@ -2276,6 +2320,16 @@ test("SetTab: onclickFocus element path (settings tab)", async () => {
     try {
         SC.SetTab("edit");
     } catch {}
+
+    // Views support an optional onresize callback fired when needsresize is
+    // set. Plug one into an existing view and switch to it.
+    let resizeCalls = 0;
+    control.views.sheet.onresize = () => { resizeCalls++; };
+    control.views.sheet.needsresize = true;
+    try {
+        SC.SetTab("sheet");
+    } catch {}
+    expect(resizeCalls).toBe(1);
 });
 
 // -------------------------------------------------------------------

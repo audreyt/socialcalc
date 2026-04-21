@@ -566,17 +566,9 @@ SocialCalc.FormatNumber.formatNumberWithFormat = function(rawvalue, format_strin
                }
             }
          }
-      else if (op == scfn.commands.section) { // end of section
-         break;
-         }
-
-      else if (op == scfn.commands.comparison) { // ignore
-         continue;
-         }
-
-      else {
-         result += "!! Parse error !!";
-         }
+      else if (op == scfn.commands.section) break; // end of section
+      else if (op == scfn.commands.comparison) continue; // ignore
+      else result += "!! Parse error !!";
       }
 
    if (textcolor) {

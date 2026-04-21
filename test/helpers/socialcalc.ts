@@ -137,45 +137,6 @@ class FakeElement {
         return this.attributes[name] ?? null;
     }
 
-    cloneNode(deep = false) {
-        const clone = new FakeElement(this.ownerDocument, this.tagName, this.nodeType);
-        clone.style = { ...this.style };
-        clone.attributes = { ...this.attributes };
-        clone.dataset = { ...this.dataset };
-        clone.className = this.className;
-        clone.id = this.id;
-        clone.innerHTML = this.innerHTML;
-        clone.textContent = this.textContent;
-        clone.value = this.value;
-        clone.checked = this.checked;
-        clone.scrollTop = this.scrollTop;
-        clone.scrollLeft = this.scrollLeft;
-        clone.clientWidth = this.clientWidth;
-        clone.clientHeight = this.clientHeight;
-        clone.offsetWidth = this.offsetWidth;
-        clone.offsetHeight = this.offsetHeight;
-        clone.offsetTop = this.offsetTop;
-        clone.offsetLeft = this.offsetLeft;
-        if (deep) {
-            for (const child of this.childNodes) {
-                clone.appendChild(child.cloneNode(true));
-            }
-        }
-        return clone;
-    }
-
-    getElementsByTagName(tagName: string) {
-        const wanted = tagName.toUpperCase();
-        const matches: FakeElement[] = [];
-        for (const child of this.childNodes) {
-            if (wanted === "*" || child.tagName === wanted) {
-                matches.push(child);
-            }
-            matches.push(...child.getElementsByTagName(tagName));
-        }
-        return matches;
-    }
-
     focus() {}
 
     blur() {}
@@ -222,15 +183,6 @@ class FakeDocument {
         return this.nodesById.get(id) || null;
     }
 
-    getElementsByTagName(tagName: string) {
-        if (tagName.toLowerCase() === "body") {
-            return [this.body];
-        }
-        if (tagName.toLowerCase() === "html") {
-            return [this.documentElement];
-        }
-        return this.documentElement.getElementsByTagName(tagName);
-    }
 }
 
 function clearBrowserShim() {
@@ -287,7 +239,7 @@ export function makeSave(lines: string[]) {
     return `${lines.join("\n")}\n`;
 }
 
-function waitForStatus(
+export function waitForStatus(
     sheet: any,
     match: string | ((status: string) => boolean),
     trigger: () => void,

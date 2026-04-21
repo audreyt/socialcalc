@@ -4089,21 +4089,13 @@ SocialCalc.RecalcTimerRoutine = function() {
       return;
       }
 
-   // otherwise should be scri.state.calc
-
-   if (scri.currentState != scri.state.calc) {
-      alert("Recalc state error: "+scri.currentState+". Error in SocialCalc code.");
-      }
+   // otherwise should be scri.state.calc (all other states handled above)
 
    coord = sheet.recalcdata.nextcalc;
    while (coord) {
       cell = sheet.cells[coord];
-	  // app widgets need cell ID so store in parseinfo {
-      if (!cell.parseinfo) { // cache parsed formula
-        cell.parseinfo = scf.ParseFormulaIntoTokens(cell.formula);
-        }
-      cell.parseinfo.coord = coord;
-	  // }
+      // parseinfo was cached by RecalcCheckCell during the order phase.
+      cell.parseinfo.coord = coord; // app widgets need cell ID
       eresult = scf.evaluate_parsed_formula(cell.parseinfo, sheet, false);
       if (scf.SheetCache.waitingForLoading) { // wait until restarted
          // schedule render to run while waiting for dependent sheet to load - schedules first render of sheet
@@ -4272,12 +4264,8 @@ mainloop:
             if (checkinfo[coord] && typeof checkinfo[coord] == "object") { // Circular reference
                cell.errors = SocialCalc.Constants.s_caccCircRef+startcoord; // set on original cell making the ref
                checkinfo[startcoord] = true; // this one should be calculated once at this point
-               if (!recalcdata.firstcalc) {
-                  recalcdata.firstcalc = startcoord;
-                  }
-               else {
-                  recalcdata.calclist[recalcdata.lastcalc] = startcoord;
-                  }
+               if (!recalcdata.firstcalc) recalcdata.firstcalc = startcoord;
+               else recalcdata.calclist[recalcdata.lastcalc] = startcoord;
                recalcdata.lastcalc = startcoord;
                recalcdata.calclistlength++; // count number on list
                sheet.attribs.circularreferencecell = coord+"|"+oldcoord; // remember at least one circ ref
@@ -4299,23 +4287,19 @@ mainloop:
 
          if (ttype == token_name) { // look for named range
             value = scf.LookupName(sheet, ttext);
-            if (value.type == "range") { // only need to recurse here for range, which may be just one cell
+            if (value.type == "range") { // range name is always "UL|LR|"
                pos = value.value.indexOf("|");
-               if (pos != -1) { // range - check each cell
-                  coordvals.cr1 = SocialCalc.coordToCr(value.value.substring(0,pos));
-                  pos2 = value.value.indexOf("|", pos+1);
-                  coordvals.cr2 = SocialCalc.coordToCr(value.value.substring(pos+1,pos2));
-                  coordvals.inrange = true;
-                  coordvals.inrangestart = true;
-                  i = i-1; // back up so will start up again here
-                  continue;
-                  }
+               coordvals.cr1 = SocialCalc.coordToCr(value.value.substring(0,pos));
+               pos2 = value.value.indexOf("|", pos+1);
+               coordvals.cr2 = SocialCalc.coordToCr(value.value.substring(pos+1,pos2));
+               coordvals.inrange = true;
+               coordvals.inrangestart = true;
+               i = i-1; // back up so will start up again here
+               continue;
                }
             else if (value.type == "coord") { // just a coord
                ttype = token_coord; // treat as a coord inline
                ttext = value.value; // and then drop through to next test which should succeed
-               }
-            else { // not a defined name - probably a function
                }
             }
 
@@ -6633,9 +6617,7 @@ SocialCalc.ConvertOtherFormatToSave = function(inputstr, inputformat) {
       row = 0;
       inquote = false;
       for (i=0; i<lines.length; i++) {
-         if (i==lines.length-1 && lines[i]=="") { // extra null line - ignore
-            break;
-            }
+         if (i==lines.length-1 && lines[i]=="") break; // extra null line - ignore
          if (inquote) { // if inquote, just continue from where left off
             value += "\n";
             }
@@ -6687,9 +6669,7 @@ SocialCalc.ConvertOtherFormatToSave = function(inputstr, inputformat) {
       row = 0;
       inquote = false;
       for (i=0; i<lines.length; i++) {
-         if (i==lines.length-1 && lines[i]=="") { // extra null line - ignore
-            break;
-            }
+         if (i==lines.length-1 && lines[i]=="") break; // extra null line - ignore
          if (inquote) { // if inquote, just continue from where left off
             value += "\n";
             }

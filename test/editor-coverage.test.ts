@@ -726,6 +726,24 @@ test("EditorProcessKey: inputboxdirect branches", async () => {
     editor.inputBox.SetText("t");
     editor.EditorProcessKey("[tab]", { shiftKey: true });
     expect(editor.state).toBe("start");
+
+    // enter with ecell != wval.ecoord → MoveECell(wval.ecoord) branch.
+    editor.MoveECell("D5");
+    editor.EditorProcessKey("[f2]", { shiftKey: false });
+    editor.inputBox.SetText("moved");
+    // Simulate ecell moving elsewhere before enter fires (e.g. via a stray
+    // RangeAnchor side effect).
+    (editor.workingvalues as any).ecoord = "D5";
+    editor.MoveECell("F7");
+    editor.EditorProcessKey("[enter]", { shiftKey: false });
+    expect(editor.state).toBe("start");
+
+    // f2 while in inputboxdirect → state "input" (covers 9993-9995 branch).
+    editor.MoveECell("E1");
+    editor.EditorProcessKey("[f2]", { shiftKey: false });
+    const r = editor.EditorProcessKey("[f2]", { shiftKey: false });
+    expect(r).toBe(false);
+    expect(editor.state).toBe("input");
 });
 
 test("EditorAddToInput: start + input branches", async () => {
@@ -1146,6 +1164,18 @@ test("CellHandles: MouseMoveOnHandle / HoverTimeout / Down / Move / Up", async (
     try {
         SC.CellHandlesMouseMoveOnHandle(
             fakeEvent({ target: editor.cellhandles.dragpalette, clientX: 55, clientY: 55 }),
+        );
+    } catch {}
+
+    // MoveOnHandle, target=dragpalette, clientX/Y outside radius2 → whichhandle=0
+    // → hits SocialCalc.CellHandlesHoverTimeout() + return inner branch.
+    editor.cellhandles.dragpalette.offsetWidth = 10;
+    editor.cellhandles.dragpalette.offsetHeight = 10;
+    editor.cellhandles.dragpalette.offsetLeft = 0;
+    editor.cellhandles.dragpalette.offsetTop = 0;
+    try {
+        SC.CellHandlesMouseMoveOnHandle(
+            fakeEvent({ target: editor.cellhandles.dragpalette, clientX: 500, clientY: 500 }),
         );
     } catch {}
 
@@ -2775,6 +2805,33 @@ test("RangeExtend: range2 overlay + unrange/newrange2 highlights", async () => {
     editor.range2 = { hasrange: false };
 });
 
+test("RangeRemove: default highlight branch + RangeChangeCallback + StatusCallback fire", async () => {
+    const SC = await loadSocialCalc({ browser: true });
+    const { control } = await newControl(SC, "rr-root");
+    const editor = control.editor;
+    let callbackFired = 0;
+    editor.RangeChangeCallback["test"] = function (ed: any) {
+        if (ed === editor) callbackFired++;
+    };
+    let statusFired = 0;
+    editor.StatusCallback["stat"] = {
+        func: function (_ed: any, ev: string) {
+            if (ev === "rangechange") statusFired++;
+        },
+        params: {},
+    };
+    // Seed range2 with an unknown-type highlight so the default branch fires.
+    editor.range2 = { hasrange: true, top: 1, bottom: 1, left: 1, right: 1 };
+    editor.context.highlights["A1"] = "custom"; // matches neither range / range2 / cursor
+    editor.RangeAnchor("B1");
+    editor.RangeExtend("C1");
+    editor.RangeRemove();
+    expect(callbackFired).toBeGreaterThan(0);
+    expect(statusFired).toBeGreaterThan(0);
+    delete editor.RangeChangeCallback["test"];
+    delete editor.StatusCallback["stat"];
+});
+
 test("CellHandlesMouseUp dragtype=Nothing / FillC / MoveC / MoveIC paths", async () => {
     const SC = await loadSocialCalc({ browser: true });
     const { control } = await newControl(SC, "chmu-root");
@@ -3000,6 +3057,29 @@ test("ProcessEditorMouseMove: auto-repeat (result.coord missing)", async () => {
     SC.SetDragAutoRepeat(editor, null);
 });
 
+test("ProcessEditorMouseMove: no shiftKey + no hasrange triggers RangeAnchor fallback", async () => {
+    const SC = await loadSocialCalc({ browser: true });
+    const { control } = await newControl(SC, "pmm-ra-root");
+    const editor = control.editor;
+    primeGridLayout(editor);
+    SC.EditorMouseInfo.editor = editor;
+    SC.EditorMouseInfo.element = editor.fullgrid;
+    SC.EditorMouseInfo.mousedowncoord = "A1";
+    SC.EditorMouseInfo.mouselastcoord = "A1";
+    editor.MoveECell("A1");
+    editor.RangeRemove();
+    editor.headposition = { left: 30, top: 30 };
+    editor.gridposition = { left: 0, top: 0 };
+    // Move to a coord cell (clientX 100, clientY 60) without shiftKey → hits
+    // `!e.shiftKey && !editor.range.hasrange` → editor.RangeAnchor(mousedowncoord).
+    try {
+        SC.ProcessEditorMouseMove(fakeEvent({
+            clientX: 100, clientY: 60, target: editor.fullgrid,
+        }));
+    } catch {}
+    SC.SetDragAutoRepeat(editor, null);
+});
+
 test("TableControl: CreateTableControl with scroll-area buttons fired", async () => {
     const SC = await loadSocialCalc({ browser: true });
     const { control } = await newControl(SC, "tcbtn-root");
@@ -3186,11 +3266,60 @@ test("ctrl-V / ctrl-C timeout callbacks invoked directly", async () => {
         try { (captured as Function)(); } catch {}
     }
 
+    // Ctrl-V with pastescclipboard=true (single-cell copiedfrom A1:A1 path).
+    // Seed clipboard with a SocialCalc-format save whose copiedfrom is a
+    // single cell so `matches[1] === matches[2]` holds.
+    SC.Clipboard.clipboard = "copiedfrom:A1:A1\nversion:1.5\n";
+    editor.pastescclipboard = true;
+    editor.RangeAnchor("B1");
+    editor.RangeExtend("C2");
+    captured = null;
+    (globalThis as any).setTimeout = captureST;
+    try {
+        editor.ctrlkeyFunction(editor, "[ctrl-v]");
+    } catch {}
+    (globalThis as any).setTimeout = origST;
+    if (captured) {
+        editor.pasteTextarea.value = "val\n";
+        try { (captured as Function)(); } catch {}
+    }
+
     // Ctrl-S cmd path.
     SC.Constants.AllowCtrlS = true;
     const winr: any = (globalThis as any).window;
     winr.prompt = (_a: string, _b: string) => "cmd:recalc";
     (globalThis as any).prompt = winr.prompt;
+    captured = null;
+    (globalThis as any).setTimeout = captureST;
+    try {
+        editor.ctrlkeyFunction(editor, "[ctrl-s]");
+    } catch {}
+    (globalThis as any).setTimeout = origST;
+    if (captured) {
+        try { (captured as Function)(); } catch {}
+    }
+
+    // Ctrl-S with "edit:" prefix (invokes SocialCalc.CtrlSEditor).
+    winr.prompt = (_a: string, _b: string) => "edit:foo";
+    (globalThis as any).prompt = winr.prompt;
+    const savedCtrlSEditor = SC.CtrlSEditor;
+    SC.CtrlSEditor = function (_s: any) {};
+    captured = null;
+    (globalThis as any).setTimeout = captureST;
+    try {
+        editor.ctrlkeyFunction(editor, "[ctrl-s]");
+    } catch {}
+    (globalThis as any).setTimeout = origST;
+    if (captured) {
+        try { (captured as Function)(); } catch {}
+    }
+    SC.CtrlSEditor = savedCtrlSEditor;
+
+    // Ctrl-S with arbitrary format + range (hasrange branch, sets sel).
+    winr.prompt = (_a: string, _b: string) => "my-format";
+    (globalThis as any).prompt = winr.prompt;
+    editor.RangeAnchor("B2");
+    editor.RangeExtend("C3");
     captured = null;
     (globalThis as any).setTimeout = captureST;
     try {

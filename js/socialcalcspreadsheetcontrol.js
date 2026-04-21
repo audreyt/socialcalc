@@ -1532,20 +1532,6 @@ SocialCalc.LoadColumnChoosers = function(spreadsheet) {
    }
 
 //
-// SocialCalc.CmdGotFocus(obj)
-//
-// Sets SocialCalc.Keyboard.passThru: obj should be element with focus or "true"
-//
-
-/** @param {any} obj */
-SocialCalc.CmdGotFocus = function(obj) {
-
-   SocialCalc.Keyboard.passThru = obj;
-
-   }
-
-
-//
 // SocialCalc.DoButtonCmd(e, buttoninfo, bobj)
 //
 
@@ -2508,12 +2494,8 @@ SocialCalc.SpreadsheetControl.DoLink = function() {
    text = SocialCalc.special_chars(text);
 
    cell = spreadsheet.sheet.cells[editor.ecell.coord];
-   if (!cell || !cell.textvalueformat) { // set to link format, but don't override
-      setformat = " checked";
-      }
-   else {
-      setformat = "";
-      }
+   // set to link format, but don't override
+   setformat = (!cell || !cell.textvalueformat) ? " checked" : "";
 
    popup = parts.newwin ? " checked" : "";
 
