@@ -42,4 +42,8 @@ jobs:
         run: bun run build
 
       - name: Test
-        run: bun test
+        # Use --parallel (matches `bun run test` locally). Serial `bun test`
+        # on bun 1.3.13 Linux x64 has been segfaulting mid-run in CI
+        # (https://bun.report/1.3.13/lt1bf2e2ce...). --parallel runs files in
+        # separate worker processes and sidesteps the crashing path.
+        run: bun test --parallel
