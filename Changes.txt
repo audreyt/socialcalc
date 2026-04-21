@@ -1,4 +1,133 @@
 Changes
+=======
+
+This file is organised in reverse-chronological order: newest releases first,
+with the original 2007–2010 development log preserved verbatim at the bottom.
+
+
+==============================================================================
+v3.0.0 — 2026-04-21
+==============================================================================
+
+Major version bump for modernisation and removal of legacy browser support.
+See the Dead-code removal section below for the breaking-change items.
+
+Toolchain and build
+- Ported to TypeScript 7.0 (tsgo) with strict-mode compatibility.
+- Switched test runner and bundler to Bun.
+- Added UMD wrappers so the library works in both browser globals and Node.
+- Added TypeScript declarations (.d.ts) for the SocialCalc namespace and
+  ship them in dist.
+- Enabled @ts-check on all .js source files; fixed ~35 latent bugs surfaced
+  by strict typing (including strict-mode ReferenceErrors on paste/render/
+  format paths).
+- Baked strict flags into the root tsconfig; widened test include.
+- Added typedoc API docs with a GitHub Pages deploy.
+
+Testing
+- Split the smoke test into a proper test suite; expanded meaningful
+  coverage across all modules.
+- Scaffolded Stryker mutation testing; wired it into scripts; raised
+  formatnumber2.js mutation score from 89% to 95%; finished mutation
+  kills for the formula1.js parser/evaluator.
+- Pushed dist/SocialCalc.js line coverage from 72% → 100% across successive
+  passes (94% → 97.94% → 99.97% → 100%).
+- Added DOM-interaction tests covering ProcessEditorMouseDown, drag
+  auto-repeat, EditorProcessKey transitions, cell handles, TCPS/TCT drag,
+  the Button state machine, InputBox.Select, and more.
+- Ran tests in parallel for faster CI; worked around a bun 1.3.13 Linux
+  segfault by running with --parallel.
+
+Fixes
+- Fixed CEILING/FLOOR sig-type bug.
+- Fixed window.prompt leak in the Ctrl-S test that was spamming test output.
+- Fixed the DOM safety net in module-wrapper-bottom (dropped the UI test
+  mirror hack).
+
+Dead-code removal
+- Dropped the IE document.selection.createRange fallback in InputBox.Select
+  (IE was EOL'd June 2022; the non-IE branch was identical).
+- Dropped Opera Presto keyboard tables (specialKeysOpera, controlKeysOpera)
+  and the e.charCode==undefined dispatch in ProcessKeyPress (Presto EOL'd
+  2013; modern Opera uses Blink and follows the Safari/Firefox path).
+- Dropped the OLPC Fn key e.keyCode==0 && e.charCode==0 workaround.
+- Folded redundant UMD/module-presence guards and a string-token branch.
+
+
+==============================================================================
+v2.3.0 — 2018-08-24
+==============================================================================
+
+- Multiple copy/paste formula improvements: both paste-to-range and
+  paste-to-cell (e.g. copy C8:C9 to C10; copy C8 to C10:C11).
+- Fixed exception in SheetCommandsTimerRoutine.
+- Fixed exception in PrecomputeSheetFontsAndLayouts.
+- Fixed exception in SetECellHeaders.
+- Various small error-path fixes.
+- Source directory reorganisation; package.json updated to match.
+
+
+==============================================================================
+v2.2.0 — 2016-07-26
+==============================================================================
+
+- Added GUI widget formulas: IMAGEBUTTON, AUTOCOMPLETE, SELECT, RADIOBUTTON,
+  COPYVALUE, COPYFORMULA, INSERT, DELETEIF, COMMAND, COMMANDIF, PANEL,
+  SPLASH, STYLE.
+- App/Form widget repainting & widget HTML: re-structured widget repaint
+  to handle live updating of cell values as the user types; added HTML
+  generation for SELECT, STYLE, and other GUI formulas.
+- Mobile web-app support: loading-large-sheet message, widget in-cell
+  mouse-click handling, many-hidden-rows bug fix, skip unused renders.
+- Mobile app HTML width/height based on panel formula width/height.
+- Restored formatNumberWithFormat type-string check.
+- Various merges and synchronisation with the ethercalc line.
+
+
+==============================================================================
+v2.1.0 — 2016-06-03
+==============================================================================
+
+- Pulled in the App/form builder feature.
+- Fixes and additions to formulas.
+- Enabled the Clipboard UI tab.
+
+
+==============================================================================
+v2.0.x — 2016-04-03 through 2016-xx-xx
+==============================================================================
+
+v2.0.8 — Expand/shrink merged cells when rows or cols are inserted/removed.
+v2.0.7 — Switched to UMD.
+v2.0.6 — Fix: make toolbar text visible; remove unused styling space.
+v2.0.5 — Fix toolbar buttons styling.
+v2.0.4 — Build artifacts refresh.
+v2.0.3 — Moved the tabbar to the top; better colors for the edit tools;
+         fix searchbar positioning.
+v2.0.2 — Removed some hardcoded height styles.
+v2.0.1 — Fix exports.js; add README.
+v2.0.0 — Initial packaged release.
+
+
+==============================================================================
+Sweet SocialCalc 0.x (2008)
+==============================================================================
+
+These release markers appear inline in the historical development log below.
+
+  0.1   — 2008-01-26
+  0.6   — 2008-02-07
+  0.6.1 — 2008-02-08
+  0.6.3 — 2008-02-15
+
+
+==============================================================================
+Historical Development Log (2007-12-27 through 2010-07-05)
+==============================================================================
+
+The following is the original SocialCalc daily development log, preserved
+verbatim for historical reference.
+
 
 2007-12-27:
 Fixed missing 'nl' entry in typelookup plus entry. (=false+1 was failing)
@@ -61,7 +190,7 @@ Released Sweet SocialCalc 0.1.
 
 2008-01-28:
 Changed order of display on Show Source/doNewSheet for iPhone bug.
-Added Math1 functions: ABS, ACOS, ASIN, ATAN, COS, DEGREES, EVEN, EXP, FACT, INT, 
+Added Math1 functions: ABS, ACOS, ASIN, ATAN, COS, DEGREES, EVEN, EXP, FACT, INT,
  LN, LOG10, ODD, RADIANS, SIN, TAN
 Added ZeroArgFunctions: FALSE(), NA(), NOW(), PI(), TODAY(), TRUE()
 Added Math2Functions: ATAN2, MOD, POWER, TRUNC
@@ -627,7 +756,7 @@ Fixed bug where undo stack didn't always set changedrendervalues so moves/pastes
 
 2010-03-23:
 Finished changes to add editor.noEdit to socialcalctableeditor.js, including
-fixing thumb dragging to better handle mouse out of window, handling no socialcalcspreadsheetcontrol.js, 
+fixing thumb dragging to better handle mouse out of window, handling no socialcalcspreadsheetcontrol.js,
 etc.
 
 2010-03-25:
@@ -655,7 +784,13 @@ Made click without drag on drag palette not do any commands.
 Put in a fix for Safari 5 problem with copy/paste (involving onbeforepaste default behavior).
 
 
-TO DO:
+==============================================================================
+Historical TO DO (circa 2010)
+==============================================================================
+
+Preserved from the original Changes.txt for historical reference. Many items
+are obsolete (Perl-side modules no longer in this repo), done (undo limit),
+or subsumed by the modernisation work listed above.
 
 Check out <= and >= Test Criteria!
 
@@ -682,4 +817,3 @@ Bug in SheetFunctions.pm: StringFunctions error doesn't return right away
  IRR check for values?
 Bug in Sheet.pm: evaluate_parsed_formula return of range doesn't swap sheetname!coord
 Sheet.ResetSheet doesn't seem to work well -- it does not recalc or redisplay well afterward
-

@@ -1,6 +1,6 @@
 {
   "name": "socialcalc",
-  "version": "2.3.0",
+  "version": "3.0.0",
   "description": "Collaborative spreadsheet editor",
   "main": "dist/SocialCalc.js",
   "types": "dist/SocialCalc.d.ts",
@@ -32,7 +32,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/marcelklehr/socialcalc.git"
+    "url": "git+https://github.com/audreyt/socialcalc.git"
   },
   "keywords": [
     "spreadsheet",
@@ -50,9 +50,9 @@
   "author": "Dan Bricklin",
   "license": "(CPAL-1.0 AND Artistic-2.0 AND MPL-2.0)",
   "bugs": {
-    "url": "https://github.com/marcelklehr/socialcalc/issues"
+    "url": "https://github.com/audreyt/socialcalc/issues"
   },
-  "homepage": "https://github.com/marcelklehr/socialcalc#readme",
+  "homepage": "https://github.com/audreyt/socialcalc#readme",
   "devDependencies": {
     "@stryker-mutator/core": "^9.6.1",
     "@types/bun": "latest",
