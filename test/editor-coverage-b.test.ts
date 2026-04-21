@@ -2,81 +2,26 @@ import { afterAll, afterEach, expect, test } from "bun:test";
 
 import { loadSocialCalc as _loadSocialCalc, recalcSheet, scheduleCommands } from "./helpers/socialcalc";
 import { installUiShim } from "./helpers/ui";
+import {
+    cancelActiveTrackedTimers,
+    ensureTrackedTimers,
+    installWindowTimerTracking,
+    restoreOriginalTimers,
+} from "./helpers/timer-tracking";
 
 // Track all setInterval/setTimeout calls so we can cancel them after each
-// test. Without this, the InputEcho heartbeat (50 ms repeating) and various
-// cleanup timeouts fire against stale module state in later tests, tripping
-// errors like `editor.inputEcho.SetText` on a null editor.
-//
-// The SocialCalc bundle mostly calls `window.setTimeout` (bound at module
-// load time), so we also re-wire `window.setTimeout/Interval` after each
-// installBrowserShim(). Our loadSocialCalc wrapper below handles that.
-const activeIntervals = new Set<any>();
-const activeTimeouts = new Set<any>();
-const origSetInterval = globalThis.setInterval;
-const origClearInterval = globalThis.clearInterval;
-const origSetTimeout = globalThis.setTimeout;
-const origClearTimeout = globalThis.clearTimeout;
-
-function wrappedSetInterval(this: any, ...args: any[]) {
-    // @ts-expect-error variadic forwarding
-    const id = origSetInterval.apply(this, args);
-    activeIntervals.add(id);
-    return id;
-}
-function wrappedClearInterval(id: any) {
-    activeIntervals.delete(id);
-    return origClearInterval(id);
-}
-function wrappedSetTimeout(this: any, ...args: any[]) {
-    // @ts-expect-error variadic forwarding
-    const id = origSetTimeout.apply(this, args);
-    activeTimeouts.add(id);
-    return id;
-}
-function wrappedClearTimeout(id: any) {
-    activeTimeouts.delete(id);
-    return origClearTimeout(id);
-}
-
-(globalThis as any).setInterval = wrappedSetInterval;
-(globalThis as any).clearInterval = wrappedClearInterval;
-(globalThis as any).setTimeout = wrappedSetTimeout;
-(globalThis as any).clearTimeout = wrappedClearTimeout;
-
-function installTimerTracking() {
-    // Re-wire window.setTimeout/setInterval so SocialCalc's window.setTimeout
-    // calls are tracked too. This must be run after each installBrowserShim().
-    const win = (globalThis as any).window;
-    if (win) {
-        win.setTimeout = wrappedSetTimeout;
-        win.clearTimeout = wrappedClearTimeout;
-        win.setInterval = wrappedSetInterval;
-        win.clearInterval = wrappedClearInterval;
-    }
-}
+// test — same rationale as editor-coverage-a. The helper's idempotent guard
+// means whichever half loads first does the wrapping, and the other is a
+// no-op. Module-top rather than beforeAll because bun's file ordering turns
+// out to be sensitive to module-load weight (see editor-coverage-a).
+ensureTrackedTimers();
 
 afterEach(() => {
-    for (const id of activeIntervals) origClearInterval(id);
-    activeIntervals.clear();
-    for (const id of activeTimeouts) origClearTimeout(id);
-    activeTimeouts.clear();
+    cancelActiveTrackedTimers();
 });
 
-// Restore original timers after this suite so other test files run with
-// unmodified globals.
 afterAll(() => {
-    (globalThis as any).setInterval = origSetInterval;
-    (globalThis as any).clearInterval = origClearInterval;
-    (globalThis as any).setTimeout = origSetTimeout;
-    (globalThis as any).clearTimeout = origClearTimeout;
-    const win = (globalThis as any).window;
-    if (win) {
-        win.setTimeout = origSetTimeout;
-        win.clearTimeout = origClearTimeout;
-        win.setInterval = origSetInterval;
-        win.clearInterval = origClearInterval;
-    }
+    restoreOriginalTimers();
 });
 
 /**
@@ -98,7 +43,7 @@ afterAll(() => {
 async function loadSocialCalc(options: { browser?: boolean } = {}) {
     const SC = await _loadSocialCalc({ ...options, browser: true });
     installUiShim();
-    installTimerTracking();
+    installWindowTimerTracking();
     return SC;
 }
 

@@ -2,6 +2,12 @@ import { afterAll, afterEach, expect, test } from "bun:test";
 
 import { loadSocialCalc as _loadSocialCalc, recalcSheet, scheduleCommands } from "./helpers/socialcalc";
 import { installUiShim } from "./helpers/ui";
+import {
+    cancelActiveTrackedTimers,
+    ensureTrackedTimers,
+    installWindowTimerTracking,
+    restoreOriginalTimers,
+} from "./helpers/timer-tracking";
 
 // Track all setInterval/setTimeout calls so we can cancel them after each
 // test. Without this, the InputEcho heartbeat (50 ms repeating) and various
@@ -11,72 +17,23 @@ import { installUiShim } from "./helpers/ui";
 // The SocialCalc bundle mostly calls `window.setTimeout` (bound at module
 // load time), so we also re-wire `window.setTimeout/Interval` after each
 // installBrowserShim(). Our loadSocialCalc wrapper below handles that.
-const activeIntervals = new Set<any>();
-const activeTimeouts = new Set<any>();
-const origSetInterval = globalThis.setInterval;
-const origClearInterval = globalThis.clearInterval;
-const origSetTimeout = globalThis.setTimeout;
-const origClearTimeout = globalThis.clearTimeout;
-
-function wrappedSetInterval(this: any, ...args: any[]) {
-    // @ts-expect-error variadic forwarding
-    const id = origSetInterval.apply(this, args);
-    activeIntervals.add(id);
-    return id;
-}
-function wrappedClearInterval(id: any) {
-    activeIntervals.delete(id);
-    return origClearInterval(id);
-}
-function wrappedSetTimeout(this: any, ...args: any[]) {
-    // @ts-expect-error variadic forwarding
-    const id = origSetTimeout.apply(this, args);
-    activeTimeouts.add(id);
-    return id;
-}
-function wrappedClearTimeout(id: any) {
-    activeTimeouts.delete(id);
-    return origClearTimeout(id);
-}
-
-(globalThis as any).setInterval = wrappedSetInterval;
-(globalThis as any).clearInterval = wrappedClearInterval;
-(globalThis as any).setTimeout = wrappedSetTimeout;
-(globalThis as any).clearTimeout = wrappedClearTimeout;
-
-function installTimerTracking() {
-    // Re-wire window.setTimeout/setInterval so SocialCalc's window.setTimeout
-    // calls are tracked too. This must be run after each installBrowserShim().
-    const win = (globalThis as any).window;
-    if (win) {
-        win.setTimeout = wrappedSetTimeout;
-        win.clearTimeout = wrappedClearTimeout;
-        win.setInterval = wrappedSetInterval;
-        win.clearInterval = wrappedClearInterval;
-    }
-}
+//
+// Install at module top (not beforeAll). Moving this into beforeAll subtly
+// changed bun's file ordering — a-preload.test.ts started running AFTER this
+// file in serial mode, so __scOrig captured the stub instead of the real
+// Email (a-preload depends on capturing before editor-coverage stubs). The
+// helper's idempotent guard makes a duplicate call from editor-coverage-b
+// safe.
+ensureTrackedTimers();
 
 afterEach(() => {
-    for (const id of activeIntervals) origClearInterval(id);
-    activeIntervals.clear();
-    for (const id of activeTimeouts) origClearTimeout(id);
-    activeTimeouts.clear();
+    cancelActiveTrackedTimers();
 });
 
 // Restore original timers after this suite so other test files run with
 // unmodified globals.
 afterAll(() => {
-    (globalThis as any).setInterval = origSetInterval;
-    (globalThis as any).clearInterval = origClearInterval;
-    (globalThis as any).setTimeout = origSetTimeout;
-    (globalThis as any).clearTimeout = origClearTimeout;
-    const win = (globalThis as any).window;
-    if (win) {
-        win.setTimeout = origSetTimeout;
-        win.clearTimeout = origClearTimeout;
-        win.setInterval = origSetInterval;
-        win.clearInterval = origClearInterval;
-    }
+    restoreOriginalTimers();
 });
 
 /**
@@ -98,7 +55,7 @@ afterAll(() => {
 async function loadSocialCalc(options: { browser?: boolean } = {}) {
     const SC = await _loadSocialCalc({ ...options, browser: true });
     installUiShim();
-    installTimerTracking();
+    installWindowTimerTracking();
     return SC;
 }
 
@@ -2150,20 +2107,28 @@ test("EditorScheduleSheetCommands: busy, deferred, recalc/undo/redo/setemail, de
     // recalc path.
     editor.EditorScheduleSheetCommands("recalc");
 
-    // setemailparameters path (TriggerIoAction stub needed).
+    // setemailparameters path (TriggerIoAction stub needed). Restore at
+    // the end of the test — loadSocialCalc shares one SC instance across
+    // the whole run, so a permanent stub would leak into later test files
+    // (iofunctions-coverage relies on the real Email body).
     (SC as any).TriggerIoAction = (SC as any).TriggerIoAction || {};
+    const origEmail = (SC as any).TriggerIoAction.Email;
     (SC as any).TriggerIoAction.Email = () => {};
     try {
-        editor.EditorScheduleSheetCommands("setemailparameters X Y");
-    } catch {}
+        try {
+            editor.EditorScheduleSheetCommands("setemailparameters X Y");
+        } catch {}
 
-    // Undo / Redo.
-    editor.EditorScheduleSheetCommands("undo");
-    editor.EditorScheduleSheetCommands("redo");
+        // Undo / Redo.
+        editor.EditorScheduleSheetCommands("undo");
+        editor.EditorScheduleSheetCommands("redo");
 
-    // default (generic set).
-    editor.EditorScheduleSheetCommands("set B1 text t y", true);
-    await new Promise((r) => setTimeout(r, 50));
+        // default (generic set).
+        editor.EditorScheduleSheetCommands("set B1 text t y", true);
+        await new Promise((r) => setTimeout(r, 50));
+    } finally {
+        (SC as any).TriggerIoAction.Email = origEmail;
+    }
 });
 
 test("EditorRenderSheet: reRenderCellList + widget paths", async () => {

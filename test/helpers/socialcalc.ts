@@ -275,6 +275,15 @@ export function waitForStatus(
 }
 
 export async function recalcSheet(SC: any, sheet: any, timeoutMs = 2000) {
+    // Reset recalc state before starting. RecalcInfo is shared across all
+    // loadSocialCalc() callers (bun caches the import), so a previous test
+    // that scheduled a "recalc" command without awaiting calcfinished can
+    // leave currentState != idle — RecalcSheet then just queues and never
+    // fires, causing the subsequent test to time out.
+    if (SC.RecalcInfo) {
+        SC.RecalcInfo.currentState = 0;
+        SC.RecalcInfo.queue = [];
+    }
     await waitForStatus(sheet, "calcfinished", () => SC.RecalcSheet(sheet), timeoutMs);
 }
 

@@ -1,4 +1,4 @@
-import { beforeAll, expect, test } from "bun:test";
+import { afterAll, beforeAll, expect, test } from "bun:test";
 
 import {
     installBrowserShim,
@@ -45,6 +45,16 @@ function installEditorMock(SC: any) {
 beforeAll(async () => {
     const SC = await loadSocialCalc();
     installEditorMock(SC);
+});
+
+// Tests below reference phantom sheets (e.g. `SUM(Sheet1!A1:Sheet2!B2)`) that
+// set SheetCache.waitingForLoading. That state persists on the shared SC, so
+// clear it after this suite or later files (core.test.ts recalc, etc.) hang.
+afterAll(async () => {
+    const SC = await loadSocialCalc();
+    if (SC.Formula?.SheetCache) {
+        SC.Formula.SheetCache.waitingForLoading = null;
+    }
 });
 
 // Section 29: deletecol / deleterow with deeper coverage; deleted cells wipe
