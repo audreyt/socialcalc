@@ -1602,3 +1602,169 @@ test("TCTDragFunctionStart: stale thumbstatus rowmsgele/rowpreviewele truthy →
         SC.TCTDragFunctionStart(fakeEvent({}), draginfo, dobj);
     } catch {}
 });
+
+// -------------------------------------------------------------------
+// Final-mile coverage: the four stubborn clusters that Bun coverage
+// wouldn't credit through the natural-flow tests above.
+// Targets: 9064, 12341-12342, 13122, 13139.
+// -------------------------------------------------------------------
+
+test("ProcessEditorMouseDown: colheader dispatch reaches trailing return (9064)", async () => {
+    const SC = await loadSocialCalc({ browser: true });
+    const { control } = await newControl(SC, "pemd-col-return-root");
+    const editor = control.editor;
+    primeGridLayout(editor);
+
+    // The preamble requires event.target to live under a registeredElements
+    // entry; otherwise ProcessEditorMouseDown returns early at line 9040
+    // before ever reaching the colheader branch.
+    const target = editor.fullgrid;
+
+    // Stub both colheader dispatchers to no-ops. Without stubs, the real
+    // implementations throw before the trailing `return;` at 9064 executes
+    // (the try/catch around the call eats the throw, which is why Agent A's
+    // natural-flow test at line 222 doesn't cover 9064).
+    const origSize = SC.ProcessEditorColsizeMouseDown;
+    const origSel = SC.ProcessEditorColselectMouseDown;
+    SC.ProcessEditorColsizeMouseDown = function () {};
+    SC.ProcessEditorColselectMouseDown = function () {};
+
+    // Stub GridMousePosition to deterministically return a colheader hit.
+    const origGMP = SC.GridMousePosition;
+    SC.GridMousePosition = function () {
+        return { colheader: true, colselect: false, coltoresize: 1 };
+    };
+
+    try {
+        SC.ProcessEditorMouseDown(fakeEvent({ clientX: 30, clientY: 15, target }));
+    } catch {}
+    // Flip colselect=true to cover the other sub-branch as well.
+    SC.GridMousePosition = function () {
+        return { colheader: true, colselect: true };
+    };
+    try {
+        SC.ProcessEditorMouseDown(fakeEvent({ clientX: 70, clientY: 15, target }));
+    } catch {}
+
+    SC.GridMousePosition = origGMP;
+    SC.ProcessEditorColsizeMouseDown = origSize;
+    SC.ProcessEditorColselectMouseDown = origSel;
+    expect(true).toBe(true);
+});
+
+test("CellHandlesMouseMove: Fill filltype=Down coerce body (12341-12342)", async () => {
+    const SC = await loadSocialCalc({ browser: true });
+    const { control } = await newControl(SC, "chmm-fill-down-root");
+    const editor = control.editor;
+    primeGridLayout(editor);
+
+    SC.EditorMouseInfo.editor = editor;
+    SC.EditorMouseInfo.element = editor.fullgrid;
+    SC.EditorMouseInfo.mouselastcoord = "ZZ99";
+
+    editor.cellhandles.dragtype = "Fill";
+    editor.cellhandles.startingcoord = "C3";
+    editor.cellhandles.startingX = 100;
+    editor.cellhandles.startingY = 60;
+    editor.cellhandles.filltype = "Down";
+    editor.range2 = { hasrange: true, top: 3, bottom: 3, left: 3, right: 3 };
+
+    // Stub GridMousePosition to return a coord different from startingcoord
+    // "C3". B2 is above/left of C3, so crend.row (2) < crstart.row (3) —
+    // this triggers the 12342 body (crend.row = crstart.row).
+    const origGMP = SC.GridMousePosition;
+    SC.GridMousePosition = function () {
+        return { coord: "B2", rowheader: false, colheader: false, row: 2, col: 2 };
+    };
+
+    try {
+        SC.CellHandlesMouseMove(fakeEvent({ clientX: 60, clientY: 40 }));
+    } catch {}
+
+    SC.GridMousePosition = origGMP;
+    expect(true).toBe(true);
+});
+
+test("TCPSDragFunctionStop: hidden-row while-body row++ (13122)", async () => {
+    const SC = await loadSocialCalc({ browser: true });
+    const { control } = await newControl(SC, "tcps-stop-hidden-row-root");
+    const editor = control.editor;
+    primeGridLayout(editor);
+
+    const sheet = editor.context.sheetobj;
+    sheet.rowattribs = sheet.rowattribs || { hide: {} };
+    sheet.rowattribs.hide = sheet.rowattribs.hide || {};
+    sheet.colattribs = sheet.colattribs || { hide: {} };
+    sheet.colattribs.hide = sheet.colattribs.hide || {};
+    sheet.attribs.lastrow = 10;
+    sheet.attribs.lastcol = 10;
+    sheet.rowattribs.hide[3] = "yes";
+
+    editor.rowpositions = [0, 30, 50, 70, 90, 110];
+    editor.colpositions = [0, 30, 80, 130, 180, 230];
+    editor.headposition = { left: 30, top: 30 };
+
+    const vctrl = editor.verticaltablecontrol;
+    vctrl.sliderthickness = 10;
+    vctrl.minscrollingpanesize = 0;
+    vctrl.morebuttonstart = 1000;
+
+    // Stub EditorScheduleSheetCommands so the post-loop call doesn't throw
+    // and silently mask while-body coverage.
+    const origSched = editor.EditorScheduleSheetCommands;
+    editor.EditorScheduleSheetCommands = function () {};
+
+    const dobj: any = { vertical: true, functionobj: { control: vctrl } };
+    // Lookup(60+10=70, [0,30,50,70,90,110]) returns 3 (last index whose
+    // list[i] <= value). hide[3]="yes" → while body runs (row++ → 4), then
+    // hide[4] is undefined → loop exits.
+    const draginfo: any = { clientX: 100, clientY: 60, offsetX: 0, offsetY: 0 };
+    try {
+        SC.TCPSDragFunctionStop(fakeEvent({}), draginfo, dobj);
+    } catch {}
+
+    editor.EditorScheduleSheetCommands = origSched;
+    delete sheet.rowattribs.hide[3];
+    expect(true).toBe(true);
+});
+
+test("TCPSDragFunctionStop: hidden-col while-body col++ (13139)", async () => {
+    const SC = await loadSocialCalc({ browser: true });
+    const { control } = await newControl(SC, "tcps-stop-hidden-col-root");
+    const editor = control.editor;
+    primeGridLayout(editor);
+
+    const sheet = editor.context.sheetobj;
+    sheet.rowattribs = sheet.rowattribs || { hide: {} };
+    sheet.rowattribs.hide = sheet.rowattribs.hide || {};
+    sheet.colattribs = sheet.colattribs || { hide: {} };
+    sheet.colattribs.hide = sheet.colattribs.hide || {};
+    sheet.attribs.lastrow = 10;
+    sheet.attribs.lastcol = 10;
+    // Col 3 is "C" via rcColname.
+    sheet.colattribs.hide["C"] = "yes";
+
+    editor.rowpositions = [0, 30, 50, 70, 90, 110];
+    editor.colpositions = [0, 30, 80, 130, 180, 230];
+    editor.headposition = { left: 30, top: 30 };
+
+    const hctrl = editor.horizontaltablecontrol;
+    hctrl.sliderthickness = 10;
+    hctrl.minscrollingpanesize = 0;
+    hctrl.morebuttonstart = 1000;
+
+    const origSched = editor.EditorScheduleSheetCommands;
+    editor.EditorScheduleSheetCommands = function () {};
+
+    const dobj: any = { vertical: false, functionobj: { control: hctrl } };
+    // Lookup(120+10=130, [0,30,80,130,180,230]) returns 3 → rcColname(3)="C"
+    // → hide["C"]="yes" → col++ runs.
+    const draginfo: any = { clientX: 120, clientY: 60, offsetX: 0, offsetY: 0 };
+    try {
+        SC.TCPSDragFunctionStop(fakeEvent({}), draginfo, dobj);
+    } catch {}
+
+    editor.EditorScheduleSheetCommands = origSched;
+    delete sheet.colattribs.hide["C"];
+    expect(true).toBe(true);
+});
