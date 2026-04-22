@@ -965,6 +965,148 @@ test("ProcessEditorRowsize Down/Move/Up: full sequence", async () => {
     } catch {}
 });
 
+/**
+ * Shim document.addEventListener/removeEventListener when the test-env's
+ * `document` lacks them — SetMouseMoveUp/RemoveMouseMoveUp use them for
+ * the capture phase and will throw without this stub. The drag-select
+ * behavior tests below all need the stub.
+ */
+function ensureDocumentEvents() {
+    if (typeof (document as any).addEventListener !== "function") {
+        (document as any).addEventListener = () => {};
+    }
+    if (typeof (document as any).removeEventListener !== "function") {
+        (document as any).removeEventListener = () => {};
+    }
+}
+
+test("Rowselect drag: Down → Move → Up anchors row & extends across drag range", async () => {
+    // Behavior test for drag-to-select on a row header. Unlike the coverage
+    // test below (which just invokes the handlers for line hits), this one
+    // asserts the range state after each transition.
+    //
+    // Scenario: mousedown on row 2 header → anchor at A2, extend to last col
+    // of row 2 via sheet.LastCol(). Move to row 4 → extend span to row 4.
+    // MouseUp → capture released (subsequent stray move events must NOT
+    // extend further).
+    const SC = await loadSocialCalc({ browser: true });
+    ensureDocumentEvents();
+    const { control } = await newControl(SC, "rcselect-behavior-root");
+    const editor = control.editor;
+    const sheet = control.sheet;
+    primeGridLayout(editor);
+    // Give the sheet a known extent so sheet.LastCol()/LastRow() return
+    // deterministic values rather than depending on primeGridLayout.
+    sheet.attribs.lastcol = 6;
+    sheet.attribs.lastrow = 6;
+    SC.EditorMouseInfo.editor = editor;
+
+    // ── Rowselect Down on row 2 ──────────────────────────────────────
+    SC.ProcessEditorRowselectMouseDown(
+        fakeEvent({ clientX: 10, clientY: 60 }),
+        editor.fullgrid,
+        { row: 2 },
+    );
+    expect(editor.range.hasrange).toBe(true);
+    expect(editor.range.anchorrow).toBe(2);
+    expect(editor.range.top).toBe(2);
+    expect(editor.range.bottom).toBe(2);
+    expect(editor.range.left).toBe(1);
+    // Right edge of the selection = LastCol() of the sheet, not viewport.
+    expect(editor.range.right).toBe(sheet.LastCol());
+
+    // ── Rowselect Move down to row 4 (clientY lands in that row band) ──
+    // primeGridLayout maps clientY=110 → row 4 (rowpositions[4]=90, next=110).
+    SC.ProcessEditorRowselectMouseMove(fakeEvent({ clientX: 10, clientY: 105 }));
+    expect(editor.range.top).toBe(2);
+    expect(editor.range.bottom).toBe(4);
+    expect(editor.range.anchorrow).toBe(2); // anchor stays put.
+
+    // ── Rowselect Up releases the capture ─────────────────────────────
+    SC.ProcessEditorRowselectMouseUp(fakeEvent({ clientX: 10, clientY: 105 }));
+    // After Up, additional Move calls should be ignored (detached). The
+    // handler's early-return guard checks `mouseinfo.editor`, so simulate
+    // a stale move by flipping that and re-dispatching; range must not grow.
+    const snapshotBefore = { ...editor.range };
+    SC.EditorMouseInfo.editor = null;
+    SC.ProcessEditorRowselectMouseMove(fakeEvent({ clientX: 10, clientY: 135 }));
+    expect(editor.range.top).toBe(snapshotBefore.top);
+    expect(editor.range.bottom).toBe(snapshotBefore.bottom);
+
+    teardownEditor(SC, editor);
+});
+
+test("Colselect drag: Down → Move → Up anchors col & extends across drag range", async () => {
+    const SC = await loadSocialCalc({ browser: true });
+    ensureDocumentEvents();
+    const { control } = await newControl(SC, "colselect-behavior-root");
+    const editor = control.editor;
+    const sheet = control.sheet;
+    primeGridLayout(editor);
+    sheet.attribs.lastcol = 6;
+    sheet.attribs.lastrow = 6;
+    SC.EditorMouseInfo.editor = editor;
+
+    SC.ProcessEditorColselectMouseDown(
+        fakeEvent({ clientX: 100, clientY: 10 }),
+        editor.fullgrid,
+        { col: 3 },
+    );
+    expect(editor.range.hasrange).toBe(true);
+    expect(editor.range.anchorcol).toBe(3);
+    expect(editor.range.left).toBe(3);
+    expect(editor.range.right).toBe(3);
+    expect(editor.range.top).toBe(1);
+    expect(editor.range.bottom).toBe(sheet.LastRow());
+
+    // Move right: primeGridLayout has colpositions[5]=320 — land at 325.
+    SC.ProcessEditorColselectMouseMove(fakeEvent({ clientX: 325, clientY: 10 }));
+    expect(editor.range.left).toBe(3);
+    expect(editor.range.right).toBe(5);
+    expect(editor.range.anchorcol).toBe(3);
+
+    SC.ProcessEditorColselectMouseUp(fakeEvent({ clientX: 325, clientY: 10 }));
+    const snapshotBefore = { ...editor.range };
+    SC.EditorMouseInfo.editor = null;
+    SC.ProcessEditorColselectMouseMove(fakeEvent({ clientX: 400, clientY: 10 }));
+    expect(editor.range.left).toBe(snapshotBefore.left);
+    expect(editor.range.right).toBe(snapshotBefore.right);
+
+    teardownEditor(SC, editor);
+});
+
+test("Rowselect drag: reverse-direction extend flips top/bottom around anchor", async () => {
+    // Start on row 5, drag UP to row 2 — anchor stays on 5, top becomes 2,
+    // bottom stays on 5. Verifies the RangeExtend direction logic.
+    const SC = await loadSocialCalc({ browser: true });
+    ensureDocumentEvents();
+    const { control } = await newControl(SC, "rcselect-reverse-root");
+    const editor = control.editor;
+    const sheet = control.sheet;
+    primeGridLayout(editor);
+    sheet.attribs.lastcol = 6;
+    sheet.attribs.lastrow = 6;
+    SC.EditorMouseInfo.editor = editor;
+
+    SC.ProcessEditorRowselectMouseDown(
+        fakeEvent({ clientX: 10, clientY: 125 }),
+        editor.fullgrid,
+        { row: 5 },
+    );
+    expect(editor.range.anchorrow).toBe(5);
+    expect(editor.range.top).toBe(5);
+    expect(editor.range.bottom).toBe(5);
+
+    // Drag up to row 2 — clientY 65 lands in row 2 band (rowposition 50..70).
+    SC.ProcessEditorRowselectMouseMove(fakeEvent({ clientX: 10, clientY: 65 }));
+    expect(editor.range.top).toBe(2);
+    expect(editor.range.bottom).toBe(5);
+    expect(editor.range.anchorrow).toBe(5);
+
+    SC.ProcessEditorRowselectMouseUp(fakeEvent({ clientX: 10, clientY: 65 }));
+    teardownEditor(SC, editor);
+});
+
 test("ProcessEditorRowselect / Colselect Down/Move/Up", async () => {
     const SC = await loadSocialCalc({ browser: true });
     const { control } = await newControl(SC, "rcselect-root");
