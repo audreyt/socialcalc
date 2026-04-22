@@ -56,7 +56,7 @@
   "devDependencies": {
     "@stryker-mutator/core": "^9.6.1",
     "@types/bun": "latest",
-    "@typescript/native-preview": "^7.0.0-dev.20260419.1",
+    "@typescript/native-preview": "^7.0.0-dev.20260421.2",
     "typedoc": "^0.28.19",
     "typescript": "^6.0.3"
   }
