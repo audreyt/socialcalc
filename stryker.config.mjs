@@ -24,8 +24,6 @@ const testCommand = testsFilter
 
 /** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 export default {
-    packageManager: "npm",
-
     mutate: [
         "js/formatnumber2.js",
         "js/formula1.js",

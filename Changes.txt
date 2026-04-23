@@ -22,7 +22,8 @@ Toolchain and build
   by strict typing (including strict-mode ReferenceErrors on paste/render/
   format paths).
 - Baked strict flags into the root tsconfig; widened test include.
-- Added typedoc API docs with a GitHub Pages deploy.
+- Kept the distributed .d.ts files as the public API surface; dropped the
+  separate TypeDoc/GitHub Pages site.
 
 Testing
 - Split the smoke test into a proper test suite; expanded meaningful

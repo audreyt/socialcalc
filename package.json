@@ -22,13 +22,11 @@
     "typecheck:strict": "tsgo --noEmit -p tsconfig.strict.json",
     "test": "bun run build.ts && bun test --parallel",
     "test:coverage": "bun run build.ts && bun test --coverage --coverage-reporter=text --coverage-reporter=lcov",
-    "mutate": "stryker run",
+    "mutate": "bunx stryker run",
     "mutate:file": "bun run stryker-file.mjs",
     "mutate:format": "bun run stryker-file.mjs js/formatnumber2.js",
     "mutate:sheet": "bun run stryker-file.mjs js/socialcalc-3.js",
-    "mutate:formula": "bun run stryker-file.mjs js/formula1.js",
-    "docs": "typedoc",
-    "docs:watch": "typedoc --watch"
+    "mutate:formula": "bun run stryker-file.mjs js/formula1.js"
   },
   "repository": {
     "type": "git",
@@ -56,8 +54,6 @@
   "devDependencies": {
     "@stryker-mutator/core": "^9.6.1",
     "@types/bun": "latest",
-    "@typescript/native-preview": "^7.0.0-dev.20260421.2",
-    "typedoc": "^0.28.19",
-    "typescript": "^6.0.3"
+    "@typescript/native-preview": "^7.0.0-dev.20260421.2"
   }
 }

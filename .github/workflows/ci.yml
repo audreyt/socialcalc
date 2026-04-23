@@ -32,7 +32,7 @@ jobs:
       - name: Typecheck (strict, if configured)
         shell: bash
         run: |
-          if node -e "process.exit(require('./package.json').scripts && require('./package.json').scripts['typecheck:strict'] ? 0 : 1)"; then
+          if bun -e "const pkg = await Bun.file('./package.json').json(); process.exit(pkg.scripts?.['typecheck:strict'] ? 0 : 1)"; then
             bun run typecheck:strict
           else
             echo "typecheck:strict script not defined; skipping"
