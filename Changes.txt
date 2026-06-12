@@ -15,6 +15,11 @@ Fixes
   command range instead of flattening every cell to the base value. Fixes
   audreyt/ethercalc#314, #564, #769, and date-fill persistence #785.
 
+Testing
+- Added headless-replay tests for filldown/fillright without editor.range2:
+  numeric increment, horizontal fillright, and date-constant persistence
+  across sheet save/reload.
+
 
 ==============================================================================
 v3.0.2 — 2026-06-12
@@ -32,6 +37,11 @@ Fixes
 - ExecuteSheetCommand value: parse non-n types via DetermineValueType so
   pasted or imported values keep their datatype.
 
+Testing
+- Added export-fixes.test.ts: CSV import of leading "=" as formulas, CSV
+  export with nontextvalueformat (rounding and dates), tab export rounding,
+  and currency valuetype preservation through division + FormatCellForExport.
+
 
 ==============================================================================
 v3.0.1 — 2026-06-12
@@ -45,6 +55,9 @@ Fixes
   B in B:B). Fixes audreyt/ethercalc#534.
 
 Testing
+- Added formula-column-range.test.ts: SUM(N:N) and SUM(T:T) whole-column
+  ranges, plus guards that bare N() and T() still error and N(A1) still
+  evaluates.
 - Added behavior assertions for Rowselect/Colselect drag-to-select: anchor
   stays fixed while the range extends, capture releases on mouseup, and
   reverse-direction drags flip the correct bound. Closes the test gap flagged

@@ -41,6 +41,17 @@ test("N() with no arguments still errors", async () => {
     expect(String(cell.datavalue)).toContain("Incorrect arguments to function N");
 });
 
+test("T() with no arguments still errors", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+
+    await scheduleCommands(SC, sheet, ["set A1 formula T()"], true, 3000);
+    await recalcSheet(SC, sheet, 3000);
+
+    const cell = sheet.GetAssuredCell("A1");
+    expect(String(cell.datavalue)).toContain("Incorrect arguments to function T");
+});
+
 test("N(A1) still evaluates as the N() function", async () => {
     const SC = await loadSocialCalc();
     const sheet = new SC.Sheet();

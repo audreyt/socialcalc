@@ -32,6 +32,24 @@ test("exportCSV applies number format rounding (#638)", async () => {
     expect(SC.ConvertSaveToOtherFormat(sheet.CreateSheetSave(), "csv").trim()).toBe("2");
 });
 
+test("exportTab applies number format rounding (#638)", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(
+        SC,
+        sheet,
+        [
+            "set A1 value n 1.9859735",
+            "set A1 nontextvalueformat #,##0",
+            "recalc",
+        ],
+        true,
+        3000,
+    );
+    await recalcSheet(SC, sheet, 3000);
+    expect(SC.ConvertSaveToOtherFormat(sheet.CreateSheetSave(), "tab").trim()).toBe("2");
+});
+
 test("exportCSV formats date cells (#355)", async () => {
     const SC = await loadSocialCalc();
     const sheet = new SC.Sheet();
