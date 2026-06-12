@@ -1948,12 +1948,23 @@ SocialCalc.Formula.CalculateFunction = function(fname, operand, sheet, coord) {
       if (argnum != 100) {
          if (argnum < 0) {
             if (foperand.length < -argnum) {
+               // N()/T() collide with column letters in range syntax (N:N, T:T).
+               // See unknown-function handling below — zero args with an outer
+               // "start" still on the stack means a name ref, not a call.
+               if (foperand.length === 0 && operand.length > 0) {
+                  scf.PushOperand(operand, "name", fname);
+                  return "";
+                  }
                errortext = scf.FunctionArgsError(fname, operand);
                return errortext;
                }
             }
          else {
             if (foperand.length != argnum) {
+               if (foperand.length === 0 && operand.length > 0) {
+                  scf.PushOperand(operand, "name", fname);
+                  return "";
+                  }
                errortext = scf.FunctionArgsError(fname, operand);
                return errortext;
                }
