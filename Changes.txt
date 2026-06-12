@@ -6,6 +6,23 @@ with the original 2007–2010 development log preserved verbatim at the bottom.
 
 
 ==============================================================================
+v3.0.2 — 2026-06-12
+==============================================================================
+
+Fixes
+- CSV import: cells whose text starts with "=" are stored as formulas, not
+  plain text. Fixes audreyt/ethercalc#304.
+- CSV/tab export: apply nontextvalueformat when formatting numeric and date
+  cells (e.g. #,##0 rounding, m/d/yyyy dates). Fixes audreyt/ethercalc#355
+  and audreyt/ethercalc#638.
+- Division inherits the left operand's valuetype (e.g. currency n$), so
+  formatted export shows "$71.12" instead of a bare number. Fixes
+  audreyt/ethercalc#577.
+- ExecuteSheetCommand value: parse non-n types via DetermineValueType so
+  pasted or imported values keep their datatype.
+
+
+==============================================================================
 v3.0.1 — 2026-06-12
 ==============================================================================
 
