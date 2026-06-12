@@ -2703,10 +2703,20 @@ SocialCalc.MoveECellWithKey = function(editor, ch) {
          delta = -1;
          break;
       case "[pgdn]":
-         row += editor.pageUpDnAmount - 1 + ((cell && cell.rowspan) || 1);
+         if (editor.lastvisiblerow && editor.firstscrollingrow) {
+            row += editor.lastvisiblerow - editor.firstscrollingrow + ((cell && cell.rowspan) || 1);
+            }
+         else {
+            row += editor.pageUpDnAmount - 1 + ((cell && cell.rowspan) || 1);
+            }
          break;
       case "[pgup]":
-         row -= editor.pageUpDnAmount;
+         if (editor.lastvisiblerow && editor.firstscrollingrow) {
+            row -= editor.lastvisiblerow - editor.firstscrollingrow + 1;
+            }
+         else {
+            row -= editor.pageUpDnAmount;
+            }
          delta = -1;
          break;
       case "[aright]":

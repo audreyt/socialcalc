@@ -6,6 +6,28 @@ with the original 2007–2010 development log preserved verbatim at the bottom.
 
 
 ==============================================================================
+v3.0.4 — 2026-06-12
+==============================================================================
+
+Fixes
+- OffsetFormulaCoords, AdjustFormulaCoords, and ReplaceFormulaCoords now
+  double every embedded quote in string literals (replace /"/g, not /"/).
+  Fixes fill/paste/copy mangling of VB-style "" inside formula strings.
+  Closes audreyt/ethercalc#493 and #512.
+- DetermineValueType recognizes https:// URLs as text-link (tl), same as
+  http://. Fixes audreyt/ethercalc#501 for pasted https links with non-ASCII
+  path segments (expand_text_link already percent-encodes href targets).
+- Page Up/Down keyboard paging uses the visible row span
+  (lastvisiblerow − firstscrollingrow) when editor positions are known,
+  instead of the fixed defaultPageUpDnAmount (15). Fixes audreyt/ethercalc#358.
+
+Testing
+- Added formula-quote-escaping.test.ts: OffsetFormulaCoords,
+  filldown/paste with HTML formulas, and https non-ASCII link rendering.
+- Added page-scroll.test.ts: pgup/pgdn visible-row paging.
+
+
+==============================================================================
 v3.0.3 — 2026-06-12
 ==============================================================================
 

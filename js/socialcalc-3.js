@@ -3709,7 +3709,7 @@ SocialCalc.OffsetFormulaCoords = function(formula, coloffset, rowoffset) {
          }
       else if (ttype == token_string) {
          if (ttext.indexOf('"') >= 0) { // quotes to double
-            updatedformula += '"' + ttext.replace(/"/, '""') + '"';
+            updatedformula += '"' + ttext.replace(/"/g, '""') + '"';
             }
          else updatedformula += '"' + ttext + '"';
          }
@@ -3795,7 +3795,7 @@ SocialCalc.AdjustFormulaCoords = function(formula, col, coloffset, row, rowoffse
          ttext = newcr;
          }
       else if (ttype == token_string) {
-         ttext = '"' + (ttext.indexOf('"') >= 0 ? ttext.replace(/"/, '""') : ttext) + '"';
+         ttext = '"' + (ttext.indexOf('"') >= 0 ? ttext.replace(/"/g, '""') : ttext) + '"';
          }
       updatedformula += ttext;
       }
@@ -3865,7 +3865,7 @@ SocialCalc.ReplaceFormulaCoords = function(formula, movedto) {
             }
          }
       else if (ttype == token_string) {
-         ttext = '"' + (ttext.indexOf('"') >= 0 ? ttext.replace(/"/, '""') : ttext) + '"';
+         ttext = '"' + (ttext.indexOf('"') >= 0 ? ttext.replace(/"/g, '""') : ttext) + '"';
          }
       updatedformula += ttext;
       }
@@ -6348,6 +6348,10 @@ SocialCalc.DetermineValueType = function(rawvalue) {
       num = constr.indexOf(",");
       value = constr.substring(0,num)-0;
       type = constr.substring(num+1);
+      }
+   else if (tvalue.length > 8 && tvalue.substring(0,8).toLowerCase()=="https://") { // URL
+      value = tvalue;
+      type = "tl";
       }
    else if (tvalue.length > 7 && tvalue.substring(0,7).toLowerCase()=="http://") { // URL
       value = tvalue;
