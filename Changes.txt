@@ -6,6 +6,24 @@ with the original 2007–2010 development log preserved verbatim at the bottom.
 
 
 ==============================================================================
+v3.0.1 — 2026-06-12
+==============================================================================
+
+Fixes
+- Fixed SUM(N:N) and SUM(T:T) whole-column ranges: N() and T() collide with
+  column letters N and T in range syntax. When a registered function is
+  invoked with zero arguments but an outer argument list is still open, treat
+  the token as a column name (same path as unknown single-letter names like
+  B in B:B). Fixes audreyt/ethercalc#534.
+
+Testing
+- Added behavior assertions for Rowselect/Colselect drag-to-select: anchor
+  stays fixed while the range extends, capture releases on mouseup, and
+  reverse-direction drags flip the correct bound. Closes the test gap flagged
+  when forwarding ethercalc PR #266.
+
+
+==============================================================================
 v3.0.0 — 2026-04-21
 ==============================================================================
 
