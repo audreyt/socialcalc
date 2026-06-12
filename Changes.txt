@@ -6,6 +6,17 @@ with the original 2007–2010 development log preserved verbatim at the bottom.
 
 
 ==============================================================================
+v3.0.3 — 2026-06-12
+==============================================================================
+
+Fixes
+- filldown/fillright: when editor.range2 is absent (server log replay, peer
+  clients, reload), compute the increment from the first two cells in the
+  command range instead of flattening every cell to the base value. Fixes
+  audreyt/ethercalc#314, #564, #769, and date-fill persistence #785.
+
+
+==============================================================================
 v3.0.2 — 2026-06-12
 ==============================================================================
 
