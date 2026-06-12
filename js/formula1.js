@@ -818,7 +818,8 @@ SocialCalc.Formula.EvaluatePolish = function(parseinfo, revpolish, sheet, allowr
                }
             else if (ttext == '/') {
                if (value2.value != 0) {
-                  PushOperand("n", value1.value / value2.value); // gives plain numeric result type
+                  resulttype = lookup_result_type(value1.type, value2.type, typelookup.plus);
+                  PushOperand(resulttype, value1.value / value2.value);
                   }
                else {
                   PushOperand("e#DIV/0!", 0);

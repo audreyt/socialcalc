@@ -1970,6 +1970,7 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
    var sourceColname, colWidth, colHide, sourceRow, rowHide;
    var quashedCellCoord, quashedCell;
    var slast, tb;
+   var value;
 
    var attribs = sheet.attribs;
    var changes = sheet.changes;
@@ -2154,12 +2155,28 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
                   if (saveundo) changes.AddUndo("set "+cr+" all", sheet.CellToString(cell));
                   if (attrib=="value") { // set coord value type numeric-value
                      pos = rest.indexOf(" ");
-                     cell.datavalue = rest.substring(pos+1)-0;
+                     var vtype = rest.substring(0,pos);
+                     var vrest = rest.substring(pos+1);
                      delete cell.errors;
-                     cell.datatype = "v";
-                     cell.valuetype = rest.substring(0,pos);
                      delete cell.displaystring;
                      delete cell.parseinfo;
+                     if (vtype == "n") {
+                        cell.datavalue = vrest-0;
+                        cell.datatype = "v";
+                        cell.valuetype = "n";
+                        }
+                     else {
+                        value = SocialCalc.DetermineValueType(vrest);
+                        cell.datavalue = value.value;
+                        cell.valuetype = value.type;
+                        if (value.type.charAt(0) == "t") {
+                           cell.datatype = "t";
+                           }
+                        else {
+                           cell.datatype = "c";
+                           cell.formula = vrest;
+                           }
+                        }
                      attribs.needsrecalc = "yes";
                      }
                   else if (attrib=="text") { // set coord text type text-value
@@ -5852,6 +5869,40 @@ SocialCalc.GetCellContents = function(sheetobj, coord) {
 //
 
 /** @param {any} sheetobj @param {any} value @param {any} cr @param {any} linkstyle */
+//
+// text = FormatCellForExport(sheet, cell, cr)
+//
+// Plain-text export for csv/tab (no HTML). Applies number/date formats.
+//
+
+/** @param {any} sheet @param {any} cell @param {any} cr */
+SocialCalc.FormatCellForExport = function(sheet, cell, cr) {
+
+   var valuetype, valueformat, sheetattribs;
+
+   if (!cell) {
+      return "";
+      }
+
+   sheetattribs = sheet.attribs;
+   valuetype = cell.valuetype || "n";
+   if (valuetype.charAt(0) == "t") {
+      return cell.datavalue+"";
+      }
+
+   valueformat = cell.nontextvalueformat;
+   if (valueformat==null || valueformat=="") {
+      valueformat = sheetattribs.defaultnontextvalueformat;
+      }
+   valueformat = sheet.valueformats[valueformat-0];
+   if (valueformat==null || valueformat=="none") {
+      valueformat = "";
+      }
+
+   return SocialCalc.format_number_for_display(cell.datavalue, valuetype, valueformat);
+
+   }
+
 SocialCalc.FormatValueForDisplay = function(sheetobj, value, cr, linkstyle) {
 
    var valueformat, has_parens, has_commas, valuetype, valuesubtype;
@@ -6535,7 +6586,7 @@ SocialCalc.ConvertSaveToOtherFormat = function(savestr, outputformat, dorecalc) 
             str = cell.errors;
             }
          else {
-            str = cell.datavalue+""; // get value as text
+            str = SocialCalc.FormatCellForExport(sheet, cell, cr);
             }
 
          if (outputformat == "csv") {
@@ -6739,6 +6790,17 @@ SocialCalc.SetConvertedCell = function(sheet, cr, rawvalue) {
    var cell, value;
 
    cell = sheet.GetAssuredCell(cr);
+
+   if (typeof rawvalue == "string" && rawvalue.charAt(0) == "=") {
+      cell.datatype = "f";
+      cell.formula = rawvalue.substring(1);
+      cell.datavalue = 0;
+      cell.valuetype = "e#N/A";
+      delete cell.errors;
+      delete cell.displaystring;
+      delete cell.parseinfo;
+      return;
+      }
 
    value = SocialCalc.DetermineValueType(rawvalue);
 
