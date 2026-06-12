@@ -43,6 +43,26 @@ test("filldown preserves HTML formula quotes across rows (#493)", async () => {
     );
 });
 
+test("fillright preserves HTML formula quotes across columns (#493)", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        `set B4 formula TODAY()`,
+        `set C4 formula TODAY()`,
+        `set D4 formula TODAY()`,
+        `set A4 formula ${HTML_IF_FORMULA.slice(1)}`,
+    ]);
+    await scheduleCommands(SC, sheet, ["fillright A4:C4 formulas"]);
+    await recalcSheet(SC, sheet);
+
+    expect(sheet.cells.B4.formula).toBe(
+        '=IF(C4=TODAY(),"<span style=""background-color:rgb(81,184,72);color:rgb(81,184,72)"">_______</span>","")'.slice(1),
+    );
+    expect(sheet.cells.C4.formula).toBe(
+        '=IF(D4=TODAY(),"<span style=""background-color:rgb(81,184,72);color:rgb(81,184,72)"">_______</span>","")'.slice(1),
+    );
+});
+
 test("paste offsets formula and keeps every string quote pair (#512)", async () => {
     const SC = await loadSocialCalc();
     const sheet = new SC.Sheet();

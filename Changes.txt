@@ -23,8 +23,10 @@ Fixes
 
 Testing
 - Added formula-quote-escaping.test.ts: OffsetFormulaCoords,
-  filldown/paste with HTML formulas, and https non-ASCII link rendering.
-- Added page-scroll.test.ts: pgup/pgdn visible-row paging.
+  filldown/fillright/paste with HTML formulas, and https non-ASCII link
+  rendering.
+- Added page-scroll.test.ts: pgup/pgdn visible-row paging and fallback to
+  pageUpDnAmount when scroll positions are unknown.
 
 
 ==============================================================================

@@ -12,6 +12,24 @@ async function newControl(SC: any, containerId = "pg-scroll-root") {
     return { control, container };
 }
 
+test("page down/up fall back to pageUpDnAmount when scroll positions are unknown", async () => {
+    const SC = await loadSocialCalc({ browser: true });
+    installUiShim();
+    const { control } = await newControl(SC, "pg-scroll-fallback");
+    const editor = control.editor;
+
+    editor.MoveECell("A20");
+    editor.firstscrollingrow = null;
+    editor.lastvisiblerow = null;
+    editor.pageUpDnAmount = 15;
+
+    editor.MoveECellWithKey("[pgdn]");
+    expect(editor.ecell.row).toBe(35);
+
+    editor.MoveECellWithKey("[pgup]");
+    expect(editor.ecell.row).toBe(20);
+});
+
 test("page down/up use visible row count instead of fixed defaultPageUpDnAmount (#358)", async () => {
     const SC = await loadSocialCalc({ browser: true });
     installUiShim();
