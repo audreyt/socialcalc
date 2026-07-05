@@ -416,7 +416,7 @@ fn rewrite_offset(formula: &str, coloffset: i32, rowoffset: i32) -> String {
                     cr.row += rowoffset;
                 }
                 newcr.push_str(&cr.row.to_string());
-                if cr.row < 1 || cr.col < 1 {
+                if cr.row < 1 || cr.col < 1 || cr.col > 702 {
                     newcr = "#REF!".to_string();
                 }
                 out.push_str(&newcr);
@@ -478,7 +478,7 @@ fn rewrite_adjust(
                 newcr.push('$');
             }
             newcr.push_str(&cr.row.to_string());
-            if cr.row < 1 || cr.col < 1 {
+            if cr.row < 1 || cr.col < 1 || cr.col > 702 {
                 newcr = "#REF!".to_string();
             }
             text = newcr;

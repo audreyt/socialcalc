@@ -3720,6 +3720,9 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
             newcolend = cr1.col;
             newrowstart = 1;
             newrowend = attribs.lastrow;
+            if (attribs.lastcol >= 702) {
+               break;
+               }
             if (saveundo) changes.AddUndo("deletecol "+cr1.coord);
             }
          else {
@@ -4643,7 +4646,7 @@ SocialCalc.OffsetFormulaCoords = function(formula, coloffset, rowoffset) {
             newcr += "$";
             }
          newcr += cr.row;
-         if (cr.row < 1 || cr.col < 1) {
+         if (cr.row < 1 || cr.col < 1 || cr.col > 702) {
             newcr = "#REF!";
             }
          updatedformula += newcr;
@@ -4730,7 +4733,7 @@ SocialCalc.AdjustFormulaCoords = function(formula, col, coloffset, row, rowoffse
          else {
             newcr += cr.row;
             }
-         if (cr.row < 1 || cr.col < 1) {
+         if (cr.row < 1 || cr.col < 1 || cr.col > 702) {
             newcr = "#REF!";
             }
          ttext = newcr;

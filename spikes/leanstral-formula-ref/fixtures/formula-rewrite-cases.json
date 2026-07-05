@@ -153,6 +153,22 @@
       "invariant": "Documents the unsafe composition boundary; once a rewrite produces #REF!, later offsets keep #REF!."
     },
     {
+      "name": "offset past max column ZZ becomes REF",
+      "method": "offset",
+      "formula": "ZZ1",
+      "args": { "coloffset": 1, "rowoffset": 0 },
+      "expected": "#REF!",
+      "invariant": "References shifted beyond SocialCalc's ZZ column cap become #REF! instead of clamping back to ZZ."
+    },
+    {
+      "name": "adjust past max column ZZ becomes REF",
+      "method": "adjust",
+      "formula": "ZZ1",
+      "args": { "col": 1, "coloffset": 1, "row": 1, "rowoffset": 0 },
+      "expected": "#REF!",
+      "invariant": "Structural rewrites that move a reference beyond the ZZ column cap become #REF!."
+    },
+    {
       "name": "adjust diagonal insert rewrites each absolute marker independently",
       "method": "adjust",
       "formula": "$A1+A$1+$A$1",
