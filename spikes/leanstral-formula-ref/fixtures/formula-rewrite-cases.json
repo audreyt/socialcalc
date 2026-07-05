@@ -97,6 +97,14 @@
       "invariant": "Current JS parser compresses >= to G then TokenOpExpansion re-emits >=; Rust preserves spelling directly."
     },
     {
+      "name": "<> operator expansion preserves not-equal spelling",
+      "method": "offset",
+      "formula": "A1<>B1",
+      "args": { "coloffset": 0, "rowoffset": 0 },
+      "expected": "A1<>B1",
+      "invariant": "Current JS parser compresses <> to N then TokenOpExpansion re-emits <>; Rust preserves spelling directly."
+    },
+    {
       "name": "adjust sheet-qualified range Sheet1!A1:B1 unchanged when sheetref persists across colon",
       "method": "adjust",
       "formula": "Sheet1!A1:B1",
@@ -111,6 +119,38 @@
       "args": { "coloffset": 1, "rowoffset": 0 },
       "expected": "SHEET1!B1:C1",
       "invariant": "OffsetFormulaCoords ignores sheetref; contrasts with adjust on same formula."
+    },
+    {
+      "name": "adjust keeps whole-column names while shifting trailing coord",
+      "method": "adjust",
+      "formula": "SUM(N:N)+SUM(T:T)+C1",
+      "args": { "col": 1, "coloffset": 1, "row": 1, "rowoffset": 0 },
+      "expected": "SUM(N:N)+SUM(T:T)+D1",
+      "invariant": "Whole-column names are never coords; adjust still shifts refs at or after the insertion anchor."
+    },
+    {
+      "name": "adjust delete skips sheet-qualified coord while local ref becomes REF",
+      "method": "adjust",
+      "formula": "Sheet2!B1+B1",
+      "args": { "col": 2, "coloffset": -1, "row": 1, "rowoffset": 0 },
+      "expected": "SHEET2!B1+#REF!",
+      "invariant": "With sheetref active after !, SHEET2!B1 is skipped; the local B1 in the deleted column becomes #REF!."
+    },
+    {
+      "name": "offset composition succeeds when intermediates stay valid",
+      "method": "offset",
+      "formula": "A1+B1",
+      "args": { "coloffset": 2, "rowoffset": 2 },
+      "expected": "C3+D3",
+      "invariant": "Matches offset(1,1) followed by offset(1,1); documents the safe composition path."
+    },
+    {
+      "name": "offset composition first leg invalid yields REF",
+      "method": "offset",
+      "formula": "A1",
+      "args": { "coloffset": -1, "rowoffset": 0 },
+      "expected": "#REF!",
+      "invariant": "Documents the unsafe composition boundary; once a rewrite produces #REF!, later offsets keep #REF!."
     }
   ],
   "commandCases": [
