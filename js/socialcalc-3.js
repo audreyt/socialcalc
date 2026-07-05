@@ -3000,7 +3000,8 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
 
          for (name in sheet.names) { // update cell references to moved cells in names
             if (sheet.names[name]) { // works with "A1", "A1:A20", and "=formula" forms
-               v1 = sheet.names[name].definition;
+               olddefinition = sheet.names[name].definition;
+               v1 = olddefinition;
                v2 = "";
                if (v1.charAt(0) == "=") {
                   v2 = "=";
@@ -3008,6 +3009,9 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
                   }
                sheet.names[name].definition = v2 +
                   SocialCalc.AdjustFormulaCoords(v1, cr1.col, coloffset, cr1.row, rowoffset);
+               if (saveundo && sheet.names[name].definition != olddefinition) {
+                  changes.AddUndo("name define "+name+" "+olddefinition);
+                  }
                }
             }
 

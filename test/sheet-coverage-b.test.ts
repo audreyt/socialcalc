@@ -77,6 +77,7 @@ test("deletecol updates formula refs with #REF! and names; undo restores formula
     expect(sheet.names.MYREF.definition).toContain("#REF!");
     await sheetUndo(SC, sheet);
     expect(sheet.cells.C1?.formula).toBe("A1+B1");
+    expect(sheet.names.MYREF.definition).toBe("B1");
 });
 
 test("deleterow updates references and names, handles phantom row deletes beyond lastrow", async () => {
@@ -88,9 +89,13 @@ test("deleterow updates references and names, handles phantom row deletes beyond
         "set A3 value n 3",
         "set A4 formula SUM(A1:A3)",
         "name define FIRST A1",
+        "name define ROWTWO A2",
     ]);
     await scheduleCommands(SC, sheet, ["deleterow 2"]);
     expect(sheet.cells.A3.formula).toBe("SUM(A1:A2)");
+    expect(sheet.names.ROWTWO.definition).toContain("#REF!");
+    await sheetUndo(SC, sheet);
+    expect(sheet.names.ROWTWO.definition).toBe("A2");
     // Delete past lastrow (phantom rows) - should not change lastrow.
     await scheduleCommands(SC, sheet, ["deleterow 20"]);
 });
