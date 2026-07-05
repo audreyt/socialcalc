@@ -6,6 +6,41 @@ with the original 2007–2010 development log preserved verbatim at the bottom.
 
 
 ==============================================================================
+v3.0.5 — 2026-07-05
+==============================================================================
+
+Fixes
+- Formula reference rewrites now preserve SocialCalc compatibility across a
+  larger set of copy, paste, fill, insert, delete, and replace cases, with
+  legacy js/socialcalc-3.js behavior used as the compatibility oracle.
+- References shifted beyond SocialCalc's maximum column ZZ now become #REF!
+  instead of silently clamping to ZZ or extending sheet bounds past the
+  supported 702 columns. insertcol at the max-column boundary is covered to
+  preserve existing cells instead of extending the grid past ZZ.
+- filldown/fillright now preserve rectangular numeric series increments per
+  column or row, including interactive fills whose range2 state is captured
+  before the range is cleared.
+- deletecol/deleterow undo now restores changed named-reference definitions
+  and formulas in cells before the deleted band, not only moved cell formulas.
+- The Rust/WASM formula-reference parity spike now mirrors the JavaScript
+  oracle for max-column overflow and promoted formula rewrite edge cases.
+
+Testing
+- Added formula-reference regression coverage for quote survival, whole-column
+  references, parser normalization, absolute-reference structural movement,
+  sheet-qualified range stickiness, delete-band #REF! behavior, and max-column
+  overflow.
+- Added command-level regressions for moveinsert/movepaste, named-reference
+  undo/redo, range endpoint structural edits, sheet-qualified references,
+  absolute references across copy/fill versus structural edits, max row/column
+  boundaries, clipboard persistence, filldown/fillright persistence,
+  rectangular numeric fills, named-reference undo restoration, delete undo for
+  formulas before the deleted band, and max-column insert boundary behavior.
+- Updated Leanstral parity fixtures and regenerated Rust/WASM
+  formula-reference artifacts.
+
+
+==============================================================================
 v3.0.4 — 2026-06-12
 ==============================================================================
 

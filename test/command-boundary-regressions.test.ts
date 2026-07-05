@@ -4,6 +4,7 @@ import {
     loadSocialCalc,
     recalcSheet,
     scheduleCommands,
+    sheetUndo,
 } from "./helpers/socialcalc";
 
 const MAX_COL = 702;
@@ -76,4 +77,58 @@ test("insertcol ZZ at max column preserves ZZ cell and keeps lastcol at max", as
     expect(sheet.attribs.lastcol).toBe(MAX_COL);
     expect(sheet.cells.ZZ1?.datavalue).toBe("boundary-marker");
     expect(sheet.cells.ZZ1?.comment).toBe("edge");
+});
+
+test("insertcol before ZZ at max column leaves the sheet unchanged", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        `set sheet lastcol ${MAX_COL}`,
+        "set ZX1 formula ZY1+ZZ1",
+        "set ZY1 value n 1",
+        "set ZZ1 value n 2",
+    ]);
+
+    await scheduleCommands(SC, sheet, ["insertcol ZY"]);
+
+    expect(sheet.attribs.lastcol).toBe(MAX_COL);
+    expect(sheet.cells.ZX1?.formula).toBe("ZY1+ZZ1");
+    expect(sheet.cells.ZY1?.datavalue).toBe(1);
+    expect(sheet.cells.ZZ1?.datavalue).toBe(2);
+});
+
+test("deletecol undo restores formulas in cells before the deleted column", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 formula B1+C1",
+        "set B1 value n 2",
+        "set C1 value n 3",
+    ]);
+
+    await scheduleCommands(SC, sheet, ["deletecol B"]);
+    expect(sheet.cells.A1?.formula).toBe("#REF!+B1");
+
+    await sheetUndo(SC, sheet);
+    expect(sheet.cells.A1?.formula).toBe("B1+C1");
+    expect(sheet.cells.B1?.datavalue).toBe(2);
+    expect(sheet.cells.C1?.datavalue).toBe(3);
+});
+
+test("deleterow undo restores formulas in cells before the deleted row", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 formula A2+A3",
+        "set A2 value n 2",
+        "set A3 value n 3",
+    ]);
+
+    await scheduleCommands(SC, sheet, ["deleterow 2"]);
+    expect(sheet.cells.A1?.formula).toBe("#REF!+A2");
+
+    await sheetUndo(SC, sheet);
+    expect(sheet.cells.A1?.formula).toBe("A2+A3");
+    expect(sheet.cells.A2?.datavalue).toBe(2);
+    expect(sheet.cells.A3?.datavalue).toBe(3);
 });

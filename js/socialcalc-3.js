@@ -2791,6 +2791,8 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
          what = cmd.NextToken();
          rest = cmd.RestOfString();
          ParseRange();
+         lastcol = attribs.lastcol;
+         lastrow = attribs.lastrow;
 
          if (cmd1 == "insertcol") {
             coloffset = 1;
@@ -2818,8 +2820,8 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
             if (saveundo) changes.AddUndo("deleterow "+cr1.coord);
             }
 
-         for (row=attribs.lastrow; row >= rowend; row--) { // copy the cells forward
-            for (col=attribs.lastcol; col >= colend; col--) {
+         for (row=lastrow; row >= rowend; row--) { // copy the cells forward
+            for (col=lastcol; col >= colend; col--) {
                crbase = SocialCalc.crToCoord(col, row);
                cr = SocialCalc.crToCoord(col+coloffset, row+rowoffset);
                if (!sheet.cells[crbase]) { // copying empty cell
@@ -2884,7 +2886,7 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
                }
             }
 
-         for (col = attribs.lastcol; col >= colend && cmd1 == "insertcol"; col--) { // copy the column attributes forward
+         for (col = lastcol; col >= colend && cmd1 == "insertcol"; col--) { // copy the column attributes forward
             colthis = SocialCalc.rcColname(col);
             colnext = SocialCalc.rcColname(col + coloffset);
             for (attrib in sheet.colattribs) {
@@ -2929,7 +2931,7 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
                 }
             }
 
-         attribs.lastcol += coloffset;
+         attribs.lastcol = Math.min(702, attribs.lastcol + coloffset);
          attribs.lastrow += rowoffset;
          attribs.needsrecalc = "yes";
          break;
@@ -3004,8 +3006,13 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
                       delete cell.parseinfo;
                       if (saveundo && cell.formula.indexOf("#REF!")!=-1) { // save old version only if removed coord
                          oldcr = SocialCalc.coordToCr(cr);
-                         changes.AddUndo("set "+SocialCalc.rcColname(oldcr.col-coloffset)+(oldcr.row-rowoffset)+
-                                         " formula "+oldformula);
+                         if (cmd1 == "deletecol") {
+                            crbase = SocialCalc.crToCoord(oldcr.col < cr1.col ? oldcr.col : oldcr.col-coloffset, oldcr.row);
+                            }
+                         else {
+                            crbase = SocialCalc.crToCoord(oldcr.col, oldcr.row < cr1.row ? oldcr.row : oldcr.row-rowoffset);
+                            }
+                         changes.AddUndo("set "+crbase+" formula "+oldformula);
                          }
                       }
                    }
