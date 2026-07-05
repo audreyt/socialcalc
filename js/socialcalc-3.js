@@ -2391,8 +2391,8 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
          what = cmd.NextToken();
          rest = cmd.RestOfString();
          ParseRange();
-         /** @param {boolean} down */
-         function increment_amount(down) {
+         /** @param {boolean} down @param {number} seriescol @param {number} seriesrow */
+         function increment_amount(down, seriescol, seriesrow) {
             /** @param {string | null | undefined} type */
             function valid_datatype(type) {
 		return type == "v" || type == "c";
@@ -2410,46 +2410,49 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
             var returnval = undefined;
             var startcell, endcell;
             if (range && range.hasrange) {
-                if (down && (range.bottom - range.top == 1) && range.left == range.right) {
-                  startcell = sheet.GetAssuredCell(SocialCalc.crToCoord(range.left, range.top));
-                  endcell = sheet.GetAssuredCell(SocialCalc.crToCoord(range.left, range.bottom));
+               if (down && (range.bottom - range.top == 1) && seriescol >= range.left && seriescol <= range.right) {
+                  startcell = sheet.GetAssuredCell(SocialCalc.crToCoord(seriescol, range.top));
+                  endcell = sheet.GetAssuredCell(SocialCalc.crToCoord(seriescol, range.bottom));
                   returnval = increment_from_cells(startcell, endcell);
-                } else if (!down && range.left != range.right) {
-                  startcell = sheet.GetAssuredCell(SocialCalc.crToCoord(range.left, range.top));
-                  endcell = sheet.GetAssuredCell(SocialCalc.crToCoord(range.right, range.top));
+                  }
+               else if (!down && (range.right - range.left == 1) && seriesrow >= range.top && seriesrow <= range.bottom) {
+                  startcell = sheet.GetAssuredCell(SocialCalc.crToCoord(range.left, seriesrow));
+                  endcell = sheet.GetAssuredCell(SocialCalc.crToCoord(range.right, seriesrow));
                   returnval = increment_from_cells(startcell, endcell);
 		  }
-                }
+               }
             if (returnval === undefined) {
                // Fall back to the command range so filldown/fillright replay on the
                // server (no editor.range2) still compute increments from the first
-               // two source cells in the fill direction.
-               if (down && cr2.row > cr1.row && cr1.col == cr2.col) {
-                  startcell = sheet.GetAssuredCell(SocialCalc.crToCoord(cr1.col, cr1.row));
-                  endcell = sheet.GetAssuredCell(SocialCalc.crToCoord(cr1.col, cr1.row + 1));
+               // two source cells in the fill direction. For rectangular fills,
+               // compute a separate increment per column (filldown) or row
+               // (fillright), matching spreadsheet series behavior.
+               if (down && cr2.row > cr1.row) {
+                  startcell = sheet.GetAssuredCell(SocialCalc.crToCoord(seriescol, cr1.row));
+                  endcell = sheet.GetAssuredCell(SocialCalc.crToCoord(seriescol, cr1.row + 1));
                   returnval = increment_from_cells(startcell, endcell);
                   }
-               else if (!down && cr2.col > cr1.col && cr1.row == cr2.row) {
-                  startcell = sheet.GetAssuredCell(SocialCalc.crToCoord(cr1.col, cr1.row));
-                  endcell = sheet.GetAssuredCell(SocialCalc.crToCoord(cr1.col + 1, cr1.row));
+               else if (!down && cr2.col > cr1.col) {
+                  startcell = sheet.GetAssuredCell(SocialCalc.crToCoord(cr1.col, seriesrow));
+                  endcell = sheet.GetAssuredCell(SocialCalc.crToCoord(cr1.col + 1, seriesrow));
                   returnval = increment_from_cells(startcell, endcell);
                   }
                }
-            if (editor) editor.Range2Remove();
            return returnval;
          }
+         var csco = SocialCalc.GetSpreadsheetControlObject();
+         var editor = csco && csco.editor;
+         if (editor) editor.Range2Remove();
 	 var inc;
          if (cmd1 == "fillright") {
             fillright = true;
             rowstart = cr1.row;
             colstart = cr1.col + 1;
-	    inc = increment_amount(false);
             }
          else {
             fillright = false;
             rowstart = cr1.row + 1;
             colstart = cr1.col;
-	    inc = increment_amount(true);
             }
          for (row = rowstart; row <= cr2.row; row++) {
             for (col = colstart; col <= cr2.col; col++) {
@@ -2468,6 +2471,7 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
                   rowoffset = row - rowstart + 1;
                   }
                basecell = sheet.GetAssuredCell(crbase);
+               inc = increment_amount(!fillright, col, row);
                if (rest == "all" || rest == "formats") {
                   for (attrib in cellProperties) {
                      if (cellProperties[attrib] == 1) continue; // copy only format attributes

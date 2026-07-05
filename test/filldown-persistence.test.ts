@@ -56,6 +56,42 @@ test("fillright without editor.range2 increments from command range", async () =
     expect(sheet.cells.D1.datavalue).toBe(40);
 });
 
+test("filldown without editor.range2 increments each column numeric series independently", async () => {
+    const SC = await loadSocialCalc();
+    installHeadlessEditorMock(SC);
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 1",
+        "set A2 value n 2",
+        "set B1 value n 10",
+        "set B2 value n 20",
+    ]);
+    await scheduleCommands(SC, sheet, ["filldown A1:B4 all"]);
+    await recalcSheet(SC, sheet);
+
+    expect(sheet.cells.A3.datavalue).toBe(3);
+    expect(sheet.cells.A4.datavalue).toBe(4);
+    expect(sheet.cells.B3.datavalue).toBe(30);
+    expect(sheet.cells.B4.datavalue).toBe(40);
+});
+
+test("fillright without editor.range2 increments each row numeric series independently", async () => {
+    const SC = await loadSocialCalc();
+    installHeadlessEditorMock(SC);
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 1",
+        "set B1 value n 2",
+        "set A2 value n 10",
+        "set B2 value n 20",
+    ]);
+    await scheduleCommands(SC, sheet, ["fillright A1:C2 all"]);
+    await recalcSheet(SC, sheet);
+
+    expect(sheet.cells.C1.datavalue).toBe(3);
+    expect(sheet.cells.C2.datavalue).toBe(30);
+});
+
 test("filldown without editor.range2 increments date constants", async () => {
     const SC = await loadSocialCalc();
     installHeadlessEditorMock(SC);
