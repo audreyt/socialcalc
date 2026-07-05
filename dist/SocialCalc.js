@@ -3363,10 +3363,6 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
                }
            return returnval;
          }
-         var csco = SocialCalc.GetSpreadsheetControlObject();
-         var editor = csco && csco.editor;
-         if (editor) editor.Range2Remove();
-	 var inc;
          if (cmd1 == "fillright") {
             fillright = true;
             rowstart = cr1.row;
@@ -3377,6 +3373,20 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
             rowstart = cr1.row + 1;
             colstart = cr1.col;
             }
+         var increments = {};
+         if (fillright) {
+            for (row = rowstart; row <= cr2.row; row++) {
+               increments[row] = increment_amount(false, cr1.col, row);
+               }
+            }
+         else {
+            for (col = colstart; col <= cr2.col; col++) {
+               increments[col] = increment_amount(true, col, cr1.row);
+               }
+            }
+         var csco = SocialCalc.GetSpreadsheetControlObject();
+         var editor = csco && csco.editor;
+         if (editor) editor.Range2Remove();
          for (row = rowstart; row <= cr2.row; row++) {
             for (col = colstart; col <= cr2.col; col++) {
                cr = SocialCalc.crToCoord(col, row);
@@ -3394,7 +3404,7 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
                   rowoffset = row - rowstart + 1;
                   }
                basecell = sheet.GetAssuredCell(crbase);
-               inc = increment_amount(!fillright, col, row);
+               inc = increments[fillright ? row : col];
                if (rest == "all" || rest == "formats") {
                   for (attrib in cellProperties) {
                      if (cellProperties[attrib] == 1) continue; // copy only format attributes
