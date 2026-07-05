@@ -55,6 +55,6 @@
     "@stryker-mutator/core": "^9.6.1",
     "@types/bun": "latest",
     "@typescript/native-preview": "^7.0.0-dev.20260421.2",
-    "binaryen": "^130.0.0"
+    "binaryen": "130.0.0"
   }
 }
