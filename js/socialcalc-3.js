@@ -5887,8 +5887,6 @@ SocialCalc.GetCellContents = function(sheetobj, coord) {
 // during edit than with plain HTML.
 //
 
-/** @param {any} sheetobj @param {any} value @param {any} cr @param {any} linkstyle */
-//
 // text = FormatCellForExport(sheet, cell, cr)
 //
 // Plain-text export for csv/tab (no HTML). Applies number/date formats.
@@ -5922,6 +5920,7 @@ SocialCalc.FormatCellForExport = function(sheet, cell, cr) {
 
    }
 
+/** @param {any} sheetobj @param {any} value @param {any} cr @param {any} [linkstyle] */
 SocialCalc.FormatValueForDisplay = function(sheetobj, value, cr, linkstyle) {
 
    var valueformat, has_parens, has_commas, valuetype, valuesubtype;

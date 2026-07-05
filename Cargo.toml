@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/formula-ref-core"]
+resolver = "3"

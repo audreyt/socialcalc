@@ -37,8 +37,11 @@ const testsByFile = {
         "test/formula.test.ts",
     ],
     "socialcalc-3.js": [
-        "test/sheet-coverage.test.ts",
+        "test/sheet-coverage-a.test.ts",
+        "test/sheet-coverage-b.test.ts",
         "test/core.test.ts",
+        "test/formula-quote-escaping.test.ts",
+        "test/filldown-persistence.test.ts",
     ],
     "socialcalctableeditor.js": ["test/ui-coverage.test.ts"],
     "socialcalcpopup.js": ["test/ui-coverage.test.ts"],

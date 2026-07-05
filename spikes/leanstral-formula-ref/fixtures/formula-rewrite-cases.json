@@ -1,0 +1,171 @@
+{
+  "directCases": [
+    {
+      "name": "offset preserves string literal that looks like a reference",
+      "method": "offset",
+      "formula": "CONCATENATE(\"A1 should stay\",A1)",
+      "args": { "coloffset": 1, "rowoffset": 2 },
+      "expected": "CONCATENATE(\"A1 should stay\",B3)",
+      "invariant": "Only coord token A1 shifts; the string token remains byte-equivalent after quote re-escaping."
+    },
+    {
+      "name": "offset intentionally shifts sheet-qualified references",
+      "method": "offset",
+      "formula": "Sheet2!A1+B1",
+      "args": { "coloffset": 1, "rowoffset": 0 },
+      "expected": "SHEET2!B1+C1",
+      "invariant": "OffsetFormulaCoords does not honor sheetref and shifts both coords; this preserves current fill/paste behavior."
+    },
+    {
+      "name": "adjust skips sheet-qualified references",
+      "method": "adjust",
+      "formula": "Sheet2!A1+B1",
+      "args": { "col": 1, "coloffset": 2, "row": 1, "rowoffset": 0 },
+      "expected": "SHEET2!A1+D1",
+      "invariant": "AdjustFormulaCoords sets sheetref after ! and skips the sheet-qualified A1 while shifting local B1."
+    },
+    {
+      "name": "replace skips sheet-qualified references",
+      "method": "replace",
+      "formula": "Sheet2!A1+B1",
+      "args": { "movedto": { "A1": "C3", "B1": "D4" } },
+      "expected": "SHEET2!A1+D4",
+      "invariant": "ReplaceFormulaCoords skips the sheet-qualified A1 but replaces local B1."
+    },
+    {
+      "name": "offset preserves absolute column and row markers",
+      "method": "offset",
+      "formula": "$A1+A$1+$A$1",
+      "args": { "coloffset": 2, "rowoffset": 2 },
+      "expected": "$A3+C$1+$A$1",
+      "invariant": "A leading $ locks the column and a later $ locks the row."
+    },
+    {
+      "name": "adjust deletion turns removed refs into REF",
+      "method": "adjust",
+      "formula": "B1+C1",
+      "args": { "col": 2, "coloffset": -1, "row": 1, "rowoffset": 0 },
+      "expected": "#REF!+B1",
+      "invariant": "Refs in the deleted column band become #REF!, while later refs shift backward."
+    },
+    {
+      "name": "replace preserves absolute markers",
+      "method": "replace",
+      "formula": "$A1+A$2",
+      "args": { "movedto": { "A1": "B5", "A2": "B6" } },
+      "expected": "$B5+B$6",
+      "invariant": "Replacement copies original absolute markers onto the target coordinate parts."
+    },
+    {
+      "name": "whole-column names are not rewrite coordinates",
+      "method": "offset",
+      "formula": "SUM(N:N)+SUM(T:T)",
+      "args": { "coloffset": 1, "rowoffset": 0 },
+      "expected": "SUM(N:N)+SUM(T:T)",
+      "invariant": "Whole-column N:T spellings parse as name tokens, not coord tokens."
+    },
+    {
+      "name": "whole-column AA stays name while AA1 shifts",
+      "method": "offset",
+      "formula": "SUM(AA:AA)+AA1",
+      "args": { "coloffset": 1, "rowoffset": 0 },
+      "expected": "SUM(AA:AA)+AB1",
+      "invariant": "AA in AA:AA is a name token; AA1 is a coord token."
+    },
+    {
+      "name": "range endpoints are rewritten independently",
+      "method": "replace",
+      "formula": "SUM(A1:B2)",
+      "args": { "movedto": { "A1": "C3" } },
+      "expected": "SUM(C3:B2)",
+      "invariant": "Current ReplaceFormulaCoords has no whole-range extent move; only mapped endpoint A1 changes."
+    },
+    {
+      "name": "doubled quotes survive re-emission",
+      "method": "offset",
+      "formula": "CONCATENATE(\"a\"\"b\"\"c\",A1)",
+      "args": { "coloffset": 1, "rowoffset": 0 },
+      "expected": "CONCATENATE(\"a\"\"b\"\"c\",B1)",
+      "invariant": "Inner quote bytes are doubled on output."
+    },
+    {
+      "name": "operator expansion preserves comparator spelling",
+      "method": "offset",
+      "formula": "A1>=B1",
+      "args": { "coloffset": 0, "rowoffset": 0 },
+      "expected": "A1>=B1",
+      "invariant": "Current JS parser compresses >= to G then TokenOpExpansion re-emits >=; Rust preserves spelling directly."
+    },
+    {
+      "name": "adjust sheet-qualified range Sheet1!A1:B1 unchanged when sheetref persists across colon",
+      "method": "adjust",
+      "formula": "Sheet1!A1:B1",
+      "args": { "col": 1, "coloffset": 1, "row": 1, "rowoffset": 0 },
+      "expected": "SHEET1!A1:B1",
+      "invariant": "Leanstral counterexample: ':' does not reset sheetref; both endpoints skipped on adjust (JS behavior to preserve)."
+    },
+    {
+      "name": "offset still shifts sheet-qualified range Sheet1!A1:B1",
+      "method": "offset",
+      "formula": "Sheet1!A1:B1",
+      "args": { "coloffset": 1, "rowoffset": 0 },
+      "expected": "SHEET1!B1:C1",
+      "invariant": "OffsetFormulaCoords ignores sheetref; contrasts with adjust on same formula."
+    }
+  ],
+  "commandCases": [
+    {
+      "name": "filldown offsets refs while preserving HTML quotes",
+      "setup": [
+        "set B4 formula TODAY()",
+        "set B5 formula TODAY()",
+        "set B6 formula TODAY()",
+        "set A4 formula IF(B4=TODAY(),\"<span style=\"\"background-color:rgb(81,184,72);color:rgb(81,184,72)\"\">_______</span>\",\"\")"
+      ],
+      "commands": ["filldown A4:A6 formulas"],
+      "expectedCells": [
+        {
+          "coord": "A5",
+          "field": "formula",
+          "expected": "IF(B5=TODAY(),\"<span style=\"\"background-color:rgb(81,184,72);color:rgb(81,184,72)\"\">_______</span>\",\"\")"
+        },
+        {
+          "coord": "A6",
+          "field": "formula",
+          "expected": "IF(B6=TODAY(),\"<span style=\"\"background-color:rgb(81,184,72);color:rgb(81,184,72)\"\">_______</span>\",\"\")"
+        }
+      ]
+    },
+    {
+      "name": "paste offsets local ref but leaves whole column and string literal",
+      "setup": [
+        "set A1 value n 1",
+        "set B1 formula A1+SUM(N:N)+\"A1\""
+      ],
+      "commands": ["copy B1", "paste D3 formulas"],
+      "expectedCells": [
+        {
+          "coord": "D3",
+          "field": "formula",
+          "expected": "C3+SUM(N:N)+\"A1\""
+        }
+      ]
+    },
+    {
+      "name": "deletecol updates formula through AdjustFormulaCoords",
+      "setup": [
+        "set A1 value n 1",
+        "set B1 value n 2",
+        "set C1 formula B1+C1"
+      ],
+      "commands": ["deletecol B1"],
+      "expectedCells": [
+        {
+          "coord": "B1",
+          "field": "formula",
+          "expected": "#REF!+B1"
+        }
+      ]
+    }
+  ]
+}
