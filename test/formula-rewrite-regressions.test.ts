@@ -73,4 +73,27 @@ describe("formula reference rewrite regressions (Leanstral oracle)", () => {
         const SC = await loadSocialCalc();
         expect(SC.AdjustFormulaCoords("Sheet2!A1+B1", 1, 2, 1, 0)).toBe("SHEET2!A1+D1");
     });
+
+    test("AdjustFormulaCoords shifts row-locked and col-locked absolutes on diagonal insert", async () => {
+        const SC = await loadSocialCalc();
+        expect(SC.AdjustFormulaCoords("$A1+A$1+$A$1", 1, 1, 1, 1)).toBe("$B2+B$2+$B$2");
+    });
+
+    test("ReplaceFormulaCoords leaves sheet-qualified range endpoints while replacing local refs", async () => {
+        const SC = await loadSocialCalc();
+        expect(
+            SC.ReplaceFormulaCoords("Sheet1!A1:B1+C1", {
+                A1: "D4",
+                B1: "E5",
+                C1: "F6",
+            }),
+        ).toBe("SHEET1!A1:B1+F6");
+    });
+
+    test("AdjustFormulaCoords maps multiple deleted-column refs to REF and shifts survivors", async () => {
+        const SC = await loadSocialCalc();
+        expect(SC.AdjustFormulaCoords("A1+B1+C1+D1", 2, -2, 1, 0)).toBe(
+            "A1+#REF!+#REF!+B1",
+        );
+    });
 });

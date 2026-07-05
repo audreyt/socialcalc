@@ -151,6 +151,30 @@
       "args": { "coloffset": -1, "rowoffset": 0 },
       "expected": "#REF!",
       "invariant": "Documents the unsafe composition boundary; once a rewrite produces #REF!, later offsets keep #REF!."
+    },
+    {
+      "name": "adjust diagonal insert rewrites each absolute marker independently",
+      "method": "adjust",
+      "formula": "$A1+A$1+$A$1",
+      "args": { "col": 1, "coloffset": 1, "row": 1, "rowoffset": 1 },
+      "expected": "$B2+B$2+$B$2",
+      "invariant": "Structural adjust shifts the underlying coordinate even when offset-style absolute markers are present, then reapplies each marker."
+    },
+    {
+      "name": "replace keeps sheet-qualified A1:B1 range when endpoints are mapped but sheet-sticky",
+      "method": "replace",
+      "formula": "Sheet1!A1:B1+C1",
+      "args": { "movedto": { "A1": "D4", "B1": "E5", "C1": "F6" } },
+      "expected": "SHEET1!A1:B1+F6",
+      "invariant": "Sheet-qualified range after ! is not rewritten even when A1 and B1 appear in movedto; local C1 still replaces after + resets sheetref."
+    },
+    {
+      "name": "adjust wide column delete turns in-band refs to REF and compacts later refs",
+      "method": "adjust",
+      "formula": "A1+B1+C1+D1",
+      "args": { "col": 2, "coloffset": -2, "row": 1, "rowoffset": 0 },
+      "expected": "A1+#REF!+#REF!+B1",
+      "invariant": "Deleting two columns from col 2 invalidates B1 and C1 while D1 shifts back to B1."
     }
   ],
   "commandCases": [
