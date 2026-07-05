@@ -1926,6 +1926,8 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
    /** @type {any} */
    var oldcr;
    /** @type {any} */
+   var olddefinition;
+   /** @type {any} */
    var cols;
    /** @type {any} */
    var dirs;
@@ -1971,6 +1973,7 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
    var quashedCellCoord, quashedCell;
    var slast, tb;
    var value;
+   var inc;
 
    var attribs = sheet.attribs;
    var changes = sheet.changes;
@@ -2450,6 +2453,7 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
             rowstart = cr1.row + 1;
             colstart = cr1.col;
             }
+         /** @type {Record<number, number | undefined>} */
          var increments = {};
          if (fillright) {
             for (row = rowstart; row <= cr2.row; row++) {
