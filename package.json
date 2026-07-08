@@ -18,8 +18,8 @@
   "scripts": {
     "build": "bun run build.ts",
     "build:min": "bun run build.ts --minify",
-    "typecheck": "tsgo --noEmit",
-    "typecheck:strict": "tsgo --noEmit -p tsconfig.strict.json",
+    "typecheck": "tsc --noEmit",
+    "typecheck:strict": "tsc --noEmit -p tsconfig.strict.json",
     "test": "bun run build.ts && bun test --parallel",
     "test:coverage": "bun run build.ts && bun test --coverage --coverage-reporter=text --coverage-reporter=lcov",
     "mutate": "bunx stryker run",
@@ -54,7 +54,7 @@
   "devDependencies": {
     "@stryker-mutator/core": "^9.6.1",
     "@types/bun": "latest",
-    "@typescript/native-preview": "^7.0.0-dev.20260421.2",
-    "binaryen": "130.0.0"
+    "binaryen": "130.0.0",
+    "typescript": "^7.0.2"
   }
 }
