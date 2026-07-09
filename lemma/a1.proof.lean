@@ -1,12 +1,44 @@
+import Mathlib.Tactic.IntervalCases
 import «a1.spec»
 /-
   Hand-written Lean proofs for lemma/a1.ts (LemmaScript Lean backend).
   Generated: a1.types.lean, a1.def.lean — re-run `bun run verify:lean:gen`.
+  LETTERS lemmas live here (not a1.spec) so a1.def can import a1.spec
+  without a build cycle after regen.
 -/
 import «a1.def»
 
 set_option loom.semantics.termination "total"
 set_option loom.semantics.choice "demonic"
+
+@[simp]
+theorem letters_len {i : Nat} (hi : i < 26) : (LETTERS[i]!).length = 1 := by
+  have h : i < 26 := hi
+  interval_cases i <;> norm_num [LETTERS] <;> decide
+
+@[simp]
+theorem letters_tmod_len (c : Int) (hc1 : 1 ≤ c) (hc2 : c ≤ 702) :
+    (LETTERS[((c - 1).tmod 26).toNat]!).length = 1 := by
+  apply letters_len
+  have h0 : c - 1 ≥ 0 := by omega
+  have h1 : (c - 1).tmod 26 < 26 := Int.tmod_lt_of_pos (c - 1) (by decide)
+  have h2 : (c - 1).tmod 26 ≥ 0 := Int.tmod_nonneg 26 h0
+  have h3 : ((c - 1).tmod 26).toNat = (c - 1).tmod 26 := by
+    rw [Int.toNat_of_nonneg h2]
+  omega
+
+@[simp]
+theorem letters_colhigh_minus1_len (c : Int) (hc1 : 1 ≤ c) (hc2 : c ≤ 702) :
+    (LETTERS[((c - 1) / 26 - 1).toNat]!).length = 1 := by
+  apply letters_len
+  have h0 : (c - 1) / 26 ≤ 26 := by
+    rw [Int.ediv_le_iff_le_mul (by decide)]
+    omega
+  have h3 : (c - 1) / 26 - 1 < 26 := by omega
+  have h4 : ((c - 1) / 26 - 1).toNat < 26 := by
+    rw [Int.toNat_lt_of_ne_zero (by decide)]
+    exact h3
+  exact h4
 
 prove_correct clampCol by
   unfold Pure.clampCol; loom_solve
