@@ -1,9 +1,6 @@
 /-
   Hand-written Lean proofs for lemma/a1.ts (LemmaScript Lean backend).
   Generated: a1.types.lean, a1.def.lean — re-run `bun run verify:lean:gen`.
-
-  Pure helpers (Pure.*) target loom_solve once `verify:lean:build` is green.
-  Remaining open sorries are imperative string builders / structural adjust.
 -/
 import «a1.def»
 
@@ -41,6 +38,10 @@ prove_correct offsetA1Parts by
   unfold Pure.offsetA1Parts Pure.applyAxisOffset Pure.offsetCol Pure.offsetRow Pure.isColInBounds Pure.isRowInBounds
   loom_solve
 
+prove_correct adjustAxis by
+  unfold Pure.adjustAxis; loom_solve
+
+-- Imperative string builders: open goals for later Leanstral / lake work.
 prove_correct rcColname by
   loom_goals_intro
   all_goals sorry
@@ -58,10 +59,6 @@ prove_correct formatA1Parts by
   all_goals sorry
 
 prove_correct offsetA1 by
-  loom_goals_intro
-  all_goals sorry
-
-prove_correct adjustAxis by
   loom_goals_intro
   all_goals sorry
 

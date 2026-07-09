@@ -73,4 +73,20 @@ def offsetA1Parts (col : Int) (row : Int) (absCol : Bool) (absRow : Bool) (colof
     else
       { col := c, row := r }
 
+def adjustAxis (value : Int) (start : Int) (delta : Int) (isCol : Bool) : Int :=
+  if delta < 0 ∧ value ≥ start ∧ value < start - delta then
+    -1
+  else
+    let shifted := if value ≥ start then value + delta else value
+    if isCol then
+      if shifted < 1 ∨ shifted > 702 then
+        -1
+      else
+        shifted
+    else
+      if shifted < 1 then
+        -1
+      else
+        shifted
+
 end Pure

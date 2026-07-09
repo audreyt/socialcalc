@@ -181,6 +181,30 @@ lemma offsetA1Parts_ensures(col: int, row: int, absCol: bool, absRow: bool, colo
 {
 }
 
+function adjustAxis(value: int, start: int, delta: int, isCol: bool): int
+{
+  if (((delta < 0) && (value >= start)) && (value < (start - delta))) then
+    -1
+  else
+    var shifted := (if (value >= start) then (value + delta) else value);
+    if isCol then
+      if ((shifted < 1) || (shifted > 702)) then
+        -1
+      else
+        shifted
+    else
+      if (shifted < 1) then
+        -1
+      else
+        shifted
+}
+
+lemma adjustAxis_ensures(value: int, start: int, delta: int, isCol: bool)
+  ensures (((adjustAxis(value, start, delta, isCol) == -1) || (((isCol == true) && (adjustAxis(value, start, delta, isCol) >= 1)) && (adjustAxis(value, start, delta, isCol) <= 702))) || ((isCol == false) && (adjustAxis(value, start, delta, isCol) >= 1)))
+  ensures ((delta == 0) ==> ((adjustAxis(value, start, delta, isCol) == value) || (adjustAxis(value, start, delta, isCol) == -1)))
+{
+}
+
 const LETTERS: seq<string> := ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
 
 method rcColname(c: int) returns (res: string)
@@ -270,27 +294,6 @@ method offsetA1(col: int, row: int, absCol: bool, absRow: bool, coloffset: int, 
   }
   var i_t7 := formatA1Parts(p.col, p.row, absCol, absRow);
   return i_t7;
-}
-
-method adjustAxis(value: int, start: int, delta: int, isCol: bool) returns (res: int)
-  ensures (((res == -1) || (((isCol == true) && (res >= 1)) && (res <= 702))) || ((isCol == false) && (res >= 1)))
-  ensures ((delta == 0) ==> ((res == value) || (res == -1)))
-{
-  var v := value;
-  if (((delta < 0) && (v >= start)) && (v < (start - delta))) {
-    return -1;
-  }
-  if (v >= start) {
-    v := (v + delta);
-  }
-  if isCol {
-    if ((v < 1) || (v > 702)) {
-      return -1;
-    }
-  } else if (v < 1) {
-    return -1;
-  }
-  return v;
 }
 
 method adjustA1(col: int, row: int, absCol: bool, absRow: bool, startCol: int, coloffset: int, startRow: int, rowoffset: int) returns (res: string)

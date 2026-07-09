@@ -279,19 +279,16 @@ export function adjustAxis(
   //@ verify
   //@ ensures \result === -1 || (isCol === true && \result >= 1 && \result <= 702) || (isCol === false && \result >= 1)
   //@ ensures delta === 0 ==> (\result === value || \result === -1)
-  let v = value;
-  if (delta < 0 && v >= start && v < start - delta) {
+  if (delta < 0 && value >= start && value < start - delta) {
     return -1;
   }
-  if (v >= start) {
-    v = v + delta;
-  }
+  const shifted = value >= start ? value + delta : value;
   if (isCol) {
-    if (v < 1 || v > 702) return -1;
-  } else {
-    if (v < 1) return -1;
+    if (shifted < 1 || shifted > 702) return -1;
+    return shifted;
   }
-  return v;
+  if (shifted < 1) return -1;
+  return shifted;
 }
 
 /**

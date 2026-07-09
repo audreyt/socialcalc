@@ -150,17 +150,7 @@ method adjustAxis (value : Int) (start : Int) (delta : Int) (isCol : Bool) retur
   ensures res = -1 ∨ isCol = true ∧ res ≥ 1 ∧ res ≤ 702 ∨ isCol = false ∧ res ≥ 1
   ensures delta = 0 → res = value ∨ res = -1
   do
-    let mut v : Int := value
-    if delta < 0 && v ≥ start && v < start - delta then
-      return -1
-    if v ≥ start then
-      v := v + delta
-    if isCol then
-      if v < 1 || v > 702 then
-        return -1
-    else if v < 1 then
-      return -1
-    return v
+    return Pure.adjustAxis value start delta isCol
 
 method adjustA1 (col : Int) (row : Int) (absCol : Bool) (absRow : Bool) (startCol : Int) (coloffset : Int) (startRow : Int) (rowoffset : Int) return (res : String)
   ensures res.length ≥ 2
