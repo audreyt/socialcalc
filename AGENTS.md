@@ -30,7 +30,6 @@ formula1 operand/evaluator helpers still need extraction/typing before prove.
 Promote findings to Bun fixtures/tests; shipping `dist/SocialCalc.js` remains
 the compatibility oracle. Keep the Rust/WASM spike as parity harness, not the
 insight path.
-Keep the Rust/WASM spike as parity harness, not the insight path.
 
 ## SocialCalc formula-reference work
 
