@@ -15827,8 +15827,7 @@ FormulaRefRoot.ReplaceFormulaCoords = function(formula, movedto) {
 // Opt this module into TypeScript strict checking via the r2scout config.
 // In-place TypeScript conversion of socialcalcpopup.js (SocialCalc global script).
 // Ambient API types live in socialcalcpopup.d.ts.
-// Intermediate: @ts-nocheck until fully annotated.
-// @ts-nocheck
+// Typechecked global-script module (no @ts-nocheck).
 /*
 // The module of the SocialCalc package for the optional popup menus in socialcalcspreadsheetcontrol.js
 //
@@ -15851,23 +15850,24 @@ FormulaRefRoot.ReplaceFormulaCoords = function(formula, movedto) {
    // Module-load guards removed — in the concatenated UMD bundle, SocialCalc
    // is always defined by the time this file runs.
 
-   // The main Popup data -- there is only one set
+// Implementation-only mutable view for progressive Popup bag init.
 
 SocialCalc.Popup = {};
-SocialCalc.Popup.Types = {};
-SocialCalc.Popup.Controls = {};
-SocialCalc.Popup.Current = {};
+const PopupMut = SocialCalc.Popup;
+PopupMut.Types = {};
+PopupMut.Controls = {};
+PopupMut.Current = {};
 SocialCalc.Popup.LocalizeString = function(str) {
   return str;
 };
-SocialCalc.Popup.Create = function(type, id, attribs) {
+PopupMut.Create = function(type, id, attribs) {
   var pt = SocialCalc.Popup.Types[type];
   if (pt && pt.Create) {
     pt.Create(type, id, attribs);
   }
-  SocialCalc.Popup.imagePrefix = SocialCalc.Constants.defaultImagePrefix;
+  PopupMut.imagePrefix = SocialCalc.Constants.defaultImagePrefix;
 };
-SocialCalc.Popup.SetValue = function(id, value) {
+PopupMut.SetValue = function(id, value) {
   var sp = SocialCalc.Popup;
   var spt = sp.Types;
   var spc = sp.Controls;
@@ -15885,7 +15885,7 @@ SocialCalc.Popup.SetValue = function(id, value) {
     }
   }
 };
-SocialCalc.Popup.SetDisabled = function(id, disabled) {
+PopupMut.SetDisabled = function(id, disabled) {
   var sp = SocialCalc.Popup;
   var spt = sp.Types;
   var spc = sp.Controls;
@@ -15903,7 +15903,7 @@ SocialCalc.Popup.SetDisabled = function(id, disabled) {
     pt.SetDisabled(type, id, disabled);
   }
 };
-SocialCalc.Popup.GetValue = function(id) {
+PopupMut.GetValue = function(id) {
   var sp = SocialCalc.Popup;
   var spt = sp.Types;
   var spc = sp.Controls;
@@ -15918,7 +15918,7 @@ SocialCalc.Popup.GetValue = function(id) {
   }
   return null;
 };
-SocialCalc.Popup.Initialize = function(id, data) {
+PopupMut.Initialize = function(id, data) {
   var sp = SocialCalc.Popup;
   var spt = sp.Types;
   var spc = sp.Controls;
@@ -15932,14 +15932,14 @@ SocialCalc.Popup.Initialize = function(id, data) {
     pt.Initialize(type, id, data);
   }
 };
-SocialCalc.Popup.Reset = function(type) {
+PopupMut.Reset = function(type) {
   var sp = SocialCalc.Popup;
   var spt = sp.Types;
   var spc = sp.Controls;
   if (spt[type].Reset)
     spt[type].Reset(type);
 };
-SocialCalc.Popup.CClick = function(id) {
+PopupMut.CClick = function(id) {
   var sp = SocialCalc.Popup;
   var spt = sp.Types;
   var spc = sp.Controls;
@@ -15963,7 +15963,7 @@ SocialCalc.Popup.CClick = function(id) {
   }
   sp.Current.id = id;
 };
-SocialCalc.Popup.Close = function() {
+PopupMut.Close = function() {
   var sp = SocialCalc.Popup;
   var spt = sp.Types;
   var spc = sp.Controls;
@@ -15971,7 +15971,7 @@ SocialCalc.Popup.Close = function() {
     return;
   sp.CClick(sp.Current.id);
 };
-SocialCalc.Popup.Cancel = function() {
+PopupMut.Cancel = function() {
   var sp = SocialCalc.Popup;
   var spt = sp.Types;
   var spc = sp.Controls;
@@ -15982,7 +15982,7 @@ SocialCalc.Popup.Cancel = function() {
   pt.Cancel(type, sp.Current.id);
   sp.Current.id = null;
 };
-SocialCalc.Popup.CreatePopupDiv = function(id, attribs) {
+PopupMut.CreatePopupDiv = function(id, attribs) {
   var pos, ele;
   var sp = SocialCalc.Popup;
   var spc = sp.Controls;
@@ -15992,7 +15992,7 @@ SocialCalc.Popup.CreatePopupDiv = function(id, attribs) {
   pos = SocialCalc.GetElementPosition(spcdata.mainele);
   main.style.top = pos.top + spcdata.mainele.offsetHeight + "px";
   main.style.left = pos.left + "px";
-  main.style.zIndex = 100;
+  main.style.zIndex = String(100);
   main.style.backgroundColor = "#FFF";
   main.style.border = "1px solid black";
   if (attribs.width) {
@@ -16018,7 +16018,7 @@ SocialCalc.Popup.CreatePopupDiv = function(id, attribs) {
   }
   return main;
 };
-SocialCalc.Popup.EnsurePosition = function(id, container) {
+PopupMut.EnsurePosition = function(id, container) {
   var sp = SocialCalc.Popup;
   var spc = sp.Controls;
   var spcdata = spc[id].data;
@@ -16074,7 +16074,7 @@ SocialCalc.Popup.EnsurePosition = function(id, container) {
     t = 8;
   }
 };
-SocialCalc.Popup.DestroyPopupDiv = function(ele, dragregistered) {
+PopupMut.DestroyPopupDiv = function(ele, dragregistered) {
   if (!ele)
     return;
   ele.innerHTML = "";
@@ -16083,7 +16083,7 @@ SocialCalc.Popup.DestroyPopupDiv = function(ele, dragregistered) {
     ele.parentNode.removeChild(ele);
   }
 };
-SocialCalc.Popup.RGBToHex = function(val) {
+PopupMut.RGBToHex = function(val) {
   var sp = SocialCalc.Popup;
   if (val == "") {
     return "000000";
@@ -16095,27 +16095,27 @@ SocialCalc.Popup.RGBToHex = function(val) {
     return "000000";
   }
 };
-SocialCalc.Popup.HexDigits = "0123456789ABCDEF";
-SocialCalc.Popup.ToHex = function(num) {
+PopupMut.HexDigits = "0123456789ABCDEF";
+PopupMut.ToHex = function(num) {
   var sp = SocialCalc.Popup;
   var first = Math.floor(num / 16);
   var second = num % 16;
   return sp.HexDigits.charAt(first) + sp.HexDigits.charAt(second);
 };
-SocialCalc.Popup.FromHex = function(str) {
+PopupMut.FromHex = function(str) {
   var sp = SocialCalc.Popup;
   var first = sp.HexDigits.indexOf(str.charAt(0).toUpperCase());
   var second = sp.HexDigits.indexOf(str.charAt(1).toUpperCase());
   return (first >= 0 ? first : 0) * 16 + (second >= 0 ? second : 0);
 };
-SocialCalc.Popup.HexToRGB = function(val) {
+PopupMut.HexToRGB = function(val) {
   var sp = SocialCalc.Popup;
   return "rgb(" + sp.FromHex(val.substring(1, 3)) + "," + sp.FromHex(val.substring(3, 5)) + "," + sp.FromHex(val.substring(5, 7)) + ")";
 };
-SocialCalc.Popup.makeRGB = function(r, g, b) {
+PopupMut.makeRGB = function(r, g, b) {
   return "rgb(" + (r > 0 ? r : 0) + "," + (g > 0 ? g : 0) + "," + (b > 0 ? b : 0) + ")";
 };
-SocialCalc.Popup.splitRGB = function(rgb) {
+PopupMut.splitRGB = function(rgb) {
   var parts = rgb.match(/(\d+)\D+(\d+)\D+(\d+)\D/);
   if (!parts) {
     return { r: 0, g: 0, b: 0 };
@@ -16123,7 +16123,7 @@ SocialCalc.Popup.splitRGB = function(rgb) {
     return { r: Number(parts[1]), g: Number(parts[2]), b: Number(parts[3]) };
   }
 };
-SocialCalc.Popup.Types.List = {};
+PopupMut.Types.List = {};
 SocialCalc.Popup.Types.List.Create = function(type, id, attribs) {
   var sp = SocialCalc.Popup;
   var spt = sp.Types;
@@ -16378,7 +16378,7 @@ SocialCalc.Popup.Types.List.Hide = function(type, id) {
 SocialCalc.Popup.Types.List.Cancel = function(type, id) {
   SocialCalc.Popup.Types.List.Hide(type, id);
 };
-SocialCalc.Popup.Types.ColorChooser = {};
+PopupMut.Types.ColorChooser = {};
 SocialCalc.Popup.Types.ColorChooser.Create = function(type, id, attribs) {
   var sp = SocialCalc.Popup;
   var spt = sp.Types;
@@ -16568,8 +16568,8 @@ SocialCalc.Popup.Types.ColorChooser.CreateGrid = function(type, id) {
   var grid = spcdata.grid;
   var mainele = document.createElement("div");
   var tele = document.createElement("table");
-  tele.cellSpacing = 0;
-  tele.cellPadding = 0;
+  tele.cellSpacing = "0";
+  tele.cellPadding = "0";
   tele.style.width = "100px";
   grid.table = tele;
   ele = document.createElement("tbody");
@@ -19279,8 +19279,7 @@ SocialCalc.CtrlSEditorDone = function(idprefix, whichpart) {
 // In-place TypeScript conversion of socialcalcviewer.js (SocialCalc global script).
 // Ambient API types live in socialcalcviewer.d.ts (referenced by dist/SocialCalc.d.ts).
 // Build strips types via Bun.Transpiler before UMD concat — no runtime tax.
-// Intermediate: @ts-nocheck until this module is fully annotated against ambient types.
-// @ts-nocheck
+// Typechecked global-script module (no @ts-nocheck).
 //
 // SocialCalcViewer
 //
@@ -19299,7 +19298,7 @@ SocialCalc.CtrlSEditorDone = function(idprefix, whichpart) {
 SocialCalc.LocalizeStringList = {};
 const LocalizeStringListMut = SocialCalc.LocalizeStringList;
 SocialCalc.CurrentSpreadsheetViewerObject = null;
-SocialCalc.SpreadsheetViewer = function(idPrefix) {
+const SpreadsheetViewerCtor = function(idPrefix) {
   var scc = SocialCalc.Constants;
   this.parentNode = null;
   this.spreadsheetDiv = null;
@@ -19309,9 +19308,6 @@ SocialCalc.SpreadsheetViewer = function(idPrefix) {
   this.height = 0;
   this.width = 0;
   this.viewheight = 0;
-  this.sheet = null;
-  this.context = null;
-  this.editor = null;
   this.spreadsheetDiv = null;
   this.editorDiv = null;
   this.sortrange = "";
@@ -19349,6 +19345,7 @@ SocialCalc.SpreadsheetViewer = function(idPrefix) {
   SocialCalc.CurrentSpreadsheetViewerObject = this;
   return;
 };
+SocialCalc.SpreadsheetViewer = SpreadsheetViewerCtor;
 SocialCalc.SpreadsheetViewer.prototype.InitializeSpreadsheetViewer = function(node, height, width, spacebelow) {
   return SocialCalc.InitializeSpreadsheetViewer(this, node, height, width, spacebelow);
 };
@@ -19374,9 +19371,9 @@ SocialCalc.InitializeSpreadsheetViewer = function(spreadsheet, node, height, wid
   var html, child, i, vname, v, style, button, bele;
   var tabs = spreadsheet.tabs;
   var views = spreadsheet.views;
-  spreadsheet.requestedHeight = height;
-  spreadsheet.requestedWidth = width;
-  spreadsheet.requestedSpaceBelow = spacebelow;
+  spreadsheet.requestedHeight = height || 0;
+  spreadsheet.requestedWidth = width || 0;
+  spreadsheet.requestedSpaceBelow = spacebelow || 0;
   var nodeEl = typeof node == "string" ? document.getElementById(node) : node;
   if (nodeEl == null) {
     alert("SocialCalc.SpreadsheetControl not given parent node.");
@@ -19392,11 +19389,13 @@ SocialCalc.InitializeSpreadsheetViewer = function(spreadsheet, node, height, wid
   spreadsheet.nonviewheight = spreadsheet.hasStatusLine ? spreadsheet.statuslineheight : 0;
   spreadsheet.viewheight = spreadsheet.height - spreadsheet.nonviewheight;
   spreadsheet.editorDiv = spreadsheet.editor.CreateTableEditor(spreadsheet.width, spreadsheet.viewheight);
-  spreadsheet.spreadsheetDiv.appendChild(spreadsheet.editorDiv);
+  if (spreadsheet.spreadsheetDiv && spreadsheet.editorDiv) {
+    spreadsheet.spreadsheetDiv.appendChild(spreadsheet.editorDiv);
+  }
   if (spreadsheet.hasStatusLine) {
     spreadsheet.statuslineDiv = document.createElement("div");
     spreadsheet.statuslineDiv.style.cssText = spreadsheet.statuslineCSS;
-    spreadsheet.statuslineDiv.style.height = spreadsheet.statuslineheight - (spreadsheet.statuslineDiv.style.paddingTop.slice(0, -2) - 0) - (spreadsheet.statuslineDiv.style.paddingBottom.slice(0, -2) - 0) + "px";
+    spreadsheet.statuslineDiv.style.height = spreadsheet.statuslineheight - (Number(spreadsheet.statuslineDiv.style.paddingTop.slice(0, -2)) || 0) - (Number(spreadsheet.statuslineDiv.style.paddingBottom.slice(0, -2)) || 0) + "px";
     spreadsheet.statuslineDiv.id = spreadsheet.idPrefix + "statusline";
     spreadsheet.spreadsheetDiv.appendChild(spreadsheet.statuslineDiv);
     spreadsheet.editor.StatusCallback.statusline = {
@@ -19510,10 +19509,10 @@ SocialCalc.GetSpreadsheetViewerObject = function() {
     return csvo;
   throw "No current SpreadsheetViewer object.";
 };
-SocialCalc.DoOnResize = function(spreadsheet) {
+function SocialCalc_DoOnResize_Viewer(spreadsheet) {
   var v;
   var vname;
-  var views = spreadsheet.views;
+  var views = spreadsheet.views || {};
   var needresize = spreadsheet.SizeSSDiv();
   if (!needresize)
     return;
@@ -19525,28 +19524,32 @@ SocialCalc.DoOnResize = function(spreadsheet) {
   if (SocialCalc._app)
     return;
   spreadsheet.editor.ResizeTableEditor(spreadsheet.width, spreadsheet.height - spreadsheet.nonviewheight);
-};
-SocialCalc.SizeSSDiv = function(spreadsheet) {
-  var sizes, pos, resized, nodestyle, newval;
+}
+function SocialCalc_SizeSSDiv_Viewer(spreadsheet) {
+  var sizes;
+  var pos;
+  var resized, nodestyle, newval;
   var fudgefactorX = 10;
   var fudgefactorY = 10;
   resized = false;
+  if (!spreadsheet.parentNode || !spreadsheet.spreadsheetDiv) {
+    return false;
+  }
   sizes = SocialCalc.GetViewportInfo();
-  pos = SocialCalc.GetElementPosition(spreadsheet.parentNode);
-  pos.bottom = 0;
-  pos.right = 0;
+  const basePos = SocialCalc.GetElementPosition(spreadsheet.parentNode);
+  pos = { left: basePos.left, top: basePos.top, right: 0, bottom: 0 };
   nodestyle = spreadsheet.parentNode.style;
   if (nodestyle.marginTop) {
-    pos.top += nodestyle.marginTop.slice(0, -2) - 0;
+    pos.top += Number(nodestyle.marginTop.slice(0, -2)) || 0;
   }
   if (nodestyle.marginBottom) {
-    pos.bottom += nodestyle.marginBottom.slice(0, -2) - 0;
+    pos.bottom += Number(nodestyle.marginBottom.slice(0, -2)) || 0;
   }
   if (nodestyle.marginLeft) {
-    pos.left += nodestyle.marginLeft.slice(0, -2) - 0;
+    pos.left += Number(nodestyle.marginLeft.slice(0, -2)) || 0;
   }
   if (nodestyle.marginRight) {
-    pos.right += nodestyle.marginRight.slice(0, -2) - 0;
+    pos.right += Number(nodestyle.marginRight.slice(0, -2)) || 0;
   }
   newval = spreadsheet.requestedHeight || sizes.height - (pos.top + pos.bottom + fudgefactorY) - (spreadsheet.requestedSpaceBelow || 0);
   if (spreadsheet.height != newval) {
@@ -19562,7 +19565,9 @@ SocialCalc.SizeSSDiv = function(spreadsheet) {
   }
   spreadsheet.spreadsheetDiv.style.position = "relative";
   return resized;
-};
+}
+SocialCalc.DoOnResize = SocialCalc_DoOnResize_Viewer;
+SocialCalc.SizeSSDiv = SocialCalc_SizeSSDiv_Viewer;
 SocialCalc.SpreadsheetViewerStatuslineCallback = function(editor, status, arg, params) {
   var spreadsheet = params.spreadsheetobj;
   var slstr = "";
@@ -19570,7 +19575,7 @@ SocialCalc.SpreadsheetViewerStatuslineCallback = function(editor, status, arg, p
     if (spreadsheet.statuslineFull) {
       slstr = editor.GetStatuslineString(status, arg, params);
     } else {
-      slstr = editor.ecell.coord;
+      slstr = editor.ecell ? editor.ecell.coord : "";
     }
     slstr = spreadsheet.statuslineHTML.replace(/\{status\}/, slstr);
     spreadsheet.statuslineDiv.innerHTML = slstr;

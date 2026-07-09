@@ -164,9 +164,7 @@ declare namespace SocialCalc {
    function DecodeCellAttributes(sheet: Sheet, coord: string, newattribs: AttribSet, range?: string): string | null;
    function DecodeSheetAttributes(sheet: Sheet, newattribs: AttribSet): string | null;
 
-   class SheetCommandInfo {
-      constructor(sheetobj: Sheet);
-
+   interface SheetCommandInfo {
       sheetobj: Sheet;
       timerobj: ReturnType<typeof setTimeout> | null;
       firsttimerdelay: number;
@@ -174,9 +172,20 @@ declare namespace SocialCalc {
       maxtimeslice: number;
       saveundo: boolean;
       CmdExtensionCallbacks: { [name: string]: { func: (cmdname: string, data: any, sheet: Sheet, parseobj: Parse, saveundo: boolean) => void; data: any } };
-
       [key: string]: any;
    }
+
+   // Runtime also uses SocialCalc.SheetCommandInfo as a singleton command bag
+   // (with CmdExtensionCallbacks), not only as a constructible class.
+   interface SheetCommandInfoConstructor {
+      new (sheetobj: Sheet): SheetCommandInfo;
+      (sheetobj: Sheet): SheetCommandInfo;
+      prototype: SheetCommandInfo;
+      CmdExtensionCallbacks: SheetCommandInfo["CmdExtensionCallbacks"];
+      [key: string]: any;
+   }
+
+   var SheetCommandInfo: SheetCommandInfoConstructor;
 
    function ScheduleSheetCommands(sheet: Sheet, cmdstr: string, saveundo?: boolean): void;
    function SheetCommandsTimerRoutine(sci: SheetCommandInfo, parseobj: Parse, saveundo?: boolean): void;
@@ -419,7 +428,7 @@ declare namespace SocialCalc {
    function setStyles(element: HTMLElement, cssText: string): void;
 
    function GetViewportInfo(): { width: number; height: number; horizontalScroll: number; verticalScroll: number };
-   function GetElementPosition(element: HTMLElement): { left: number; top: number };
+   function GetElementPosition(element: HTMLElement): { left: number; top: number; right?: number; bottom?: number; width?: number; height?: number };
    function GetElementPositionWithScroll(element: HTMLElement): { left: number; right: number; top: number; bottom: number; width: number; height: number };
    function GetElementFixedParent(element: HTMLElement): HTMLElement | false;
    function GetComputedStyle(element: HTMLElement, style: string): string;
