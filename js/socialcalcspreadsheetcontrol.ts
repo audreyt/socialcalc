@@ -114,7 +114,7 @@ See the comments in the main SocialCalc code module file of the SocialCalc packa
 
 // Constructor:
 
-const SpreadsheetControlCtor = function(this: SocialCalc.SpreadsheetControl, idPrefix?: string) {
+SocialCalc.SpreadsheetControl = function(idPrefix) {
 
    var scc = SocialCalc.Constants;
 
@@ -911,7 +911,6 @@ const SpreadsheetControlCtor = function(this: SocialCalc.SpreadsheetControl, idP
 
    };
 
-SocialCalc.SpreadsheetControl = SpreadsheetControlCtor as unknown as SocialCalc.SpreadsheetControlConstructor;
 
 // Methods:
 

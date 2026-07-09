@@ -16929,7 +16929,7 @@ not governed by the terms of the CPAL.
 SocialCalc.OtherSaveParts = {};
 const OtherSavePartsMut = SocialCalc.OtherSaveParts;
 SocialCalc.CurrentSpreadsheetControlObject = null;
-const SpreadsheetControlCtor = function(idPrefix) {
+SocialCalc.SpreadsheetControl = function(idPrefix) {
   var scc = SocialCalc.Constants;
   this.parentNode = null;
   this.spreadsheetDiv = null;
@@ -17362,7 +17362,6 @@ const SpreadsheetControlCtor = function(idPrefix) {
   };
   return;
 };
-SocialCalc.SpreadsheetControl = SpreadsheetControlCtor;
 SocialCalc.SpreadsheetControl.prototype.InitializeSpreadsheetControl = function(node, height, width, spacebelow) {
   return SocialCalc.InitializeSpreadsheetControl(this, node, height, width, spacebelow);
 };
