@@ -1038,14 +1038,14 @@ describe("miscellaneous format behaviors", () => {
 });
 
 // ===========================================================================
-// Mutation-kill tests for js/formatnumber2.js survivors.
+// Mutation-kill tests for js/formatnumber2.ts survivors.
 // Each describe block calls out the target mutants (from reports/mutation/).
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
 // ArrayDeclaration survivors on the module-level name arrays (lines 50-54).
 // The arrays are exposed on SocialCalc.FormatNumber but otherwise unused inside
-// formatnumber2.js itself, so the only way to kill these is by directly
+// formatnumber2.ts itself, so the only way to kill these is by directly
 // asserting their contents after load.
 // Kills: 5, 13, 21, 34.
 // ---------------------------------------------------------------------------

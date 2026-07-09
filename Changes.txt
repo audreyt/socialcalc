@@ -6,6 +6,29 @@ with the original 2007–2010 development log preserved verbatim at the bottom.
 
 
 ==============================================================================
+v3.0.6 — 2026-07-09
+==============================================================================
+
+Toolchain and build
+- Converted all core SocialCalc JavaScript sources under js/ to global-script
+  TypeScript (.ts). build.ts now prefers sibling .ts files, strips types with
+  Bun.Transpiler, and reattaches license preambles so the shipping
+  dist/SocialCalc.js remains a plain JavaScript/UMD bundle with no runtime
+  TypeScript tax.
+- Inlined the UMD open/close wrappers into build.ts; removed the standalone
+  js/module-wrapper-top.js and js/module-wrapper-bottom.js files.
+- Extracted pure, typechecked formula helpers into formula-parse.ts,
+  formula-operand.ts, and formula-ref.ts; annotated key pure helpers with
+  LemmaScript //@ verify. The JavaScript bundle remains the compatibility
+  oracle for formula-reference rewrite behavior.
+- Updated Stryker mutation scripts, tsconfig.json, and README.md/AGENTS.md to
+  reflect the TypeScript source layout.
+
+Testing
+- Full Bun test suite, formula-rewrite regressions, and Rust/WASM parity coverage continue to guard the TypeScript rewrite.
+- No @ts-nocheck remains in any core js/*.ts module.
+
+==============================================================================
 v3.0.5 — 2026-07-05
 ==============================================================================
 

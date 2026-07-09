@@ -1,7 +1,7 @@
-// Opt-in TypeScript checking for this file. socialcalcconstants.js is almost entirely
-// a single object literal of localization strings plus two tiny utility functions,
-// so it should strict-check easily against the existing .d.ts.
-// @ts-check
+// In-place TypeScript conversion of socialcalcconstants.js (SocialCalc global script).
+// Ambient API types live in socialcalcconstants.d.ts (referenced by dist/SocialCalc.d.ts).
+// Build strips types via Bun.Transpiler before UMD concat — no runtime tax.
+// Runtime SocialCalc bag is created in module-wrapper-top.js (UMD factory-local).
 //
 /*
 // The module of the SocialCalc package with customizable constants, strings, etc.
@@ -33,10 +33,16 @@
 //
 */
 
-/** @type {any} */
-// @ts-ignore - SocialCalc is declared ambiently; runtime re-declaration is intentional.
-var SocialCalc;
-if (!SocialCalc) SocialCalc = {};
+// SocialCalc bag: created by module-wrapper-top.js inside the UMD factory.
+
+// Implementation-only mutable view for progressive init of ambient `const` members.
+type ConstantsRootMutable = {
+   Constants: SocialCalc.SocialCalcConstants;
+   ConstantsDefaultClasses: SocialCalc.SocialCalcConstantsDefaultClasses;
+   ConstantsSetClasses: (prefix?: string) => void;
+   ConstantsSetImagePrefix: (imagePrefix: string) => void;
+};
+const ConstantsRoot = SocialCalc as unknown as ConstantsRootMutable;
 
 // *************************************
 //
@@ -72,7 +78,7 @@ if (!SocialCalc) SocialCalc = {};
 //
 // *************************************
 
-SocialCalc.Constants = {
+ConstantsRoot.Constants = {
 
 //
 // Main SocialCalc module, socialcalc-3.js:
@@ -813,7 +819,7 @@ SocialCalc.Constants = {
 
 // Default classnames for use with SocialCalc.ConstantsSetClasses:
 
-SocialCalc.ConstantsDefaultClasses = {
+ConstantsRoot.ConstantsDefaultClasses = {
    defaultComment: "",
    defaultCommentNoGrid: "",
    defaultHighlightTypeCursor: "",
@@ -852,10 +858,10 @@ SocialCalc.ConstantsDefaultClasses = {
 // lets you combine both.
 //
 
-/**
- * @param {string} [prefix]
- */
-SocialCalc.ConstantsSetClasses = function(prefix) {
+//@ verify
+//@ ensures true
+// LemmaScript: pure class-prefix rewrite over ConstantsDefaultClasses (no DOM).
+ConstantsRoot.ConstantsSetClasses = function(prefix?: string): void {
 
    var defaults = SocialCalc.ConstantsDefaultClasses;
    var scc = SocialCalc.Constants;
@@ -879,10 +885,10 @@ SocialCalc.ConstantsSetClasses = function(prefix) {
 
 // Set the image prefix on all images.
 
-/**
- * @param {string} imagePrefix
- */
-SocialCalc.ConstantsSetImagePrefix = function(imagePrefix) {
+//@ verify
+//@ ensures true
+// LemmaScript: pure image-prefix string rewrite across Constants string fields.
+ConstantsRoot.ConstantsSetImagePrefix = function(imagePrefix: string): void {
 
    var scc = SocialCalc.Constants;
 

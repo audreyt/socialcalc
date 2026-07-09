@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // Run Stryker against a single source file in fast in-place mode.
 //
-// Usage: bun run mutate:file <path/to/source.js> [startLine-endLine]
+// Usage: bun run mutate:file <path/to/source.js|.ts> [startLine-endLine]
 //
 // Maps each source file to its relevant test subset so a mutant only has to
 // run the ~100 tests that exercise that module, not all 315.
@@ -14,7 +14,7 @@ const [, , rawTarget, range] = process.argv;
 
 if (!rawTarget) {
     console.error(
-        "usage: bun run mutate:file <path/to/source.js> [startLine-endLine]",
+        "usage: bun run mutate:file <path/to/source.js|.ts> [startLine-endLine]",
     );
     process.exit(2);
 }
@@ -32,7 +32,15 @@ const testsByFile = {
         "test/format-coverage.test.ts",
         "test/formatting.test.ts",
     ],
+    "formatnumber2.ts": [
+        "test/format-coverage.test.ts",
+        "test/formatting.test.ts",
+    ],
     "formula1.js": [
+        "test/formula-coverage.test.ts",
+        "test/formula.test.ts",
+    ],
+    "formula1.ts": [
         "test/formula-coverage.test.ts",
         "test/formula.test.ts",
     ],
@@ -43,10 +51,21 @@ const testsByFile = {
         "test/formula-quote-escaping.test.ts",
         "test/filldown-persistence.test.ts",
     ],
+    "socialcalc-3.ts": [
+        "test/sheet-coverage-a.test.ts",
+        "test/sheet-coverage-b.test.ts",
+        "test/core.test.ts",
+        "test/formula-quote-escaping.test.ts",
+        "test/filldown-persistence.test.ts",
+    ],
     "socialcalctableeditor.js": ["test/ui-coverage.test.ts"],
+    "socialcalctableeditor.ts": ["test/ui-coverage.test.ts"],
     "socialcalcpopup.js": ["test/ui-coverage.test.ts"],
+    "socialcalcpopup.ts": ["test/ui-coverage.test.ts"],
     "socialcalcspreadsheetcontrol.js": ["test/ui-coverage.test.ts"],
+    "socialcalcspreadsheetcontrol.ts": ["test/ui-coverage.test.ts"],
     "socialcalcviewer.js": ["test/ui-coverage.test.ts"],
+    "socialcalcviewer.ts": ["test/ui-coverage.test.ts"],
 };
 
 const tests = testsByFile[basename(absolute)];

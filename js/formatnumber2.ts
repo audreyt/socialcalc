@@ -1,8 +1,6 @@
-// @ts-check
-// Opt-in TypeScript checking for this file. formatnumber2.js has a 95%
-// Stryker mutation score, so the code is healthy and worth type-checking.
-// Other .js files under js/ remain un-checked (see tsconfig.json
-// `checkJs: false`) until they are audited for leaky globals / typos.
+// In-place TypeScript conversion of the SocialCalc number-formatting module.
+// Ambient API types live in formatnumber2.d.ts (referenced by dist/SocialCalc.d.ts).
+// Build strips types via Bun.Transpiler before UMD concat — no runtime tax.
 //
 /*
 // SocialCalc Number Formatting Library
@@ -38,9 +36,43 @@
    // Redundant `if (!SocialCalc)` guard removed — SocialCalc is defined by
    // socialcalcconstants.js earlier in the concatenated UMD bundle.
 
-SocialCalc.FormatNumber = {};
+// Implementation-only mutable view of FormatNumber.
+// Public formatnumber2.d.ts keeps `const` members for consumers; this module
+// still performs the legacy one-time progressive assignment at load.
+type FormatNumberMutable = {
+   format_definitions: { [format_string: string]: SocialCalc.FormatNumberDefinition };
+   separatorchar: string;
+   decimalchar: string;
+   daynames: string[];
+   daynames3: string[];
+   monthnames3: string[];
+   monthnames: string[];
+   allowedcolors: { [name: string]: string };
+   alloweddates: { [name: string]: string };
+   commands: SocialCalc.FormatNumberCommands;
+   datevalues: SocialCalc.FormatNumberDateValues;
+   formatNumberWithFormat: (
+      rawvalue: number | string,
+      format_string: string,
+      currency_char?: string
+   ) => string;
+   formatTextWithFormat: (rawvalue: string | number, format_string: string) => string;
+   parse_format_string: (
+      format_defs: { [format_string: string]: SocialCalc.FormatNumberDefinition },
+      format_string: string
+   ) => void;
+   parse_format_bracket: (bracketstr: string) => SocialCalc.FormatNumberBracketData;
+   convert_date_gregorian_to_julian: (year: number, month: number, day: number) => number;
+   convert_date_julian_to_gregorian: (juliandate: number) => SocialCalc.FormatNumberYMD;
+};
 
-SocialCalc.FormatNumber.format_definitions = {}; // Parsed formats are stored here globally
+// Ambient namespace value is not runtime-created; assign empty bag once via bridge.
+(SocialCalc as unknown as { FormatNumber: FormatNumberMutable }).FormatNumber =
+   {} as FormatNumberMutable;
+const FormatNumberMut: FormatNumberMutable =
+   (SocialCalc as unknown as { FormatNumber: FormatNumberMutable }).FormatNumber;
+
+FormatNumberMut.format_definitions = {}; // Parsed formats are stored here globally
 
 // Most constants that are often customized for localization are in the SocialCalc.Constants module.
 // If you use this module standalone, provide at least the "FormatNumber" values.
@@ -50,66 +82,65 @@ SocialCalc.FormatNumber.format_definitions = {}; // Parsed formats are stored he
 // but that would make them incompatible with other uses and is discouraged.
 //
 
-SocialCalc.FormatNumber.separatorchar = ",";
-SocialCalc.FormatNumber.decimalchar = ".";
-SocialCalc.FormatNumber.daynames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-SocialCalc.FormatNumber.daynames3 = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-SocialCalc.FormatNumber.monthnames3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-SocialCalc.FormatNumber.monthnames = ["January", "February", "March", "April", "May", "June", "July", "August", "September",
+FormatNumberMut.separatorchar = ",";
+FormatNumberMut.decimalchar = ".";
+FormatNumberMut.daynames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+FormatNumberMut.daynames3 = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+FormatNumberMut.monthnames3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+FormatNumberMut.monthnames = ["January", "February", "March", "April", "May", "June", "July", "August", "September",
                                       "October", "November", "December"];
 
-SocialCalc.FormatNumber.allowedcolors =
+FormatNumberMut.allowedcolors =
    {BLACK: "#000000", BLUE: "#0000FF", CYAN: "#00FFFF", GREEN: "#00FF00", MAGENTA: "#FF00FF",
     RED: "#FF0000", WHITE: "#FFFFFF", YELLOW: "#FFFF00"};
 
-SocialCalc.FormatNumber.alloweddates =
+FormatNumberMut.alloweddates =
    {H: "h]", M: "m]", MM: "mm]", S: "s]", SS: "ss]"};
 
 // Other constants
 
-SocialCalc.FormatNumber.commands =
+FormatNumberMut.commands =
    {copy: 1, color: 2, integer_placeholder: 3, fraction_placeholder: 4, decimal: 5,
     currency: 6, general:7, separator: 8, date: 9, comparison: 10, section: 11, style: 12};
 
-SocialCalc.FormatNumber.datevalues = {julian_offset: 2415019, seconds_in_a_day: 24 * 60 * 60, seconds_in_an_hour: 60 * 60};
+FormatNumberMut.datevalues = {julian_offset: 2415019, seconds_in_a_day: 24 * 60 * 60, seconds_in_an_hour: 60 * 60};
 
 /* *******************
 
- result = SocialCalc.FormatNumber.formatNumberWithFormat = function(rawvalue, format_string, currency_char)
+ result = FormatNumberMut.formatNumberWithFormat = function(rawvalue, format_string, currency_char)
 
 ************************* */
 
-/**
- * @param {*} rawvalue - number or string; coerced to number internally
- * @param {string} format_string
- * @param {string} [currency_char]
- * @returns {string}
- */
-SocialCalc.FormatNumber.formatNumberWithFormat = function(rawvalue, format_string, currency_char) {
+FormatNumberMut.formatNumberWithFormat = function(
+   rawvalue: number | string,
+   format_string: string,
+   currency_char?: string
+): string {
 
    var scc = SocialCalc.Constants;
    var scfn = SocialCalc.FormatNumber;
 
-   var op, operandstr, fromend, cval, operandstrlc;
-   var startval, estartval;
+   var op: number = 0, operandstr: string = "", fromend: number = 0, cval: string | number = 0, operandstrlc: string = "";
+   var startval: number = 0, estartval: number = 0;
    // Initialize date/time components to 0 so TypeScript can narrow them to `number`.
    // These are only read inside `op == scfn.commands.date` branches, which are only
    // populated by parse_format_string when the format contains date placeholders —
    // at which point the `if (sectioninfo.hasdate)` block above reassigns them.
    var hrs = 0, mins = 0, secs = 0, ehrs = 0, emins = 0, esecs = 0;
-   var ampmstr, ymd;
-   var minOK, mspos;
+   var ampmstr: string | undefined;
+   var ymd: SocialCalc.FormatNumberYMD = { year: 0, month: 0, day: 0 };
+   var minOK: number = 0, mspos: number = 0;
    var result="";
-   var thisformat;
-   var section, gotcomparison, compop, compval, cpos, oppos;
-   var sectioninfo;
-   var i, decimalscale, scaledvalue, strvalue, strparts, integervalue, fractionvalue;
-   var integerdigits2, integerpos, fractionpos, textcolor, textstyle, separatorchar, decimalchar;
-   var value; // working copy to change sign, etc.
+   var thisformat: SocialCalc.FormatNumberDefinition;
+   var section: number = 0, gotcomparison: number = 0, compop: string = "", compval: number = 0, cpos: number = 0, oppos: number = 0;
+   var sectioninfo: SocialCalc.FormatNumberSectionInfo;
+   var i: number = 0, decimalscale: number = 0, scaledvalue: number = 0, strvalue: string = "", strparts: RegExpMatchArray | null = null, integervalue: string = "", fractionvalue: string = "";
+   var integerdigits2: number = 0, integerpos: number = 0, fractionpos: number = 0, textcolor: string = "", textstyle: string = "", separatorchar: string = "", decimalchar: string = "";
+   var value: number = 0; // working copy to change sign, etc.
 
    if (typeof(rawvalue) == "string" && !rawvalue.length) return "";
 
-   value = rawvalue-0; // make sure a number
+   value = Number(rawvalue); // make sure a number
    if (!isFinite(value)) {
       if (typeof(rawvalue) == "string") { // if original was a string, try to format it
          return scfn.formatTextWithFormat(rawvalue, format_string);
@@ -159,7 +190,7 @@ SocialCalc.FormatNumber.formatNumberWithFormat = function(rawvalue, format_strin
          if (op == scfn.commands.comparison) { // found a comparison - do we meet it?
             i=operandstr.indexOf(":");
             compop=operandstr.substring(0,i);
-            compval=operandstr.substring(i+1)-0;
+            compval=Number(operandstr.substring(i+1));
             if ((compop == "<" && rawvalue < compval) ||
                 (compop == "<=" && rawvalue <= compval) ||
                 (compop == "=" && rawvalue == compval) ||
@@ -197,20 +228,25 @@ SocialCalc.FormatNumber.formatNumberWithFormat = function(rawvalue, format_strin
       }
 
    sectioninfo = thisformat.sectioninfo[section]; // look at values for our section
+   var sectionCommas = sectioninfo.commas || 0;
+   var sectionPercent = sectioninfo.percent || 0;
+   var sectionFractionDigits = sectioninfo.fractiondigits || 0;
+   var sectionIntegerDigits = sectioninfo.integerdigits || 0;
+   var sectionStart = sectioninfo.sectionstart || 0;
 
-   if (sectioninfo.commas > 0) { // scale by thousands
-      for (i=0; i<sectioninfo.commas; i++) {
+   if (sectionCommas > 0) { // scale by thousands
+      for (i=0; i<sectionCommas; i++) {
          value /= 1000;
          }
       }
-   if (sectioninfo.percent > 0) { // do percent scaling
-      for (i=0; i<sectioninfo.percent; i++) {
+   if (sectionPercent > 0) { // do percent scaling
+      for (i=0; i<sectionPercent; i++) {
          value *= 100;
          }
       }
 
    decimalscale = 1; // cut down to required number of decimal digits
-   for (i=0; i<sectioninfo.fractiondigits; i++) {
+   for (i=0; i<sectionFractionDigits; i++) {
       decimalscale *= 10;
       }
    scaledvalue = Math.floor(value * decimalscale + 0.5);
@@ -252,7 +288,7 @@ SocialCalc.FormatNumber.formatNumberWithFormat = function(rawvalue, format_strin
       emins = Math.floor(estartval / 60);
       secs = startval - mins * 60;
       decimalscale = 1; // round appropriately depending if there is ss.0
-      for (i=0; i<sectioninfo.fractiondigits; i++) {
+      for (i=0; i<sectionFractionDigits; i++) {
          decimalscale *= 10;
          }
       secs = Math.floor(secs * decimalscale + 0.5);
@@ -277,7 +313,7 @@ SocialCalc.FormatNumber.formatNumberWithFormat = function(rawvalue, format_strin
       ymd = SocialCalc.FormatNumber.convert_date_julian_to_gregorian(Math.floor(rawvalue+scfn.datevalues.julian_offset));
 
       minOK = 0; // says "m" can be minutes if true
-      mspos = sectioninfo.sectionstart; // m scan position in ops
+      mspos = sectionStart; // m scan position in ops
       for ( ; ; mspos++) { // scan for "m" and "mm" to see if any minutes fields, and am/pm
          op = thisformat.operators[mspos];
          operandstr = thisformat.operands[mspos]; // get next operator and operand
@@ -342,7 +378,7 @@ SocialCalc.FormatNumber.formatNumberWithFormat = function(rawvalue, format_strin
    decimalchar = scc.FormatNumber_decimalchar;
    if (decimalchar.indexOf(" ")>=0) decimalchar = decimalchar.replace(/ /g, "&nbsp;");
 
-   oppos = sectioninfo.sectionstart;
+   oppos = sectionStart;
 
    while (op = thisformat.operators[oppos]) { // execute format
       operandstr = thisformat.operands[oppos++]; // get next operator and operand
@@ -366,8 +402,8 @@ SocialCalc.FormatNumber.formatNumberWithFormat = function(rawvalue, format_strin
             }
          integerdigits2++;
          if (integerdigits2 == 1) { // first one
-            if (integervalue.length > sectioninfo.integerdigits) { // see if integer wider than field
-               for (;integerpos < (integervalue.length - sectioninfo.integerdigits); integerpos++) {
+            if (integervalue.length > sectionIntegerDigits) { // see if integer wider than field
+               for (;integerpos < (integervalue.length - sectionIntegerDigits); integerpos++) {
                   result += integervalue.charAt(integerpos);
                   if (sectioninfo.thousandssep) { // see if this is a separator position
                      fromend = integervalue.length - integerpos - 1;
@@ -378,12 +414,12 @@ SocialCalc.FormatNumber.formatNumberWithFormat = function(rawvalue, format_strin
                   }
                }
             }
-         if (integervalue.length < sectioninfo.integerdigits
-             && integerdigits2 <= sectioninfo.integerdigits - integervalue.length) { // field is wider than value
+         if (integervalue.length < sectionIntegerDigits
+             && integerdigits2 <= sectionIntegerDigits - integervalue.length) { // field is wider than value
             if (operandstr == "0" || operandstr == "?") { // fill with appropriate characters
                result += operandstr == "0" ? "0" : "&nbsp;";
                if (sectioninfo.thousandssep) { // see if this is a separator position
-                  fromend = sectioninfo.integerdigits - integerdigits2;
+                  fromend = sectionIntegerDigits - integerdigits2;
                   if (fromend > 2 && fromend % 3 == 0) {
                      result += separatorchar;
                      }
@@ -523,12 +559,12 @@ SocialCalc.FormatNumber.formatNumberWithFormat = function(rawvalue, format_strin
             }
          else if (operandstrlc=="mmin") {
             cval = (1000 + mins)+"";
-            result += cval.substr(2);
+            result += String(cval).substr(2);
             }
          else if (operandstrlc=="mm]") {
             if (emins < 100) {
                cval = (1000 + emins)+"";
-               result += cval.substr(2);
+               result += String(cval).substr(2);
                }
             else {
                result += emins+"";
@@ -542,7 +578,7 @@ SocialCalc.FormatNumber.formatNumberWithFormat = function(rawvalue, format_strin
             }
          else if (operandstrlc=="hh") {
             cval = (1000 + hrs)+"";
-            result += cval.substr(2);
+            result += String(cval).substr(2);
             }
          else if (operandstrlc=="s") {
             cval = Math.floor(secs);
@@ -550,15 +586,15 @@ SocialCalc.FormatNumber.formatNumberWithFormat = function(rawvalue, format_strin
             }
          else if (operandstrlc=="ss") {
             cval = (1000 + Math.floor(secs))+"";
-            result += cval.substr(2);
+            result += String(cval).substr(2);
             }
          else if (operandstrlc=="am/pm" || operandstrlc=="a/p") {
-            result += ampmstr;
+            result += ampmstr || "";
             }
          else if (operandstrlc=="ss]") {
             if (esecs < 100) {
                cval = (1000 + Math.floor(esecs))+"";
-               result += cval.substr(2);
+               result += String(cval).substr(2);
                }
             else {
                cval = Math.floor(esecs);
@@ -584,26 +620,24 @@ SocialCalc.FormatNumber.formatNumberWithFormat = function(rawvalue, format_strin
 
 /* *******************
 
- result = SocialCalc.FormatNumber.formatTextWithFormat = function(rawvalue, format_string)
+ result = FormatNumberMut.formatTextWithFormat = function(rawvalue, format_string)
 
 ************************* */
 
-/**
- * @param {any} rawvalue
- * @param {string} format_string
- * @returns {string}
- */
-SocialCalc.FormatNumber.formatTextWithFormat = function(rawvalue, format_string) {
+FormatNumberMut.formatTextWithFormat = function(
+   rawvalue: string | number,
+   format_string: string
+): string {
 
    var scc = SocialCalc.Constants;
    var scfn = SocialCalc.FormatNumber;
    var value = rawvalue+"";
    var result = "";
-   var section;
-   var sectioninfo;
-   var op, oppos;
-   var operandstr;
-   var thisformat;
+   var section: number;
+   var sectioninfo: SocialCalc.FormatNumberSectionInfo;
+   var op: number | undefined, oppos: number;
+   var operandstr: string;
+   var thisformat: SocialCalc.FormatNumberDefinition;
    var textcolor = "";
    var textstyle = "";
 
@@ -624,7 +658,7 @@ SocialCalc.FormatNumber.formatTextWithFormat = function(rawvalue, format_string)
       }
 
    sectioninfo = thisformat.sectioninfo[section]; // look at values for our section
-   oppos = sectioninfo.sectionstart;
+   oppos = sectioninfo.sectionstart || 0;
 
    while (op = thisformat.operators[oppos]) { // execute format
       operandstr = thisformat.operands[oppos++]; // get next operator and operand
@@ -680,20 +714,16 @@ SocialCalc.FormatNumber.formatTextWithFormat = function(rawvalue, format_string)
 
 ************************* */
 
-/**
- * @param {{ [format_string: string]: any }} format_defs
- * @param {string} format_string
- * @returns {void}
- */
-SocialCalc.FormatNumber.parse_format_string = function(format_defs, format_string) {
+FormatNumberMut.parse_format_string = function(
+   format_defs: { [format_string: string]: SocialCalc.FormatNumberDefinition },
+   format_string: string
+): void {
 
    var scfn = SocialCalc.FormatNumber;
 
-   /** @type {{ operators: number[], operands: string[], sectioninfo: Array<{ [key: string]: any }>, hascomparison?: number, [key: string]: any }} */
-   var thisformat;
-   var section;
-   /** @type {{ [key: string]: any }} */
-   var sectioninfo;
+   var thisformat: SocialCalc.FormatNumberDefinition;
+   var section: number;
+   var sectioninfo: SocialCalc.FormatNumberSectionInfo;
    var integerpart = 1; // start out in integer part
    var lastwasinteger; // last char was an integer placeholder
    var lastwasslash; // last char was a backslash - escaping following character
@@ -931,17 +961,15 @@ SocialCalc.FormatNumber.parse_format_string = function(format_defs, format_strin
 
 ************************* */
 
-/**
- * @param {string} bracketstr
- * @returns {{ operator: number, operand: string, [key: string]: any }}
- */
-SocialCalc.FormatNumber.parse_format_bracket = function(bracketstr) {
+FormatNumberMut.parse_format_bracket = function(
+   bracketstr: string
+): SocialCalc.FormatNumberBracketData {
 
    var scfn = SocialCalc.FormatNumber;
    var scc = SocialCalc.Constants;
 
-   var bracketdata={};
-   var parts;
+   var bracketdata: SocialCalc.FormatNumberBracketData = { operator: 0, operand: "" };
+   var parts: RegExpMatchArray | null;
 
    if (bracketstr.charAt(0)=='$') { // currency
       bracketdata.operator = scfn.commands.currency;
@@ -1004,13 +1032,11 @@ C
 
 ************************* */
 
-/**
- * @param {number} year
- * @param {number} month
- * @param {number} day
- * @returns {number}
- */
-SocialCalc.FormatNumber.convert_date_gregorian_to_julian = function(year, month, day) {
+FormatNumberMut.convert_date_gregorian_to_julian = function(
+   year: number,
+   month: number,
+   day: number
+): number {
 
    var juliandate;
 
@@ -1038,11 +1064,9 @@ SocialCalc.FormatNumber.convert_date_gregorian_to_julian = function(year, month,
 
 ************************* */
 
-/**
- * @param {number} juliandate
- * @returns {{ year: number, month: number, day: number }}
- */
-SocialCalc.FormatNumber.convert_date_julian_to_gregorian = function(juliandate) {
+FormatNumberMut.convert_date_julian_to_gregorian = function(
+   juliandate: number
+): SocialCalc.FormatNumberYMD {
 
    var L, N, I, J, K;
 
@@ -1061,11 +1085,7 @@ SocialCalc.FormatNumber.convert_date_julian_to_gregorian = function(juliandate) 
 
    }
 
-/**
- * @param {number} n
- * @returns {number}
- */
-SocialCalc.intFunc = function(n) {
+SocialCalc.intFunc = function(n: number): number {
    if (n < 0) {
       return -Math.floor(-n);
       }

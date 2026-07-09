@@ -26,7 +26,7 @@ declare namespace SocialCalc {
       }
 
       interface PopupCurrent {
-         id: string | null;
+         id?: string | null;
          [k: string]: any;
       }
 

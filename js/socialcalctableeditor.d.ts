@@ -124,7 +124,7 @@ declare namespace SocialCalc {
       LoadEditorSettings(str: string, flags?: { [key: string]: any }): void;
 
       EditorRenderSheet(): void;
-      EditorScheduleSheetCommands(cmdstr: string, saveundo: boolean, ignorebusy: boolean): void;
+      EditorScheduleSheetCommands(cmdstr: string, saveundo?: boolean, ignorebusy?: boolean): void;
       ScheduleSheetCommands(cmdstr: string, saveundo: boolean): void;
       SheetUndo(): void;
       SheetRedo(): void;
@@ -447,7 +447,7 @@ declare namespace SocialCalc {
    function SaveEditorSettings(editor: TableEditor): string;
    function LoadEditorSettings(editor: TableEditor, str: string, flags?: { [key: string]: any }): void;
    function EditorRenderSheet(editor: TableEditor): void;
-   function EditorScheduleSheetCommands(editor: TableEditor, cmdstr: string, saveundo: boolean, ignorebusy: boolean): void;
+   function EditorScheduleSheetCommands(editor: TableEditor, cmdstr: string, saveundo?: boolean, ignorebusy?: boolean): void;
    function EditorSheetStatusCallback(recalcdata: any, status: string, arg: any, editor: TableEditor): void;
    function EditorGetStatuslineString(editor: TableEditor, status: string, arg: any, params: any): string;
 
@@ -557,7 +557,7 @@ declare namespace SocialCalc {
    function TCTDragFunctionStop(event: Event, draginfo: typeof DragInfo, dobj: DragRegisteredElement): void;
 
    function DragRegister(element: HTMLElement, vertical: boolean, horizontal: boolean, functionobj: DragFunctionObject | null, parent: HTMLElement): void;
-   function DragUnregister(element: HTMLElement): void;
+   function DragUnregister(element: HTMLElement | null | undefined): void;
    function DragMouseDown(event: MouseEvent): any;
    function DragMouseMove(event: MouseEvent): any;
    function DragMouseUp(event: MouseEvent): any;

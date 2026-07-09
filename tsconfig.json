@@ -29,13 +29,12 @@
   "include": [
     "build.ts",
     "js/**/*.js",
+    "js/**/*.ts",
     "test/**/*.ts",
     "dist/SocialCalc.d.ts"
   ],
   "exclude": [
     "node_modules",
-    "dist",
-    "js/module-wrapper-top.js",
-    "js/module-wrapper-bottom.js"
+    "dist"
   ]
 }

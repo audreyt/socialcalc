@@ -1,4 +1,7 @@
-// @ts-check
+// In-place TypeScript conversion of socialcalcviewer.js (SocialCalc global script).
+// Ambient API types live in socialcalcviewer.d.ts (referenced by dist/SocialCalc.d.ts).
+// Build strips types via Bun.Transpiler before UMD concat — no runtime tax.
+// Typechecked global-script module (no @ts-nocheck).
 //
 // SocialCalcViewer
 //
@@ -10,6 +13,11 @@
 // All Rights Reserved.
 //
 */
+
+
+// Mutable progressive-init bridges for ambient nested namespaces.
+(SocialCalc as unknown as { LocalizeStringList: { [key: string]: unknown } }).LocalizeStringList = {} as { [key: string]: unknown };
+const LocalizeStringListMut = (SocialCalc as unknown as { LocalizeStringList: { [key: string]: unknown } }).LocalizeStringList;
 
 /*
 
@@ -102,11 +110,7 @@ See the comments in the main SocialCalc code module file of the SocialCalc packa
 
 // Constructor:
 
-/**
- * @this {any}
- * @param {string} [idPrefix]
- */
-SocialCalc.SpreadsheetViewer = function(idPrefix) {
+const SpreadsheetViewerCtor = function(this: SocialCalc.SpreadsheetViewer, idPrefix?: string) {
 
    var scc = SocialCalc.Constants;
 
@@ -121,11 +125,7 @@ SocialCalc.SpreadsheetViewer = function(idPrefix) {
    this.width = 0;
    this.viewheight = 0; // calculated amount for views below toolbar, etc.
 
-   // Dynamic properties:
-
-   this.sheet = null;
-   this.context = null;
-   this.editor = null;
+   // Dynamic properties (sheet/context/editor set below after construction pieces):
 
    this.spreadsheetDiv = null;
    this.editorDiv = null;
@@ -184,53 +184,45 @@ SocialCalc.SpreadsheetViewer = function(idPrefix) {
 
    return;
 
-   }
+   };
+
+SocialCalc.SpreadsheetViewer = SpreadsheetViewerCtor as unknown as SocialCalc.SpreadsheetViewerConstructor;
 
 // Methods:
 
 SocialCalc.SpreadsheetViewer.prototype.InitializeSpreadsheetViewer =
-   /**
-    * @param {HTMLElement|string} node
-    * @param {number} [height]
-    * @param {number} [width]
-    * @param {number} [spacebelow]
-    */
-   function(node, height, width, spacebelow) {return SocialCalc.InitializeSpreadsheetViewer(this, node, height, width, spacebelow);};
-/** @param {string} str */
-SocialCalc.SpreadsheetViewer.prototype.LoadSave = function(str) {return SocialCalc.SpreadsheetViewerLoadSave(this, str);};
-SocialCalc.SpreadsheetViewer.prototype.DoOnResize = function() {return SocialCalc.DoOnResize(this);};
-SocialCalc.SpreadsheetViewer.prototype.SizeSSDiv = function() {return SocialCalc.SizeSSDiv(this);};
+   function(this: SocialCalc.SpreadsheetViewer, node: HTMLElement | string, height?: number, width?: number, spacebelow?: number) {
+      return SocialCalc.InitializeSpreadsheetViewer(this, node, height, width, spacebelow);
+   };
+
+SocialCalc.SpreadsheetViewer.prototype.LoadSave =
+   function(this: SocialCalc.SpreadsheetViewer, str: string) {
+      return SocialCalc.SpreadsheetViewerLoadSave(this, str);
+   };
+SocialCalc.SpreadsheetViewer.prototype.DoOnResize =
+   function(this: SocialCalc.SpreadsheetViewer) {
+      return SocialCalc.DoOnResize(this);
+   };
+SocialCalc.SpreadsheetViewer.prototype.SizeSSDiv =
+   function(this: SocialCalc.SpreadsheetViewer) {
+      return SocialCalc.SizeSSDiv(this);
+   };
 SocialCalc.SpreadsheetViewer.prototype.DecodeSpreadsheetSave =
-   /** @param {string} str */
-   function(str) {return SocialCalc.SpreadsheetViewerDecodeSpreadsheetSave(this, str);};
+   function(this: SocialCalc.SpreadsheetViewer, str: string) {
+      return SocialCalc.SpreadsheetViewerDecodeSpreadsheetSave(this, str);
+   };
+SocialCalc.SpreadsheetViewer.prototype.ParseSheetSave =
+   function(this: SocialCalc.SpreadsheetViewer, str: string) {
+      return this.sheet.ParseSheetSave(str);
+   };
 
-// Sheet Methods to make things a little easier:
-
-/** @param {string} str */
-SocialCalc.SpreadsheetViewer.prototype.ParseSheetSave = function(str) {return this.sheet.ParseSheetSave(str);};
-
-
-// Functions:
-
-//
-// InitializeSpreadsheetViewer(spreadsheet, node, height, width, spacebelow)
-//
-// Creates the control elements and makes them the child of node (string or element).
-// If present, height and width specify size.
-// If either is 0 or null (missing), the maximum that fits on the screen
-// (taking spacebelow into account) is used.
-//
-// You should do a redisplay or recalc (which redisplays) after running this.
-//
-
-/**
- * @param {any} spreadsheet
- * @param {HTMLElement|string} node
- * @param {number} [height]
- * @param {number} [width]
- * @param {number} [spacebelow]
- */
-SocialCalc.InitializeSpreadsheetViewer = function(spreadsheet, node, height, width, spacebelow) {
+SocialCalc.InitializeSpreadsheetViewer = function(
+   spreadsheet: SocialCalc.SpreadsheetViewer,
+   node: HTMLElement | string,
+   height?: number,
+   width?: number,
+   spacebelow?: number
+): void {
 
    var scc = SocialCalc.Constants;
    var SCLoc = SocialCalc.LocalizeString;
@@ -240,9 +232,9 @@ SocialCalc.InitializeSpreadsheetViewer = function(spreadsheet, node, height, wid
    var tabs = spreadsheet.tabs;
    var views = spreadsheet.views;
 
-   spreadsheet.requestedHeight = height;
-   spreadsheet.requestedWidth = width;
-   spreadsheet.requestedSpaceBelow = spacebelow;
+   spreadsheet.requestedHeight = height || 0;
+   spreadsheet.requestedWidth = width || 0;
+   spreadsheet.requestedSpaceBelow = spacebelow || 0;
 
    /** @type {HTMLElement | null} */
    var nodeEl = typeof node == "string" ? document.getElementById(node) : node;
@@ -272,7 +264,9 @@ SocialCalc.InitializeSpreadsheetViewer = function(spreadsheet, node, height, wid
    spreadsheet.viewheight = spreadsheet.height-spreadsheet.nonviewheight;
    spreadsheet.editorDiv=spreadsheet.editor.CreateTableEditor(spreadsheet.width, spreadsheet.viewheight);
 
-   spreadsheet.spreadsheetDiv.appendChild(spreadsheet.editorDiv);
+   if (spreadsheet.spreadsheetDiv && spreadsheet.editorDiv) {
+      spreadsheet.spreadsheetDiv.appendChild(spreadsheet.editorDiv);
+      }
 
    // create statusline
 
@@ -280,8 +274,8 @@ SocialCalc.InitializeSpreadsheetViewer = function(spreadsheet, node, height, wid
       spreadsheet.statuslineDiv = document.createElement("div");
       spreadsheet.statuslineDiv.style.cssText = spreadsheet.statuslineCSS;
       spreadsheet.statuslineDiv.style.height = spreadsheet.statuslineheight -
-         (spreadsheet.statuslineDiv.style.paddingTop.slice(0,-2)-0) -
-         (spreadsheet.statuslineDiv.style.paddingBottom.slice(0,-2)-0) + "px";
+         (Number(spreadsheet.statuslineDiv.style.paddingTop.slice(0,-2)) || 0) -
+         (Number(spreadsheet.statuslineDiv.style.paddingBottom.slice(0,-2)) || 0) + "px";
       spreadsheet.statuslineDiv.id = spreadsheet.idPrefix+"statusline";
       spreadsheet.spreadsheetDiv.appendChild(spreadsheet.statuslineDiv);
       spreadsheet.editor.StatusCallback.statusline =
@@ -308,7 +302,10 @@ SocialCalc.InitializeSpreadsheetViewer = function(spreadsheet, node, height, wid
  * @param {any} spreadsheet
  * @param {string} savestr
  */
-SocialCalc.SpreadsheetViewerLoadSave = function(spreadsheet, savestr) {
+SocialCalc.SpreadsheetViewerLoadSave = function(
+   spreadsheet: SocialCalc.SpreadsheetViewer,
+   savestr: string
+): void {
 
    var rmstr, pos, t, t2;
 
@@ -329,8 +326,7 @@ SocialCalc.SpreadsheetViewerLoadSave = function(spreadsheet, savestr) {
          rmstr = rmstr.replace("\r", ""); // make sure no CR, only LF
          pos = rmstr.indexOf("\n");
          if (pos > 0) {
-            // @ts-ignore - intentional "string - 0" numeric coercion idiom; NaN handled by guard below
-            t = rmstr.substring(0, pos)-0; // get number
+            t = (rmstr.substring(0, pos) as unknown as number) - 0; // get number
             t2 = t;
 //            if (!(t > 0)) t = 60; // handles NAN, too
             spreadsheet.repeatingMacroInterval = t;
@@ -356,7 +352,7 @@ SocialCalc.SpreadsheetViewerLoadSave = function(spreadsheet, savestr) {
 // Use the "startcmdextension repeatmacro delay" command last to schedule this again.
 //
 
-SocialCalc.SpreadsheetViewerDoRepeatingMacro = function() {
+SocialCalc.SpreadsheetViewerDoRepeatingMacro = function(): void {
 
    var spreadsheet = SocialCalc.GetSpreadsheetViewerObject();
    var editor = spreadsheet.editor;
@@ -376,12 +372,12 @@ SocialCalc.SpreadsheetViewerDoRepeatingMacro = function() {
  * @param {any} cmd
  * @param {any} saveundo
  */
-SocialCalc.SpreadsheetViewerRepeatMacroCommand = function(name, data, sheet, cmd, saveundo) {
+SocialCalc.SpreadsheetViewerRepeatMacroCommand = function(name: string, data: unknown, sheet: SocialCalc.Sheet, cmd: SocialCalc.Parse, saveundo: boolean): void {
 
    var spreadsheet = SocialCalc.GetSpreadsheetViewerObject();
 
    var rest = cmd.RestOfString();
-   var t = rest-0; // get number
+   var t = (rest as unknown as number) - 0; // get number (legacy coercion)
    if (!(t > 0)) t = spreadsheet.repeatingMacroInterval; // handles NAN, too, using last value
    spreadsheet.repeatingMacroInterval = t;
 
@@ -389,7 +385,7 @@ SocialCalc.SpreadsheetViewerRepeatMacroCommand = function(name, data, sheet, cmd
 
 }
 
-SocialCalc.SpreadsheetViewerStopRepeatingMacro = function() {
+SocialCalc.SpreadsheetViewerStopRepeatingMacro = function(): void {
 
    var spreadsheet = SocialCalc.GetSpreadsheetViewerObject();
 
@@ -410,7 +406,11 @@ SocialCalc.SpreadsheetViewerStopRepeatingMacro = function() {
  * @param {any} buttoninfo
  * @param {{ element: HTMLElement; functionobj: { command: string; [k: string]: any }; [k: string]: any }} bobj
  */
-SocialCalc.SpreadsheetViewerDoButtonCmd = function(e, buttoninfo, bobj) {
+SocialCalc.SpreadsheetViewerDoButtonCmd = function(
+   e: Event,
+   buttoninfo: unknown,
+   bobj: { element: HTMLElement; functionobj: { command: string; [k: string]: unknown }; [k: string]: unknown }
+): void {
 
    var obj = bobj.element;
    var which = bobj.functionobj.command;
@@ -446,7 +446,7 @@ SocialCalc.SpreadsheetViewerDoButtonCmd = function(e, buttoninfo, bobj) {
 //
 
 /** @param {string} str */
-SocialCalc.LocalizeString = function(str) {
+SocialCalc.LocalizeString = function(str: string): string {
    var cstr = SocialCalc.LocalizeStringList[str]; // found already this session?
    if (!cstr) { // no - look up
       cstr = SocialCalc.Constants["s_loc_"+str.toLowerCase().replace(/\s/g, "_").replace(/\W/g, "X")] || str;
@@ -455,7 +455,7 @@ SocialCalc.LocalizeString = function(str) {
    return cstr;
    }
 
-SocialCalc.LocalizeStringList = {}; // a list of strings to localize accumulated by the routine
+// LocalizeStringList init via mutable bridge (see above)
 
 //
 // outstr = SocialCalc.LocalizeSubstrings(str)
@@ -478,7 +478,7 @@ SocialCalc.LocalizeStringList = {}; // a list of strings to localize accumulated
 //
 
 /** @param {string} str */
-SocialCalc.LocalizeSubstrings = function(str) {
+SocialCalc.LocalizeSubstrings = function(str: string): string {
 
    var SCLoc = SocialCalc.LocalizeString;
 
@@ -505,7 +505,7 @@ SocialCalc.LocalizeSubstrings = function(str) {
 // Returns the current spreadsheet view object
 //
 
-SocialCalc.GetSpreadsheetViewerObject = function() {
+SocialCalc.GetSpreadsheetViewerObject = function(): SocialCalc.SpreadsheetViewer {
 
    var csvo = SocialCalc.CurrentSpreadsheetViewerObject;
    if (csvo) return csvo;
@@ -521,18 +521,17 @@ SocialCalc.GetSpreadsheetViewerObject = function() {
 // Processes an onResize event, setting the different views.
 //
 
-/** @param {any} spreadsheet */
-SocialCalc.DoOnResize = function(spreadsheet) {
+function SocialCalc_DoOnResize_Viewer(spreadsheet: SocialCalc.SpreadsheetViewer): void {
 
-   var v;
-   var vname;
-   var views = spreadsheet.views;
+   var v: HTMLElement;
+   var vname: string;
+   var views = spreadsheet.views || {};
 
    var needresize = spreadsheet.SizeSSDiv();
    if (!needresize) return;
 
    for (vname in views) {
-      v = views[vname].element;
+      v = views[vname]!.element;
       v.style.width = spreadsheet.width + "px";
       v.style.height = (spreadsheet.height-spreadsheet.nonviewheight) + "px";
       }
@@ -551,33 +550,38 @@ SocialCalc.DoOnResize = function(spreadsheet) {
 // Return true if different than existing values.
 //
 
-/** @param {any} spreadsheet */
-SocialCalc.SizeSSDiv = function(spreadsheet) {
+function SocialCalc_SizeSSDiv_Viewer(spreadsheet: SocialCalc.SpreadsheetViewer): boolean {
 
-   var sizes, pos, resized, nodestyle, newval;
+   var sizes: ReturnType<typeof SocialCalc.GetViewportInfo>;
+   var pos: { left: number; top: number; right: number; bottom: number };
+   var resized: boolean, nodestyle: CSSStyleDeclaration, newval: number;
    var fudgefactorX = 10; // for IE
    var fudgefactorY = 10;
 
    resized = false;
 
+   if (!spreadsheet.parentNode || !spreadsheet.spreadsheetDiv) {
+      return false;
+      }
+
    sizes = SocialCalc.GetViewportInfo();
-   pos = SocialCalc.GetElementPosition(spreadsheet.parentNode);
-   pos.bottom = 0;
-   pos.right = 0;
+   // GetElementPosition only returns left/top; extend with margin-derived right/bottom.
+   const basePos = SocialCalc.GetElementPosition(spreadsheet.parentNode);
+   pos = { left: basePos.left, top: basePos.top, right: 0, bottom: 0 };
 
    nodestyle = spreadsheet.parentNode.style;
 
    if (nodestyle.marginTop) {
-      pos.top += nodestyle.marginTop.slice(0,-2)-0;
+      pos.top += Number(nodestyle.marginTop.slice(0,-2)) || 0;
       }
    if (nodestyle.marginBottom) {
-      pos.bottom += nodestyle.marginBottom.slice(0,-2)-0;
+      pos.bottom += Number(nodestyle.marginBottom.slice(0,-2)) || 0;
       }
    if (nodestyle.marginLeft) {
-      pos.left += nodestyle.marginLeft.slice(0,-2)-0;
+      pos.left += Number(nodestyle.marginLeft.slice(0,-2)) || 0;
       }
    if (nodestyle.marginRight) {
-      pos.right += nodestyle.marginRight.slice(0,-2)-0;
+      pos.right += Number(nodestyle.marginRight.slice(0,-2)) || 0;
       }
 
    newval = spreadsheet.requestedHeight ||
@@ -602,6 +606,16 @@ SocialCalc.SizeSSDiv = function(spreadsheet) {
 
    }
 
+// Install viewer overloads onto shared free-function names (also used by SpreadsheetControl).
+(SocialCalc as unknown as {
+   DoOnResize: (spreadsheet: SocialCalc.SpreadsheetViewer) => void;
+   SizeSSDiv: (spreadsheet: SocialCalc.SpreadsheetViewer) => boolean;
+}).DoOnResize = SocialCalc_DoOnResize_Viewer;
+(SocialCalc as unknown as {
+   DoOnResize: (spreadsheet: SocialCalc.SpreadsheetViewer) => void;
+   SizeSSDiv: (spreadsheet: SocialCalc.SpreadsheetViewer) => boolean;
+}).SizeSSDiv = SocialCalc_SizeSSDiv_Viewer;
+
 
 //
 // SocialCalc.SpreadsheetViewerStatuslineCallback
@@ -613,7 +627,12 @@ SocialCalc.SizeSSDiv = function(spreadsheet) {
  * @param {any} arg
  * @param {{ spreadsheetobj?: any; [k: string]: any }} params
  */
-SocialCalc.SpreadsheetViewerStatuslineCallback = function(editor, status, arg, params) {
+SocialCalc.SpreadsheetViewerStatuslineCallback = function(
+   editor: SocialCalc.TableEditor,
+   status: string,
+   arg: unknown,
+   params: { spreadsheetobj?: SocialCalc.SpreadsheetViewer; [k: string]: unknown }
+): void {
 
    var spreadsheet = params.spreadsheetobj;
    var slstr = "";
@@ -623,7 +642,7 @@ SocialCalc.SpreadsheetViewerStatuslineCallback = function(editor, status, arg, p
          slstr = editor.GetStatuslineString(status, arg, params);
          }
       else {
-         slstr = editor.ecell.coord;
+         slstr = editor.ecell ? editor.ecell.coord : "";
          }
       slstr = spreadsheet.statuslineHTML.replace(/\{status\}/, slstr);
       spreadsheet.statuslineDiv.innerHTML = slstr;
@@ -649,7 +668,7 @@ SocialCalc.SpreadsheetViewerStatuslineCallback = function(editor, status, arg, p
 //
 
 /** @param {HTMLElement|boolean|null} obj */
-SocialCalc.CmdGotFocus = function(obj) {
+SocialCalc.CmdGotFocus = function(obj: HTMLElement | boolean | null): void {
 
    SocialCalc.Keyboard.passThru = obj;
 
@@ -663,7 +682,7 @@ SocialCalc.CmdGotFocus = function(obj) {
 //
 
 /** @param {any} spreadsheet */
-SocialCalc.SpreadsheetViewerCreateSheetHTML = function(spreadsheet) {
+SocialCalc.SpreadsheetViewerCreateSheetHTML = function(spreadsheet: SocialCalc.SpreadsheetViewer): string {
 
    var context, div, ele;
 
@@ -697,12 +716,15 @@ SocialCalc.SpreadsheetViewerCreateSheetHTML = function(spreadsheet) {
  * @param {any} spreadsheet
  * @param {string} str
  */
-SocialCalc.SpreadsheetViewerDecodeSpreadsheetSave = function(spreadsheet, str) {
+SocialCalc.SpreadsheetViewerDecodeSpreadsheetSave = function(
+   spreadsheet: SocialCalc.SpreadsheetViewer,
+   str: string
+): { [key: string]: { start: number; end: number } } {
 
    var pos1, mpregex, searchinfo, boundary, boundaryregex, blanklineregex, start, ending, lines, i, p, pnum, line;
    /** @type {{ [key: string]: { start: number; end: number } }} */
-   var parts = {};
-   var partlist = [];
+   var parts: { [key: string]: { start: number; end: number } } = {};
+   var partlist: string[] = [];
 
 var hasreturnonly = /[^\n]\r[^\n]/;
 if (hasreturnonly.test(str)) {

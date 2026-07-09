@@ -45,8 +45,17 @@ bun run test
 ```
 
 The bundle loads cleanly under `"use strict"` and keeps the existing UMD entry
-points (browser global `SocialCalc`, AMD `define`, and CommonJS
-`module.exports`) so downstream callers don't need to change.
+points (browser global `SocialCalc` and CommonJS `module.exports`; AMD was
+dropped from the wrapper) so downstream callers don't need to change.
+
+### TypeScript sources (in-place)
+
+All core modules under `js/` are global-script `.ts` (zero `js/*.js`). UMD
+wrappers are inlined in `build.ts`. Fully typechecked today: `formatnumber2.ts`, `socialcalcconstants.ts`,
+`formula-parse.ts`, `formula-operand.ts`, `formula-ref.ts`, `formula1.ts`,
+`socialcalc-3.ts`, `socialcalcspreadsheetcontrol.ts`, `socialcalctableeditor.ts`, `socialcalcviewer.ts`,
+`socialcalcpopup.ts`. LemmaScript `//@ verify` marks typed pure helpers
+(see `AGENTS.md`).
 
 ## Formula-reference rewrite spike
 
@@ -90,7 +99,7 @@ survives is a behavior the tests do not actually exercise.
 (`bun run build.ts && bun test`) so we don't need a Bun-specific plugin.
 Two modes:
 
-- **Fast per-file iteration** — `bun run mutate:file js/<source>.js [startLine-endLine]`
+- **Fast per-file iteration** — `bun run mutate:file js/<source>.js|.ts [startLine-endLine]`
   flips Stryker to in-place mode and filters the test command to only the
   test files that exercise that module (see the mapping in
   `stryker-file.mjs`). Also available: `bun run mutate:format`,
@@ -108,22 +117,24 @@ Current mutation scores:
 
 | Module | Score | Status |
 |---|---|---|
-| `formatnumber2.js` | 95.20% | Remaining 54 survivors classified as equivalent mutants |
-| `formula1.js` | — | Parser/evaluator run in progress |
-| `socialcalc-3.js` | — | Not yet measured |
-| UI modules | — | Not yet measured (heavily DOM-coupled) |
+| `formatnumber2.ts` | 95.20% | Remaining 54 survivors classified as equivalent mutants |
+| `formula1.ts` | — | Typechecked; mutation not measured |
+| `socialcalc-3.ts` | — | Typechecked; mutation not measured |
+| `socialcalcspreadsheetcontrol.ts` | — | Typechecked; mutation not measured |
+| `socialcalctableeditor.ts` | — | Typechecked; mutation not measured |
+| `socialcalcviewer.ts` / `socialcalcpopup.ts` | — | Typechecked; mutation not measured |
 
 ## Licensing
 ### Common Public Attribution License (Socialtext Inc.)
-* socialcalcspreadsheetcontrol.js
-* socialcalctableeditor.js
+* socialcalcspreadsheetcontrol.ts
+* socialcalctableeditor.ts
 
 ### Artistic License 2.0 (Socialtext Inc.)
-* formatnumber2.js
-* formula1.js
-* socialcalc-3.js
-* socialcalcconstants.js
-* socialcalcpopup.js
+* formatnumber2.ts
+* formula1.ts
+* socialcalc-3.ts
+* socialcalcconstants.ts
+* socialcalcpopup.ts
 
 ### Mozilla Public License 2.0
 * images/sc_*.png

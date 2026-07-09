@@ -12,7 +12,7 @@
 //    This is the fast loop you run during development.
 //
 // Speed math: a filtered test run is ~20 ms vs ~12 s for the full suite.
-// With a ~400 ms rebuild per mutant, inPlace iteration on formatnumber2.js
+// With a ~400 ms rebuild per mutant, inPlace iteration on formatnumber2.ts
 // (~93 mutants in a 50-line slice) finishes in well under a minute.
 
 const testsFilter = process.env.MUTATE_TESTS?.trim();
@@ -25,13 +25,13 @@ const testCommand = testsFilter
 /** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 export default {
     mutate: [
-        "js/formatnumber2.js",
-        "js/formula1.js",
-        "js/socialcalc-3.js",
-        "js/socialcalctableeditor.js",
-        "js/socialcalcpopup.js",
-        "js/socialcalcspreadsheetcontrol.js",
-        "js/socialcalcviewer.js",
+        "js/formatnumber2.ts",
+        "js/formula1.ts",
+        "js/socialcalc-3.ts",
+        "js/socialcalctableeditor.ts",
+        "js/socialcalcpopup.ts",
+        "js/socialcalcspreadsheetcontrol.ts",
+        "js/socialcalcviewer.ts",
     ],
 
     testRunner: "command",
