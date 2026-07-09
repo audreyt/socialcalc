@@ -94,14 +94,15 @@ Relevant tests:
 
 Shipping pure helpers carry `//@ verify` comments, but SocialCalc `js/*.ts` are
 global scripts, so LemmaScript cannot extract them. The exported facade
-`lemma/a1.ts` is the verification surface for pure A1 clamp/coord algebra.
+`lemma/a1.ts` is the verification surface for pure A1 clamp/coord algebra and
+overflow `#REF!` policy helpers.
 
 **Dafny backend** (requires `dafny` on PATH) — generate + verify:
 
 ```bash
 bun run verify:dafny:gen
 bun run verify:dafny
-# 8 verified, 0 errors on lemma/a1.dfy
+# 15 verified, 0 errors on lemma/a1.dfy
 ```
 
 **Lean backend** (requires `lemmascript` / `lsc`) — generate models:
