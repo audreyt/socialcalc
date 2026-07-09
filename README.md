@@ -121,7 +121,8 @@ Current mutation scores:
 | `formatnumber2.ts` | 95.20% | Remaining 54 survivors classified as equivalent mutants |
 | `formula1.ts` | — | Parser/evaluator run in progress (interim `@ts-nocheck`) |
 | `socialcalc-3.ts` | — | Not yet measured (interim `@ts-nocheck`) |
-| UI modules (`.ts`) | — | Not yet measured (DOM-coupled; interim `@ts-nocheck`) |
+| control/editor (`.ts`) | — | Not yet measured (DOM-coupled; interim `@ts-nocheck`) |
+| `socialcalcviewer.ts` / `socialcalcpopup.ts` | — | Typechecked; mutation not measured |
 
 ## Licensing
 ### Common Public Attribution License (Socialtext Inc.)
