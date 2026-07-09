@@ -4940,3 +4940,93 @@ test("RecalcCheckCell: formula using coord-named reference recalcs correctly", a
     await recalcSheet(SC, sheet);
     expect(sheet.cells.B1.datavalue).toBe(14);
 });
+
+// --------------------------------------------------------------------------
+// Error operand propagation for / and & (Excel-compatible precedence)
+// --------------------------------------------------------------------------
+
+test("EvaluatePolish: division by error operand keeps left/right error (not #DIV/0!)", async () => {
+    const SC = await loadSocialCalc();
+    resetFormulaGlobals(SC);
+    const sheet = new SC.Sheet();
+
+    const divByRef = SC.Formula.evaluate_parsed_formula(
+        SC.Formula.ParseFormulaIntoTokens("1/#REF!"),
+        sheet,
+        false,
+    );
+    expect(divByRef.type).toBe("e#REF!");
+
+    const refDivZero = SC.Formula.evaluate_parsed_formula(
+        SC.Formula.ParseFormulaIntoTokens("#REF!/0"),
+        sheet,
+        false,
+    );
+    expect(refDivZero.type).toBe("e#REF!");
+
+    const refDivRef = SC.Formula.evaluate_parsed_formula(
+        SC.Formula.ParseFormulaIntoTokens("#REF!/#REF!"),
+        sheet,
+        false,
+    );
+    expect(refDivRef.type).toBe("e#REF!");
+
+    // plain zero divisor still #DIV/0!
+    const plain = SC.Formula.evaluate_parsed_formula(
+        SC.Formula.ParseFormulaIntoTokens("1/0"),
+        sheet,
+        false,
+    );
+    expect(plain.type).toBe("e#DIV/0!");
+
+    // text divisor is not a number — #VALUE!, not coerced zero → #DIV/0!
+    const textDiv = SC.Formula.evaluate_parsed_formula(
+        SC.Formula.ParseFormulaIntoTokens('1/"x"'),
+        sheet,
+        false,
+    );
+    expect(textDiv.type).toBe("e#VALUE!");
+});
+
+test("EvaluatePolish: concat propagates right-hand error operand", async () => {
+    const SC = await loadSocialCalc();
+    resetFormulaGlobals(SC);
+    const sheet = new SC.Sheet();
+
+    const rightErr = SC.Formula.evaluate_parsed_formula(
+        SC.Formula.ParseFormulaIntoTokens('"x"&#REF!'),
+        sheet,
+        false,
+    );
+    expect(rightErr.type).toBe("e#REF!");
+
+    const leftErr = SC.Formula.evaluate_parsed_formula(
+        SC.Formula.ParseFormulaIntoTokens('#REF!&"x"'),
+        sheet,
+        false,
+    );
+    expect(leftErr.type).toBe("e#REF!");
+
+    const ok = SC.Formula.evaluate_parsed_formula(
+        SC.Formula.ParseFormulaIntoTokens('"a"&"b"'),
+        sheet,
+        false,
+    );
+    expect(ok.type.charAt(0)).toBe("t");
+    expect(ok.value).toBe("ab");
+});
+
+test("sheet: formula cell divisor that is #REF! propagates #REF! not #DIV/0!", async () => {
+    const { sheet, getVT } = await buildSheet([
+        "set A1 value n 1",
+        "set B1 formula #REF!",
+        "set C1 formula A1/B1",
+        "set D1 formula B1/A1",
+        "set E1 formula 1/0",
+        "set F1 formula A1/E1",
+    ]);
+    expect(getVT("C1")).toBe("e#REF!");
+    expect(getVT("D1")).toBe("e#REF!");
+    // true zero/error-from-div still #DIV/0!
+    expect(getVT("F1")).toBe("e#DIV/0!");
+});

@@ -349,7 +349,8 @@ FormulaMut.EvaluatePolish = function(parseinfo, revpolish, sheet, allowrangeretu
                }
             value2 = operand_as_text(sheet, operand);
             value1 = operand_as_text(sheet, operand);
-            resulttype = lookup_result_type(value1.type, value1.type, typelookup.concat);
+            // Must pass both types — lookup(value1, value1) swallows right-hand e*.
+            resulttype = lookup_result_type(value1.type, value2.type, typelookup.concat);
             PushOperand(resulttype, value1.value + value2.value);
             }
 
@@ -456,8 +457,14 @@ FormulaMut.EvaluatePolish = function(parseinfo, revpolish, sheet, allowrangeretu
                PushOperand(resulttype, value1.value * value2.value);
                }
             else if (ttext == '/') {
-               if (value2.value != 0) {
-                  resulttype = lookup_result_type(value1.type, value2.type, typelookup.plus);
+               // Error operands must win over zero-divisor. Coerced error
+               // values are 0, so checking value2 first mislabels 1/#REF!
+               // as #DIV/0!. LookupResultType propagates e* correctly.
+               resulttype = lookup_result_type(value1.type, value2.type, typelookup.plus);
+               if (resulttype.charAt(0) == "e") {
+                  PushOperand(resulttype, 0);
+                  }
+               else if (value2.value != 0) {
                   PushOperand(resulttype, value1.value / value2.value);
                   }
                else {

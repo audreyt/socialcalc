@@ -9,6 +9,13 @@ with the original 2007–2010 development log preserved verbatim at the bottom.
 v3.0.6 — 2026-07-09
 ==============================================================================
 
+
+Fixes
+- Formula arithmetic `/` now propagates error operands (e.g. `1/#REF!` →
+  `#REF!`) instead of treating coerced error zeros as `#DIV/0!`. Text divisors
+  such as `1/"x"` become `#VALUE!`. Concat `&` uses both operand types so a
+- right-hand error (e.g. `"x"&#REF!`) is preserved.
+
 Toolchain and build
 - Converted all core SocialCalc JavaScript sources under js/ to global-script
   TypeScript (.ts). build.ts now prefers sibling .ts files, strips types with

@@ -11311,7 +11311,7 @@ FormulaMut.EvaluatePolish = function(parseinfo, revpolish, sheet, allowrangeretu
         }
         value2 = operand_as_text(sheet, operand);
         value1 = operand_as_text(sheet, operand);
-        resulttype = lookup_result_type(value1.type, value1.type, typelookup.concat);
+        resulttype = lookup_result_type(value1.type, value2.type, typelookup.concat);
         PushOperand(resulttype, value1.value + value2.value);
       } else if (ttext == ":") {
         if (operand.length <= 1) {
@@ -11407,8 +11407,10 @@ FormulaMut.EvaluatePolish = function(parseinfo, revpolish, sheet, allowrangeretu
           resulttype = lookup_result_type(value1.type, value2.type, typelookup.plus);
           PushOperand(resulttype, value1.value * value2.value);
         } else if (ttext == "/") {
-          if (value2.value != 0) {
-            resulttype = lookup_result_type(value1.type, value2.type, typelookup.plus);
+          resulttype = lookup_result_type(value1.type, value2.type, typelookup.plus);
+          if (resulttype.charAt(0) == "e") {
+            PushOperand(resulttype, 0);
+          } else if (value2.value != 0) {
             PushOperand(resulttype, value1.value / value2.value);
           } else {
             PushOperand("e#DIV/0!", 0);
