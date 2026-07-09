@@ -21,7 +21,7 @@ reattaches leading license comment preambles. UMD open/close wrappers are
 | `socialcalcviewer.ts` | Fully typechecked |
 | `socialcalcpopup.ts` | Fully typechecked |
 | `socialcalcspreadsheetcontrol.ts` | Fully typechecked (toolbar/tab/save UI) |
-| `socialcalctableeditor.ts` | **Interim `@ts-nocheck`** (~700–900 errors) |
+| `socialcalctableeditor.ts` | Fully typechecked (table editor / DOM) |
 
 
 Do **not** claim a finished typed rewrite while `@ts-nocheck` remains. Next work:
