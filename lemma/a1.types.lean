@@ -78,6 +78,10 @@ def offsetA1Parts (col : Int) (row : Int) (absCol : Bool) (absRow : Bool) (colof
     else
       { col := c, row := r }
 
+def wouldOffsetA1Ref (col : Int) (row : Int) (absCol : Bool) (absRow : Bool) (coloffset : Int) (rowoffset : Int) : Bool :=
+  let p := offsetA1Parts col row absCol absRow coloffset rowoffset
+  p.col = -1
+
 def adjustAxis (value : Int) (start : Int) (delta : Int) (isCol : Bool) : Int :=
   if delta < 0 ∧ value ≥ start ∧ value < start - delta then
     -1

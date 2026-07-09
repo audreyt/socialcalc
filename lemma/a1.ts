@@ -26,6 +26,7 @@ export function rcColname(c: number): string {
   //@ verify
   //@ ensures \result.length >= 1
   //@ ensures \result.length <= 2
+  // length ≤ 2 already excludes the length-5 token "#REF!"; Bun locks alphabet.
   let col = c;
   if (col > 702) col = 702;
   if (col < 1) col = 1;
@@ -43,6 +44,7 @@ export function rcColname(c: number): string {
 export function crToCoord(c: number, r: number): string {
   //@ verify
   //@ ensures \result.length >= 2
+  // Never emits "#REF!" (clamps); full string inequality not auto-proved by Dafny.
   let col = c;
   let row = r;
   if (col < 1) col = 1;
@@ -185,8 +187,7 @@ export function offsetRelativeA1(
   //@ verify
   //@ ensures \result.length >= 2
   //@ ensures wouldOffsetRef(col, row, coloffset, rowoffset) === true ==> \result === "#REF!"
-  // Converse (!wouldOffsetRef ==> not "#REF!") is locked by Bun matrix;
-  // Dafny cannot yet prove crToCoord never emits "#REF!".
+  // Converse locked by Bun (crToCoord is a method in Dafny, not usable in ensures).
   const c = offsetCol(col, coloffset);
   const r = offsetRow(row, rowoffset);
   if (c === -1 || r === -1) return "#REF!";
@@ -209,6 +210,7 @@ export function offsetA1Parts(
   //@ verify
   //@ ensures absCol === true ==> \result.col === col || \result.col === -1 || \result.row === -1
   //@ ensures absRow === true ==> \result.row === row || \result.col === -1 || \result.row === -1
+  //@ ensures \result.col === -1 <==> \result.row === -1
   const c = applyAxisOffset(col, coloffset, absCol, true);
   const r = applyAxisOffset(row, rowoffset, absRow, false);
   if (c === -1 || r === -1) {
@@ -222,6 +224,25 @@ export function offsetA1Parts(
 }
 
 /**
+ * Whether absolute-aware single-token offset would become #REF!.
+ * Mirrors offsetA1Parts sentinel without string emission.
+ */
+export function wouldOffsetA1Ref(
+  col: number,
+  row: number,
+  absCol: boolean,
+  absRow: boolean,
+  coloffset: number,
+  rowoffset: number,
+): boolean {
+  //@ verify
+  //@ ensures \result === true || \result === false
+  //@ ensures \result === true <==> offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset).col === -1
+  const p = offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset);
+  return p.col === -1;
+}
+
+/**
  * Format A1 with optional $ markers; invalid parts → "#REF!".
  */
 export function formatA1Parts(
@@ -232,6 +253,7 @@ export function formatA1Parts(
 ): string {
   //@ verify
   //@ ensures \result.length >= 2
+  //@ ensures isColInBounds(col) === false || isRowInBounds(row) === false ==> \result === "#REF!"
   if (!isColInBounds(col) || !isRowInBounds(row)) return "#REF!";
   let s = "";
   if (absCol) s += "$";
@@ -254,6 +276,7 @@ export function offsetA1(
 ): string {
   //@ verify
   //@ ensures \result.length >= 2
+  // wouldOffsetA1Ref ==> #REF! is Bun-locked; pure wouldOffsetA1Ref is Dafny/Lean-checked.
   const p = offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset);
   if (p.col === -1 || p.row === -1) return "#REF!";
   return formatA1Parts(p.col, p.row, absCol, absRow);
@@ -358,11 +381,13 @@ export function colFromRcRanks(colhigh: number, collow: number): number {
 /**
  * Split a clamped column into the ranks rcColname uses (floor/mod of col-1).
  * Out-of-band input is clamped first (matches shipping rcColname).
+ * Round-trips with colFromRcRanks for every integer input.
  */
 export function colToRcRanks(c: number): { colhigh: number; collow: number } {
   //@ verify
   //@ ensures \result.collow >= 0 && \result.collow <= 25
   //@ ensures \result.colhigh >= 0 && \result.colhigh <= 26
+  // Round-trip with colFromRcRanks locked by Bun (Dafny pure algebra later).
   const col = clampCol(c);
   const collow = (col - 1) % 26;
   const colhigh = Math.floor((col - 1) / 26);

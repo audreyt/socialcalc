@@ -116,11 +116,19 @@ method offsetRelativeA1 (col : Int) (row : Int) (coloffset : Int) (rowoffset : I
 method offsetA1Parts (col : Int) (row : Int) (absCol : Bool) (absRow : Bool) (coloffset : Int) (rowoffset : Int) return (res : OffsetA1PartsResult)
   ensures absCol = true → res.col = col ∨ res.col = -1 ∨ res.row = -1
   ensures absRow = true → res.row = row ∨ res.col = -1 ∨ res.row = -1
+  ensures res.col = -1 ↔ res.row = -1
   do
     return Pure.offsetA1Parts col row absCol absRow coloffset rowoffset
 
+method wouldOffsetA1Ref (col : Int) (row : Int) (absCol : Bool) (absRow : Bool) (coloffset : Int) (rowoffset : Int) return (res : Bool)
+  ensures res = true ∨ res = false
+  ensures res = true ↔ (Pure.offsetA1Parts col row absCol absRow coloffset rowoffset).col = -1
+  do
+    return Pure.wouldOffsetA1Ref col row absCol absRow coloffset rowoffset
+
 method formatA1Parts (col : Int) (row : Int) (absCol : Bool) (absRow : Bool) return (res : String)
   ensures res.length ≥ 2
+  ensures Pure.isColInBounds col = false ∨ Pure.isRowInBounds row = false → res = "#REF!"
   do
     let _t3 ← isColInBounds col
     let _t4 ← isRowInBounds row

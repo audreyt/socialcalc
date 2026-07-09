@@ -45,7 +45,7 @@ bun run verify:lean:build    # lake build (sibling ../velvet, ../loom, ../LemmaS
 
 **Useful rewards now:** Dafny CI-locks pure A1/`#REF!` overflow algebra plus
 absolute-axis offset, structural adjust (`wouldAdjustRef`), and rcColname rank
-round-trips (25 VCs); Bun `test/lemma-a1-facade.test.ts` cross-checks facade vs
+round-trips (26 VCs); Bun `test/lemma-a1-facade.test.ts` cross-checks facade vs
 shipping `rcColname`/`crToCoord`/`OffsetFormulaCoords`/`AdjustFormulaCoords`.
 Lean gen feeds Leanstral goal packs (`a1.proof.lean`). Grow `lemma/*.ts` only;
 promote only to Bun fixtures.

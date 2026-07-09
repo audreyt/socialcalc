@@ -71,6 +71,9 @@ prove_correct offsetA1Parts by
   unfold Pure.offsetA1Parts Pure.applyAxisOffset Pure.offsetCol Pure.offsetRow Pure.isColInBounds Pure.isRowInBounds
   loom_solve
 
+prove_correct wouldOffsetA1Ref by
+  unfold Pure.wouldOffsetA1Ref Pure.offsetA1Parts Pure.applyAxisOffset Pure.offsetCol Pure.offsetRow Pure.isColInBounds Pure.isRowInBounds
+  loom_solve
 prove_correct adjustAxis by
   unfold Pure.adjustAxis; loom_solve
 

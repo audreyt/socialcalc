@@ -21,6 +21,7 @@ import {
   offsetRow,
   rcColname,
   wouldAdjustRef,
+  wouldOffsetA1Ref,
   wouldOffsetRef,
 } from "../lemma/a1";
 import { loadSocialCalc } from "./helpers/socialcalc";
@@ -203,6 +204,43 @@ describe("lemma/a1 facade laws (Dafny/Lean surface)", () => {
     expect(colFromRcRanks(-1, 0)).toBe(-1);
     expect(colFromRcRanks(0, 26)).toBe(-1);
     expect(colFromRcRanks(27, 0)).toBe(-1);
+  });
+
+  test("wouldOffsetA1Ref iff offsetA1 is #REF!", () => {
+    const matrix: Array<[number, number, boolean, boolean, number, number]> = [
+      [1, 1, false, false, 0, 0],
+      [1, 1, true, false, 1, 1], // $A1 → $A2
+      [1, 1, false, true, 1, 1], // A$1 → B$1
+      [1, 1, true, true, 5, 5], // $A$1 locked
+      [702, 1, false, false, 1, 0], // ZZ+1 REF
+      [702, 1, true, false, 1, 0], // $ZZ1 col locked, stays
+      [1, 1, false, false, -1, 0], // A-1 REF
+      [0, 1, true, true, 0, 0], // out-of-band abs still REF
+    ];
+    for (const [c, r, ac, ar, dc, dr] of matrix) {
+      const ref = wouldOffsetA1Ref(c, r, ac, ar, dc, dr);
+      const parts = offsetA1Parts(c, r, ac, ar, dc, dr);
+      expect(ref).toBe(parts.col === -1);
+      expect(parts.col === -1).toBe(parts.row === -1);
+      expect(ref).toBe(offsetA1(c, r, ac, ar, dc, dr) === "#REF!");
+    }
+  });
+
+  test("colToRcRanks round-trips through clampCol", () => {
+    for (const c of [-5, 0, 1, 26, 27, 702, 703, 9999]) {
+      const ranks = colToRcRanks(c);
+      expect(colFromRcRanks(ranks.colhigh, ranks.collow)).toBe(clampCol(c));
+    }
+  });
+
+  test("rcColname length excludes #REF! token", () => {
+    for (const c of [-1, 0, 1, 26, 27, 702, 800]) {
+      const s = rcColname(c);
+      expect(s.length).toBeGreaterThanOrEqual(1);
+      expect(s.length).toBeLessThanOrEqual(2);
+      expect(s).not.toBe("#REF!");
+      expect(crToCoord(c, 1)).not.toBe("#REF!");
+    }
   });
 });
 

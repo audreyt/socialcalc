@@ -28,7 +28,7 @@ Toolchain and build
 - Updated Stryker mutation scripts, tsconfig.json, and README.md/AGENTS.md to
   reflect the TypeScript source layout and the Rust drop.
 - Wired LemmaScript dual-backend scaffolding: exported facade lemma/a1.ts
-  (A1 clamp/coord + overflow #REF! policy helpers), Dafny gen/check (25
+  (A1 clamp/coord + overflow #REF! policy helpers), Dafny gen/check (26
   verified / 0 errors), Lean gen + full lake proofs (a1.spec length lemmas;
   a1.proof no sorry), scripts verify:dafny / verify:lean / verify:both, CI
   workflow lemmascript.yml. Full lake build remains optional (sibling
@@ -43,7 +43,7 @@ Testing
 - LemmaScript-files.txt lists lemma/a1.ts; lsc cannot extract global-script js/*.ts.
 - test/lemma-a1-facade.test.ts locks pure A1/#REF! overflow, absolute-axis offset,
   structural adjust (wouldAdjustRef), and rcColname rank round-trip helpers
-  against shipping oracles (Dafny 25 VCs + Bun cross-check).
+  against shipping oracles (Dafny 26 VCs + Bun cross-check).
 
 ==============================================================================
 v3.0.5 — 2026-07-05

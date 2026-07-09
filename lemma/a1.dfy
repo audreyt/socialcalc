@@ -180,6 +180,19 @@ function offsetA1Parts(col: int, row: int, absCol: bool, absRow: bool, coloffset
 lemma offsetA1Parts_ensures(col: int, row: int, absCol: bool, absRow: bool, coloffset: int, rowoffset: int)
   ensures ((absCol == true) ==> (((offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset).col == col) || (offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset).col == -1)) || (offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset).row == -1)))
   ensures ((absRow == true) ==> (((offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset).row == row) || (offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset).col == -1)) || (offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset).row == -1)))
+  ensures ((offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset).col == -1) <==> (offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset).row == -1))
+{
+}
+
+function wouldOffsetA1Ref(col: int, row: int, absCol: bool, absRow: bool, coloffset: int, rowoffset: int): bool
+{
+  var p := offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset);
+  (p.col == -1)
+}
+
+lemma wouldOffsetA1Ref_ensures(col: int, row: int, absCol: bool, absRow: bool, coloffset: int, rowoffset: int)
+  ensures ((wouldOffsetA1Ref(col, row, absCol, absRow, coloffset, rowoffset) == true) || (wouldOffsetA1Ref(col, row, absCol, absRow, coloffset, rowoffset) == false))
+  ensures ((wouldOffsetA1Ref(col, row, absCol, absRow, coloffset, rowoffset) == true) <==> (offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset).col == -1))
 {
 }
 
@@ -321,6 +334,7 @@ method offsetRelativeA1(col: int, row: int, coloffset: int, rowoffset: int) retu
 
 method formatA1Parts(col: int, row: int, absCol: bool, absRow: bool) returns (res: string)
   ensures (|res| >= 2)
+  ensures (((isColInBounds(col) == false) || (isRowInBounds(row) == false)) ==> (res == "#REF!"))
 {
   var i_t3 := isColInBounds(col);
   var i_t4 := isRowInBounds(row);

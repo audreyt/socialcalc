@@ -102,7 +102,7 @@ overflow `#REF!` policy helpers.
 ```bash
 bun run verify:dafny:gen
 bun run verify:dafny
-# 25 verified, 0 errors on lemma/a1.dfy
+# 26 verified, 0 errors on lemma/a1.dfy
 ```
 
 **Lean backend** (requires `lemmascript` / `lsc`) — generate models:
