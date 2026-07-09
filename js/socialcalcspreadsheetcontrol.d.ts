@@ -16,10 +16,8 @@ declare namespace SocialCalc {
 
    var debug_log: any[];
 
-   class SpreadsheetControl {
-      constructor(idPrefix?: string);
-
-      parentNode: HTMLElement | null;
+   interface SpreadsheetControl {
+parentNode: HTMLElement | null;
       spreadsheetDiv: HTMLElement | null;
       requestedHeight: number;
       requestedWidth: number;
@@ -84,7 +82,17 @@ declare namespace SocialCalc {
       CreateSheetSave(): string;
 
       [key: string]: any;
+   
    }
+
+   interface SpreadsheetControlConstructor {
+      new (idPrefix?: string): SpreadsheetControl;
+      (idPrefix?: string): SpreadsheetControl;
+      prototype: SpreadsheetControl;
+   }
+
+   var SpreadsheetControl: SpreadsheetControlConstructor;
+
 
    namespace SpreadsheetControl {
       function DoFunctionList(): void;

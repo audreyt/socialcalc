@@ -16850,7 +16850,8 @@ SocialCalc.Popup.Types.ColorChooser.CloseOK = function(e) {
 // In-place TypeScript conversion of socialcalcspreadsheetcontrol.js (SocialCalc global script).
 // Ambient API types live in socialcalcspreadsheetcontrol.d.ts (referenced by dist/SocialCalc.d.ts).
 // Build strips types via Bun.Transpiler before UMD concat — no runtime tax.
-// Intermediate: @ts-nocheck until this module is fully annotated against ambient types.
+// Intermediate: @ts-nocheck remains — constructor/prototype shape fixed;
+// full peel blocked on ~700 ambient/nullability errors.
 // @ts-nocheck
 // Opt-in to TypeScript strict checking (noImplicitAny, strictNullChecks) via r2scout config.
 //
@@ -16928,7 +16929,7 @@ not governed by the terms of the CPAL.
 SocialCalc.OtherSaveParts = {};
 const OtherSavePartsMut = SocialCalc.OtherSaveParts;
 SocialCalc.CurrentSpreadsheetControlObject = null;
-SocialCalc.SpreadsheetControl = function(idPrefix) {
+const SpreadsheetControlCtor = function(idPrefix) {
   var scc = SocialCalc.Constants;
   this.parentNode = null;
   this.spreadsheetDiv = null;
@@ -16943,9 +16944,6 @@ SocialCalc.SpreadsheetControl = function(idPrefix) {
   this.tabreplacements = {};
   this.currentTab = -1;
   this.views = {};
-  this.sheet = null;
-  this.context = null;
-  this.editor = null;
   this.spreadsheetDiv = null;
   this.editorDiv = null;
   this.sortrange = "";
@@ -17364,6 +17362,7 @@ SocialCalc.SpreadsheetControl = function(idPrefix) {
   };
   return;
 };
+SocialCalc.SpreadsheetControl = SpreadsheetControlCtor;
 SocialCalc.SpreadsheetControl.prototype.InitializeSpreadsheetControl = function(node, height, width, spacebelow) {
   return SocialCalc.InitializeSpreadsheetControl(this, node, height, width, spacebelow);
 };

@@ -1,7 +1,8 @@
 // In-place TypeScript conversion of socialcalcspreadsheetcontrol.js (SocialCalc global script).
 // Ambient API types live in socialcalcspreadsheetcontrol.d.ts (referenced by dist/SocialCalc.d.ts).
 // Build strips types via Bun.Transpiler before UMD concat — no runtime tax.
-// Intermediate: @ts-nocheck until this module is fully annotated against ambient types.
+// Intermediate: @ts-nocheck remains — constructor/prototype shape fixed;
+// full peel blocked on ~700 ambient/nullability errors.
 // @ts-nocheck
 // Opt-in to TypeScript strict checking (noImplicitAny, strictNullChecks) via r2scout config.
 //
@@ -113,11 +114,7 @@ See the comments in the main SocialCalc code module file of the SocialCalc packa
 
 // Constructor:
 
-/**
- * @this {any}
- * @param {string} [idPrefix]
- */
-SocialCalc.SpreadsheetControl = function(idPrefix) {
+const SpreadsheetControlCtor = function(this: SocialCalc.SpreadsheetControl, idPrefix?: string) {
 
    var scc = SocialCalc.Constants;
 
@@ -174,11 +171,7 @@ SocialCalc.SpreadsheetControl = function(idPrefix) {
 
    this.views = {}; // {viewname: view-object, ...}
 
-   // Dynamic properties:
-
-   this.sheet = null;
-   this.context = null;
-   this.editor = null;
+   // Dynamic properties (sheet/context/editor assigned below):
 
    this.spreadsheetDiv = null;
    this.editorDiv = null;
@@ -916,9 +909,10 @@ SocialCalc.SpreadsheetControl = function(idPrefix) {
 
    return;
 
-   }
+   };
 
-   
+SocialCalc.SpreadsheetControl = SpreadsheetControlCtor as unknown as SocialCalc.SpreadsheetControlConstructor;
+
 // Methods:
 
 SocialCalc.SpreadsheetControl.prototype.InitializeSpreadsheetControl =

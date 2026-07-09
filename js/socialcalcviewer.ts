@@ -326,8 +326,7 @@ SocialCalc.SpreadsheetViewerLoadSave = function(
          rmstr = rmstr.replace("\r", ""); // make sure no CR, only LF
          pos = rmstr.indexOf("\n");
          if (pos > 0) {
-            // @ts-ignore - intentional "string - 0" numeric coercion idiom; NaN handled by guard below
-            t = rmstr.substring(0, pos)-0; // get number
+            t = (rmstr.substring(0, pos) as unknown as number) - 0; // get number
             t2 = t;
 //            if (!(t > 0)) t = 60; // handles NAN, too
             spreadsheet.repeatingMacroInterval = t;

@@ -18,7 +18,10 @@ reattaches leading license comment preambles. UMD open/close wrappers are
 | `socialcalcconstants.ts` | Fully typechecked; LemmaScript `//@ verify` on pure class/image-prefix helpers |
 | `formula1.ts` | **Interim `@ts-nocheck`** — evaluator + remaining Formula surface |
 | `socialcalc-3.ts` | **Interim `@ts-nocheck`** — command/caller code |
-| viewer/popup/control/editor `.ts` | **Interim `@ts-nocheck`** — rename + build path only |
+| `socialcalcviewer.ts` | Fully typechecked |
+| `socialcalcpopup.ts` | Fully typechecked |
+| control/editor `.ts` | **Interim `@ts-nocheck`** (~700–900 errors each) |
+
 
 Do **not** claim a finished typed rewrite while `@ts-nocheck` remains. Next work:
 remove nocheck file-by-file by typing against ambient `.d.ts`, using
