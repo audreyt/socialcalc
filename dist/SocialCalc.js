@@ -15182,7 +15182,7 @@ FormulaMut.TestCriteria = function(value, type, criteria) {
 */
 
 // Formula object and token tables are created in formula1.ts. Assign pure
-// methods onto the same bag via a named mutable view.
+// methods onto the same bag via a named mutable view typed against the ambient API.
 
 const FormulaParseMut = SocialCalc.Formula;
 FormulaParseMut.ParsePushToken = function(parseinfo, ttext, ttype, topcode) {

@@ -12,9 +12,18 @@
 */
 
 // Formula object and token tables are created in formula1.ts. Assign pure
-// methods onto the same bag via a named mutable view.
-type FormulaParseMutable = { [key: string]: unknown };
-const FormulaParseMut = (SocialCalc as unknown as { Formula: FormulaParseMutable }).Formula;
+// methods onto the same bag via a named mutable view typed against the ambient API.
+type FormulaParseMutable = Pick<
+    typeof SocialCalc.Formula,
+    | "ParsePushToken"
+    | "ParseFormulaIntoTokens"
+    | "ConvertInfixToPolish"
+    | "LookupResultType"
+    | "ArrayValuesEqual"
+    | "PushOperand"
+    | "CopyFunctionArgs"
+>;
+const FormulaParseMut = SocialCalc.Formula as FormulaParseMutable;
 
 //@ verify
 // LemmaScript: pure token push onto parseinfo array.

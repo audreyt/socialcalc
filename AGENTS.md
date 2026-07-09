@@ -24,11 +24,12 @@ remove nocheck file-by-file by typing against ambient `.d.ts`, using
 implementation-only mutable bridges for progressive `const` init (see
 `FormatNumberMut` / `ConstantsRoot` / `FormulaRefRoot` patterns). Public `*.d.ts`
 stay consumer API skins unless a runtime binding is genuinely reassigned by callers.
-
 **LemmaScript:** `//@ verify` + `//@ ensures` on typed pure helpers in
-`formula-ref.ts` and `socialcalcconstants.ts`. Formula pure helpers in
-`formula1.ts` still need precise signatures before prove. Promote findings to
-Bun fixtures/tests; shipping `dist/SocialCalc.js` remains the compatibility oracle.
+`formula-ref.ts`, `formula-parse.ts`, and `socialcalcconstants.ts`. Remaining
+formula1 operand/evaluator helpers still need extraction/typing before prove.
+Promote findings to Bun fixtures/tests; shipping `dist/SocialCalc.js` remains
+the compatibility oracle. Keep the Rust/WASM spike as parity harness, not the
+insight path.
 Keep the Rust/WASM spike as parity harness, not the insight path.
 
 ## SocialCalc formula-reference work
