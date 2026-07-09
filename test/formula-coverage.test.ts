@@ -1546,12 +1546,11 @@ test("text concatenation preserves text subtypes (th, tw, tl)", async () => {
     ]);
     await recalcSheet(SC, sheet);
 
-    // Different text sub-types trip LookupResultType concat branches.
-    // (The source uses value1.type twice for concat, so the result is derived
-    // solely from the left operand.)
-    expect(sheet.GetAssuredCell("B1").valuetype).toBe("th");
+    // LookupResultType(concat) uses both operand types.
+    // th&tw → t; th&t → th; tl&th → th; tw&tw → tw.
+    expect(sheet.GetAssuredCell("B1").valuetype).toBe("t");
     expect(sheet.GetAssuredCell("B2").valuetype).toBe("th");
-    expect(sheet.GetAssuredCell("B3").valuetype).toBe("tl");
+    expect(sheet.GetAssuredCell("B3").valuetype).toBe("th");
     expect(sheet.GetAssuredCell("B4").valuetype).toBe("tw");
 });
 

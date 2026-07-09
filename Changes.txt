@@ -14,7 +14,7 @@ Fixes
 - Formula arithmetic `/` now propagates error operands (e.g. `1/#REF!` →
   `#REF!`) instead of treating coerced error zeros as `#DIV/0!`. Text divisors
   such as `1/"x"` become `#VALUE!`. Concat `&` uses both operand types so a
-- right-hand error (e.g. `"x"&#REF!`) is preserved.
+  right-hand error (e.g. `"x"&#REF!`) is preserved.
 
 Toolchain and build
 - Converted all core SocialCalc JavaScript sources under js/ to global-script
