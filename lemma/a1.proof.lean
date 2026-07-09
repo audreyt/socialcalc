@@ -1,26 +1,49 @@
 /-
   Hand-written Lean proofs for lemma/a1.ts (LemmaScript Lean backend).
-  Generated files: a1.types.lean, a1.def.lean — do not edit those; re-run
-  `bun run verify:lean:gen`.
+  Generated: a1.types.lean, a1.def.lean — re-run `bun run verify:lean:gen`.
+
+  Pure helpers (Pure.* mirrors) are intended for loom_solve.
+  Imperative Velvet methods (rcColname/crToCoord/offsetRelativeA1) stay open
+  until verify:lean:build is green on this machine.
 -/
 import «a1.def»
 
 set_option loom.semantics.termination "total"
 set_option loom.semantics.choice "demonic"
 
--- Pure clamp helpers: bodies are already Pure.clamp* mirrors.
 prove_correct clampCol by
   unfold Pure.clampCol; loom_solve
 
 prove_correct clampRow by
   unfold Pure.clampRow; loom_solve
 
--- Column/coord builders are Velvet methods (imperative). Scaffold goals so
--- `lake build` exercises the LemmaScript/Loom/Velvet stack; expand proofs as needed.
+prove_correct isColInBounds by
+  unfold Pure.isColInBounds; loom_solve
+
+prove_correct isRowInBounds by
+  unfold Pure.isRowInBounds; loom_solve
+
+prove_correct offsetCol by
+  unfold Pure.offsetCol; loom_solve
+
+prove_correct offsetRow by
+  unfold Pure.offsetRow; loom_solve
+
+prove_correct applyAxisOffset by
+  unfold Pure.applyAxisOffset Pure.offsetCol Pure.offsetRow; loom_solve
+
+prove_correct composeOffsets by
+  unfold Pure.composeOffsets; loom_solve
+
+-- Imperative builders / string #REF! path: scaffold goals for Leanstral backlog.
 prove_correct rcColname by
   loom_goals_intro
   all_goals sorry
 
 prove_correct crToCoord by
+  loom_goals_intro
+  all_goals sorry
+
+prove_correct offsetRelativeA1 by
   loom_goals_intro
   all_goals sorry

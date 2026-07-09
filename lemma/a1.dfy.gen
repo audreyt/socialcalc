@@ -61,6 +61,81 @@ lemma clampRow_ensures(r: int)
 {
 }
 
+function isColInBounds(c: int): bool
+{
+  ((c >= 1) && (c <= 702))
+}
+
+lemma isColInBounds_ensures(c: int)
+  ensures ((isColInBounds(c) == true) || (isColInBounds(c) == false))
+{
+}
+
+function isRowInBounds(r: int): bool
+{
+  (r >= 1)
+}
+
+lemma isRowInBounds_ensures(r: int)
+  ensures ((isRowInBounds(r) == true) || (isRowInBounds(r) == false))
+{
+}
+
+function offsetCol(col: int, coloffset: int): int
+{
+  var c := (col + coloffset);
+  if ((c < 1) || (c > 702)) then
+    -1
+  else
+    c
+}
+
+lemma offsetCol_ensures(col: int, coloffset: int)
+  ensures ((offsetCol(col, coloffset) == -1) || ((offsetCol(col, coloffset) >= 1) && (offsetCol(col, coloffset) <= 702)))
+{
+}
+
+function offsetRow(row: int, rowoffset: int): int
+{
+  var r := (row + rowoffset);
+  if (r < 1) then
+    -1
+  else
+    r
+}
+
+lemma offsetRow_ensures(row: int, rowoffset: int)
+  ensures ((offsetRow(row, rowoffset) == -1) || (offsetRow(row, rowoffset) >= 1))
+{
+}
+
+function applyAxisOffset(value: int, offset: int, abs: bool, isCol: bool): int
+{
+  if abs then
+    value
+  else
+    if isCol then
+      offsetCol(value, offset)
+    else
+      offsetRow(value, offset)
+}
+
+lemma applyAxisOffset_ensures(value: int, offset: int, abs: bool, isCol: bool)
+  ensures ((abs == true) ==> (applyAxisOffset(value, offset, abs, isCol) == value))
+  ensures ((((applyAxisOffset(value, offset, abs, isCol) == -1) || (((isCol == true) && (applyAxisOffset(value, offset, abs, isCol) >= 1)) && (applyAxisOffset(value, offset, abs, isCol) <= 702))) || ((isCol == false) && (applyAxisOffset(value, offset, abs, isCol) >= 1))) || (abs == true))
+{
+}
+
+function composeOffsets(a: int, b: int): int
+{
+  (a + b)
+}
+
+lemma composeOffsets_ensures(a: int, b: int)
+  ensures (composeOffsets(a, b) == (a + b))
+{
+}
+
 const LETTERS: seq<string> := ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
 
 method rcColname(c: int) returns (res: string)
@@ -102,4 +177,18 @@ method crToCoord(c: int, r: int) returns (res: string)
     return ((LETTERS[(colhigh - 1)] + LETTERS[collow]) + IntToString(row));
   }
   return (LETTERS[collow] + IntToString(row));
+}
+
+method offsetRelativeA1(col: int, row: int, coloffset: int, rowoffset: int) returns (res: string)
+  ensures (|res| >= 2)
+{
+  var i_t0 := offsetCol(col, coloffset);
+  var c := i_t0;
+  var i_t1 := offsetRow(row, rowoffset);
+  var r := i_t1;
+  if ((c == -1) || (r == -1)) {
+    return "#REF!";
+  }
+  var i_t2 := crToCoord(c, r);
+  return i_t2;
 }

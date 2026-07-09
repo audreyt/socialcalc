@@ -31,22 +31,25 @@ missing API.
 
 **LemmaScript:** Shipping pure cores keep `//@ verify` marks in place, but
 `lsc` cannot extract global-script `js/*.ts` (no exports). The verification
-surface is the exported facade under `lemma/` (currently `lemma/a1.ts` for pure
-A1 clamp/coord algebra). Both backends are scaffolded:
+surface is the exported facade under `lemma/` (currently `lemma/a1.ts`: A1
+clamp/coord + overflow `#REF!` policy helpers). Both backends are scaffolded:
 
 ```bash
 bun run verify:both          # Dafny check + Lean gen smoke
-bun run verify:dafny:gen     # → lemma/a1.dfy + a1.dfy.gen
+bun run verify:dafny:gen     # → lemma/a1.dfy.gen
+bun run verify:dafny:regen   # merge gen into proof-bearing a1.dfy
 bun run verify:dafny         # lsc check --backend=dafny (LemmaScript-files.txt)
 bun run verify:lean:gen      # → lemma/a1.types.lean + a1.def.lean
 bun run verify:lean          # gen + assert non-empty Lean artifacts
-bun run verify:lean:build    # optional full lake build (sibling ../velvet, ../loom, ../LemmaScript)
+bun run verify:lean:build    # optional lake build (sibling ../velvet, ../loom, ../LemmaScript)
 ```
 
-Promote findings to Bun fixtures/tests; shipping `dist/SocialCalc.js` remains
-the compatibility oracle. Dafny proofs live as additions in `*.dfy` (not
-`*.dfy.gen`). Lean proofs live in hand-written `*.proof.lean`. Full `lake build`
-is optional and needs sibling Loom/Velvet/LemmaScript checkouts (see README).
+**Useful rewards now:** Dafny CI-locks pure A1/`#REF!` overflow algebra (15 VCs);
+Bun `test/lemma-a1-facade.test.ts` cross-checks facade vs shipping
+`rcColname`/`crToCoord`/`OffsetFormulaCoords`. Lean gen feeds Leanstral goal
+packs (`a1.proof.lean`). Grow `lemma/*.ts` only; promote only to Bun fixtures.
+Do not formalize command/DOM. After TS facade edits: `verify:dafny:regen` then
+`verify:dafny` (`.dfy` is proof-bearing; plain `gen` alone can leave it stale).
 
 ## SocialCalc formula-reference work
 

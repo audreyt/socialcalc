@@ -51,3 +51,46 @@ method clampRow (r : Int) return (res : Int)
   ensures res ≥ 1
   do
     return Pure.clampRow r
+
+method isColInBounds (c : Int) return (res : Bool)
+  ensures res = true ∨ res = false
+  do
+    return Pure.isColInBounds c
+
+method isRowInBounds (r : Int) return (res : Bool)
+  ensures res = true ∨ res = false
+  do
+    return Pure.isRowInBounds r
+
+method offsetCol (col : Int) (coloffset : Int) return (res : Int)
+  ensures res = -1 ∨ res ≥ 1 ∧ res ≤ 702
+  do
+    return Pure.offsetCol col coloffset
+
+method offsetRow (row : Int) (rowoffset : Int) return (res : Int)
+  ensures res = -1 ∨ res ≥ 1
+  do
+    return Pure.offsetRow row rowoffset
+
+method applyAxisOffset (value : Int) (offset : Int) (abs : Bool) (isCol : Bool) return (res : Int)
+  ensures abs = true → res = value
+  ensures res = -1 ∨ isCol = true ∧ res ≥ 1 ∧ res ≤ 702 ∨ isCol = false ∧ res ≥ 1 ∨ abs = true
+  do
+    return Pure.applyAxisOffset value offset abs isCol
+
+method composeOffsets (a : Int) (b : Int) return (res : Int)
+  ensures res = a + b
+  do
+    return Pure.composeOffsets a b
+
+method offsetRelativeA1 (col : Int) (row : Int) (coloffset : Int) (rowoffset : Int) return (res : String)
+  ensures res.length ≥ 2
+  do
+    let _t0 ← offsetCol col coloffset
+    let c := _t0
+    let _t1 ← offsetRow row rowoffset
+    let r := _t1
+    if c = -1 || r = -1 then
+      return "#REF!"
+    let _t2 ← crToCoord c r
+    return _t2

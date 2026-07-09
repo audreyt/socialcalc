@@ -20,4 +20,36 @@ def clampRow (r : Int) : Int :=
   else
     r
 
+def isColInBounds (c : Int) : Bool :=
+  c ≥ 1 ∧ c ≤ 702
+
+def isRowInBounds (r : Int) : Bool :=
+  r ≥ 1
+
+def offsetCol (col : Int) (coloffset : Int) : Int :=
+  let c := col + coloffset
+  if c < 1 ∨ c > 702 then
+    -1
+  else
+    c
+
+def offsetRow (row : Int) (rowoffset : Int) : Int :=
+  let r := row + rowoffset
+  if r < 1 then
+    -1
+  else
+    r
+
+def applyAxisOffset (value : Int) (offset : Int) (abs : Bool) (isCol : Bool) : Int :=
+  if abs then
+    value
+  else
+    if isCol then
+      offsetCol value offset
+    else
+      offsetRow value offset
+
+def composeOffsets (a : Int) (b : Int) : Int :=
+  a + b
+
 end Pure
