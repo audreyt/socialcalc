@@ -4,19 +4,20 @@
 
 Sources under `js/` are global-script TypeScript (not ES modules). `build.ts`
 prefers sibling `.ts` over listed `.js`, strips types with `Bun.Transpiler`, and
-reattaches leading license comment preambles. UMD wrappers stay `.js`
-(`module-wrapper-top.js` creates the factory-local `var SocialCalc = {}`).
+reattaches leading license comment preambles. UMD open/close wrappers are
+**inlined strings in `build.ts`** (not `js/*` files — they are not standalone-parseable).
 
 **Type-safety status (honest):**
 
 | File | Status |
 |---|---|
 | `formatnumber2.ts` | Fully typechecked (no `@ts-nocheck`) |
-| `formula-ref.ts` | Fully typechecked pure formula-ref + A1 coord algebra (shipping; after formula-parse in build) |
-| `formula-parse.ts` | Fully typechecked pure lexer/RPN/type helpers (shipping; after formula1 in build) |
+| `formula-ref.ts` | Fully typechecked pure formula-ref + A1 coord algebra (after formula-operand in build) |
+| `formula-parse.ts` | Fully typechecked pure lexer/RPN/type helpers (after formula1 in build) |
+| `formula-operand.ts` | Fully typechecked pure operand-stack helpers (after formula-parse in build) |
 | `socialcalcconstants.ts` | Fully typechecked; LemmaScript `//@ verify` on pure class/image-prefix helpers |
-| `formula1.ts` | **Interim `@ts-nocheck`** — mechanical TS + mutable Formula bridge |
-| `socialcalc-3.ts` | **Interim `@ts-nocheck`** — command/caller code; formula-ref helpers moved out |
+| `formula1.ts` | **Interim `@ts-nocheck`** — evaluator + remaining Formula surface |
+| `socialcalc-3.ts` | **Interim `@ts-nocheck`** — command/caller code |
 | viewer/popup/control/editor `.ts` | **Interim `@ts-nocheck`** — rename + build path only |
 
 Do **not** claim a finished typed rewrite while `@ts-nocheck` remains. Next work:
@@ -25,12 +26,11 @@ implementation-only mutable bridges for progressive `const` init (see
 `FormatNumberMut` / `ConstantsRoot` / `FormulaRefRoot` patterns). Public `*.d.ts`
 stay consumer API skins unless a runtime binding is genuinely reassigned by callers.
 
-**LemmaScript:** `//@ verify` + `//@ ensures` on typed pure helpers in
-`formula-ref.ts`, `formula-parse.ts`, and `socialcalcconstants.ts`. Remaining
-formula1 operand/evaluator helpers still need extraction/typing before prove.
-Promote findings to Bun fixtures/tests; shipping `dist/SocialCalc.js` remains
-the compatibility oracle. Keep the Rust/WASM spike as parity harness, not the
-insight path.
+**LemmaScript:** `//@ verify` on typed pure helpers in `formula-ref.ts`,
+`formula-parse.ts`, `formula-operand.ts`, and `socialcalcconstants.ts`. Remaining
+formula1 evaluator helpers still need extraction/typing before prove. Promote
+findings to Bun fixtures/tests; shipping `dist/SocialCalc.js` remains the
+compatibility oracle. Keep the Rust/WASM spike as parity harness, not the insight path.
 
 ## SocialCalc formula-reference work
 

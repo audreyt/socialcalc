@@ -589,36 +589,7 @@ FormulaMut.EvaluatePolish = function(parseinfo, revpolish, sheet, allowrangeretu
 #
 */
 
-/**
- * @param {any} sheet
- * @param {any[]} operand
- */
-FormulaMut.TopOfStackValueAndType = function(sheet, operand) {
-
-   var cellvtype, cell, pos, coordsheet;
-   var scf = SocialCalc.Formula;
-
-   /** @type {{ type: string, value: any, error?: string }} */
-   var result = {type: "", value: ""};
-
-   var stacklen = operand.length;
-
-   if (!stacklen) { // make sure something is there
-      result.error = SocialCalc.Constants.s_InternalError+"no operand on stack";
-      return result;
-      }
-
-   result.value = operand[stacklen-1].value; // get top of stack
-   result.type = operand[stacklen-1].type;
-   operand.pop(); // we have data - pop stack
-
-   if (result.type == "name") {
-      result = scf.LookupName(sheet, result.value);
-      }
-
-   return result;
-
-   }
+// TopOfStackValueAndType moved to js/formula-operand.ts (typechecked pure core).
 
 
 /*
@@ -631,44 +602,7 @@ FormulaMut.TopOfStackValueAndType = function(sheet, operand) {
 #
 */
 
-/**
- * @param {any} sheet
- * @param {any[]} operand
- */
-// LemmaScript opportunity (needs precise TS types before //@ verify): pure formula helper (no DOM).
-FormulaMut.OperandAsNumber = function(sheet, operand) {
-
-   var t, valueinfo;
-   var operandinfo = SocialCalc.Formula.OperandValueAndType(sheet, operand);
-
-   t = operandinfo.type.charAt(0);
-
-   if (t == "n") {
-      operandinfo.value = operandinfo.value-0;
-      }
-   else if (t == "b") { // blank cell
-      operandinfo.type = "n";
-      operandinfo.value = 0;
-      }
-   else if (t == "e") { // error
-      operandinfo.value = 0;
-      }
-   else {
-      valueinfo = SocialCalc.DetermineValueType ? SocialCalc.DetermineValueType(operandinfo.value) :
-                                                    {value: operandinfo.value-0, type: "n"}; // if without rest of SocialCalc
-      if (valueinfo.type.charAt(0) == "n") {
-         operandinfo.value = valueinfo.value-0;
-         operandinfo.type = valueinfo.type;
-         }
-      else {
-         operandinfo.value = 0;
-         operandinfo.type = valueinfo.type;
-         }
-      }
-
-   return operandinfo;
-
-   }
+// OperandAsNumber moved to js/formula-operand.ts (typechecked pure core).
 
 /*
 #
@@ -679,42 +613,7 @@ FormulaMut.OperandAsNumber = function(sheet, operand) {
 #
 */
 
-/**
- * @param {any} sheet
- * @param {any[]} operand
- */
-// LemmaScript opportunity (needs precise TS types before //@ verify): pure formula helper (no DOM).
-FormulaMut.OperandAsText = function(sheet, operand) {
-
-   var t, valueinfo;
-   var operandinfo = SocialCalc.Formula.OperandValueAndType(sheet, operand);
-
-   t = operandinfo.type.charAt(0);
-
-   if (t ==  "t") { // any flavor of text returns as is
-      ;
-      }
-   else if (t == "n") {
-      operandinfo.value = SocialCalc.format_number_for_display ?
-                             SocialCalc.format_number_for_display(operandinfo.value, operandinfo.type, "") :
-                             operandinfo.value = operandinfo.value+"";
-      operandinfo.type = "t";
-      }
-   else if (t == "b") { // blank
-      operandinfo.value = "";
-      operandinfo.type = "t";
-      }
-   else if (t == "e") { // error
-      operandinfo.value = "";
-      }
-   else {
-      operandinfo.value = operandinfo.value + "";
-      operandinfo.type = "t";
-      }
-
-   return operandinfo;
-
-   }
+// OperandAsText moved to js/formula-operand.ts (typechecked pure core).
 
 /*
 #
@@ -727,68 +626,7 @@ FormulaMut.OperandAsText = function(sheet, operand) {
 #
 */
 
-/**
- * @param {any} sheet
- * @param {any[]} operand
- */
-FormulaMut.OperandValueAndType = function(sheet, operand) {
-
-   var cellvtype, cell, pos, coordsheet;
-   var scf = SocialCalc.Formula;
-
-   /** @type {{ type: string, value: any, error?: string }} */
-   var result = {type: "", value: ""};
-
-   var stacklen = operand.length;
-
-   if (!stacklen) { // make sure something is there
-      result.error = SocialCalc.Constants.s_InternalError+"no operand on stack";
-      return result;
-      }
-
-   result.value = operand[stacklen-1].value; // get top of stack
-   result.type = operand[stacklen-1].type;
-   operand.pop(); // we have data - pop stack
-
-   if (result.type == "name") {
-      result = scf.LookupName(sheet, result.value);
-      }
-
-   if (result.type == "range") {
-      result = scf.StepThroughRangeDown(operand, result.value);
-      }
-
-   if (result.type == "coord") { // value is a coord reference
-      coordsheet = sheet;
-      pos = result.value.indexOf("!");
-      if (pos != -1) { // sheet reference
-         coordsheet = scf.FindInSheetCache(result.value.substring(pos+1)); // get other sheet
-         if (coordsheet == null) { // unavailable
-            result.type = "e#REF!";
-            result.error = SocialCalc.Constants.s_sheetunavailable+" "+result.value.substring(pos+1);
-            result.value = 0;
-            return result;
-            }
-         result.value = result.value.substring(0, pos); // get coord part
-         }
-
-      cell = coordsheet.cells[SocialCalc.Formula.PlainCoord(result.value)];
-      if (cell) {
-         cellvtype = cell.valuetype; // get type of value in the cell it points to
-         result.value = cell.datavalue;
-         }
-      else {
-         cellvtype = "b";
-         }
-      result.type = cellvtype || "b";
-      if (result.type == "b") { // blank
-         result.value = 0;
-         }
-      }
-
-   return result;
-
-   }
+// OperandValueAndType moved to js/formula-operand.ts (typechecked pure core).
 
 /*
 #
@@ -800,14 +638,7 @@ FormulaMut.OperandValueAndType = function(sheet, operand) {
 */
 
 
-/**
- * @param {any} sheet
- * @param {any[]} operand
- */
-// LemmaScript opportunity (needs precise TS types before //@ verify): pure formula helper (no DOM).
-FormulaMut.OperandAsCoord = function(sheet, operand) {
-	return SocialCalc.Formula.OperandAsType(sheet, operand, "coord");
-}
+// OperandAsCoord moved to js/formula-operand.ts (typechecked pure core).
 
 
 /*
@@ -819,51 +650,9 @@ FormulaMut.OperandAsCoord = function(sheet, operand) {
 #
 */
 
-/**
- * @param {any} sheet
- * @param {any[]} operand
- */
-FormulaMut.OperandAsRange = function(sheet, operand) {
-	return SocialCalc.Formula.OperandAsType(sheet, operand, "range");
-}
+// OperandAsRange moved to js/formula-operand.ts (typechecked pure core).
 
-/*
-#
-# operandinfo = SocialCalc.Formula.OperandAsType(sheet, operand, operandtype)
-#
-# Gets top of stack and pops it.
-# Returns operandtype value. All others are treated as an error.
-#
-*/
-/**
- * @param {any} sheet
- * @param {any[]} operand
- * @param {any} operandtype
- */
-FormulaMut.OperandAsType = function(sheet, operand, operandtype) {
-
-   var scf = SocialCalc.Formula;
-
-   /** @type {{ type: string, value: any, error?: string }} */
-   var result = {type: "", value: ""};
-
-   var stacklen = operand.length;
-
-   result.value = operand[stacklen-1].value; // get top of stack
-   result.type = operand[stacklen-1].type;
-   operand.pop(); // we have data - pop stack
-   if (result.type == "name") {
-      result = SocialCalc.Formula.LookupName(sheet, result.value);
-      }
-   if (result.type == operandtype) { // value is a coord reference
-      return result;
-      }
-   else {
-      result.value = SocialCalc.Constants.s_calcerrcellrefmissing;
-      result.type = "e#REF!";
-      return result;
-      }
-}
+// OperandAsType moved to js/formula-operand.ts (typechecked pure core).
 
 
 /*
@@ -877,57 +666,7 @@ FormulaMut.OperandAsType = function(sheet, operand, operandtype) {
 #
 */
 
-/**
- * @param {any} sheet
- * @param {any[]} operand
- */
-FormulaMut.OperandsAsCoordOnSheet = function(sheet, operand) {
-
-   var sheetname, othersheet, pos1, pos2;
-   /** @type {any} */
-   var value1 = {};
-   /** @type {any} */
-   var result = {};
-   var scf = SocialCalc.Formula;
-
-   var stacklen = operand.length;
-   value1.value = operand[stacklen-1].value; // get top of stack - coord or name
-   value1.type = operand[stacklen-1].type;
-   operand.pop(); // we have data - pop stack
-
-   sheetname = scf.OperandAsSheetName(sheet, operand); // get sheetname as text
-   othersheet = scf.FindInSheetCache(sheetname.value);
-   if (othersheet == null) { // unavailable
-      result.type = "e#REF!";
-      result.value = 0;
-      result.error = SocialCalc.Constants.s_sheetunavailable+" "+sheetname.value;
-      return result;
-      }
-
-   if (value1.type == "name") {
-      value1 = scf.LookupName(othersheet, value1.value);
-      }
-   result.type = value1.type;
-   if (value1.type == "coord") { // value is a coord reference
-      result.value = value1.value + "!" + sheetname.value; // return in the format as used on stack
-      }
-   else if (value1.type == "range") { // value is a range reference
-      pos1 = value1.value.indexOf("|");
-      pos2 = value1.value.indexOf("|", pos1+1);
-      result.value = value1.value.substring(0, pos1) + "!" + sheetname.value +
-                    "|" + value1.value.substring(pos1+1, pos2) + "|";
-      }
-   else if (value1.type.charAt(0)=="e") {
-      result.value = value1.value;
-      }
-   else {
-      result.error = SocialCalc.Constants.s_calcerrcellrefmissing;
-      result.type = "e#REF!";
-      result.value = 0;
-      }
-   return result;
-   
-   }
+// OperandsAsCoordOnSheet moved to js/formula-operand.ts (typechecked pure core).
 
 /*
 #
@@ -940,50 +679,7 @@ FormulaMut.OperandsAsCoordOnSheet = function(sheet, operand) {
 #
 */
 
-/**
- * @param {any} sheet
- * @param {any[]} operand
- */
-FormulaMut.OperandsAsRangeOnSheet = function(sheet, operand) {
-
-   var value1, othersheet, pos1, pos2;
-   /** @type {any} */
-   var value2 = {};
-   var scf = SocialCalc.Formula;
-   var scc = SocialCalc.Constants;
-
-   var stacklen = operand.length;
-   value2.value = operand[stacklen-1].value; // get top of stack - coord or name for "right" side
-   value2.type = operand[stacklen-1].type;
-   operand.pop(); // we have data - pop stack
-
-   value1 = scf.OperandAsCoord(sheet, operand); // get "left" coord
-   if (value1.type != "coord") { // not a coord, which it must be
-      return {value: 0, type: "e#REF!"};
-      }
-
-   othersheet = sheet;
-   pos1 = value1.value.indexOf("!");
-   if (pos1 != -1) { // sheet reference
-      pos2 = value1.value.indexOf("|", pos1+1);
-      if (pos2 < 0) pos2 = value1.value.length;
-      othersheet = scf.FindInSheetCache(value1.value.substring(pos1+1,pos2)); // get other sheet
-      if (othersheet == null) { // unavailable
-         return {value: 0, type: "e#REF!", errortext: scc.s_sheetunavailable+" "+value1.value.substring(pos1+1,pos2)};
-         }
-      }
-
-   if (value2.type == "name") { // coord:name is allowed, if name is just one cell
-      value2 = scf.LookupName(othersheet, value2.value, "end");
-      }
-
-   if (value2.type == "coord") { // value is a coord reference, so return the combined range
-      return {value: value1.value+"|"+value2.value+"|", type: "range"}; // return range in the format as used on stack
-      }
-   else { // bad form
-      return {value: scc.s_calcerrcellrefmissing, type: "e#REF!"};
-      }
-   }
+// OperandsAsRangeOnSheet moved to js/formula-operand.ts (typechecked pure core).
 
 
 /*
@@ -996,53 +692,7 @@ FormulaMut.OperandsAsRangeOnSheet = function(sheet, operand) {
 #
 */
 
-/**
- * @param {any} sheet
- * @param {any[]} operand
- */
-FormulaMut.OperandAsSheetName = function(sheet, operand) {
-
-   var nvalue, cell;
-
-   var scf = SocialCalc.Formula;
-
-   /** @type {{ type: string, value: any, error?: string }} */
-   var result = {type: "", value: ""};
-
-   var stacklen = operand.length;
-
-   result.value = operand[stacklen-1].value; // get top of stack
-   result.type = operand[stacklen-1].type;
-   operand.pop(); // we have data - pop stack
-   if (result.type == "name") {
-      nvalue = SocialCalc.Formula.LookupName(sheet, result.value);
-      if (!nvalue.value) { // not a known name - return bare name as the name value
-         return result;
-         }
-      result.value = nvalue.value;
-      result.type = nvalue.type;
-      }
-   if (result.type == "coord") { // value is a coord reference, follow it to find sheet name
-      cell = sheet.cells[SocialCalc.Formula.PlainCoord(result.value)];
-      if (cell) {
-         result.value = cell.datavalue;
-         result.type = cell.valuetype;
-         }
-      else {
-         result.value = "";
-         result.type = "b";
-         }
-      }
-   if (result.type.charAt(0) == "t") { // value is a string which could be a sheet name
-      return result;
-      }
-   else {
-      result.value = "";
-      result.error = SocialCalc.Constants.s_calcerrsheetnamemissing;
-      return result;
-      }
-
-   }
+// OperandAsSheetName moved to js/formula-operand.ts (typechecked pure core).
 
 //
 // value = SocialCalc.Formula.LookupName(sheet, name)

@@ -35,8 +35,6 @@
   ],
   "exclude": [
     "node_modules",
-    "dist",
-    "js/module-wrapper-top.js",
-    "js/module-wrapper-bottom.js"
+    "dist"
   ]
 }

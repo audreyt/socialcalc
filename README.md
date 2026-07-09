@@ -50,12 +50,12 @@ dropped from the wrapper) so downstream callers don't need to change.
 
 ### TypeScript sources (in-place)
 
-Core modules under `js/` are global-script `.ts` (not ES modules). `build.ts`
-strips types and reattaches license headers. Fully typechecked today:
-`formatnumber2.ts`, `socialcalcconstants.ts`. Other modules still carry interim
-`// @ts-nocheck` — mechanical conversion + mutable init bridges; **not** a finished
-typed rewrite. LemmaScript hooks mark pure helpers as future proof targets
-(see `AGENTS.md`).
+All core modules under `js/` are global-script `.ts` (zero `js/*.js`). UMD
+wrappers are inlined in `build.ts`. Fully typechecked pure cores today:
+`formatnumber2.ts`, `socialcalcconstants.ts`, `formula-parse.ts`,
+`formula-operand.ts`, `formula-ref.ts`. Remaining modules still carry interim
+`// @ts-nocheck` (evaluator/commands/UI). LemmaScript `//@ verify` marks typed
+pure helpers (see `AGENTS.md`).
 
 ## Formula-reference rewrite spike
 

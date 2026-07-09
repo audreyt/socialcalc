@@ -1,7 +1,4 @@
-// Opening half of a UMD IIFE. Only parses when concatenated with
-// module-wrapper-bottom.js (see build.ts) — standalone it has an
-// unclosed `function(window) {` block. Excluded from tsconfig.json's
-// `include` for that reason; brace balance is correct after concat.
+// Opening half of a UMD IIFE. Inlined in build.ts — not a standalone module.
 //
 // Taken from https://github.com/umdjs/umd/blob/master/templates/returnExports.js
 // (c) by The UMD contributors
@@ -22,7 +19,7 @@
     }
 }(typeof globalThis !== 'undefined' ? globalThis : this, function (window) {
 "use strict";
-// Factory-local bag. Formerly created in socialcalcconstants.js as
+// Factory-local bag. Formerly created in socialcalcconstants as
 // `var SocialCalc; if (!SocialCalc) SocialCalc = {}`. Hoisted here so
 // converted TypeScript sources can typecheck against the ambient
 // `declare namespace SocialCalc` without a runtime `var SocialCalc`
@@ -11599,236 +11596,6 @@ FormulaMut.EvaluatePolish = function(parseinfo, revpolish, sheet, allowrangeretu
   }
   return { value, type: valuetype, error: errortext };
 };
-FormulaMut.TopOfStackValueAndType = function(sheet, operand) {
-  var cellvtype, cell, pos, coordsheet;
-  var scf = SocialCalc.Formula;
-  var result = { type: "", value: "" };
-  var stacklen = operand.length;
-  if (!stacklen) {
-    result.error = SocialCalc.Constants.s_InternalError + "no operand on stack";
-    return result;
-  }
-  result.value = operand[stacklen - 1].value;
-  result.type = operand[stacklen - 1].type;
-  operand.pop();
-  if (result.type == "name") {
-    result = scf.LookupName(sheet, result.value);
-  }
-  return result;
-};
-FormulaMut.OperandAsNumber = function(sheet, operand) {
-  var t, valueinfo;
-  var operandinfo = SocialCalc.Formula.OperandValueAndType(sheet, operand);
-  t = operandinfo.type.charAt(0);
-  if (t == "n") {
-    operandinfo.value = operandinfo.value - 0;
-  } else if (t == "b") {
-    operandinfo.type = "n";
-    operandinfo.value = 0;
-  } else if (t == "e") {
-    operandinfo.value = 0;
-  } else {
-    valueinfo = SocialCalc.DetermineValueType ? SocialCalc.DetermineValueType(operandinfo.value) : { value: operandinfo.value - 0, type: "n" };
-    if (valueinfo.type.charAt(0) == "n") {
-      operandinfo.value = valueinfo.value - 0;
-      operandinfo.type = valueinfo.type;
-    } else {
-      operandinfo.value = 0;
-      operandinfo.type = valueinfo.type;
-    }
-  }
-  return operandinfo;
-};
-FormulaMut.OperandAsText = function(sheet, operand) {
-  var t, valueinfo;
-  var operandinfo = SocialCalc.Formula.OperandValueAndType(sheet, operand);
-  t = operandinfo.type.charAt(0);
-  if (t == "t") {} else if (t == "n") {
-    operandinfo.value = SocialCalc.format_number_for_display ? SocialCalc.format_number_for_display(operandinfo.value, operandinfo.type, "") : operandinfo.value = operandinfo.value + "";
-    operandinfo.type = "t";
-  } else if (t == "b") {
-    operandinfo.value = "";
-    operandinfo.type = "t";
-  } else if (t == "e") {
-    operandinfo.value = "";
-  } else {
-    operandinfo.value = operandinfo.value + "";
-    operandinfo.type = "t";
-  }
-  return operandinfo;
-};
-FormulaMut.OperandValueAndType = function(sheet, operand) {
-  var cellvtype, cell, pos, coordsheet;
-  var scf = SocialCalc.Formula;
-  var result = { type: "", value: "" };
-  var stacklen = operand.length;
-  if (!stacklen) {
-    result.error = SocialCalc.Constants.s_InternalError + "no operand on stack";
-    return result;
-  }
-  result.value = operand[stacklen - 1].value;
-  result.type = operand[stacklen - 1].type;
-  operand.pop();
-  if (result.type == "name") {
-    result = scf.LookupName(sheet, result.value);
-  }
-  if (result.type == "range") {
-    result = scf.StepThroughRangeDown(operand, result.value);
-  }
-  if (result.type == "coord") {
-    coordsheet = sheet;
-    pos = result.value.indexOf("!");
-    if (pos != -1) {
-      coordsheet = scf.FindInSheetCache(result.value.substring(pos + 1));
-      if (coordsheet == null) {
-        result.type = "e#REF!";
-        result.error = SocialCalc.Constants.s_sheetunavailable + " " + result.value.substring(pos + 1);
-        result.value = 0;
-        return result;
-      }
-      result.value = result.value.substring(0, pos);
-    }
-    cell = coordsheet.cells[SocialCalc.Formula.PlainCoord(result.value)];
-    if (cell) {
-      cellvtype = cell.valuetype;
-      result.value = cell.datavalue;
-    } else {
-      cellvtype = "b";
-    }
-    result.type = cellvtype || "b";
-    if (result.type == "b") {
-      result.value = 0;
-    }
-  }
-  return result;
-};
-FormulaMut.OperandAsCoord = function(sheet, operand) {
-  return SocialCalc.Formula.OperandAsType(sheet, operand, "coord");
-};
-FormulaMut.OperandAsRange = function(sheet, operand) {
-  return SocialCalc.Formula.OperandAsType(sheet, operand, "range");
-};
-FormulaMut.OperandAsType = function(sheet, operand, operandtype) {
-  var scf = SocialCalc.Formula;
-  var result = { type: "", value: "" };
-  var stacklen = operand.length;
-  result.value = operand[stacklen - 1].value;
-  result.type = operand[stacklen - 1].type;
-  operand.pop();
-  if (result.type == "name") {
-    result = SocialCalc.Formula.LookupName(sheet, result.value);
-  }
-  if (result.type == operandtype) {
-    return result;
-  } else {
-    result.value = SocialCalc.Constants.s_calcerrcellrefmissing;
-    result.type = "e#REF!";
-    return result;
-  }
-};
-FormulaMut.OperandsAsCoordOnSheet = function(sheet, operand) {
-  var sheetname, othersheet, pos1, pos2;
-  var value1 = {};
-  var result = {};
-  var scf = SocialCalc.Formula;
-  var stacklen = operand.length;
-  value1.value = operand[stacklen - 1].value;
-  value1.type = operand[stacklen - 1].type;
-  operand.pop();
-  sheetname = scf.OperandAsSheetName(sheet, operand);
-  othersheet = scf.FindInSheetCache(sheetname.value);
-  if (othersheet == null) {
-    result.type = "e#REF!";
-    result.value = 0;
-    result.error = SocialCalc.Constants.s_sheetunavailable + " " + sheetname.value;
-    return result;
-  }
-  if (value1.type == "name") {
-    value1 = scf.LookupName(othersheet, value1.value);
-  }
-  result.type = value1.type;
-  if (value1.type == "coord") {
-    result.value = value1.value + "!" + sheetname.value;
-  } else if (value1.type == "range") {
-    pos1 = value1.value.indexOf("|");
-    pos2 = value1.value.indexOf("|", pos1 + 1);
-    result.value = value1.value.substring(0, pos1) + "!" + sheetname.value + "|" + value1.value.substring(pos1 + 1, pos2) + "|";
-  } else if (value1.type.charAt(0) == "e") {
-    result.value = value1.value;
-  } else {
-    result.error = SocialCalc.Constants.s_calcerrcellrefmissing;
-    result.type = "e#REF!";
-    result.value = 0;
-  }
-  return result;
-};
-FormulaMut.OperandsAsRangeOnSheet = function(sheet, operand) {
-  var value1, othersheet, pos1, pos2;
-  var value2 = {};
-  var scf = SocialCalc.Formula;
-  var scc = SocialCalc.Constants;
-  var stacklen = operand.length;
-  value2.value = operand[stacklen - 1].value;
-  value2.type = operand[stacklen - 1].type;
-  operand.pop();
-  value1 = scf.OperandAsCoord(sheet, operand);
-  if (value1.type != "coord") {
-    return { value: 0, type: "e#REF!" };
-  }
-  othersheet = sheet;
-  pos1 = value1.value.indexOf("!");
-  if (pos1 != -1) {
-    pos2 = value1.value.indexOf("|", pos1 + 1);
-    if (pos2 < 0)
-      pos2 = value1.value.length;
-    othersheet = scf.FindInSheetCache(value1.value.substring(pos1 + 1, pos2));
-    if (othersheet == null) {
-      return { value: 0, type: "e#REF!", errortext: scc.s_sheetunavailable + " " + value1.value.substring(pos1 + 1, pos2) };
-    }
-  }
-  if (value2.type == "name") {
-    value2 = scf.LookupName(othersheet, value2.value, "end");
-  }
-  if (value2.type == "coord") {
-    return { value: value1.value + "|" + value2.value + "|", type: "range" };
-  } else {
-    return { value: scc.s_calcerrcellrefmissing, type: "e#REF!" };
-  }
-};
-FormulaMut.OperandAsSheetName = function(sheet, operand) {
-  var nvalue, cell;
-  var scf = SocialCalc.Formula;
-  var result = { type: "", value: "" };
-  var stacklen = operand.length;
-  result.value = operand[stacklen - 1].value;
-  result.type = operand[stacklen - 1].type;
-  operand.pop();
-  if (result.type == "name") {
-    nvalue = SocialCalc.Formula.LookupName(sheet, result.value);
-    if (!nvalue.value) {
-      return result;
-    }
-    result.value = nvalue.value;
-    result.type = nvalue.type;
-  }
-  if (result.type == "coord") {
-    cell = sheet.cells[SocialCalc.Formula.PlainCoord(result.value)];
-    if (cell) {
-      result.value = cell.datavalue;
-      result.type = cell.valuetype;
-    } else {
-      result.value = "";
-      result.type = "b";
-    }
-  }
-  if (result.type.charAt(0) == "t") {
-    return result;
-  } else {
-    result.value = "";
-    result.error = SocialCalc.Constants.s_calcerrsheetnamemissing;
-    return result;
-  }
-};
 FormulaMut.LookupName = function(sheet, name, isEnd) {
   var pos, specialc, parseinfo;
   var names = sheet.names;
@@ -15527,6 +15294,260 @@ FormulaParseMut.CopyFunctionArgs = function(operand, foperand) {
   }
   operand.pop();
   return;
+};
+
+// Pure formula operand-stack helpers.
+// Shipping source extracted from formula1 for full typecheck + LemmaScript.
+// Concatenated after formula-parse (token helpers) and before formula-ref.
+// Fully typechecked — no @ts-nocheck.
+//
+/*
+// SocialCalc Formula Operand Helpers
+// Part of the SocialCalc package.
+// (c) Copyright 2008 Socialtext, Inc.
+// Artistic License 2.0: http://socialcalc.org/licenses/al-20/
+//
+*/
+
+// Methods assign onto SocialCalc.Formula created in formula1.ts.
+
+const FormulaOperandMut = SocialCalc.Formula;
+FormulaOperandMut.TopOfStackValueAndType = function(sheet, operand) {
+  var cellvtype, cell, pos, coordsheet;
+  var scf = SocialCalc.Formula;
+  var result = { type: "", value: "" };
+  var stacklen = operand.length;
+  if (!stacklen) {
+    result.error = SocialCalc.Constants.s_InternalError + "no operand on stack";
+    return result;
+  }
+  result.value = operand[stacklen - 1].value;
+  result.type = operand[stacklen - 1].type;
+  operand.pop();
+  if (result.type == "name") {
+    result = scf.LookupName(sheet, String(result.value));
+  }
+  return result;
+};
+FormulaOperandMut.OperandAsNumber = function(sheet, operand) {
+  var t, valueinfo;
+  var operandinfo = SocialCalc.Formula.OperandValueAndType(sheet, operand);
+  t = operandinfo.type.charAt(0);
+  if (t == "n") {
+    operandinfo.value = Number(operandinfo.value);
+  } else if (t == "b") {
+    operandinfo.type = "n";
+    operandinfo.value = 0;
+  } else if (t == "e") {
+    operandinfo.value = 0;
+  } else {
+    valueinfo = SocialCalc.DetermineValueType ? SocialCalc.DetermineValueType(operandinfo.value) : { value: Number(operandinfo.value), type: "n" };
+    if (valueinfo.type.charAt(0) == "n") {
+      operandinfo.value = Number(valueinfo.value);
+      operandinfo.type = valueinfo.type;
+    } else {
+      operandinfo.value = 0;
+      operandinfo.type = valueinfo.type;
+    }
+  }
+  return operandinfo;
+};
+FormulaOperandMut.OperandAsText = function(sheet, operand) {
+  var t, valueinfo;
+  var operandinfo = SocialCalc.Formula.OperandValueAndType(sheet, operand);
+  t = operandinfo.type.charAt(0);
+  if (t == "t") {} else if (t == "n") {
+    operandinfo.value = SocialCalc.format_number_for_display ? SocialCalc.format_number_for_display(operandinfo.value, operandinfo.type, "") : operandinfo.value = operandinfo.value + "";
+    operandinfo.type = "t";
+  } else if (t == "b") {
+    operandinfo.value = "";
+    operandinfo.type = "t";
+  } else if (t == "e") {
+    operandinfo.value = "";
+  } else {
+    operandinfo.value = operandinfo.value + "";
+    operandinfo.type = "t";
+  }
+  return operandinfo;
+};
+FormulaOperandMut.OperandValueAndType = function(sheet, operand) {
+  var cellvtype, cell, pos, coordsheet;
+  var scf = SocialCalc.Formula;
+  var result = { type: "", value: "" };
+  var stacklen = operand.length;
+  if (!stacklen) {
+    result.error = SocialCalc.Constants.s_InternalError + "no operand on stack";
+    return result;
+  }
+  result.value = operand[stacklen - 1].value;
+  result.type = operand[stacklen - 1].type;
+  operand.pop();
+  if (result.type == "name") {
+    result = scf.LookupName(sheet, String(result.value));
+  }
+  if (result.type == "range") {
+    const stepped = scf.StepThroughRangeDown(operand, result.value);
+    if (stepped)
+      result = stepped;
+  }
+  if (result.type == "coord") {
+    coordsheet = sheet;
+    const coordText = String(result.value);
+    pos = coordText.indexOf("!");
+    if (pos != -1) {
+      coordsheet = scf.FindInSheetCache(coordText.substring(pos + 1));
+      if (coordsheet == null) {
+        result.type = "e#REF!";
+        result.error = SocialCalc.Constants.s_sheetunavailable + " " + coordText.substring(pos + 1);
+        result.value = 0;
+        return result;
+      }
+      result.value = coordText.substring(0, pos);
+    }
+    cell = coordsheet.cells[SocialCalc.Formula.PlainCoord(String(result.value))];
+    if (cell) {
+      cellvtype = cell.valuetype;
+      result.value = cell.datavalue;
+    } else {
+      cellvtype = "b";
+    }
+    result.type = cellvtype || "b";
+    if (result.type == "b") {
+      result.value = 0;
+    }
+  }
+  return result;
+};
+FormulaOperandMut.OperandAsCoord = function(sheet, operand) {
+  return SocialCalc.Formula.OperandAsType(sheet, operand, "coord");
+};
+FormulaOperandMut.OperandAsRange = function(sheet, operand) {
+  return SocialCalc.Formula.OperandAsType(sheet, operand, "range");
+};
+FormulaOperandMut.OperandAsType = function(sheet, operand, operandtype) {
+  var scf = SocialCalc.Formula;
+  var result = { type: "", value: "" };
+  var stacklen = operand.length;
+  result.value = operand[stacklen - 1].value;
+  result.type = operand[stacklen - 1].type;
+  operand.pop();
+  if (result.type == "name") {
+    result = SocialCalc.Formula.LookupName(sheet, result.value);
+  }
+  if (result.type == operandtype) {
+    return result;
+  } else {
+    result.value = SocialCalc.Constants.s_calcerrcellrefmissing;
+    result.type = "e#REF!";
+    return result;
+  }
+};
+FormulaOperandMut.OperandsAsCoordOnSheet = function(sheet, operand) {
+  var sheetname, othersheet, pos1, pos2;
+  var value1 = { type: "", value: "" };
+  var result = { type: "", value: "" };
+  var scf = SocialCalc.Formula;
+  var stacklen = operand.length;
+  value1.value = operand[stacklen - 1].value;
+  value1.type = operand[stacklen - 1].type;
+  operand.pop();
+  sheetname = scf.OperandAsSheetName(sheet, operand);
+  othersheet = scf.FindInSheetCache(sheetname.value);
+  if (othersheet == null) {
+    result.type = "e#REF!";
+    result.value = 0;
+    result.error = SocialCalc.Constants.s_sheetunavailable + " " + sheetname.value;
+    return result;
+  }
+  if (value1.type == "name") {
+    value1 = scf.LookupName(othersheet, String(value1.value));
+  }
+  result.type = value1.type;
+  if (value1.type == "coord") {
+    result.value = String(value1.value) + "!" + sheetname.value;
+  } else if (value1.type == "range") {
+    const rv = String(value1.value);
+    pos1 = rv.indexOf("|");
+    pos2 = rv.indexOf("|", pos1 + 1);
+    result.value = rv.substring(0, pos1) + "!" + sheetname.value + "|" + rv.substring(pos1 + 1, pos2) + "|";
+  } else if (value1.type.charAt(0) == "e") {
+    result.value = value1.value;
+  } else {
+    result.error = SocialCalc.Constants.s_calcerrcellrefmissing;
+    result.type = "e#REF!";
+    result.value = 0;
+  }
+  return result;
+};
+FormulaOperandMut.OperandsAsRangeOnSheet = function(sheet, operand) {
+  var value1;
+  var othersheet, pos1, pos2;
+  var value2 = { type: "", value: "" };
+  var scf = SocialCalc.Formula;
+  var scc = SocialCalc.Constants;
+  var stacklen = operand.length;
+  value2.value = operand[stacklen - 1].value;
+  value2.type = operand[stacklen - 1].type;
+  operand.pop();
+  value1 = scf.OperandAsCoord(sheet, operand);
+  if (value1.type != "coord") {
+    return { value: 0, type: "e#REF!" };
+  }
+  othersheet = sheet;
+  const leftCoord = String(value1.value);
+  pos1 = leftCoord.indexOf("!");
+  if (pos1 != -1) {
+    pos2 = leftCoord.indexOf("|", pos1 + 1);
+    if (pos2 < 0)
+      pos2 = leftCoord.length;
+    othersheet = scf.FindInSheetCache(leftCoord.substring(pos1 + 1, pos2));
+    if (othersheet == null) {
+      return { value: 0, type: "e#REF!", error: scc.s_sheetunavailable + " " + leftCoord.substring(pos1 + 1, pos2) };
+    }
+    value1.value = leftCoord;
+  }
+  if (value2.type == "name") {
+    value2 = scf.LookupName(othersheet, String(value2.value), "end");
+  }
+  if (value2.type == "coord") {
+    return { value: String(value1.value) + "|" + String(value2.value) + "|", type: "range" };
+  } else {
+    return { value: scc.s_calcerrcellrefmissing, type: "e#REF!" };
+  }
+};
+FormulaOperandMut.OperandAsSheetName = function(sheet, operand) {
+  var nvalue, cell;
+  var scf = SocialCalc.Formula;
+  var result = { type: "", value: "" };
+  var stacklen = operand.length;
+  result.value = operand[stacklen - 1].value;
+  result.type = operand[stacklen - 1].type;
+  operand.pop();
+  if (result.type == "name") {
+    nvalue = SocialCalc.Formula.LookupName(sheet, result.value);
+    if (!nvalue.value) {
+      return result;
+    }
+    result.value = nvalue.value;
+    result.type = nvalue.type;
+  }
+  if (result.type == "coord") {
+    cell = sheet.cells[SocialCalc.Formula.PlainCoord(result.value)];
+    if (cell) {
+      result.value = cell.datavalue;
+      result.type = cell.valuetype;
+    } else {
+      result.value = "";
+      result.type = "b";
+    }
+  }
+  if (result.type.charAt(0) == "t") {
+    return result;
+  } else {
+    result.value = "";
+    result.error = SocialCalc.Constants.s_calcerrsheetnamemissing;
+    return result;
+  }
 };
 
 // In-place TypeScript module: pure formula-reference rewrite + A1 coord algebra.
@@ -19644,19 +19665,14 @@ $2`);
   return parts;
 };
 
-// Closing half of a UMD IIFE; see module-wrapper-top.js. Standalone it
-// starts with a dangling `}))` and references `SocialCalc` without a
-// local binding. Excluded from tsconfig.json's `include` for that
-// reason; brace balance is correct after concat by build.ts.
+// Closing half of a UMD IIFE. Inlined in build.ts — not a standalone module.
 
-
-// Leading `;` defuses an ASI trap: the preceding file ends with
-// `SocialCalc.SpreadsheetViewerDecodeSpreadsheetSave = function(s,str){...}`
-// and no trailing semicolon, so a bare `(` would be parsed as a call
-// applied to that function expression.
+// Leading `;` defuses an ASI trap: the preceding file may end with a
+// function expression and no trailing semicolon, so a bare `(` would be
+// parsed as a call applied to that function expression.
 ;(function () {
     // DOM-free safety net. Full implementations live in
-    // socialcalctableeditor.js / socialcalcspreadsheetcontrol.js and touch
+    // socialcalctableeditor.ts / socialcalcspreadsheetcontrol.ts and touch
     // `document`. Each wrapper checks at call time so tests that install a
     // DOM shim *after* bundle load still reach the real methods — the old
     // load-time replacement permanently stomped them once the bundle had
