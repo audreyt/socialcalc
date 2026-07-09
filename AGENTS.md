@@ -35,7 +35,7 @@ surface is exported facades under `lemma/`:
 
 - `lemma/a1.ts` — A1 clamp/coord + overflow `#REF!` rewrite policy (26 Dafny VCs)
 - `lemma/eval-ops.ts` — pure `/` and `&` error-propagation lattice (4 Dafny VCs)
-- `lemma/lookup-result.ts` — pure LookupResultType string-table core (1 Dafny VC on resolveToken; Bun locks full row-scan)
+- `lemma/lookup-result.ts` — LookupResultType precedence chooser (resolveToken, preferExact, chooseLookupResult VCs; Bun locks full row-scan)
 
 Both backends are scaffolded:
 
@@ -49,7 +49,8 @@ bun run verify:lean:build    # lake build (sibling ../velvet, ../loom, ../LemmaS
 ```
 
 **Useful rewards now:** Dafny CI-locks pure A1/`#REF!` overflow algebra (26 VCs),
-`/`/`&` error lattice (4 VCs), and LookupResultType token resolve (1 VC). Bun
+`/`/`&` error lattice (4 VCs), and LookupResultType precedence chooser
+ (resolveToken + preferExact + chooseLookupResult VCs). Bun
 `test/lemma-a1-facade.test.ts`, `test/lemma-eval-ops-facade.test.ts`, and
 `test/lemma-lookup-result-facade.test.ts` cross-check facades vs shipping oracles.
 Lean gen feeds Leanstral goal packs. Grow `lemma/*.ts` only; promote only to

@@ -17,3 +17,39 @@ lemma resolveToken_ensures(type1: string, type2: string, token: string)
   ensures ((token != "1") ==> (token != "2") ==> (resolveToken(type1, type2, token) == token))
 {
 }
+
+function preferExact(hasExactKey: bool, hasWildKey: bool): int
+{
+  if (hasExactKey == true) then
+    0
+  else
+    if (hasWildKey == true) then
+      1
+    else
+      2
+}
+
+lemma preferExact_ensures(hasExactKey: bool, hasWildKey: bool)
+  ensures ((hasExactKey == true) ==> (preferExact(hasExactKey, hasWildKey) == 0))
+  ensures ((hasExactKey == false) ==> (hasWildKey == true) ==> (preferExact(hasExactKey, hasWildKey) == 1))
+  ensures ((hasExactKey == false) ==> (hasWildKey == false) ==> (preferExact(hasExactKey, hasWildKey) == 2))
+{
+}
+
+function chooseLookupResult(type1: string, type2: string, hasExactKey: bool, exactToken: string, hasWildKey: bool, wildToken: string): string
+{
+  if (hasExactKey == true) then
+    resolveToken(type1, type2, exactToken)
+  else
+    if (hasWildKey == true) then
+      resolveToken(type1, type2, wildToken)
+    else
+      "e#VALUE!"
+}
+
+lemma chooseLookupResult_ensures(type1: string, type2: string, hasExactKey: bool, exactToken: string, hasWildKey: bool, wildToken: string)
+  ensures ((hasExactKey == true) ==> (chooseLookupResult(type1, type2, hasExactKey, exactToken, hasWildKey, wildToken) == resolveToken(type1, type2, exactToken)))
+  ensures ((hasExactKey == false) ==> (hasWildKey == true) ==> (chooseLookupResult(type1, type2, hasExactKey, exactToken, hasWildKey, wildToken) == resolveToken(type1, type2, wildToken)))
+  ensures ((hasExactKey == false) ==> (hasWildKey == false) ==> (chooseLookupResult(type1, type2, hasExactKey, exactToken, hasWildKey, wildToken) == "e#VALUE!"))
+{
+}

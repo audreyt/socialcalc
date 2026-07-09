@@ -14,4 +14,22 @@ def resolveToken (type1 : String) (type2 : String) (token : String) : String :=
     else
       token
 
+def preferExact (hasExactKey : Bool) (hasWildKey : Bool) : Int :=
+  if hasExactKey = true then
+    0
+  else
+    if hasWildKey = true then
+      1
+    else
+      2
+
+def chooseLookupResult (type1 : String) (type2 : String) (hasExactKey : Bool) (exactToken : String) (hasWildKey : Bool) (wildToken : String) : String :=
+  if hasExactKey = true then
+    resolveToken type1 type2 exactToken
+  else
+    if hasWildKey = true then
+      resolveToken type1 type2 wildToken
+    else
+      "e#VALUE!"
+
 end Pure

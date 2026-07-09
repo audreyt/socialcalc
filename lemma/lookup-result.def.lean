@@ -13,3 +13,17 @@ method resolveToken (type1 : String) (type2 : String) (token : String) return (r
   ensures token ≠ "1" → token ≠ "2" → res = token
   do
     return Pure.resolveToken type1 type2 token
+
+method preferExact (hasExactKey : Bool) (hasWildKey : Bool) return (res : Int)
+  ensures hasExactKey = true → res = 0
+  ensures hasExactKey = false → hasWildKey = true → res = 1
+  ensures hasExactKey = false → hasWildKey = false → res = 2
+  do
+    return Pure.preferExact hasExactKey hasWildKey
+
+method chooseLookupResult (type1 : String) (type2 : String) (hasExactKey : Bool) (exactToken : String) (hasWildKey : Bool) (wildToken : String) return (res : String)
+  ensures hasExactKey = true → res = Pure.resolveToken type1 type2 exactToken
+  ensures hasExactKey = false → hasWildKey = true → res = Pure.resolveToken type1 type2 wildToken
+  ensures hasExactKey = false → hasWildKey = false → res = "e#VALUE!"
+  do
+    return Pure.chooseLookupResult type1 type2 hasExactKey exactToken hasWildKey wildToken

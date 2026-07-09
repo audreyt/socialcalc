@@ -82,8 +82,8 @@ Toolchain and build
 - Wired LemmaScript dual-backend scaffolding: exported facades lemma/a1.ts
   (A1 clamp/coord + overflow #REF! policy, 26 Dafny VCs), lemma/eval-ops.ts
   (pure `/`/`&` error lattice, 4 Dafny VCs + Lean proofs), and
-  lemma/lookup-result.ts (LookupResultType string-table; resolveToken VC +
-  Bun full-algorithm matrix), scripts verify:dafny / verify:lean / verify:both,
+  lemma/lookup-result.ts (LookupResultType precedence chooser: resolveToken,
+  preferExact, chooseLookupResult VCs + Bun full-algorithm matrix),
   CI workflow lemmascript.yml. Full lake build remains optional (sibling
   Loom/Velvet/LemmaScript).
 
@@ -101,7 +101,7 @@ Testing
 - test/lemma-eval-ops-facade.test.ts locks pure `/`/`&` error lattice against
   shipping EvaluatePolish (Dafny 4 VCs).
 - test/lemma-lookup-result-facade.test.ts locks pure LookupResultType against
-  shipping TypeLookupTable/LookupResultType (Dafny resolveToken + Bun matrix).
+  shipping TypeLookupTable/LookupResultType (Dafny precedence chooser VCs + Bun matrix).
 
 ==============================================================================
 v3.0.5 — 2026-07-05

@@ -10,3 +10,9 @@ set_option loom.semantics.choice "demonic"
 
 prove_correct resolveToken by
   unfold Pure.resolveToken; loom_solve
+
+prove_correct preferExact by
+  unfold Pure.preferExact; loom_solve
+
+prove_correct chooseLookupResult by
+  unfold Pure.chooseLookupResult Pure.resolveToken; loom_solve
