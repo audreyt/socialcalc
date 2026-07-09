@@ -436,7 +436,7 @@ ConstantsRoot.Constants = {
   s_calcerrerrorvalueinformula: "Error value in formula",
   s_parseerrerrorinformulabadval: "Error in formula resulting in bad value",
   s_formularangeresult: "Formula results in range value:",
-  s_calcerrnumericnan: "Formula results in an bad numeric value",
+  s_calcerrnumericnan: "Formula results in a bad numeric value",
   s_calcerrnumericoverflow: "Numeric overflow",
   s_sheetunavailable: "Sheet unavailable:",
   s_calcerrcellrefmissing: "Cell reference missing when expected.",
@@ -477,7 +477,7 @@ ConstantsRoot.Constants = {
   s_fdef_DEGREES: "Converts value in radians into degrees. ",
   s_fdef_DGET: "Returns the value of the specified field in the single record that meets the criteria. ",
   s_fdef_DMAX: "Returns the maximum of the numeric values in the specified field in records that meet the criteria. ",
-  s_fdef_DMIN: "Returns the maximum of the numeric values in the specified field in records that meet the criteria. ",
+  s_fdef_DMIN: "Returns the minimum of the numeric values in the specified field in records that meet the criteria. ",
   s_fdef_DPRODUCT: "Returns the result of multiplying the numeric values in the specified field in records that meet the criteria. ",
   s_fdef_DSTDEV: "Returns the sample standard deviation of the numeric values in the specified field in records that meet the criteria. ",
   s_fdef_DSTDEVP: "Returns the standard deviation of the numeric values in the specified field in records that meet the criteria. ",
@@ -662,9 +662,19 @@ ConstantsRoot.ConstantsSetClasses = function(prefix) {
 };
 ConstantsRoot.ConstantsSetImagePrefix = function(imagePrefix) {
   var scc = SocialCalc.Constants;
+  var oldPrefix = scc.defaultImagePrefix;
+  var oldHyphen = oldPrefix.endsWith("_") ? oldPrefix.slice(0, -1) + "-" : oldPrefix;
+  var newHyphen = imagePrefix.endsWith("_") ? imagePrefix.slice(0, -1) + "-" : imagePrefix;
   for (var item in scc) {
     if (typeof scc[item] == "string") {
-      scc[item] = scc[item].replace(scc.defaultImagePrefix, imagePrefix);
+      var s = scc[item];
+      if (oldPrefix) {
+        s = s.split(oldPrefix).join(imagePrefix);
+      }
+      if (oldHyphen && oldHyphen !== oldPrefix) {
+        s = s.split(oldHyphen).join(newHyphen);
+      }
+      scc[item] = s;
     }
   }
   scc.defaultImagePrefix = imagePrefix;
@@ -2715,7 +2725,12 @@ SC.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
             cell = new SocialCalc.Cell(cr);
             sheet.CellFromStringParts(cell, sortcells[sortedcr].split(":"), 1);
             if (cell.datatype == "f") {
-              cell.formula = SocialCalc.OffsetFormulaCoords(cell.formula, 0, row - cr1.row - originalrow);
+              cell.formula = SocialCalc.OffsetFormulaCoords(cell.formula, 0, row - cr1.row - originalrow, {
+                startCol: cr1.col,
+                endCol: cr2.col,
+                startRow: cr1.row,
+                endRow: cr2.row
+              });
             }
             sheet.cells[cr] = cell;
           } else {
@@ -10272,7 +10287,7 @@ FormatNumberMut.formatNumberWithFormat = function(rawvalue, format_string, curre
   if (negativevalue)
     value = -value;
   var zerovalue = value == 0 ? 1 : 0;
-  currency_char = currency_char || scc.FormatNumber_DefaultCurrency;
+  currency_char = currency_char || scc.FormatNumber_defaultCurrency;
   scfn.parse_format_string(scfn.format_definitions, format_string);
   thisformat = scfn.format_definitions[format_string];
   if (!thisformat)
@@ -10542,7 +10557,7 @@ FormatNumberMut.formatNumberWithFormat = function(rawvalue, format_string, curre
         result += "-";
         negativevalue = 0;
       }
-      result += operandstr;
+      result += (operandstr === "$" ? currency_char : operandstr) || operandstr;
     } else if (op == scfn.commands.general) {
       if (value != 0) {
         var factor = Math.floor(Math.LOG10E * Math.log(value));
@@ -10857,7 +10872,7 @@ FormatNumberMut.parse_format_string = function(format_defs, format_string) {
     } else if (ch == "$") {
       lastwasinteger = 0;
       thisformat.operators.push(scfn.commands.currency);
-      thisformat.operands.push(ch);
+      thisformat.operands.push("$");
     } else if (ch == ",") {
       if (lastwasinteger) {
         sectioninfo.commas++;
@@ -13801,17 +13816,21 @@ FormulaMut.NPVFunction = function(fname, operand, foperand, sheet) {
   factor = 1;
   while (foperand.length) {
     value1 = scf.OperandValueAndType(sheet, foperand);
-    if (value1.type.charAt(0) == "n") {
+    if (value1.type.charAt(0) == "e" && resulttypenpv.charAt(0) != "e") {
+      resulttypenpv = value1.type;
+      break;
+    }
+    if (value1.type.charAt(0) == "n" || value1.type.charAt(0) == "b" || value1.type.charAt(0) == "t") {
       factor *= 1 + rate.value;
       if (factor == 0) {
         scf.PushOperand(operand, "e#DIV/0!", 0);
         return;
       }
-      sum += value1.value / factor;
-      resulttypenpv = scf.LookupResultType(value1.type, resulttypenpv || value1.type, scf.TypeLookupTable.plus);
-    } else if (value1.type.charAt(0) == "e" && resulttypenpv.charAt(0) != "e") {
-      resulttypenpv = value1.type;
-      break;
+      var cash = value1.type.charAt(0) == "n" ? value1.value - 0 : 0;
+      sum += cash / factor;
+      if (value1.type.charAt(0) == "n") {
+        resulttypenpv = scf.LookupResultType(value1.type, resulttypenpv || value1.type, scf.TypeLookupTable.plus);
+      }
     }
   }
   if (resulttypenpv.charAt(0) == "n") {
@@ -15604,7 +15623,7 @@ function quoteFormulaString(text) {
   }
   return '"' + escaped + '"';
 }
-FormulaRefRoot.OffsetFormulaCoords = function(formula, coloffset, rowoffset) {
+FormulaRefRoot.OffsetFormulaCoords = function(formula, coloffset, rowoffset, band) {
   const scf = SocialCalc.Formula;
   const tokentype = scf.TokenType;
   const token_op = tokentype.op;
@@ -15613,22 +15632,49 @@ FormulaRefRoot.OffsetFormulaCoords = function(formula, coloffset, rowoffset) {
   const tokenOpExpansion = scf.TokenOpExpansion;
   const parseinfo = scf.ParseFormulaIntoTokens(formula);
   let updatedformula = "";
+  let sheetref = false;
   for (let i = 0;i < parseinfo.length; i++) {
     const ttype = parseinfo[i].type;
     const ttext = parseinfo[i].text;
+    if (ttype === token_op) {
+      if (ttext === "!") {
+        sheetref = true;
+      } else if (ttext !== ":") {
+        sheetref = false;
+      }
+    }
     if (ttype === token_coord) {
       let newcr = "";
       const cr = FormulaRefRoot.coordToCr(ttext);
-      if (ttext.charAt(0) !== "$") {
+      const absCol = ttext.charAt(0) === "$";
+      const absRow = ttext.indexOf("$", 1) !== -1;
+      let shiftCol = !absCol;
+      let shiftRow = !absRow;
+      if (band && sheetref) {
+        shiftCol = false;
+        shiftRow = false;
+      } else if (band) {
+        if (band.startCol != null && band.endCol != null && (cr.col < band.startCol || cr.col > band.endCol)) {
+          shiftCol = false;
+          shiftRow = false;
+        }
+        if (band.startRow != null && band.endRow != null && (cr.row < band.startRow || cr.row > band.endRow)) {
+          shiftCol = false;
+          shiftRow = false;
+        }
+      }
+      if (shiftCol) {
         cr.col += coloffset;
-      } else {
+      }
+      if (absCol) {
         newcr += "$";
       }
       newcr += FormulaRefRoot.rcColname(cr.col);
-      if (ttext.indexOf("$", 1) === -1) {
-        cr.row += rowoffset;
-      } else {
+      if (absRow) {
         newcr += "$";
+      }
+      if (shiftRow) {
+        cr.row += rowoffset;
       }
       newcr += cr.row;
       if (cr.row < 1 || cr.col < 1 || cr.col > 702) {

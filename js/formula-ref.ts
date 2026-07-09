@@ -35,7 +35,12 @@ type FormulaRefMutableRoot = {
     crToCoord: (c: number, r: number) => string;
     coordToCr: (cr: string) => CrParts;
     ParseRange: (range: string) => { cr1: CrPartsWithCoord; cr2: CrPartsWithCoord };
-    OffsetFormulaCoords: (formula: string, coloffset: number, rowoffset: number) => string;
+    OffsetFormulaCoords: (
+        formula: string,
+        coloffset: number,
+        rowoffset: number,
+        band?: { startCol?: number; endCol?: number; startRow?: number; endRow?: number },
+    ) => string;
     AdjustFormulaCoords: (
         formula: string,
         col: number,
@@ -178,6 +183,7 @@ FormulaRefRoot.OffsetFormulaCoords = function (
     formula: string,
     coloffset: number,
     rowoffset: number,
+    band?: { startCol?: number; endCol?: number; startRow?: number; endRow?: number },
 ): string {
     const scf = SocialCalc.Formula;
     const tokentype = scf.TokenType;
@@ -188,25 +194,63 @@ FormulaRefRoot.OffsetFormulaCoords = function (
 
     const parseinfo = scf.ParseFormulaIntoTokens(formula);
     let updatedformula = "";
+    let sheetref = false;
 
     for (let i = 0; i < parseinfo.length; i++) {
         const ttype = parseinfo[i]!.type;
         const ttext = parseinfo[i]!.text;
+        if (ttype === token_op) {
+            if (ttext === "!") {
+                sheetref = true;
+            } else if (ttext !== ":") {
+                // sheetref sticky through ':' (same as Adjust/Replace)
+                sheetref = false;
+            }
+        }
         if (ttype === token_coord) {
             let newcr = "";
             const cr = FormulaRefRoot.coordToCr(ttext);
-            if (ttext.charAt(0) !== "$") {
-                // add col offset unless absolute column
+            const absCol = ttext.charAt(0) === "$";
+            const absRow = ttext.indexOf("$", 1) !== -1;
+            // Optional band (sort): only move relative legs whose *original*
+            // coord sits inside the sorted rectangle; external anchors stay put.
+            // Sheet-qualified coords freeze only under band mode (sort); fill/paste
+            // Offset still shifts sheet-qualified relatives (shipping oracle).
+            let shiftCol = !absCol;
+            let shiftRow = !absRow;
+            if (band && sheetref) {
+                shiftCol = false;
+                shiftRow = false;
+            } else if (band) {
+                if (
+                    band.startCol != null &&
+                    band.endCol != null &&
+                    (cr.col < band.startCol || cr.col > band.endCol)
+                ) {
+                    shiftCol = false;
+                    shiftRow = false;
+                }
+                if (
+                    band.startRow != null &&
+                    band.endRow != null &&
+                    (cr.row < band.startRow || cr.row > band.endRow)
+                ) {
+                    shiftCol = false;
+                    shiftRow = false;
+                }
+            }
+            if (shiftCol) {
                 cr.col += coloffset;
-            } else {
+            }
+            if (absCol) {
                 newcr += "$";
             }
             newcr += FormulaRefRoot.rcColname(cr.col);
-            if (ttext.indexOf("$", 1) === -1) {
-                // add row offset unless absolute row
-                cr.row += rowoffset;
-            } else {
+            if (absRow) {
                 newcr += "$";
+            }
+            if (shiftRow) {
+                cr.row += rowoffset;
             }
             newcr += cr.row;
             if (cr.row < 1 || cr.col < 1 || cr.col > 702) {

@@ -38,6 +38,16 @@ Fixes
 - `OperandAsNumber` maps non-numeric text/`""` to `e#VALUE!` (not empty type);
   `OperandAsCoord`/`OperandAsType` empty stack returns soft `e#REF!` instead of
   throwing.
+- `FormatNumber_defaultCurrency` key used for `currency_char` default (was dead
+  `FormatNumber_DefaultCurrency`); bare `$` / empty `[$]` honor `currency_char`
+  at format time without poisoning the format cache.
+- `ConstantsSetImagePrefix` rewrites both `images/sc_` concat prefixes and
+  `images/sc-…` style URLs; `s_fdef_DMIN` says minimum; `s_calcerrnumericnan`
+  grammar fixed.
+- NPV: blank/text cashflows occupy a discount period as 0 (no silent period
+  shift); errors still short-circuit.
+- Sort: `OffsetFormulaCoords` optional band freezes external relative refs
+  outside the sorted rectangle (`Z1` stays `Z1`); in-band relatives still move.
 
 Toolchain and build
 - Converted all core SocialCalc JavaScript sources under js/ to global-script

@@ -155,7 +155,7 @@ FormatNumberMut.formatNumberWithFormat = function(
    if (negativevalue) value = -value;
    var zerovalue = value == 0 ? 1 : 0;
 
-   currency_char = currency_char || scc.FormatNumber_DefaultCurrency;
+   currency_char = currency_char || scc.FormatNumber_defaultCurrency;
 
    scfn.parse_format_string(scfn.format_definitions, format_string); // make sure format is parsed
    thisformat = scfn.format_definitions[format_string]; // Get format structure
@@ -462,7 +462,9 @@ FormatNumberMut.formatNumberWithFormat = function(
             result += "-";
             negativevalue = 0;
             }
-         result += operandstr;
+         // Bare `$` / empty `[$]` parse as "$"; honor currency_char at format time
+         // so cached format_definitions stay format-string-keyed only.
+         result += (operandstr === "$" ? currency_char : operandstr) || operandstr;
          }
 
       else if (op == scfn.commands.general) { // insert "General" conversion
@@ -867,7 +869,9 @@ FormatNumberMut.parse_format_string = function(
       else if (ch=='$') { // currency char
          lastwasinteger = 0;
          thisformat.operators.push(scfn.commands.currency);
-         thisformat.operands.push(ch);
+         // Bare $ is a currency placeholder; actual glyph comes from currency_char
+         // at format time. Parse-time operand is a sentinel replaced below.
+         thisformat.operands.push("$");
          }
       else if (ch==",") {
          if (lastwasinteger) {

@@ -896,9 +896,13 @@ describe("FormatNumber helper functions and constants", () => {
         expect(unk.operand).toBe("[whatever]");
     });
 
-    test("formatNumberWithFormat accepts currency_char for bracketed currency", async () => {
+    test("formatNumberWithFormat honors currency_char for bare $ and empty [$]", async () => {
         const SC = await loadSocialCalc({ browser: true });
         expect(SC.FormatNumber.formatNumberWithFormat(1234, "[$€]#,##0", "€")).toBe("€1,234");
+        expect(SC.FormatNumber.formatNumberWithFormat(12.5, "$#,##0.00", "€")).toBe("€12.50");
+        expect(SC.FormatNumber.formatNumberWithFormat(12.5, "[$]#,##0.00", "€")).toBe("€12.50");
+        // Explicit [$£] keeps the bracket currency, not currency_char
+        expect(SC.FormatNumber.formatNumberWithFormat(12, "[$£]#,##0", "€")).toBe("£12");
     });
 
     test("InputConstants exposes all expected keys", async () => {

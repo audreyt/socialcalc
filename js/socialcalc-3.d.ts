@@ -196,7 +196,7 @@ declare namespace SocialCalc {
    function CreateAuditString(sheet: Sheet): string;
    function GetStyleNum(sheet: Sheet, atype: string, style: string): number;
    function GetStyleString(sheet: Sheet, atype: string, num: number): string | null;
-   function OffsetFormulaCoords(formula: string, coloffset: number, rowoffset: number): string;
+   function OffsetFormulaCoords(formula: string, coloffset: number, rowoffset: number, band?: { startCol?: number; endCol?: number; startRow?: number; endRow?: number }): string;
    function AdjustFormulaCoords(formula: string, col: number, coloffset: number, row: number, rowoffset: number): string;
    function ReplaceFormulaCoords(formula: string, movedto: { [coord: string]: string }): string;
 

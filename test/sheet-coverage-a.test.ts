@@ -1168,12 +1168,20 @@ test("SocialCalc.Parse tokenises multi-line inputs", async () => {
 test("ConstantsSetClasses and ConstantsSetImagePrefix mutate as documented", async () => {
     const SC = await loadSocialCalc();
     const originalPrefix = SC.Constants.defaultImagePrefix;
+    const originalUnhide = SC.Constants.defaultUnhideLeftStyle;
     SC.ConstantsSetClasses("my-");
     expect(SC.Constants.defaultCommentClass.startsWith("my-")).toBe(true);
-    SC.ConstantsSetImagePrefix("/img/");
-    expect(SC.Constants.defaultImagePrefix).toBe("/img/");
+    // SetClasses clears string-style defaults (defaultCommentStyle → ""); unhide styles remain.
+    SC.ConstantsSetImagePrefix("/img/xx_");
+    expect(SC.Constants.defaultImagePrefix).toBe("/img/xx_");
+    // Style URLs use images/sc-…; rewrite must hit both sc_ prefix and sc- hyphen form
+    expect(SC.Constants.defaultUnhideLeftStyle).toContain("/img/xx-unhideleft.gif");
+    expect(SC.Constants.defaultUnhideLeftStyle).not.toContain("images/sc-");
     // Restore for subsequent tests (other test files share the loaded module cache).
     SC.ConstantsSetImagePrefix(originalPrefix);
+    if (originalUnhide) {
+        SC.Constants.defaultUnhideLeftStyle = originalUnhide;
+    }
 });
 
 // ===========================================================================

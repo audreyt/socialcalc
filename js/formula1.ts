@@ -4375,18 +4375,24 @@ FormulaMut.NPVFunction = function(fname, operand, foperand, sheet) {
 
    while (foperand.length) {
       value1 = scf.OperandValueAndType(sheet, foperand);
-      if (value1.type.charAt(0) == "n") {
+      if (value1.type.charAt(0) == "e" && resulttypenpv.charAt(0) != "e") {
+         resulttypenpv = value1.type;
+         break;
+         }
+      // Numeric, blank, and text cashflows each occupy a discount period.
+      // Non-numeric non-error values count as 0 so later periods do not shift
+      // (was: text skipped → NPV(0.1,100,"x",200) == NPV(0.1,100,200)).
+      if (value1.type.charAt(0) == "n" || value1.type.charAt(0) == "b" || value1.type.charAt(0) == "t") {
          factor *= (1 + rate.value);
          if (factor == 0) {
             scf.PushOperand(operand, "e#DIV/0!", 0);
             return;
             }
-         sum += value1.value / factor;
-         resulttypenpv = scf.LookupResultType(value1.type, resulttypenpv || value1.type, scf.TypeLookupTable.plus);
-         }
-      else if (value1.type.charAt(0) == "e" && resulttypenpv.charAt(0) != "e") {
-         resulttypenpv = value1.type;
-         break;
+         var cash = value1.type.charAt(0) == "n" ? value1.value - 0 : 0;
+         sum += cash / factor;
+         if (value1.type.charAt(0) == "n") {
+            resulttypenpv = scf.LookupResultType(value1.type, resulttypenpv || value1.type, scf.TypeLookupTable.plus);
+            }
          }
       }
 

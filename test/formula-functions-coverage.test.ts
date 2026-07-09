@@ -581,21 +581,22 @@ test("InterestFunctions: NPER with part3<=0, PV at rate=-1, RATE convergence fai
     expect(getVT("A6").charAt(0)).toBe("e");
 });
 
-test("NPV: factor=0, error in args", async () => {
+test("NPV: factor=0, error in args, text cashflow occupies a period as 0", async () => {
     const { getDV, getVT } = await buildSheet([
         "set A1 value n 100",
         "set A2 value n 200",
         // NPV with rate error
         "set B1 formula NPV(1/0,A1,A2)",
-        // NPV with non-numeric cashflow mixed
+        // NPV with non-numeric cashflow mixed — counts as period-2 zero
         'set B2 formula NPV(0.1,"x",A1)',
+        "set B4 formula NPV(0.1,0,A1)",
         // NPV with error in middle -> breaks loop early with error result
         "set B3 formula NPV(0.1,A1,1/0,A2)",
     ]);
 
     expect(getVT("B1").charAt(0)).toBe("e");
-    // Text cashflow treated as non-numeric, ignored
-    expect(typeof getDV("B2")).toBe("number");
+    // Text cashflow occupies a period as 0 (same discount as explicit 0)
+    expect(getDV("B2")).toBe(getDV("B4"));
     expect(getVT("B3").charAt(0)).toBe("e");
 });
 

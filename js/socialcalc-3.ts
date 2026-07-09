@@ -2704,8 +2704,10 @@ SC.ExecuteSheetCommand = function(sheet: any,cmd: any,saveundo: any) {
                if (sortcells[sortedcr]) {
                   cell = new SocialCalc.Cell(cr);
                   sheet.CellFromStringParts(cell, sortcells[sortedcr].split(":"), 1);
-                  if (cell.datatype == "f") { // offset coord refs, even to ***relative*** coords in other sheets
-                     cell.formula = SocialCalc.OffsetFormulaCoords(cell.formula, 0, (row-cr1.row)-originalrow);
+                  if (cell.datatype == "f") { // offset coord refs inside the sort band only
+                     cell.formula = SocialCalc.OffsetFormulaCoords(cell.formula, 0, (row-cr1.row)-originalrow, {
+                        startCol: cr1.col, endCol: cr2.col, startRow: cr1.row, endRow: cr2.row,
+                        });
                      }
                   sheet.cells[cr] = cell;
                   }

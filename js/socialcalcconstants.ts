@@ -626,7 +626,7 @@ ConstantsRoot.Constants = {
    s_calcerrerrorvalueinformula: "Error value in formula",
    s_parseerrerrorinformulabadval: "Error in formula resulting in bad value",
    s_formularangeresult: "Formula results in range value:",
-   s_calcerrnumericnan: "Formula results in an bad numeric value",
+   s_calcerrnumericnan: "Formula results in a bad numeric value",
    s_calcerrnumericoverflow: "Numeric overflow",
    s_sheetunavailable: "Sheet unavailable:", // when FindSheetInCache returns null
    s_calcerrcellrefmissing: "Cell reference missing when expected.",
@@ -670,7 +670,7 @@ ConstantsRoot.Constants = {
    s_fdef_DEGREES: 'Converts value in radians into degrees. ',
    s_fdef_DGET: 'Returns the value of the specified field in the single record that meets the criteria. ',
    s_fdef_DMAX: 'Returns the maximum of the numeric values in the specified field in records that meet the criteria. ',
-   s_fdef_DMIN: 'Returns the maximum of the numeric values in the specified field in records that meet the criteria. ',
+   s_fdef_DMIN: 'Returns the minimum of the numeric values in the specified field in records that meet the criteria. ',
    s_fdef_DPRODUCT: 'Returns the result of multiplying the numeric values in the specified field in records that meet the criteria. ',
    s_fdef_DSTDEV: 'Returns the sample standard deviation of the numeric values in the specified field in records that meet the criteria. ',
    s_fdef_DSTDEVP: 'Returns the standard deviation of the numeric values in the specified field in records that meet the criteria. ',
@@ -891,10 +891,22 @@ ConstantsRoot.ConstantsSetClasses = function(prefix?: string): void {
 ConstantsRoot.ConstantsSetImagePrefix = function(imagePrefix: string): void {
 
    var scc = SocialCalc.Constants;
+   var oldPrefix = scc.defaultImagePrefix;
+   // Style URLs use images/sc-… while the default prefix is images/sc_ (concat form).
+   // Rewrite both so SetImagePrefix actually updates comment/lock/unhide backgrounds.
+   var oldHyphen = oldPrefix.endsWith("_") ? oldPrefix.slice(0, -1) + "-" : oldPrefix;
+   var newHyphen = imagePrefix.endsWith("_") ? imagePrefix.slice(0, -1) + "-" : imagePrefix;
 
    for (var item in scc) {
       if (typeof scc[item] == "string") {
-         scc[item] = scc[item].replace(scc.defaultImagePrefix, imagePrefix);
+         var s = scc[item] as string;
+         if (oldPrefix) {
+            s = s.split(oldPrefix).join(imagePrefix);
+            }
+         if (oldHyphen && oldHyphen !== oldPrefix) {
+            s = s.split(oldHyphen).join(newHyphen);
+            }
+         scc[item] = s;
          }
       }
    scc.defaultImagePrefix = imagePrefix;
