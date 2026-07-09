@@ -52,10 +52,9 @@ dropped from the wrapper) so downstream callers don't need to change.
 
 All core modules under `js/` are global-script `.ts` (zero `js/*.js`). UMD
 wrappers are inlined in `build.ts`. Fully typechecked today: `formatnumber2.ts`, `socialcalcconstants.ts`,
-`formula-parse.ts`, `formula-operand.ts`, `formula-ref.ts`,
+`formula-parse.ts`, `formula-operand.ts`, `formula-ref.ts`, `formula1.ts`,
 `socialcalcviewer.ts`, `socialcalcpopup.ts`. Still interim `// @ts-nocheck`:
-`formula1.ts`, `socialcalc-3.ts`, `socialcalcspreadsheetcontrol.ts`,
-`socialcalctableeditor.ts`. LemmaScript `//@ verify` marks typed pure helpers
+`socialcalc-3.ts`, `socialcalcspreadsheetcontrol.ts`, `socialcalctableeditor.ts`. LemmaScript `//@ verify` marks typed pure helpers
 (see `AGENTS.md`).
 
 ## Formula-reference rewrite spike
@@ -119,7 +118,7 @@ Current mutation scores:
 | Module | Score | Status |
 |---|---|---|
 | `formatnumber2.ts` | 95.20% | Remaining 54 survivors classified as equivalent mutants |
-| `formula1.ts` | — | Parser/evaluator run in progress (interim `@ts-nocheck`) |
+| `formula1.ts` | — | Typechecked; mutation not measured |
 | `socialcalc-3.ts` | — | Not yet measured (interim `@ts-nocheck`) |
 | control/editor (`.ts`) | — | Not yet measured (DOM-coupled; interim `@ts-nocheck`) |
 | `socialcalcviewer.ts` / `socialcalcpopup.ts` | — | Typechecked; mutation not measured |
