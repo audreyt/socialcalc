@@ -3485,157 +3485,6 @@ SocialCalc.GetStyleString = function(sheet, atype, num) {
     return null;
   return sheet[atype + "s"][num];
 };
-SocialCalc.OffsetFormulaCoords = function(formula, coloffset, rowoffset) {
-  var parseinfo, ttext, ttype, i, cr, newcr;
-  var updatedformula = "";
-  var scf = SocialCalc.Formula;
-  var tokentype = scf.TokenType;
-  var token_op = tokentype.op;
-  var token_string = tokentype.string;
-  var token_coord = tokentype.coord;
-  var tokenOpExpansion = scf.TokenOpExpansion;
-  parseinfo = scf.ParseFormulaIntoTokens(formula);
-  for (i = 0;i < parseinfo.length; i++) {
-    ttype = parseinfo[i].type;
-    ttext = parseinfo[i].text;
-    if (ttype == token_coord) {
-      newcr = "";
-      cr = SocialCalc.coordToCr(ttext);
-      if (ttext.charAt(0) != "$") {
-        cr.col += coloffset;
-      } else {
-        newcr += "$";
-      }
-      newcr += SocialCalc.rcColname(cr.col);
-      if (ttext.indexOf("$", 1) == -1) {
-        cr.row += rowoffset;
-      } else {
-        newcr += "$";
-      }
-      newcr += cr.row;
-      if (cr.row < 1 || cr.col < 1 || cr.col > 702) {
-        newcr = "#REF!";
-      }
-      updatedformula += newcr;
-    } else if (ttype == token_string) {
-      if (ttext.indexOf('"') >= 0) {
-        updatedformula += '"' + ttext.replace(/"/g, '""') + '"';
-      } else
-        updatedformula += '"' + ttext + '"';
-    } else if (ttype == token_op) {
-      updatedformula += tokenOpExpansion[ttext] || ttext;
-    } else {
-      updatedformula += ttext;
-    }
-  }
-  return updatedformula;
-};
-SocialCalc.AdjustFormulaCoords = function(formula, col, coloffset, row, rowoffset) {
-  var ttype, ttext, i, newcr, cr, parseinfo;
-  var updatedformula = "";
-  var sheetref = false;
-  var scf = SocialCalc.Formula;
-  var tokentype = scf.TokenType;
-  var token_op = tokentype.op;
-  var token_string = tokentype.string;
-  var token_coord = tokentype.coord;
-  var tokenOpExpansion = scf.TokenOpExpansion;
-  parseinfo = SocialCalc.Formula.ParseFormulaIntoTokens(formula);
-  for (i = 0;i < parseinfo.length; i++) {
-    ttype = parseinfo[i].type;
-    ttext = parseinfo[i].text;
-    if (ttype == token_op) {
-      if (ttext == "!") {
-        sheetref = true;
-      } else if (ttext != ":") {
-        sheetref = false;
-      }
-      ttext = tokenOpExpansion[ttext] || ttext;
-    }
-    if (ttype == token_coord) {
-      cr = SocialCalc.coordToCr(ttext);
-      if (coloffset < 0 && cr.col >= col && cr.col < col - coloffset || rowoffset < 0 && cr.row >= row && cr.row < row - rowoffset) {
-        if (!sheetref) {
-          cr.col = 0;
-          cr.row = 0;
-        }
-      }
-      if (!sheetref) {
-        if (cr.col >= col) {
-          cr.col += coloffset;
-        }
-        if (cr.row >= row) {
-          cr.row += rowoffset;
-        }
-      }
-      if (ttext.charAt(0) == "$") {
-        newcr = "$" + SocialCalc.rcColname(cr.col);
-      } else {
-        newcr = SocialCalc.rcColname(cr.col);
-      }
-      if (ttext.indexOf("$", 1) != -1) {
-        newcr += "$" + cr.row;
-      } else {
-        newcr += cr.row;
-      }
-      if (cr.row < 1 || cr.col < 1 || cr.col > 702) {
-        newcr = "#REF!";
-      }
-      ttext = newcr;
-    } else if (ttype == token_string) {
-      ttext = '"' + (ttext.indexOf('"') >= 0 ? ttext.replace(/"/g, '""') : ttext) + '"';
-    }
-    updatedformula += ttext;
-  }
-  return updatedformula;
-};
-SocialCalc.ReplaceFormulaCoords = function(formula, movedto) {
-  var ttype, ttext, i, newcr, coord, cr, parseinfo;
-  var updatedformula = "";
-  var sheetref = false;
-  var scf = SocialCalc.Formula;
-  var tokentype = scf.TokenType;
-  var token_op = tokentype.op;
-  var token_string = tokentype.string;
-  var token_coord = tokentype.coord;
-  var tokenOpExpansion = scf.TokenOpExpansion;
-  parseinfo = SocialCalc.Formula.ParseFormulaIntoTokens(formula);
-  for (i = 0;i < parseinfo.length; i++) {
-    ttype = parseinfo[i].type;
-    ttext = parseinfo[i].text;
-    if (ttype == token_op) {
-      if (ttext == "!") {
-        sheetref = true;
-      } else if (ttext != ":") {
-        sheetref = false;
-      }
-      //!!!! HANDLE RANGE EXTENT MOVES
-      ttext = tokenOpExpansion[ttext] || ttext;
-    }
-    if (ttype == token_coord) {
-      cr = SocialCalc.coordToCr(ttext);
-      coord = SocialCalc.crToCoord(cr.col, cr.row);
-      if (movedto[coord] && !sheetref) {
-        cr = SocialCalc.coordToCr(movedto[coord]);
-        if (ttext.charAt(0) == "$") {
-          newcr = "$" + SocialCalc.rcColname(cr.col);
-        } else {
-          newcr = SocialCalc.rcColname(cr.col);
-        }
-        if (ttext.indexOf("$", 1) != -1) {
-          newcr += "$" + cr.row;
-        } else {
-          newcr += cr.row;
-        }
-        ttext = newcr;
-      }
-    } else if (ttype == token_string) {
-      ttext = '"' + (ttext.indexOf('"') >= 0 ? ttext.replace(/"/g, '""') : ttext) + '"';
-    }
-    updatedformula += ttext;
-  }
-  return updatedformula;
-};
 SocialCalc.RecalcInfo = {
   sheet: null,
   currentState: 0,
@@ -4855,105 +4704,6 @@ SocialCalc.CellInPane = function(context, row, col, rowpane, colpane) {
 };
 SocialCalc.CreatePseudoElement = function() {
   return { style: { cssText: "" }, innerHTML: "", className: "" };
-};
-SocialCalc.rcColname = function(c) {
-  if (c > 702)
-    c = 702;
-  if (c < 1)
-    c = 1;
-  var collow = (c - 1) % 26 + 65;
-  var colhigh = Math.floor((c - 1) / 26);
-  if (colhigh)
-    return String.fromCharCode(colhigh + 64) + String.fromCharCode(collow);
-  else
-    return String.fromCharCode(collow);
-};
-SocialCalc.letters = [
-  "A",
-  "B",
-  "C",
-  "D",
-  "E",
-  "F",
-  "G",
-  "H",
-  "I",
-  "J",
-  "K",
-  "L",
-  "M",
-  "N",
-  "O",
-  "P",
-  "Q",
-  "R",
-  "S",
-  "T",
-  "U",
-  "V",
-  "W",
-  "X",
-  "Y",
-  "Z"
-];
-SocialCalc.crToCoord = function(c, r) {
-  var result;
-  if (c < 1)
-    c = 1;
-  if (c > 702)
-    c = 702;
-  if (r < 1)
-    r = 1;
-  var collow = (c - 1) % 26;
-  var colhigh = Math.floor((c - 1) / 26);
-  if (colhigh)
-    result = SocialCalc.letters[colhigh - 1] + SocialCalc.letters[collow] + r;
-  else
-    result = SocialCalc.letters[collow] + r;
-  return result;
-};
-SocialCalc.coordToCol = {};
-SocialCalc.coordToRow = {};
-SocialCalc.coordToCr = function(cr) {
-  var c, i, ch;
-  var r = SocialCalc.coordToRow[cr];
-  if (r)
-    return { row: r, col: SocialCalc.coordToCol[cr] };
-  c = 0;
-  r = 0;
-  for (i = 0;i < cr.length; i++) {
-    ch = cr.charCodeAt(i);
-    if (ch == 36) {} else if (ch <= 57)
-      r = 10 * r + ch - 48;
-    else if (ch >= 97)
-      c = 26 * c + ch - 96;
-    else if (ch >= 65)
-      c = 26 * c + ch - 64;
-  }
-  SocialCalc.coordToCol[cr] = c;
-  SocialCalc.coordToRow[cr] = r;
-  return { row: r, col: c };
-};
-SocialCalc.ParseRange = function(range) {
-  var pos, cr, cr1, cr2;
-  if (!range)
-    range = "A1:A1";
-  range = range.toUpperCase();
-  pos = range.indexOf(":");
-  if (pos >= 0) {
-    cr = range.substring(0, pos);
-    cr1 = SocialCalc.coordToCr(cr);
-    cr1.coord = cr;
-    cr = range.substring(pos + 1);
-    cr2 = SocialCalc.coordToCr(cr);
-    cr2.coord = cr;
-  } else {
-    cr1 = SocialCalc.coordToCr(range);
-    cr1.coord = range;
-    cr2 = SocialCalc.coordToCr(range);
-    cr2.coord = range;
-  }
-  return { cr1, cr2 };
 };
 SocialCalc.decodeFromSave = function(s) {
   if (typeof s != "string")
@@ -11604,211 +11354,6 @@ FormulaMut.TypeLookupTable = {
   twoargnumeric: { "n*": "|n*:n|t*:e#VALUE!|e*:2|", "e*": "|e*:1|n*:1|t*:1|", "t*": "|t*:e#VALUE!|n*:e#VALUE!|e*:2|" },
   propagateerror: { "n*": "|n*:2|e*:2|", "e*": "|e*:2|", "t*": "|t*:2|e*:2|", b: "|b:2|e*:2|" }
 };
-FormulaMut.ParseFormulaIntoTokens = function(line) {
-  var i, ch, cclass, last_token, last_token_type, last_token_text, t;
-  var scf = SocialCalc.Formula;
-  var scc = SocialCalc.Constants;
-  var parsestate = scf.ParseState;
-  var tokentype = scf.TokenType;
-  var charclass = scf.CharClass;
-  var charclasstable = scf.CharClassTable;
-  var uppercasetable = scf.UpperCaseTable;
-  var pushtoken = scf.ParsePushToken;
-  var coordregex = /^\$?[A-Z]{1,2}\$?[1-9]\d*$/i;
-  var parseinfo = [];
-  var str = "";
-  var state = 0;
-  var haddecimal = false;
-  var twochrop = "";
-  for (i = 0;i <= line.length; i++) {
-    if (i < line.length) {
-      ch = line.charAt(i);
-      cclass = charclasstable[ch];
-    } else {
-      ch = "";
-      cclass = charclass.eof;
-    }
-    if (state == parsestate.num) {
-      if (cclass == charclass.num) {
-        str += ch;
-      } else if (cclass == charclass.numstart && !haddecimal) {
-        haddecimal = true;
-        str += ch;
-      } else if (ch == "E" || ch == "e") {
-        str += ch;
-        haddecimal = false;
-        state = parsestate.numexp1;
-      } else {
-        pushtoken(parseinfo, str, tokentype.num, 0);
-        haddecimal = false;
-        state = 0;
-      }
-    }
-    if (state == parsestate.numexp1) {
-      if (cclass == parsestate.num) {
-        state = parsestate.numexp2;
-      } else if ((ch == "+" || ch == "-") && uppercasetable[str.charAt(str.length - 1)] == "E") {
-        str += ch;
-      } else if (ch == "E" || ch == "e") {} else {
-        pushtoken(parseinfo, scc.s_parseerrexponent, tokentype.error, 0);
-        state = 0;
-      }
-    }
-    if (state == parsestate.numexp2) {
-      if (cclass == charclass.num) {
-        str += ch;
-      } else {
-        pushtoken(parseinfo, str, tokentype.num, 0);
-        state = 0;
-      }
-    }
-    if (state == parsestate.alpha) {
-      if (cclass == charclass.num) {
-        state = parsestate.coord;
-      } else if (cclass == charclass.alpha || ch == ".") {
-        str += ch;
-      } else if (cclass == charclass.incoord) {
-        state = parsestate.coord;
-      } else if (cclass == charclass.op || cclass == charclass.numstart || cclass == charclass.space || cclass == charclass.eof) {
-        pushtoken(parseinfo, str.toUpperCase(), tokentype.name, 0);
-        state = 0;
-      } else {
-        pushtoken(parseinfo, scc.s_parseerrchar, tokentype.error, 0);
-        state = 0;
-      }
-    }
-    if (state == parsestate.coord) {
-      if (cclass == charclass.num) {
-        str += ch;
-      } else if (cclass == charclass.incoord) {
-        str += ch;
-      } else if (cclass == charclass.alpha) {
-        state = parsestate.alphanumeric;
-      } else if (cclass == charclass.op || cclass == charclass.numstart || cclass == charclass.eof || cclass == charclass.space) {
-        if (coordregex.test(str)) {
-          t = tokentype.coord;
-        } else {
-          t = tokentype.name;
-        }
-        pushtoken(parseinfo, str.toUpperCase(), t, 0);
-        state = 0;
-      } else {
-        pushtoken(parseinfo, scc.s_parseerrchar, tokentype.error, 0);
-        state = 0;
-      }
-    }
-    if (state == parsestate.alphanumeric) {
-      if (cclass == charclass.num || cclass == charclass.alpha) {
-        str += ch;
-      } else if (cclass == charclass.op || cclass == charclass.numstart || cclass == charclass.space || cclass == charclass.eof) {
-        pushtoken(parseinfo, str.toUpperCase(), tokentype.name, 0);
-        state = 0;
-      } else {
-        pushtoken(parseinfo, scc.s_parseerrchar, tokentype.error, 0);
-        state = 0;
-      }
-    }
-    if (state == parsestate.string) {
-      if (cclass == charclass.quote) {
-        state = parsestate.stringquote;
-      } else if (cclass == charclass.eof) {
-        pushtoken(parseinfo, scc.s_parseerrstring, tokentype.error, 0);
-        state = 0;
-      } else {
-        str += ch;
-      }
-    } else if (state == parsestate.stringquote) {
-      if (cclass == charclass.quote) {
-        str += ch;
-        state = parsestate.string;
-      } else {
-        pushtoken(parseinfo, str, tokentype.string, 0);
-        state = 0;
-      }
-    } else if (state == parsestate.specialvalue) {
-      if (str.charAt(str.length - 1) == "!") {
-        pushtoken(parseinfo, str, tokentype.name, 0);
-        state = 0;
-      } else if (cclass == charclass.eof) {
-        pushtoken(parseinfo, scc.s_parseerrspecialvalue, tokentype.error, 0);
-        state = 0;
-      } else {
-        str += ch;
-      }
-    }
-    if (state == 0) {
-      if (cclass == charclass.num) {
-        str = ch;
-        state = parsestate.num;
-      } else if (cclass == charclass.numstart) {
-        str = ch;
-        haddecimal = true;
-        state = parsestate.num;
-      } else if (cclass == charclass.alpha || cclass == charclass.incoord) {
-        str = ch;
-        state = parsestate.alpha;
-      } else if (cclass == charclass.specialstart) {
-        str = ch;
-        state = parsestate.specialvalue;
-      } else if (cclass == charclass.op) {
-        str = ch;
-        if (parseinfo.length > 0) {
-          last_token = parseinfo[parseinfo.length - 1];
-          last_token_type = last_token.type;
-          last_token_text = last_token.text;
-          if (last_token_type == charclass.op) {
-            twochrop = last_token_text + str;
-            if (twochrop == "<=" || twochrop == ">=" || twochrop == "<>") {
-              str = last_token_text + str;
-              parseinfo.pop();
-              last_token = parseinfo[parseinfo.length - 1];
-              last_token_type = last_token.type;
-              last_token_text = last_token.text;
-            }
-          }
-        } else {
-          last_token_type = charclass.eof;
-          last_token_text = "EOF";
-        }
-        t = tokentype.op;
-        if (parseinfo.length == 0 || last_token_type == charclass.op && last_token_text != ")" && last_token_text != "%") {
-          if (str == "-") {
-            str = "M";
-            ch = "M";
-          } else if (str == "+") {
-            str = "P";
-            ch = "P";
-          } else if (str == ")" && last_token_text == "(") {} else if (str != "(") {
-            t = tokentype.error;
-            str = scc.s_parseerrtwoops;
-          }
-        } else if (str.length > 1) {
-          if (str == ">=") {
-            str = "G";
-            ch = "G";
-          } else if (str == "<=") {
-            str = "L";
-            ch = "L";
-          } else {
-            str = "N";
-            ch = "N";
-          }
-        }
-        pushtoken(parseinfo, str, t, ch);
-        state = 0;
-      } else if (cclass == charclass.quote) {
-        str = "";
-        state = parsestate.string;
-      } else if (cclass == charclass.space) {} else if (cclass == charclass.eof) {} else {
-        pushtoken(parseinfo, scc.s_parseerrchar, tokentype.error, 0);
-      }
-    }
-  }
-  return parseinfo;
-};
-FormulaMut.ParsePushToken = function(parseinfo, ttext, ttype, topcode) {
-  parseinfo.push({ text: ttext, type: ttype, opcode: topcode });
-};
 FormulaMut.evaluate_parsed_formula = function(parseinfo, sheet, allowrangereturn) {
   var result;
   var scf = SocialCalc.Formula;
@@ -11819,85 +11364,6 @@ FormulaMut.evaluate_parsed_formula = function(parseinfo, sheet, allowrangereturn
   revpolish = scf.ConvertInfixToPolish(parseinfo);
   result = scf.EvaluatePolish(parseinfo, revpolish, sheet, allowrangereturn);
   return result;
-};
-FormulaMut.ConvertInfixToPolish = function(parseinfo) {
-  var scf = SocialCalc.Formula;
-  var scc = SocialCalc.Constants;
-  var tokentype = scf.TokenType;
-  var token_precedence = scf.TokenPrecedence;
-  var revpolish = [];
-  var parsestack = [];
-  var errortext = "";
-  var function_start = -1;
-  var i, pii, ttype, ttext, tprecedence, tstackprecedence;
-  for (i = 0;i < parseinfo.length; i++) {
-    pii = parseinfo[i];
-    ttype = pii.type;
-    ttext = pii.text;
-    if (ttype == tokentype.num || ttype == tokentype.coord || ttype == tokentype.string) {
-      revpolish.push(i);
-    } else if (ttype == tokentype.name) {
-      parsestack.push(i);
-      revpolish.push(function_start);
-    } else if (ttype == tokentype.space) {
-      continue;
-    } else if (ttext == ",") {
-      while (parsestack.length && parseinfo[parsestack[parsestack.length - 1]].text != "(") {
-        revpolish.push(parsestack.pop());
-      }
-      if (parsestack.length == 0) {
-        errortext = scc.s_parseerrmissingopenparen;
-        break;
-      }
-    } else if (ttext == "(") {
-      parsestack.push(i);
-    } else if (ttext == ")") {
-      while (parsestack.length && parseinfo[parsestack[parsestack.length - 1]].text != "(") {
-        revpolish.push(parsestack.pop());
-      }
-      if (parsestack.length == 0) {
-        errortext = scc.s_parseerrcloseparennoopen;
-        break;
-      }
-      parsestack.pop();
-      if (parsestack.length && parseinfo[parsestack[parsestack.length - 1]].type == tokentype.name) {
-        revpolish.push(parsestack.pop());
-      }
-    } else if (ttype == tokentype.op) {
-      if (parsestack.length && parseinfo[parsestack[parsestack.length - 1]].type == tokentype.name) {
-        revpolish.push(parsestack.pop());
-      }
-      while (parsestack.length && parseinfo[parsestack[parsestack.length - 1]].type == tokentype.op && parseinfo[parsestack[parsestack.length - 1]].text != "(") {
-        tprecedence = token_precedence[pii.opcode];
-        tstackprecedence = token_precedence[parseinfo[parsestack[parsestack.length - 1]].opcode];
-        if (tprecedence >= 0 && tprecedence < tstackprecedence)
-          break;
-        if (tprecedence < 0) {
-          tprecedence = -tprecedence;
-          if (tstackprecedence < 0)
-            tstackprecedence = -tstackprecedence;
-          if (tprecedence <= tstackprecedence)
-            break;
-        }
-        revpolish.push(parsestack.pop());
-      }
-      parsestack.push(i);
-    } else if (ttype == tokentype.error) {
-      errortext = ttext;
-      break;
-    }
-  }
-  while (parsestack.length > 0) {
-    if (parseinfo[parsestack[parsestack.length - 1]].text == "(") {
-      errortext = scc.s_parseerrmissingcloseparen;
-      break;
-    }
-    revpolish.push(parsestack.pop());
-  }
-  if (errortext) {
-    return errortext;
-  }
-  return revpolish;
 };
 if (typeof SocialCalc.debug_log === "undefined")
   SocialCalc.debug_log = [];
@@ -12132,41 +11598,6 @@ FormulaMut.EvaluatePolish = function(parseinfo, revpolish, sheet, allowrangeretu
     errortext = isNaN(value) ? scc.s_calcerrnumericnan : scc.s_calcerrnumericoverflow;
   }
   return { value, type: valuetype, error: errortext };
-};
-FormulaMut.LookupResultType = function(type1, type2, typelookup) {
-  var pos1, pos2, result;
-  var table1 = typelookup[type1];
-  if (!table1) {
-    table1 = typelookup[type1.charAt(0) + "*"];
-    if (!table1) {
-      return "e#VALUE! (internal error, missing LookupResultType " + type1.charAt(0) + "*)";
-    }
-  }
-  pos1 = table1.indexOf("|" + type2 + ":");
-  if (pos1 >= 0) {
-    pos2 = table1.indexOf("|", pos1 + 1);
-    if (pos2 < 0)
-      return "e#VALUE! (internal error, incorrect LookupResultType " + table1 + ")";
-    result = table1.substring(pos1 + type2.length + 2, pos2);
-    if (result == "1")
-      return type1;
-    if (result == "2")
-      return type2;
-    return result;
-  }
-  pos1 = table1.indexOf("|" + type2.charAt(0) + "*:");
-  if (pos1 >= 0) {
-    pos2 = table1.indexOf("|", pos1 + 1);
-    if (pos2 < 0)
-      return "e#VALUE! (internal error, incorrect LookupResultType " + table1 + ")";
-    result = table1.substring(pos1 + 4, pos2);
-    if (result == "1")
-      return type1;
-    if (result == "2")
-      return type2;
-    return result;
-  }
-  return "e#VALUE!";
 };
 FormulaMut.TopOfStackValueAndType = function(sheet, operand) {
   var cellvtype, cell, pos, coordsheet;
@@ -12611,16 +12042,6 @@ FormulaMut.StoreIoEventFormula = function(function_name, coord, operand_reverse,
     }
   }
 };
-FormulaMut.ArrayValuesEqual = function(a, b) {
-  var i = a.length;
-  if (i != b.length)
-    return false;
-  while (i--) {
-    if (a[i] !== b[i])
-      return false;
-  }
-  return true;
-};
 FormulaMut.Clone = function(destination, source) {
   for (var property in source) {
     if (typeof source[property] === "object" && source[property] !== null && destination[property]) {
@@ -12698,20 +12119,6 @@ FormulaMut.CalculateFunction = function(fname, operand, sheet, coord) {
     }
   }
   return errortext;
-};
-FormulaMut.PushOperand = function(operand, t, v) {
-  operand.push({ type: t, value: v });
-};
-FormulaMut.CopyFunctionArgs = function(operand, foperand) {
-  var fobj, ffunc, argnum;
-  var scf = SocialCalc.Formula;
-  var ok = 1;
-  var errortext = null;
-  while (operand.length > 0 && operand[operand.length - 1].type != "start") {
-    foperand.push(operand.pop());
-  }
-  operand.pop();
-  return;
 };
 FormulaMut.FunctionArgsError = function(fname, operand) {
   var errortext = SocialCalc.Constants.s_calcerrincorrectargstofunction + " " + fname + ". ";
@@ -15759,6 +15166,644 @@ FormulaMut.TestCriteria = function(value, type, criteria) {
     }
   }
   return cond;
+};
+
+// Pure formula parse / token / type helpers.
+// Shipping source extracted from formula1 for full typecheck + LemmaScript.
+// Concatenated after formula1 (Formula bag + token tables) and before formula-ref.
+// Fully typechecked — no @ts-nocheck.
+//
+/*
+// SocialCalc Formula Parse Helpers
+// Part of the SocialCalc package.
+// (c) Copyright 2008 Socialtext, Inc.
+// Artistic License 2.0: http://socialcalc.org/licenses/al-20/
+//
+*/
+
+// Formula object and token tables are created in formula1.ts. Assign pure
+// methods onto the same bag via a named mutable view.
+
+const FormulaParseMut = SocialCalc.Formula;
+FormulaParseMut.ParsePushToken = function(parseinfo, ttext, ttype, topcode) {
+  parseinfo.push({ text: ttext, type: ttype, opcode: topcode });
+};
+FormulaParseMut.ParseFormulaIntoTokens = function(line) {
+  var i, ch, cclass, last_token, last_token_type, last_token_text, t;
+  var scf = SocialCalc.Formula;
+  var scc = SocialCalc.Constants;
+  var parsestate = scf.ParseState;
+  var tokentype = scf.TokenType;
+  var charclass = scf.CharClass;
+  var charclasstable = scf.CharClassTable;
+  var uppercasetable = scf.UpperCaseTable;
+  var pushtoken = scf.ParsePushToken;
+  var coordregex = /^\$?[A-Z]{1,2}\$?[1-9]\d*$/i;
+  var parseinfo = [];
+  var str = "";
+  var state = 0;
+  var haddecimal = false;
+  var twochrop = "";
+  for (i = 0;i <= line.length; i++) {
+    if (i < line.length) {
+      ch = line.charAt(i);
+      cclass = charclasstable[ch];
+    } else {
+      ch = "";
+      cclass = charclass.eof;
+    }
+    if (state == parsestate.num) {
+      if (cclass == charclass.num) {
+        str += ch;
+      } else if (cclass == charclass.numstart && !haddecimal) {
+        haddecimal = true;
+        str += ch;
+      } else if (ch == "E" || ch == "e") {
+        str += ch;
+        haddecimal = false;
+        state = parsestate.numexp1;
+      } else {
+        pushtoken(parseinfo, str, tokentype.num, 0);
+        haddecimal = false;
+        state = 0;
+      }
+    }
+    if (state == parsestate.numexp1) {
+      if (cclass == parsestate.num) {
+        state = parsestate.numexp2;
+      } else if ((ch == "+" || ch == "-") && uppercasetable[str.charAt(str.length - 1)] == "E") {
+        str += ch;
+      } else if (ch == "E" || ch == "e") {} else {
+        pushtoken(parseinfo, scc.s_parseerrexponent, tokentype.error, 0);
+        state = 0;
+      }
+    }
+    if (state == parsestate.numexp2) {
+      if (cclass == charclass.num) {
+        str += ch;
+      } else {
+        pushtoken(parseinfo, str, tokentype.num, 0);
+        state = 0;
+      }
+    }
+    if (state == parsestate.alpha) {
+      if (cclass == charclass.num) {
+        state = parsestate.coord;
+      } else if (cclass == charclass.alpha || ch == ".") {
+        str += ch;
+      } else if (cclass == charclass.incoord) {
+        state = parsestate.coord;
+      } else if (cclass == charclass.op || cclass == charclass.numstart || cclass == charclass.space || cclass == charclass.eof) {
+        pushtoken(parseinfo, str.toUpperCase(), tokentype.name, 0);
+        state = 0;
+      } else {
+        pushtoken(parseinfo, scc.s_parseerrchar, tokentype.error, 0);
+        state = 0;
+      }
+    }
+    if (state == parsestate.coord) {
+      if (cclass == charclass.num) {
+        str += ch;
+      } else if (cclass == charclass.incoord) {
+        str += ch;
+      } else if (cclass == charclass.alpha) {
+        state = parsestate.alphanumeric;
+      } else if (cclass == charclass.op || cclass == charclass.numstart || cclass == charclass.eof || cclass == charclass.space) {
+        if (coordregex.test(str)) {
+          t = tokentype.coord;
+        } else {
+          t = tokentype.name;
+        }
+        pushtoken(parseinfo, str.toUpperCase(), t, 0);
+        state = 0;
+      } else {
+        pushtoken(parseinfo, scc.s_parseerrchar, tokentype.error, 0);
+        state = 0;
+      }
+    }
+    if (state == parsestate.alphanumeric) {
+      if (cclass == charclass.num || cclass == charclass.alpha) {
+        str += ch;
+      } else if (cclass == charclass.op || cclass == charclass.numstart || cclass == charclass.space || cclass == charclass.eof) {
+        pushtoken(parseinfo, str.toUpperCase(), tokentype.name, 0);
+        state = 0;
+      } else {
+        pushtoken(parseinfo, scc.s_parseerrchar, tokentype.error, 0);
+        state = 0;
+      }
+    }
+    if (state == parsestate.string) {
+      if (cclass == charclass.quote) {
+        state = parsestate.stringquote;
+      } else if (cclass == charclass.eof) {
+        pushtoken(parseinfo, scc.s_parseerrstring, tokentype.error, 0);
+        state = 0;
+      } else {
+        str += ch;
+      }
+    } else if (state == parsestate.stringquote) {
+      if (cclass == charclass.quote) {
+        str += ch;
+        state = parsestate.string;
+      } else {
+        pushtoken(parseinfo, str, tokentype.string, 0);
+        state = 0;
+      }
+    } else if (state == parsestate.specialvalue) {
+      if (str.charAt(str.length - 1) == "!") {
+        pushtoken(parseinfo, str, tokentype.name, 0);
+        state = 0;
+      } else if (cclass == charclass.eof) {
+        pushtoken(parseinfo, scc.s_parseerrspecialvalue, tokentype.error, 0);
+        state = 0;
+      } else {
+        str += ch;
+      }
+    }
+    if (state == 0) {
+      if (cclass == charclass.num) {
+        str = ch;
+        state = parsestate.num;
+      } else if (cclass == charclass.numstart) {
+        str = ch;
+        haddecimal = true;
+        state = parsestate.num;
+      } else if (cclass == charclass.alpha || cclass == charclass.incoord) {
+        str = ch;
+        state = parsestate.alpha;
+      } else if (cclass == charclass.specialstart) {
+        str = ch;
+        state = parsestate.specialvalue;
+      } else if (cclass == charclass.op) {
+        str = ch;
+        if (parseinfo.length > 0) {
+          last_token = parseinfo[parseinfo.length - 1];
+          last_token_type = last_token.type;
+          last_token_text = last_token.text;
+          if (last_token_type == charclass.op) {
+            twochrop = last_token_text + str;
+            if (twochrop == "<=" || twochrop == ">=" || twochrop == "<>") {
+              str = last_token_text + str;
+              parseinfo.pop();
+              last_token = parseinfo[parseinfo.length - 1];
+              last_token_type = last_token.type;
+              last_token_text = last_token.text;
+            }
+          }
+        } else {
+          last_token_type = charclass.eof;
+          last_token_text = "EOF";
+        }
+        t = tokentype.op;
+        if (parseinfo.length == 0 || last_token_type == charclass.op && last_token_text != ")" && last_token_text != "%") {
+          if (str == "-") {
+            str = "M";
+            ch = "M";
+          } else if (str == "+") {
+            str = "P";
+            ch = "P";
+          } else if (str == ")" && last_token_text == "(") {} else if (str != "(") {
+            t = tokentype.error;
+            str = scc.s_parseerrtwoops;
+          }
+        } else if (str.length > 1) {
+          if (str == ">=") {
+            str = "G";
+            ch = "G";
+          } else if (str == "<=") {
+            str = "L";
+            ch = "L";
+          } else {
+            str = "N";
+            ch = "N";
+          }
+        }
+        pushtoken(parseinfo, str, t, ch);
+        state = 0;
+      } else if (cclass == charclass.quote) {
+        str = "";
+        state = parsestate.string;
+      } else if (cclass == charclass.space) {} else if (cclass == charclass.eof) {} else {
+        pushtoken(parseinfo, scc.s_parseerrchar, tokentype.error, 0);
+      }
+    }
+  }
+  return parseinfo;
+};
+FormulaParseMut.ConvertInfixToPolish = function(parseinfo) {
+  var scf = SocialCalc.Formula;
+  var scc = SocialCalc.Constants;
+  var tokentype = scf.TokenType;
+  var token_precedence = scf.TokenPrecedence;
+  var revpolish = [];
+  var parsestack = [];
+  var errortext = "";
+  var function_start = -1;
+  var i, pii, ttype, ttext, tprecedence, tstackprecedence;
+  for (i = 0;i < parseinfo.length; i++) {
+    pii = parseinfo[i];
+    ttype = pii.type;
+    ttext = pii.text;
+    if (ttype == tokentype.num || ttype == tokentype.coord || ttype == tokentype.string) {
+      revpolish.push(i);
+    } else if (ttype == tokentype.name) {
+      parsestack.push(i);
+      revpolish.push(function_start);
+    } else if (ttype == tokentype.space) {
+      continue;
+    } else if (ttext == ",") {
+      while (parsestack.length && parseinfo[parsestack[parsestack.length - 1]].text != "(") {
+        revpolish.push(parsestack.pop());
+      }
+      if (parsestack.length == 0) {
+        errortext = scc.s_parseerrmissingopenparen;
+        break;
+      }
+    } else if (ttext == "(") {
+      parsestack.push(i);
+    } else if (ttext == ")") {
+      while (parsestack.length && parseinfo[parsestack[parsestack.length - 1]].text != "(") {
+        revpolish.push(parsestack.pop());
+      }
+      if (parsestack.length == 0) {
+        errortext = scc.s_parseerrcloseparennoopen;
+        break;
+      }
+      parsestack.pop();
+      if (parsestack.length && parseinfo[parsestack[parsestack.length - 1]].type == tokentype.name) {
+        revpolish.push(parsestack.pop());
+      }
+    } else if (ttype == tokentype.op) {
+      if (parsestack.length && parseinfo[parsestack[parsestack.length - 1]].type == tokentype.name) {
+        revpolish.push(parsestack.pop());
+      }
+      while (parsestack.length && parseinfo[parsestack[parsestack.length - 1]].type == tokentype.op && parseinfo[parsestack[parsestack.length - 1]].text != "(") {
+        tprecedence = token_precedence[pii.opcode];
+        tstackprecedence = token_precedence[parseinfo[parsestack[parsestack.length - 1]].opcode];
+        if (tprecedence >= 0 && tprecedence < tstackprecedence)
+          break;
+        if (tprecedence < 0) {
+          tprecedence = -tprecedence;
+          if (tstackprecedence < 0)
+            tstackprecedence = -tstackprecedence;
+          if (tprecedence <= tstackprecedence)
+            break;
+        }
+        revpolish.push(parsestack.pop());
+      }
+      parsestack.push(i);
+    } else if (ttype == tokentype.error) {
+      errortext = ttext;
+      break;
+    }
+  }
+  while (parsestack.length > 0) {
+    if (parseinfo[parsestack[parsestack.length - 1]].text == "(") {
+      errortext = scc.s_parseerrmissingcloseparen;
+      break;
+    }
+    revpolish.push(parsestack.pop());
+  }
+  if (errortext) {
+    return errortext;
+  }
+  return revpolish;
+};
+FormulaParseMut.LookupResultType = function(type1, type2, typelookup) {
+  var pos1, pos2, result;
+  var table1 = typelookup[type1];
+  if (!table1) {
+    table1 = typelookup[type1.charAt(0) + "*"];
+    if (!table1) {
+      return "e#VALUE! (internal error, missing LookupResultType " + type1.charAt(0) + "*)";
+    }
+  }
+  pos1 = table1.indexOf("|" + type2 + ":");
+  if (pos1 >= 0) {
+    pos2 = table1.indexOf("|", pos1 + 1);
+    if (pos2 < 0)
+      return "e#VALUE! (internal error, incorrect LookupResultType " + table1 + ")";
+    result = table1.substring(pos1 + type2.length + 2, pos2);
+    if (result == "1")
+      return type1;
+    if (result == "2")
+      return type2;
+    return result;
+  }
+  pos1 = table1.indexOf("|" + type2.charAt(0) + "*:");
+  if (pos1 >= 0) {
+    pos2 = table1.indexOf("|", pos1 + 1);
+    if (pos2 < 0)
+      return "e#VALUE! (internal error, incorrect LookupResultType " + table1 + ")";
+    result = table1.substring(pos1 + 4, pos2);
+    if (result == "1")
+      return type1;
+    if (result == "2")
+      return type2;
+    return result;
+  }
+  return "e#VALUE!";
+};
+FormulaParseMut.ArrayValuesEqual = function(a, b) {
+  var i = a.length;
+  if (i != b.length)
+    return false;
+  while (i--) {
+    if (a[i] !== b[i])
+      return false;
+  }
+  return true;
+};
+FormulaParseMut.PushOperand = function(operand, t, v) {
+  operand.push({ type: t, value: v });
+};
+FormulaParseMut.CopyFunctionArgs = function(operand, foperand) {
+  var fobj, ffunc, argnum;
+  var scf = SocialCalc.Formula;
+  var ok = 1;
+  var errortext = null;
+  while (operand.length > 0 && operand[operand.length - 1].type != "start") {
+    foperand.push(operand.pop());
+  }
+  operand.pop();
+  return;
+};
+
+// In-place TypeScript module: pure formula-reference rewrite + A1 coord algebra.
+// Shipping source (not a parallel oracle). Concatenated after formula1.js so
+// SocialCalc.Formula.ParseFormulaIntoTokens exists at call time.
+// Fully typechecked — no @ts-nocheck.
+// Ambient API surface remains in socialcalc-3.d.ts for consumers.
+//
+/*
+// SocialCalc Formula Reference Rewrite Helpers
+//
+// Part of the SocialCalc package.
+// Extracted from socialcalc-3 for typechecked pure-core work and LemmaScript.
+//
+// (c) Copyright 2008 Socialtext, Inc.
+// All Rights Reserved.
+//
+// The contents of this file are subject to the Artistic License 2.0; you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at http://socialcalc.org/licenses/al-20/.
+//
+*/
+
+// Runtime root is created by module-wrapper-top.js. Ambient declare namespace is
+// types-only; progressive assignment of these members uses a named mutable view
+// so we never redeclare `var SocialCalc` (which collapses the namespace in tsc).
+
+const FormulaRefRoot = SocialCalc;
+FormulaRefRoot.rcColname = function(c) {
+  if (c > 702)
+    c = 702;
+  if (c < 1)
+    c = 1;
+  const collow = (c - 1) % 26 + 65;
+  const colhigh = Math.floor((c - 1) / 26);
+  if (colhigh) {
+    return String.fromCharCode(colhigh + 64) + String.fromCharCode(collow);
+  }
+  return String.fromCharCode(collow);
+};
+FormulaRefRoot.letters = [
+  "A",
+  "B",
+  "C",
+  "D",
+  "E",
+  "F",
+  "G",
+  "H",
+  "I",
+  "J",
+  "K",
+  "L",
+  "M",
+  "N",
+  "O",
+  "P",
+  "Q",
+  "R",
+  "S",
+  "T",
+  "U",
+  "V",
+  "W",
+  "X",
+  "Y",
+  "Z"
+];
+FormulaRefRoot.crToCoord = function(c, r) {
+  if (c < 1)
+    c = 1;
+  if (c > 702)
+    c = 702;
+  if (r < 1)
+    r = 1;
+  const collow = (c - 1) % 26;
+  const colhigh = Math.floor((c - 1) / 26);
+  if (colhigh) {
+    return FormulaRefRoot.letters[colhigh - 1] + FormulaRefRoot.letters[collow] + r;
+  }
+  return FormulaRefRoot.letters[collow] + r;
+};
+FormulaRefRoot.coordToCol = {};
+FormulaRefRoot.coordToRow = {};
+FormulaRefRoot.coordToCr = function(cr) {
+  const cachedRow = FormulaRefRoot.coordToRow[cr];
+  if (cachedRow) {
+    return { row: cachedRow, col: FormulaRefRoot.coordToCol[cr] };
+  }
+  let c = 0;
+  let r = 0;
+  for (let i = 0;i < cr.length; i++) {
+    const ch = cr.charCodeAt(i);
+    if (ch === 36) {} else if (ch <= 57) {
+      r = 10 * r + ch - 48;
+    } else if (ch >= 97) {
+      c = 26 * c + ch - 96;
+    } else if (ch >= 65) {
+      c = 26 * c + ch - 64;
+    }
+  }
+  FormulaRefRoot.coordToCol[cr] = c;
+  FormulaRefRoot.coordToRow[cr] = r;
+  return { row: r, col: c };
+};
+FormulaRefRoot.ParseRange = function(range) {
+  if (!range)
+    range = "A1:A1";
+  range = range.toUpperCase();
+  const pos = range.indexOf(":");
+  if (pos >= 0) {
+    const crA = range.substring(0, pos);
+    const a = FormulaRefRoot.coordToCr(crA);
+    const crB = range.substring(pos + 1);
+    const b = FormulaRefRoot.coordToCr(crB);
+    return {
+      cr1: { row: a.row, col: a.col, coord: crA },
+      cr2: { row: b.row, col: b.col, coord: crB }
+    };
+  }
+  const p0 = FormulaRefRoot.coordToCr(range);
+  return {
+    cr1: { row: p0.row, col: p0.col, coord: range },
+    cr2: { row: p0.row, col: p0.col, coord: range }
+  };
+};
+FormulaRefRoot.OffsetFormulaCoords = function(formula, coloffset, rowoffset) {
+  const scf = SocialCalc.Formula;
+  const tokentype = scf.TokenType;
+  const token_op = tokentype.op;
+  const token_string = tokentype.string;
+  const token_coord = tokentype.coord;
+  const tokenOpExpansion = scf.TokenOpExpansion;
+  const parseinfo = scf.ParseFormulaIntoTokens(formula);
+  let updatedformula = "";
+  for (let i = 0;i < parseinfo.length; i++) {
+    const ttype = parseinfo[i].type;
+    const ttext = parseinfo[i].text;
+    if (ttype === token_coord) {
+      let newcr = "";
+      const cr = FormulaRefRoot.coordToCr(ttext);
+      if (ttext.charAt(0) !== "$") {
+        cr.col += coloffset;
+      } else {
+        newcr += "$";
+      }
+      newcr += FormulaRefRoot.rcColname(cr.col);
+      if (ttext.indexOf("$", 1) === -1) {
+        cr.row += rowoffset;
+      } else {
+        newcr += "$";
+      }
+      newcr += cr.row;
+      if (cr.row < 1 || cr.col < 1 || cr.col > 702) {
+        newcr = "#REF!";
+      }
+      updatedformula += newcr;
+    } else if (ttype === token_string) {
+      if (ttext.indexOf('"') >= 0) {
+        updatedformula += '"' + ttext.replace(/"/g, '""') + '"';
+      } else {
+        updatedformula += '"' + ttext + '"';
+      }
+    } else if (ttype === token_op) {
+      updatedformula += tokenOpExpansion[ttext] || ttext;
+    } else {
+      updatedformula += ttext;
+    }
+  }
+  return updatedformula;
+};
+FormulaRefRoot.AdjustFormulaCoords = function(formula, col, coloffset, row, rowoffset) {
+  const scf = SocialCalc.Formula;
+  const tokentype = scf.TokenType;
+  const token_op = tokentype.op;
+  const token_string = tokentype.string;
+  const token_coord = tokentype.coord;
+  const tokenOpExpansion = scf.TokenOpExpansion;
+  const parseinfo = scf.ParseFormulaIntoTokens(formula);
+  let updatedformula = "";
+  let sheetref = false;
+  for (let i = 0;i < parseinfo.length; i++) {
+    let ttype = parseinfo[i].type;
+    let ttext = parseinfo[i].text;
+    if (ttype === token_op) {
+      if (ttext === "!") {
+        sheetref = true;
+      } else if (ttext !== ":") {
+        sheetref = false;
+      }
+      ttext = tokenOpExpansion[ttext] || ttext;
+    }
+    if (ttype === token_coord) {
+      const cr = FormulaRefRoot.coordToCr(ttext);
+      if (coloffset < 0 && cr.col >= col && cr.col < col - coloffset || rowoffset < 0 && cr.row >= row && cr.row < row - rowoffset) {
+        if (!sheetref) {
+          cr.col = 0;
+          cr.row = 0;
+        }
+      }
+      if (!sheetref) {
+        if (cr.col >= col) {
+          cr.col += coloffset;
+        }
+        if (cr.row >= row) {
+          cr.row += rowoffset;
+        }
+      }
+      let newcr;
+      if (ttext.charAt(0) === "$") {
+        newcr = "$" + FormulaRefRoot.rcColname(cr.col);
+      } else {
+        newcr = FormulaRefRoot.rcColname(cr.col);
+      }
+      if (ttext.indexOf("$", 1) !== -1) {
+        newcr += "$" + cr.row;
+      } else {
+        newcr += cr.row;
+      }
+      if (cr.row < 1 || cr.col < 1 || cr.col > 702) {
+        newcr = "#REF!";
+      }
+      ttext = newcr;
+    } else if (ttype === token_string) {
+      ttext = '"' + (ttext.indexOf('"') >= 0 ? ttext.replace(/"/g, '""') : ttext) + '"';
+    }
+    updatedformula += ttext;
+  }
+  return updatedformula;
+};
+FormulaRefRoot.ReplaceFormulaCoords = function(formula, movedto) {
+  const scf = SocialCalc.Formula;
+  const tokentype = scf.TokenType;
+  const token_op = tokentype.op;
+  const token_string = tokentype.string;
+  const token_coord = tokentype.coord;
+  const tokenOpExpansion = scf.TokenOpExpansion;
+  const parseinfo = scf.ParseFormulaIntoTokens(formula);
+  let updatedformula = "";
+  let sheetref = false;
+  for (let i = 0;i < parseinfo.length; i++) {
+    let ttype = parseinfo[i].type;
+    let ttext = parseinfo[i].text;
+    if (ttype === token_op) {
+      if (ttext === "!") {
+        sheetref = true;
+      } else if (ttext !== ":") {
+        sheetref = false;
+      }
+      //!!!! HANDLE RANGE EXTENT MOVES
+      ttext = tokenOpExpansion[ttext] || ttext;
+    }
+    if (ttype === token_coord) {
+      const cr0 = FormulaRefRoot.coordToCr(ttext);
+      const coord = FormulaRefRoot.crToCoord(cr0.col, cr0.row);
+      const moved = movedto[coord];
+      if (moved && !sheetref) {
+        const cr = FormulaRefRoot.coordToCr(moved);
+        let newcr;
+        if (ttext.charAt(0) === "$") {
+          newcr = "$" + FormulaRefRoot.rcColname(cr.col);
+        } else {
+          newcr = FormulaRefRoot.rcColname(cr.col);
+        }
+        if (ttext.indexOf("$", 1) !== -1) {
+          newcr += "$" + cr.row;
+        } else {
+          newcr += cr.row;
+        }
+        ttext = newcr;
+      }
+    } else if (ttype === token_string) {
+      ttext = '"' + (ttext.indexOf('"') >= 0 ? ttext.replace(/"/g, '""') : ttext) + '"';
+    }
+    updatedformula += ttext;
+  }
+  return updatedformula;
 };
 
 // Opt this module into TypeScript strict checking via the r2scout config.

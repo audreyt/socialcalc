@@ -27,6 +27,8 @@ const jsFiles = [
     "socialcalctableeditor.js",
     "formatnumber2.js",
     "formula1.js",
+    "formula-parse.ts",
+    "formula-ref.ts",
     "socialcalcpopup.js",
     "socialcalcspreadsheetcontrol.js",
     "socialcalcviewer.js",
