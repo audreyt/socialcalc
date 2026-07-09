@@ -39,16 +39,17 @@ describe("formula reference rewrite regressions (Leanstral oracle)", () => {
         );
     });
 
-    test("quote re-emit doubles inner double-quotes and stays reparsable", async () => {
+    test("quote re-emit doubles both quote chars for mixed payload", async () => {
         const SC = await loadSocialCalc();
-        // Content with " is only representable via doubled "" inside double quotes.
-        const out = SC.OffsetFormulaCoords('CONCATENATE("say ""hi""",A1)', 1, 0);
-        expect(out).toBe('CONCATENATE("say ""hi""",B1)');
+        // Lexer treats ' and " as the same quote class; both must be doubled.
+        // Input already uses doubled inner " so it parses; re-emit must keep that.
+        const out = SC.OffsetFormulaCoords("CONCATENATE('say \"\"hi\"\" O''Brien',A1)", 1, 0);
+        expect(out).toBe("CONCATENATE('say \"\"hi\"\" O''Brien',B1)");
         const tokens = SC.Formula.ParseFormulaIntoTokens(out);
         const stringTok = tokens.find(
             (t: { type: number; text: string }) => t.type === SC.Formula.TokenType.string,
         );
-        expect(stringTok?.text).toBe('say "hi"');
+        expect(stringTok?.text).toBe('say "hi" O\'Brien');
     });
 
     test("whole-column name tokens N:N and T:T are not rewritten on offset", async () => {
