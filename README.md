@@ -113,8 +113,9 @@ bun run verify:lean          # gen + assert non-empty artifacts
 ```
 Optional full Lean proof build (`bun run verify:lean:build` / `lake build`) needs
 sibling checkouts at `../velvet`, `../loom` (`lemma` branches), and
-`../LemmaScript`. Pure helpers (incl. `adjustAxis`) prove with `loom_solve`;
-string builders still use `sorry`. CI runs Dafny `lsc check` and Lean `lsc gen`
+`../LemmaScript`. Pure helpers and string builders (`rcColname`/`crToCoord`/
+`offset*`/`formatA1Parts`/`adjustA1`) prove with `loom_solve` + `a1.spec.lean`
+length lemmas — no `sorry`. CI runs Dafny `lsc check` and Lean `lsc gen`
 smoke. File list: `LemmaScript-files.txt`.
 
 Both: `bun run verify:both`

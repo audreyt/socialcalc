@@ -28,10 +28,11 @@ Toolchain and build
 - Updated Stryker mutation scripts, tsconfig.json, and README.md/AGENTS.md to
   reflect the TypeScript source layout and the Rust drop.
 - Wired LemmaScript dual-backend scaffolding: exported facade lemma/a1.ts
-  (A1 clamp/coord + overflow #REF! policy helpers), Dafny gen/check (15
-  verified / 0 errors), Lean gen smoke, scripts verify:dafny / verify:lean /
-  verify:both, CI workflow lemmascript.yml. Full lake build remains optional
-  (sibling Loom/Velvet/LemmaScript).
+  (A1 clamp/coord + overflow #REF! policy helpers), Dafny gen/check (21
+  verified / 0 errors), Lean gen + full lake proofs (a1.spec length lemmas;
+  a1.proof no sorry), scripts verify:dafny / verify:lean / verify:both, CI
+  workflow lemmascript.yml. Full lake build remains optional (sibling
+  Loom/Velvet/LemmaScript).
 
 Testing
 - Ported formula-rewrite fixture cases into test/fixtures/formula-rewrite-cases.json

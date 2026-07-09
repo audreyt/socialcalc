@@ -70,5 +70,5 @@ target downloadDependencies pkg : Array FilePath := do
 @[default_target]
 lean_lib A1 where
   srcDir := "lemma"
-  roots := #[`«a1.types», `«a1.def», `«a1.proof»]
+  roots := #[`«a1.types», `«a1.def», `«a1.spec», `«a1.proof»]
   extraDepTargets := #[``downloadDependencies]
