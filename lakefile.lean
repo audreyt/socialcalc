@@ -72,3 +72,9 @@ lean_lib A1 where
   srcDir := "lemma"
   roots := #[`«a1.types», `«a1.def», `«a1.spec», `«a1.proof»]
   extraDepTargets := #[``downloadDependencies]
+
+@[default_target]
+lean_lib EvalOps where
+  srcDir := "lemma"
+  roots := #[`«eval-ops.types», `«eval-ops.def», `«eval-ops.proof»]
+  extraDepTargets := #[``downloadDependencies]

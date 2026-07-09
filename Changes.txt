@@ -34,12 +34,11 @@ Toolchain and build
   binaryen devDependency used only for WASM fallback generation.
 - Updated Stryker mutation scripts, tsconfig.json, and README.md/AGENTS.md to
   reflect the TypeScript source layout and the Rust drop.
-- Wired LemmaScript dual-backend scaffolding: exported facade lemma/a1.ts
-  (A1 clamp/coord + overflow #REF! policy helpers), Dafny gen/check (26
-  verified / 0 errors), Lean gen + full lake proofs (a1.spec length lemmas;
-  a1.proof no sorry), scripts verify:dafny / verify:lean / verify:both, CI
-  workflow lemmascript.yml. Full lake build remains optional (sibling
-  Loom/Velvet/LemmaScript).
+- Wired LemmaScript dual-backend scaffolding: exported facades lemma/a1.ts
+  (A1 clamp/coord + overflow #REF! policy, 26 Dafny VCs) and lemma/eval-ops.ts
+  (pure `/`/`&` error lattice, 4 Dafny VCs + Lean proofs), scripts verify:dafny
+  / verify:lean / verify:both, CI workflow lemmascript.yml. Full lake build
+  remains optional (sibling Loom/Velvet/LemmaScript).
 
 Testing
 - Ported formula-rewrite fixture cases into test/fixtures/formula-rewrite-cases.json
@@ -47,10 +46,13 @@ Testing
   longer depend on WASM/fallback artifacts.
 - Formula-rewrite regressions and the full Bun suite continue to guard the
   TypeScript rewrite.
-- LemmaScript-files.txt lists lemma/a1.ts; lsc cannot extract global-script js/*.ts.
+- LemmaScript-files.txt lists lemma/a1.ts and lemma/eval-ops.ts; lsc cannot
+  extract global-script js/*.ts.
 - test/lemma-a1-facade.test.ts locks pure A1/#REF! overflow, absolute-axis offset,
   structural adjust (wouldAdjustRef), and rcColname rank round-trip helpers
   against shipping oracles (Dafny 26 VCs + Bun cross-check).
+- test/lemma-eval-ops-facade.test.ts locks pure `/`/`&` error lattice against
+  shipping EvaluatePolish (Dafny 4 VCs).
 
 ==============================================================================
 v3.0.5 — 2026-07-05

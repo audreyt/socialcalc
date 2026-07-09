@@ -93,16 +93,18 @@ Relevant tests:
 ## LemmaScript verification (Dafny + Lean)
 
 Shipping pure helpers carry `//@ verify` comments, but SocialCalc `js/*.ts` are
-global scripts, so LemmaScript cannot extract them. The exported facade
-`lemma/a1.ts` is the verification surface for pure A1 clamp/coord algebra and
-overflow `#REF!` policy helpers.
+global scripts, so LemmaScript cannot extract them. Exported facades under
+`lemma/` are the verification surface:
+
+- `lemma/a1.ts` — pure A1 clamp/coord algebra and overflow `#REF!` policy
+- `lemma/eval-ops.ts` — pure `/` and `&` error-propagation lattice
 
 **Dafny backend** (requires `dafny` on PATH) — generate + verify:
 
 ```bash
 bun run verify:dafny:gen
 bun run verify:dafny
-# 26 verified, 0 errors on lemma/a1.dfy
+# 26 VCs on lemma/a1.dfy + 4 VCs on lemma/eval-ops.dfy
 ```
 
 **Lean backend** (requires `lemmascript` / `lsc`) — generate models:
@@ -113,10 +115,9 @@ bun run verify:lean          # gen + assert non-empty artifacts
 ```
 Optional full Lean proof build (`bun run verify:lean:build` / `lake build`) needs
 sibling checkouts at `../velvet`, `../loom` (`lemma` branches), and
-`../LemmaScript`. Pure helpers and string builders (`rcColname`/`crToCoord`/
-`offset*`/`formatA1Parts`/`adjustA1`) prove with `loom_solve` + `a1.spec.lean`
-length lemmas — no `sorry`. CI runs Dafny `lsc check` and Lean `lsc gen`
-smoke. File list: `LemmaScript-files.txt`.
+`../LemmaScript`. Pure helpers prove with `loom_solve` (a1 + eval-ops; a1 string
+builders use `a1.spec.lean` length lemmas) — no `sorry`. CI runs Dafny
+`lsc check` and Lean `lsc gen` smoke. File list: `LemmaScript-files.txt`.
 
 Both: `bun run verify:both`
 

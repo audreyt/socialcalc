@@ -62,3 +62,6 @@ jobs:
           test -s lemma/a1.types.lean
           test -s lemma/a1.def.lean
           test -s lemma/a1.proof.lean
+          test -s lemma/eval-ops.types.lean
+          test -s lemma/eval-ops.def.lean
+          test -s lemma/eval-ops.proof.lean
