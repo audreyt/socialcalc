@@ -4,7 +4,6 @@
   "description": "Collaborative spreadsheet editor",
   "main": "dist/SocialCalc.js",
   "types": "dist/SocialCalc.d.ts",
-  "type": "module",
   "files": [
     "dist/SocialCalc.js",
     "dist/SocialCalc.d.ts",
