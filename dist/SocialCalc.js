@@ -673,8 +673,8 @@ ConstantsRoot.ConstantsSetImagePrefix = function(imagePrefix) {
 // In-place TypeScript conversion of socialcalc-3.js (SocialCalc global script).
 // Ambient API types live in socialcalc-3.d.ts (referenced by dist/SocialCalc.d.ts).
 // Build strips types via Bun.Transpiler before UMD concat — no runtime tax.
-// Intermediate: @ts-nocheck until this module is fully annotated against ambient types.
-// @ts-nocheck
+// Typechecked core after removing @ts-nocheck.
+
 // The main SocialCalc code module of the SocialCalc package
 //
 /*
@@ -774,17 +774,8 @@ More comments yet to come...
 // before this file in the UMD bundle). Redundant `if (!SocialCalc)` guard
 // removed.
 
-// *************************************
-//
-// Shared values
-//
-// These are "global" values shared by the classes, including default settings
-//
-// *************************************
-
-// Callbacks
-
-SocialCalc.Callbacks = {
+const SC = SocialCalc;
+SC.Callbacks = {
   expand_wiki: null,
   expand_markup: function(displayvalue, sheetobj, linkstyle) {
     return SocialCalc.default_expand_markup(displayvalue, sheetobj, linkstyle);
@@ -792,7 +783,7 @@ SocialCalc.Callbacks = {
   MakePageLink: null,
   NormalizeSheetName: null
 };
-SocialCalc.Cell = function(coord) {
+SC.Cell = function(coord) {
   this.coord = coord;
   this.datavalue = "";
   this.datatype = null;
@@ -800,7 +791,7 @@ SocialCalc.Cell = function(coord) {
   this.valuetype = "b";
   this.readonly = false;
 };
-SocialCalc.CellProperties = {
+SC.CellProperties = {
   coord: 1,
   datavalue: 1,
   datatype: 1,
@@ -830,7 +821,7 @@ SocialCalc.CellProperties = {
   hcolspan: 3,
   hrowspan: 3
 };
-SocialCalc.CellPropertiesTable = {
+SC.CellPropertiesTable = {
   bt: "borderstyle",
   br: "borderstyle",
   bb: "borderstyle",
@@ -843,12 +834,12 @@ SocialCalc.CellPropertiesTable = {
   nontextvalueformat: "valueformat",
   textvalueformat: "valueformat"
 };
-SocialCalc.Sheet = function() {
+SC.Sheet = function() {
   SocialCalc.ResetSheet(this);
   this.statuscallback = null;
   this.statuscallbackparams = null;
 };
-SocialCalc.ResetSheet = function(sheet, reload) {
+SC.ResetSheet = function(sheet, reload) {
   sheet.cells = {};
   sheet.attribs = {
     lastcol: 1,
@@ -890,13 +881,13 @@ SocialCalc.ResetSheet = function(sheet, reload) {
   sheet.ioEventTree = {};
   sheet.ioParameterList = {};
 };
-SocialCalc.Sheet.prototype.ResetSheet = function() {
+SC.Sheet.prototype.ResetSheet = function() {
   SocialCalc.ResetSheet(this);
 };
-SocialCalc.Sheet.prototype.AddCell = function(newcell) {
+SC.Sheet.prototype.AddCell = function(newcell) {
   return this.cells[newcell.coord] = newcell;
 };
-SocialCalc.Sheet.prototype.LastCol = function() {
+SC.Sheet.prototype.LastCol = function() {
   var last_col = 1;
   for (var cell_id in this.cells) {
     var cr = SocialCalc.coordToCr(cell_id);
@@ -906,7 +897,7 @@ SocialCalc.Sheet.prototype.LastCol = function() {
   }
   return last_col;
 };
-SocialCalc.Sheet.prototype.LastRow = function() {
+SC.Sheet.prototype.LastRow = function() {
   var last_row = 1;
   for (var cell_id in this.cells) {
     var cr = SocialCalc.coordToCr(cell_id);
@@ -916,58 +907,58 @@ SocialCalc.Sheet.prototype.LastRow = function() {
   }
   return last_row;
 };
-SocialCalc.Sheet.prototype.GetAssuredCell = function(coord) {
+SC.Sheet.prototype.GetAssuredCell = function(coord) {
   return this.cells[coord] || this.AddCell(new SocialCalc.Cell(coord));
 };
-SocialCalc.Sheet.prototype.ParseSheetSave = function(savedsheet) {
+SC.Sheet.prototype.ParseSheetSave = function(savedsheet) {
   SocialCalc.ParseSheetSave(savedsheet, this);
 };
-SocialCalc.Sheet.prototype.CellFromStringParts = function(cell, parts, j) {
+SC.Sheet.prototype.CellFromStringParts = function(cell, parts, j) {
   return SocialCalc.CellFromStringParts(this, cell, parts, j);
 };
-SocialCalc.Sheet.prototype.CreateSheetSave = function(range, canonicalize) {
+SC.Sheet.prototype.CreateSheetSave = function(range, canonicalize) {
   return SocialCalc.CreateSheetSave(this, range, canonicalize);
 };
-SocialCalc.Sheet.prototype.CellToString = function(cell) {
+SC.Sheet.prototype.CellToString = function(cell) {
   return SocialCalc.CellToString(this, cell);
 };
-SocialCalc.Sheet.prototype.CanonicalizeSheet = function(full) {
+SC.Sheet.prototype.CanonicalizeSheet = function(full) {
   return SocialCalc.CanonicalizeSheet(this, full);
 };
-SocialCalc.Sheet.prototype.EncodeCellAttributes = function(coord) {
+SC.Sheet.prototype.EncodeCellAttributes = function(coord) {
   return SocialCalc.EncodeCellAttributes(this, coord);
 };
-SocialCalc.Sheet.prototype.EncodeSheetAttributes = function() {
+SC.Sheet.prototype.EncodeSheetAttributes = function() {
   return SocialCalc.EncodeSheetAttributes(this);
 };
-SocialCalc.Sheet.prototype.DecodeCellAttributes = function(coord, attribs, range) {
+SC.Sheet.prototype.DecodeCellAttributes = function(coord, attribs, range) {
   return SocialCalc.DecodeCellAttributes(this, coord, attribs, range);
 };
-SocialCalc.Sheet.prototype.DecodeSheetAttributes = function(attribs) {
+SC.Sheet.prototype.DecodeSheetAttributes = function(attribs) {
   return SocialCalc.DecodeSheetAttributes(this, attribs);
 };
-SocialCalc.Sheet.prototype.ScheduleSheetCommands = function(cmd, saveundo) {
+SC.Sheet.prototype.ScheduleSheetCommands = function(cmd, saveundo) {
   return SocialCalc.ScheduleSheetCommands(this, cmd, saveundo);
 };
-SocialCalc.Sheet.prototype.SheetUndo = function() {
+SC.Sheet.prototype.SheetUndo = function() {
   return SocialCalc.SheetUndo(this);
 };
-SocialCalc.Sheet.prototype.SheetRedo = function() {
+SC.Sheet.prototype.SheetRedo = function() {
   return SocialCalc.SheetRedo(this);
 };
-SocialCalc.Sheet.prototype.CreateAuditString = function() {
+SC.Sheet.prototype.CreateAuditString = function() {
   return SocialCalc.CreateAuditString(this);
 };
-SocialCalc.Sheet.prototype.GetStyleNum = function(atype, style) {
+SC.Sheet.prototype.GetStyleNum = function(atype, style) {
   return SocialCalc.GetStyleNum(this, atype, style);
 };
-SocialCalc.Sheet.prototype.GetStyleString = function(atype, num) {
+SC.Sheet.prototype.GetStyleString = function(atype, num) {
   return SocialCalc.GetStyleString(this, atype, num);
 };
-SocialCalc.Sheet.prototype.RecalcSheet = function() {
+SC.Sheet.prototype.RecalcSheet = function() {
   return SocialCalc.RecalcSheet(this);
 };
-SocialCalc.ParseSheetSave = function(savedsheet, sheetobj) {
+SC.ParseSheetSave = function(savedsheet, sheetobj) {
   var lines = savedsheet.split(/\r\n|\n/);
   var parts = [];
   var line;
@@ -1135,12 +1126,12 @@ SocialCalc.ParseSheetSave = function(savedsheet, sheetobj) {
     parts = null;
   }
 };
-SocialCalc.CellFromStringParts = function(sheet, cell, parts, j) {
+SC.CellFromStringParts = function(sheet, cell, parts, j) {
   var t, v, ro;
   while (t = parts[j++]) {
     switch (t) {
       case "v":
-        cell.datavalue = SocialCalc.decodeFromSave(parts[j++]) - 0;
+        cell.datavalue = +SocialCalc.decodeFromSave(parts[j++]);
         cell.datatype = "v";
         cell.valuetype = "n";
         break;
@@ -1154,7 +1145,7 @@ SocialCalc.CellFromStringParts = function(sheet, cell, parts, j) {
         cell.valuetype = v;
         if (v.charAt(0) == "n") {
           cell.datatype = "v";
-          cell.datavalue = SocialCalc.decodeFromSave(parts[j++]) - 0;
+          cell.datavalue = +SocialCalc.decodeFromSave(parts[j++]);
         } else {
           cell.datatype = "t";
           cell.datavalue = SocialCalc.decodeFromSave(parts[j++]);
@@ -1164,7 +1155,7 @@ SocialCalc.CellFromStringParts = function(sheet, cell, parts, j) {
         v = parts[j++];
         cell.valuetype = v;
         if (v.charAt(0) == "n") {
-          cell.datavalue = SocialCalc.decodeFromSave(parts[j++]) - 0;
+          cell.datavalue = +SocialCalc.decodeFromSave(parts[j++]);
         } else {
           cell.datavalue = SocialCalc.decodeFromSave(parts[j++]);
         }
@@ -1175,7 +1166,7 @@ SocialCalc.CellFromStringParts = function(sheet, cell, parts, j) {
         v = parts[j++];
         cell.valuetype = v;
         if (v.charAt(0) == "n") {
-          cell.datavalue = SocialCalc.decodeFromSave(parts[j++]) - 0;
+          cell.datavalue = +SocialCalc.decodeFromSave(parts[j++]);
         } else {
           cell.datavalue = SocialCalc.decodeFromSave(parts[j++]);
         }
@@ -1240,9 +1231,9 @@ SocialCalc.CellFromStringParts = function(sheet, cell, parts, j) {
     }
   }
 };
-SocialCalc.sheetfields = ["defaultrowheight", "defaultcolwidth", "circularreferencecell", "recalc", "needsrecalc", "usermaxcol", "usermaxrow"];
-SocialCalc.sheetfieldsshort = ["h", "w", "circularreferencecell", "recalc", "needsrecalc", "usermaxcol", "usermaxrow"];
-SocialCalc.sheetfieldsxlat = [
+SC.sheetfields = ["defaultrowheight", "defaultcolwidth", "circularreferencecell", "recalc", "needsrecalc", "usermaxcol", "usermaxrow"];
+SC.sheetfieldsshort = ["h", "w", "circularreferencecell", "recalc", "needsrecalc", "usermaxcol", "usermaxrow"];
+SC.sheetfieldsxlat = [
   "defaulttextformat",
   "defaultnontextformat",
   "defaulttextvalueformat",
@@ -1252,8 +1243,8 @@ SocialCalc.sheetfieldsxlat = [
   "defaultfont",
   "defaultlayout"
 ];
-SocialCalc.sheetfieldsxlatshort = ["tf", "ntf", "tvf", "ntvf", "color", "bgcolor", "font", "layout"];
-SocialCalc.sheetfieldsxlatxlt = [
+SC.sheetfieldsxlatshort = ["tf", "ntf", "tvf", "ntvf", "color", "bgcolor", "font", "layout"];
+SC.sheetfieldsxlatxlt = [
   "cellformat",
   "cellformat",
   "valueformat",
@@ -1263,7 +1254,7 @@ SocialCalc.sheetfieldsxlatxlt = [
   "font",
   "layout"
 ];
-SocialCalc.CreateSheetSave = function(sheetobj, range, canonicalize) {
+SC.CreateSheetSave = function(sheetobj, range, canonicalize) {
   var cell, cr1, cr2, row, col, coord, attrib, line, value, formula, i, t, r, b, l, name, blanklen;
   var result = [];
   var prange;
@@ -1348,7 +1339,7 @@ SocialCalc.CreateSheetSave = function(sheetobj, range, canonicalize) {
   return result.join(`
 `);
 };
-SocialCalc.CellToString = function(sheet, cell) {
+SC.CellToString = function(sheet, cell) {
   var cell, line, value, formula, t, r, b, l, xlt;
   line = "";
   if (!cell)
@@ -1432,7 +1423,7 @@ SocialCalc.CellToString = function(sheet, cell) {
     line += ":comment:" + SocialCalc.encodeForSave(cell.comment);
   return line;
 };
-SocialCalc.CanonicalizeSheet = function(sheetobj, full) {
+SC.CanonicalizeSheet = function(sheetobj, full) {
   var l;
   var coord;
   var cr;
@@ -1581,7 +1572,7 @@ SocialCalc.CanonicalizeSheet = function(sheetobj, full) {
   xlt.maxcol = maxcol || 1;
   sheetobj.xlt = xlt;
 };
-SocialCalc.EncodeCellAttributes = function(sheet, coord) {
+SC.EncodeCellAttributes = function(sheet, coord) {
   var value, i, b, bb, parts;
   var result = {};
   var InitAttrib = function(name) {
@@ -1662,7 +1653,7 @@ SocialCalc.EncodeCellAttributes = function(sheet, coord) {
   SetAttrib("mod", cell.mod || "n");
   return result;
 };
-SocialCalc.EncodeSheetAttributes = function(sheet) {
+SC.EncodeSheetAttributes = function(sheet) {
   var value;
   var parts;
   var attribs = sheet.attribs;
@@ -1743,7 +1734,7 @@ SocialCalc.EncodeSheetAttributes = function(sheet) {
   }
   return result;
 };
-SocialCalc.DecodeCellAttributes = function(sheet, coord, newattribs, range) {
+SC.DecodeCellAttributes = function(sheet, coord, newattribs, range) {
   var value, b, bb, i;
   var cell = sheet.GetAssuredCell(coord);
   var changed = false;
@@ -1814,7 +1805,7 @@ SocialCalc.DecodeCellAttributes = function(sheet, coord, newattribs, range) {
     return null;
   }
 };
-SocialCalc.DecodeSheetAttributes = function(sheet, newattribs) {
+SC.DecodeSheetAttributes = function(sheet, newattribs) {
   var value;
   var attribs = sheet.attribs;
   var changed = false;
@@ -1872,7 +1863,7 @@ SocialCalc.DecodeSheetAttributes = function(sheet, newattribs) {
     return null;
   }
 };
-SocialCalc.SheetCommandInfo = function(sheetobj) {
+SC.SheetCommandInfo = function(sheetobj) {
   this.sheetobj = sheetobj;
   this.timerobj = null;
   this.firsttimerdelay = 50;
@@ -1881,7 +1872,7 @@ SocialCalc.SheetCommandInfo = function(sheetobj) {
   this.saveundo = false;
   this.CmdExtensionCallbacks = {};
 };
-SocialCalc.ScheduleSheetCommands = function(sheet, cmdstr, saveundo) {
+SC.ScheduleSheetCommands = function(sheet, cmdstr, saveundo) {
   var sci = sheet.sci;
   var parseobj = new SocialCalc.Parse(cmdstr);
   if (sci.sheetobj.statuscallback) {
@@ -1894,7 +1885,7 @@ SocialCalc.ScheduleSheetCommands = function(sheet, cmdstr, saveundo) {
     SocialCalc.SheetCommandsTimerRoutine(sci, parseobj, saveundo);
   }, sci.firsttimerdelay);
 };
-SocialCalc.SheetCommandsTimerRoutine = function(sci, parseobj, saveundo) {
+SC.SheetCommandsTimerRoutine = function(sci, parseobj, saveundo) {
   var errortext;
   var starttime = new Date;
   sci.timerobj = null;
@@ -1923,7 +1914,7 @@ SocialCalc.SheetCommandsTimerRoutine = function(sci, parseobj, saveundo) {
     sci.sheetobj.statuscallback(sci, "cmdend", "", sci.sheetobj.statuscallbackparams);
   }
 };
-SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
+SC.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
   var cmdstr;
   var cmd1;
   var rest;
@@ -3419,7 +3410,7 @@ SocialCalc.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
   }
   return errortext;
 };
-SocialCalc.SheetUndo = function(sheet) {
+SC.SheetUndo = function(sheet) {
   var i;
   var tos = sheet.changes.TOS();
   var lastone = tos ? tos.undo.length - 1 : -1;
@@ -3433,7 +3424,7 @@ SocialCalc.SheetUndo = function(sheet) {
   sheet.changes.Undo();
   sheet.ScheduleSheetCommands(cmdstr, false);
 };
-SocialCalc.SheetRedo = function(sheet) {
+SC.SheetRedo = function(sheet) {
   var tos, i;
   var didredo = sheet.changes.Redo();
   if (!didredo) {
@@ -3450,7 +3441,7 @@ SocialCalc.SheetRedo = function(sheet) {
   }
   sheet.ScheduleSheetCommands(cmdstr, false);
 };
-SocialCalc.CreateAuditString = function(sheet) {
+SC.CreateAuditString = function(sheet) {
   var i, j;
   var result = "";
   var stack = sheet.changes.stack;
@@ -3463,7 +3454,7 @@ SocialCalc.CreateAuditString = function(sheet) {
   }
   return result;
 };
-SocialCalc.GetStyleNum = function(sheet, atype, style) {
+SC.GetStyleNum = function(sheet, atype, style) {
   var num;
   if (style.length == 0)
     return 0;
@@ -3477,12 +3468,12 @@ SocialCalc.GetStyleNum = function(sheet, atype, style) {
   }
   return num;
 };
-SocialCalc.GetStyleString = function(sheet, atype, num) {
+SC.GetStyleString = function(sheet, atype, num) {
   if (!num)
     return null;
   return sheet[atype + "s"][num];
 };
-SocialCalc.RecalcInfo = {
+SC.RecalcInfo = {
   sheet: null,
   currentState: 0,
   state: { idle: 0, start_calc: 1, order: 2, calc: 3, start_wait: 4, done_wait: 5 },
@@ -3495,7 +3486,7 @@ SocialCalc.RecalcInfo = {
     return false;
   }
 };
-SocialCalc.RecalcData = function() {
+SC.RecalcData = function() {
   this.inrecalc = true;
   this.celllist = [];
   this.celllistitem = 0;
@@ -3507,7 +3498,7 @@ SocialCalc.RecalcData = function() {
   this.count = 0;
   this.checkinfo = {};
 };
-SocialCalc.RecalcCheckInfo = function() {
+SC.RecalcCheckInfo = function() {
   this.oldcoord = null;
   this.parsepos = 0;
   this.inrange = false;
@@ -3521,7 +3512,7 @@ SocialCalc.RecalcCheckInfo = function() {
   this.c = null;
   this.r = null;
 };
-SocialCalc.RecalcSheet = function(sheet) {
+SC.RecalcSheet = function(sheet) {
   var coord, err, recalcdata;
   var scri = SocialCalc.RecalcInfo;
   if (scri.currentState != scri.state.idle) {
@@ -3539,18 +3530,18 @@ SocialCalc.RecalcSheet = function(sheet) {
   }
   SocialCalc.RecalcSetTimeout();
 };
-SocialCalc.RecalcSetTimeout = function() {
+SC.RecalcSetTimeout = function() {
   var scri = SocialCalc.RecalcInfo;
   scri.recalctimer = window.setTimeout(SocialCalc.RecalcTimerRoutine, scri.timeslicedelay);
 };
-SocialCalc.RecalcClearTimeout = function() {
+SC.RecalcClearTimeout = function() {
   var scri = SocialCalc.RecalcInfo;
   if (scri.recalctimer) {
     window.clearTimeout(scri.recalctimer);
     scri.recalctimer = null;
   }
 };
-SocialCalc.RecalcLoadedSheet = function(sheetname, str, recalcneeded, live) {
+SC.RecalcLoadedSheet = function(sheetname, str, recalcneeded, live) {
   var sheet;
   var scri = SocialCalc.RecalcInfo;
   var scf = SocialCalc.Formula;
@@ -3563,7 +3554,7 @@ SocialCalc.RecalcLoadedSheet = function(sheetname, str, recalcneeded, live) {
   scf.SheetCache.waitingForLoading = null;
   SocialCalc.RecalcSetTimeout();
 };
-SocialCalc.RecalcTimerRoutine = function() {
+SC.RecalcTimerRoutine = function() {
   var eresult, cell, coord, err, status;
   var starttime = new Date;
   var count = 0;
@@ -3686,7 +3677,7 @@ SocialCalc.RecalcTimerRoutine = function() {
   }
   return;
 };
-SocialCalc.RecalcCheckCell = function(sheet, startcoord) {
+SC.RecalcCheckCell = function(sheet, startcoord) {
   var parseinfo, ttext, ttype, i, rangecoord, circref, value, pos, pos2, cell, coordvals;
   var scf = SocialCalc.Formula;
   var tokentype = scf.TokenType;
@@ -3839,7 +3830,7 @@ SocialCalc.RecalcCheckCell = function(sheet, startcoord) {
     }
   return "";
 };
-SocialCalc.Parse = function(str) {
+SC.Parse = function(str) {
   this.str = str;
   this.pos = 0;
   this.delimiter = " ";
@@ -3849,7 +3840,7 @@ SocialCalc.Parse = function(str) {
     this.lineEnd = str.length;
   }
 };
-SocialCalc.Parse.prototype.NextToken = function() {
+SC.Parse.prototype.NextToken = function() {
   if (this.pos < 0)
     return "";
   var pos2 = this.str.indexOf(this.delimiter, this.pos);
@@ -3865,19 +3856,19 @@ SocialCalc.Parse.prototype.NextToken = function() {
     return this.str.substring(pos1, this.lineEnd);
   }
 };
-SocialCalc.Parse.prototype.RestOfString = function() {
+SC.Parse.prototype.RestOfString = function() {
   var oldpos = this.pos;
   if (this.pos < 0 || this.pos >= this.lineEnd)
     return "";
   this.pos = this.lineEnd;
   return this.str.substring(oldpos, this.lineEnd);
 };
-SocialCalc.Parse.prototype.RestOfStringNoMove = function() {
+SC.Parse.prototype.RestOfStringNoMove = function() {
   if (this.pos < 0 || this.pos >= this.lineEnd)
     return "";
   return this.str.substring(this.pos, this.lineEnd);
 };
-SocialCalc.Parse.prototype.NextLine = function() {
+SC.Parse.prototype.NextLine = function() {
   this.pos = this.lineEnd + 1;
   this.lineEnd = this.str.indexOf(`
 `, this.pos);
@@ -3885,18 +3876,18 @@ SocialCalc.Parse.prototype.NextLine = function() {
     this.lineEnd = this.str.length;
   }
 };
-SocialCalc.Parse.prototype.EOF = function() {
+SC.Parse.prototype.EOF = function() {
   if (this.pos < 0 || this.pos >= this.str.length)
     return true;
   return false;
 };
-SocialCalc.UndoStack = function() {
+SC.UndoStack = function() {
   this.stack = [];
   this.tos = -1;
   this.maxRedo = 0;
   this.maxUndo = 50;
 };
-SocialCalc.UndoStack.prototype.PushChange = function(type) {
+SC.UndoStack.prototype.PushChange = function(type) {
   while (this.stack.length > 0 && this.stack.length - 1 > this.tos) {
     this.stack.pop();
   }
@@ -3909,7 +3900,7 @@ SocialCalc.UndoStack.prototype.PushChange = function(type) {
   }
   this.tos = this.stack.length - 1;
 };
-SocialCalc.UndoStack.prototype.AddDo = function() {
+SC.UndoStack.prototype.AddDo = function() {
   if (!this.stack[this.stack.length - 1]) {
     return;
   }
@@ -3921,7 +3912,7 @@ SocialCalc.UndoStack.prototype.AddDo = function() {
   var cmd = args.join(" ");
   this.stack[this.stack.length - 1].command.push(cmd);
 };
-SocialCalc.UndoStack.prototype.AddUndo = function() {
+SC.UndoStack.prototype.AddUndo = function() {
   if (!this.stack[this.stack.length - 1]) {
     return;
   }
@@ -3933,13 +3924,13 @@ SocialCalc.UndoStack.prototype.AddUndo = function() {
   var cmd = args.join(" ");
   this.stack[this.stack.length - 1].undo.push(cmd);
 };
-SocialCalc.UndoStack.prototype.TOS = function() {
+SC.UndoStack.prototype.TOS = function() {
   if (this.tos >= 0)
     return this.stack[this.tos];
   else
     return null;
 };
-SocialCalc.UndoStack.prototype.Undo = function() {
+SC.UndoStack.prototype.Undo = function() {
   if (this.tos >= 0 && (!this.maxUndo || this.tos > this.stack.length - this.maxUndo - 1)) {
     this.tos -= 1;
     return true;
@@ -3947,7 +3938,7 @@ SocialCalc.UndoStack.prototype.Undo = function() {
     return false;
   }
 };
-SocialCalc.UndoStack.prototype.Redo = function() {
+SC.UndoStack.prototype.Redo = function() {
   if (this.tos < this.stack.length - 1) {
     this.tos += 1;
     return true;
@@ -3955,10 +3946,10 @@ SocialCalc.UndoStack.prototype.Redo = function() {
     return false;
   }
 };
-SocialCalc.Clipboard = {
+SC.Clipboard = {
   clipboard: ""
 };
-SocialCalc.RenderContext = function(sheetobj) {
+SC.RenderContext = function(sheetobj) {
   var parts, num, s;
   var attribs = sheetobj.attribs;
   var scc = SocialCalc.Constants;
@@ -4051,55 +4042,55 @@ SocialCalc.RenderContext = function(sheetobj) {
   } else
     throw scc.s_rcMissingSheet;
 };
-SocialCalc.RenderContext.prototype.PrecomputeSheetFontsAndLayouts = function() {
+SC.RenderContext.prototype.PrecomputeSheetFontsAndLayouts = function() {
   SocialCalc.PrecomputeSheetFontsAndLayouts(this);
 };
-SocialCalc.RenderContext.prototype.CalculateCellSkipData = function() {
+SC.RenderContext.prototype.CalculateCellSkipData = function() {
   SocialCalc.CalculateCellSkipData(this);
 };
-SocialCalc.RenderContext.prototype.CalculateColWidthData = function() {
+SC.RenderContext.prototype.CalculateColWidthData = function() {
   SocialCalc.CalculateColWidthData(this);
 };
-SocialCalc.RenderContext.prototype.CalculateRowHeightData = function() {
+SC.RenderContext.prototype.CalculateRowHeightData = function() {
   SocialCalc.CalculateRowHeightData(this);
 };
-SocialCalc.RenderContext.prototype.SetRowPaneFirstLast = function(panenum, first, last) {
+SC.RenderContext.prototype.SetRowPaneFirstLast = function(panenum, first, last) {
   this.rowpanes[panenum] = { first, last };
 };
-SocialCalc.RenderContext.prototype.SetColPaneFirstLast = function(panenum, first, last) {
+SC.RenderContext.prototype.SetColPaneFirstLast = function(panenum, first, last) {
   this.colpanes[panenum] = { first, last };
 };
-SocialCalc.RenderContext.prototype.CoordInPane = function(coord, rowpane, colpane) {
+SC.RenderContext.prototype.CoordInPane = function(coord, rowpane, colpane) {
   return SocialCalc.CoordInPane(this, coord, rowpane, colpane);
 };
-SocialCalc.RenderContext.prototype.CellInPane = function(row, col, rowpane, colpane) {
+SC.RenderContext.prototype.CellInPane = function(row, col, rowpane, colpane) {
   return SocialCalc.CellInPane(this, row, col, rowpane, colpane);
 };
-SocialCalc.RenderContext.prototype.InitializeTable = function(tableobj) {
+SC.RenderContext.prototype.InitializeTable = function(tableobj) {
   SocialCalc.InitializeTable(this, tableobj);
 };
-SocialCalc.RenderContext.prototype.RenderSheet = function(oldtable, linkstyle) {
+SC.RenderContext.prototype.RenderSheet = function(oldtable, linkstyle) {
   return SocialCalc.RenderSheet(this, oldtable, linkstyle);
 };
-SocialCalc.RenderContext.prototype.RenderColGroup = function() {
+SC.RenderContext.prototype.RenderColGroup = function() {
   return SocialCalc.RenderColGroup(this);
 };
-SocialCalc.RenderContext.prototype.RenderColHeaders = function() {
+SC.RenderContext.prototype.RenderColHeaders = function() {
   return SocialCalc.RenderColHeaders(this);
 };
-SocialCalc.RenderContext.prototype.RenderSizingRow = function() {
+SC.RenderContext.prototype.RenderSizingRow = function() {
   return SocialCalc.RenderSizingRow(this);
 };
-SocialCalc.RenderContext.prototype.RenderRow = function(rownum, rowpane, linkstyle) {
+SC.RenderContext.prototype.RenderRow = function(rownum, rowpane, linkstyle) {
   return SocialCalc.RenderRow(this, rownum, rowpane, linkstyle);
 };
-SocialCalc.RenderContext.prototype.RenderSpacingRow = function() {
+SC.RenderContext.prototype.RenderSpacingRow = function() {
   return SocialCalc.RenderSpacingRow(this);
 };
-SocialCalc.RenderContext.prototype.RenderCell = function(rownum, colnum, rowpane, colpane, noElement, linkstyle) {
+SC.RenderContext.prototype.RenderCell = function(rownum, colnum, rowpane, colpane, noElement, linkstyle) {
   return SocialCalc.RenderCell(this, rownum, colnum, rowpane, colpane, noElement, linkstyle);
 };
-SocialCalc.PrecomputeSheetFontsAndLayouts = function(context) {
+SC.PrecomputeSheetFontsAndLayouts = function(context) {
   var defaultfont, parts, layoutre, dparts, sparts, num, s, i;
   var sheetobj = context.sheetobj;
   var attribs = sheetobj.attribs;
@@ -4144,7 +4135,7 @@ SocialCalc.PrecomputeSheetFontsAndLayouts = function(context) {
   }
   context.needprecompute = false;
 };
-SocialCalc.CalculateCellSkipData = function(context) {
+SC.CalculateCellSkipData = function(context) {
   var row, col, coord, cell, contextcell, colspan, rowspan, skiprow, skipcol, skipcoord;
   var sheetobj = context.sheetobj;
   var sheetrowattribs = sheetobj.rowattribs;
@@ -4180,7 +4171,7 @@ SocialCalc.CalculateCellSkipData = function(context) {
   }
   context.needcellskip = false;
 };
-SocialCalc.CalculateColWidthData = function(context) {
+SC.CalculateColWidthData = function(context) {
   var colnum, colname, colwidth, totalwidth, colpane;
   var sheetobj = context.sheetobj;
   var sheetcolattribs = sheetobj.colattribs;
@@ -4201,7 +4192,7 @@ SocialCalc.CalculateColWidthData = function(context) {
   }
   context.totalwidth = totalwidth;
 };
-SocialCalc.CalculateRowHeightData = function(context) {
+SC.CalculateRowHeightData = function(context) {
   var rownum, rowheight, totalheight, rowpane;
   var sheetobj = context.sheetobj;
   totalheight = context.showRCHeaders ? context.pixelsPerRow : 0;
@@ -4220,13 +4211,13 @@ SocialCalc.CalculateRowHeightData = function(context) {
   }
   context.totalheight = totalheight;
 };
-SocialCalc.InitializeTable = function(context, tableobj) {
+SC.InitializeTable = function(context, tableobj) {
   tableobj.style.borderCollapse = "collapse";
   tableobj.cellSpacing = "0";
   tableobj.cellPadding = "0";
   tableobj.style.width = context.totalwidth + "px";
 };
-SocialCalc.RenderSheet = function(context, oldtable, linkstyle) {
+SC.RenderSheet = function(context, oldtable, linkstyle) {
   var newrow, rowpane, rownum;
   var tableobj, colgroupobj, tbodyobj, parentnode;
   if (context.sheetobj.changedrendervalues) {
@@ -4271,7 +4262,7 @@ SocialCalc.RenderSheet = function(context, oldtable, linkstyle) {
   }
   return tableobj;
 };
-SocialCalc.RenderRow = function(context, rownum, rowpane, linkstyle) {
+SC.RenderRow = function(context, rownum, rowpane, linkstyle) {
   var sheetobj = context.sheetobj;
   var result = document.createElement("tr");
   var colnum, newcol, colpane, newdiv;
@@ -4339,7 +4330,7 @@ SocialCalc.RenderRow = function(context, rownum, rowpane, linkstyle) {
   }
   return result;
 };
-SocialCalc.RenderSpacingRow = function(context) {
+SC.RenderSpacingRow = function(context) {
   var colnum, newcol, colpane, w;
   var sheetobj = context.sheetobj;
   var result = document.createElement("tr");
@@ -4380,7 +4371,7 @@ SocialCalc.RenderSpacingRow = function(context) {
   }
   return result;
 };
-SocialCalc.RenderColHeaders = function(context) {
+SC.RenderColHeaders = function(context) {
   var sheetobj = context.sheetobj;
   var result = document.createElement("tr");
   var colnum, newcol, colpane;
@@ -4440,7 +4431,7 @@ SocialCalc.RenderColHeaders = function(context) {
   }
   return result;
 };
-SocialCalc.RenderColGroup = function(context) {
+SC.RenderColGroup = function(context) {
   var colpane, colnum, newcol, t;
   var sheetobj = context.sheetobj;
   var result = document.createElement("colgroup");
@@ -4469,7 +4460,7 @@ SocialCalc.RenderColGroup = function(context) {
   }
   return result;
 };
-SocialCalc.RenderSizingRow = function(context) {
+SC.RenderSizingRow = function(context) {
   var colpane, colnum, newcell, t;
   var sheetobj = context.sheetobj;
   var result = document.createElement("tr");
@@ -4501,7 +4492,7 @@ SocialCalc.RenderSizingRow = function(context) {
   }
   return result;
 };
-SocialCalc.RenderCell = function(context, rownum, colnum, rowpane, colpane, noElement, linkstyle) {
+SC.RenderCell = function(context, rownum, colnum, rowpane, colpane, noElement, linkstyle) {
   var sheetobj = context.sheetobj;
   var num, t, result, span, stylename, cell, endcell, sheetattribs, scdefaults;
   var stylestr = "";
@@ -4682,13 +4673,13 @@ SocialCalc.RenderCell = function(context, rownum, colnum, rowpane, colpane, noEl
   }
   return result;
 };
-SocialCalc.CoordInPane = function(context, coord, rowpane, colpane) {
+SC.CoordInPane = function(context, coord, rowpane, colpane) {
   var coordToCR = context.coordToCR[coord];
   if (!coordToCR || !coordToCR.row || !coordToCR.col)
     throw "Bad coordToCR for " + coord;
   return context.CellInPane(coordToCR.row, coordToCR.col, rowpane, colpane);
 };
-SocialCalc.CellInPane = function(context, row, col, rowpane, colpane) {
+SC.CellInPane = function(context, row, col, rowpane, colpane) {
   var panerowlimits = context.rowpanes[rowpane];
   var panecollimits = context.colpanes[colpane];
   if (!panerowlimits || !panecollimits)
@@ -4699,10 +4690,10 @@ SocialCalc.CellInPane = function(context, row, col, rowpane, colpane) {
     return false;
   return true;
 };
-SocialCalc.CreatePseudoElement = function() {
+SC.CreatePseudoElement = function() {
   return { style: { cssText: "" }, innerHTML: "", className: "" };
 };
-SocialCalc.decodeFromSave = function(s) {
+SC.decodeFromSave = function(s) {
   if (typeof s != "string")
     return s;
   if (s.indexOf("\\") == -1)
@@ -4712,7 +4703,7 @@ SocialCalc.decodeFromSave = function(s) {
 `);
   return r.replace(/\\b/g, "\\");
 };
-SocialCalc.decodeFromAjax = function(s) {
+SC.decodeFromAjax = function(s) {
   if (typeof s != "string")
     return s;
   if (s.indexOf("\\") == -1)
@@ -4723,7 +4714,7 @@ SocialCalc.decodeFromAjax = function(s) {
   r = r.replace(/\\e/g, "]]");
   return r.replace(/\\b/g, "\\");
 };
-SocialCalc.encodeForSave = function(s) {
+SC.encodeForSave = function(s) {
   if (typeof s != "string")
     return s;
   if (s.indexOf("\\") != -1)
@@ -4735,7 +4726,7 @@ SocialCalc.encodeForSave = function(s) {
     s = s.replace(/\n/g, "\\n");
   return s;
 };
-SocialCalc.special_chars = function(string) {
+SC.special_chars = function(string) {
   if (/[&<>"]/.test(string)) {
     string = string.replace(/&/g, "&amp;");
     string = string.replace(/</g, "&lt;");
@@ -4744,7 +4735,7 @@ SocialCalc.special_chars = function(string) {
   }
   return string;
 };
-SocialCalc.Lookup = function(value, list) {
+SC.Lookup = function(value, list) {
   for (var i = 0;i < list.length; i++) {
     if (list[i] > value) {
       if (i > 0)
@@ -4755,7 +4746,7 @@ SocialCalc.Lookup = function(value, list) {
   }
   return list.length - 1;
 };
-SocialCalc.setStyles = function(element, cssText) {
+SC.setStyles = function(element, cssText) {
   var parts, part, pos, name, value;
   if (!cssText)
     return;
@@ -4771,7 +4762,7 @@ SocialCalc.setStyles = function(element, cssText) {
     }
   }
 };
-SocialCalc.GetViewportInfo = function() {
+SC.GetViewportInfo = function() {
   var result = {};
   if (window.innerWidth) {
     result.width = window.innerWidth;
@@ -4793,7 +4784,7 @@ SocialCalc.GetViewportInfo = function() {
   }
   return result;
 };
-SocialCalc.GetElementPosition = function(element) {
+SC.GetElementPosition = function(element) {
   var offsetLeft = 0;
   var offsetTop = 0;
   while (element) {
@@ -4805,7 +4796,7 @@ SocialCalc.GetElementPosition = function(element) {
   }
   return { left: offsetLeft, top: offsetTop };
 };
-SocialCalc.GetElementPositionWithScroll = function(element) {
+SC.GetElementPositionWithScroll = function(element) {
   var rect = element.getBoundingClientRect();
   return {
     left: rect.left,
@@ -4816,7 +4807,7 @@ SocialCalc.GetElementPositionWithScroll = function(element) {
     height: rect.height ? rect.height : rect.bottom - rect.top
   };
 };
-SocialCalc.GetElementFixedParent = function(element) {
+SC.GetElementFixedParent = function(element) {
   while (element) {
     if (element.tagName == "HTML")
       break;
@@ -4826,7 +4817,7 @@ SocialCalc.GetElementFixedParent = function(element) {
   }
   return false;
 };
-SocialCalc.GetComputedStyle = function(element, style) {
+SC.GetComputedStyle = function(element, style) {
   var computedStyle;
   if (document.defaultView) {
     computedStyle = document.defaultView.getComputedStyle(element, null);
@@ -4835,7 +4826,7 @@ SocialCalc.GetComputedStyle = function(element, style) {
   }
   return computedStyle[style];
 };
-SocialCalc.LookupElement = function(element, array) {
+SC.LookupElement = function(element, array) {
   var i;
   for (i = 0;i < array.length; i++) {
     if (array[i].element == element)
@@ -4843,12 +4834,12 @@ SocialCalc.LookupElement = function(element, array) {
   }
   return null;
 };
-SocialCalc.AssignID = function(obj, element, id) {
+SC.AssignID = function(obj, element, id) {
   if (obj.idPrefix) {
     element.id = obj.idPrefix + id;
   }
 };
-SocialCalc.GetCellContents = function(sheetobj, coord) {
+SC.GetCellContents = function(sheetobj, coord) {
   var result = "";
   var cellobj = sheetobj.cells[coord];
   if (cellobj) {
@@ -4871,7 +4862,7 @@ SocialCalc.GetCellContents = function(sheetobj, coord) {
   }
   return result;
 };
-SocialCalc.FormatCellForExport = function(sheet, cell, cr) {
+SC.FormatCellForExport = function(sheet, cell, cr) {
   var valuetype, valueformat, sheetattribs;
   if (!cell) {
     return "";
@@ -4891,7 +4882,7 @@ SocialCalc.FormatCellForExport = function(sheet, cell, cr) {
   }
   return SocialCalc.format_number_for_display(cell.datavalue, valuetype, valueformat);
 };
-SocialCalc.FormatValueForDisplay = function(sheetobj, value, cr, linkstyle) {
+SC.FormatValueForDisplay = function(sheetobj, value, cr, linkstyle) {
   var valueformat, has_parens, has_commas, valuetype, valuesubtype;
   var displayvalue, valueinputwidget;
   var sheetattribs = sheetobj.attribs;
@@ -4924,9 +4915,9 @@ SocialCalc.FormatValueForDisplay = function(sheetobj, value, cr, linkstyle) {
       }
       return displayvalue;
     }
-    var html_display_value = displayvalue;
+    html_display_value = displayvalue;
     displayvalue = SocialCalc.format_text_for_display(displayvalue, cell.valuetype, valueformat, sheetobj, linkstyle, cell.nontextvalueformat);
-    var html_formated_value = displayvalue;
+    html_formated_value = displayvalue;
   } else if (valuetype == "n") {
     valueformat = cell.nontextvalueformat;
     if (valueformat == null || valueformat == "") {
@@ -4955,9 +4946,9 @@ SocialCalc.FormatValueForDisplay = function(sheetobj, value, cr, linkstyle) {
       }
       return displayvalue;
     }
-    var html_display_value = displayvalue;
+    html_display_value = displayvalue;
     displayvalue = SocialCalc.format_number_for_display(displayvalue, cell.valuetype, valueformat);
-    var html_formated_value = displayvalue;
+    html_formated_value = displayvalue;
   } else {
     displayvalue = "&nbsp;";
   }
@@ -4997,7 +4988,7 @@ SocialCalc.FormatValueForDisplay = function(sheetobj, value, cr, linkstyle) {
   }
   return displayvalue;
 };
-SocialCalc.format_text_for_display = function(rawvalue, valuetype, valueformat, sheetobj, linkstyle, nontextvalueformat) {
+SC.format_text_for_display = function(rawvalue, valuetype, valueformat, sheetobj, linkstyle, nontextvalueformat) {
   var valuesubtype, dvsc, dvue;
   var textval;
   var displayvalue;
@@ -5060,7 +5051,7 @@ SocialCalc.format_text_for_display = function(rawvalue, valuetype, valueformat, 
   }
   return displayvalue;
 };
-SocialCalc.format_number_for_display = function(rawvalue, valuetype, valueformat) {
+SC.format_number_for_display = function(rawvalue, valuetype, valueformat) {
   var value, valuesubtype;
   var scc = SocialCalc.Constants;
   value = rawvalue - 0;
@@ -5090,7 +5081,7 @@ SocialCalc.format_number_for_display = function(rawvalue, valuetype, valueformat
   }
   return SocialCalc.FormatNumber.formatNumberWithFormat(rawvalue, valueformat, "");
 };
-SocialCalc.DetermineValueType = function(rawvalue) {
+SC.DetermineValueType = function(rawvalue) {
   var value = rawvalue + "";
   var type = "t";
   var tvalue;
@@ -5201,7 +5192,7 @@ SocialCalc.DetermineValueType = function(rawvalue) {
   }
   return { value, type };
 };
-SocialCalc.InputConstants = {
+SC.InputConstants = {
   TRUE: "1,nl",
   FALSE: "0,nl",
   "#N/A": "0,e#N/A",
@@ -5212,14 +5203,14 @@ SocialCalc.InputConstants = {
   "#REF!": "0,e#REF!",
   "#NAME?": "0,e#NAME?"
 };
-SocialCalc.default_expand_markup = function(displayvalue, sheetobj, linkstyle) {
+SC.default_expand_markup = function(displayvalue, sheetobj, linkstyle) {
   var result = displayvalue;
   result = SocialCalc.special_chars(result);
   result = result.replace(/  /g, "&nbsp; ");
   result = result.replace(/\n/g, "<br>");
   return result;
 };
-SocialCalc.expand_text_link = function(displayvalue, sheetobj, linkstyle, valueformat) {
+SC.expand_text_link = function(displayvalue, sheetobj, linkstyle, valueformat) {
   var desc, tb, str;
   var scc = SocialCalc.Constants;
   var url = "";
@@ -5243,7 +5234,7 @@ SocialCalc.expand_text_link = function(displayvalue, sheetobj, linkstyle, valuef
   str = '<a href="' + url + '"' + tb + ">" + desc + "</a>";
   return str;
 };
-SocialCalc.ParseCellLinkText = function(str) {
+SC.ParseCellLinkText = function(str) {
   var result = { url: "", desc: "", newwin: false, pagename: "", workspace: "" };
   var pageform = false;
   var urlend = str.length - 1;
@@ -5305,7 +5296,7 @@ SocialCalc.ParseCellLinkText = function(str) {
   }
   return result;
 };
-SocialCalc.ConvertSaveToOtherFormat = function(savestr, outputformat, dorecalc) {
+SC.ConvertSaveToOtherFormat = function(savestr, outputformat, dorecalc) {
   var sheet, context, clipextents, div, ele, row, col, cr, cell, str;
   var result = "";
   if (outputformat == "scsave") {
@@ -5374,7 +5365,7 @@ SocialCalc.ConvertSaveToOtherFormat = function(savestr, outputformat, dorecalc) 
   }
   return result;
 };
-SocialCalc.ConvertOtherFormatToSave = function(inputstr, inputformat) {
+SC.ConvertOtherFormatToSave = function(inputstr, inputformat) {
   var sheet;
   var context;
   var lines;
@@ -5510,7 +5501,7 @@ SocialCalc.ConvertOtherFormatToSave = function(inputstr, inputformat) {
   }
   return result;
 };
-SocialCalc.SetConvertedCell = function(sheet, cr, rawvalue) {
+SC.SetConvertedCell = function(sheet, cr, rawvalue) {
   var cell, value;
   cell = sheet.GetAssuredCell(cr);
   if (typeof rawvalue == "string" && rawvalue.charAt(0) == "=") {

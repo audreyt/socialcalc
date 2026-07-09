@@ -17,7 +17,7 @@ reattaches leading license comment preambles. UMD open/close wrappers are
 | `formula-operand.ts` | Fully typechecked pure operand-stack helpers (after formula-parse in build) |
 | `socialcalcconstants.ts` | Fully typechecked; LemmaScript `//@ verify` on pure class/image-prefix helpers |
 | `formula1.ts` | Fully typechecked (evaluator + Formula surface) |
-| `socialcalc-3.ts` | **Interim `@ts-nocheck`** — command/caller code |
+| `socialcalc-3.ts` | Fully typechecked (command/caller core) |
 | `socialcalcviewer.ts` | Fully typechecked |
 | `socialcalcpopup.ts` | Fully typechecked |
 | control/editor `.ts` | **Interim `@ts-nocheck`** (~700–900 errors each) |
