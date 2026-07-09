@@ -80,7 +80,7 @@ const TriggerIoMut: TriggerIoMutable =
 
    FormulaMut.SpecialConstants = { // names that turn into constants for name lookup
       "#NULL!": "0,e#NULL!", "#NUM!": "0,e#NUM!", "#DIV/0!": "0,e#DIV/0!", "#VALUE!": "0,e#VALUE!",
-      "#REF!": "0,e#REF!", "#NAME?": "0,e#NAME?"};
+      "#REF!": "0,e#REF!", "#NAME?": "0,e#NAME?", "#N/A": "0,e#N/A"};
 
 
    // Operator Precedence table
@@ -1190,6 +1190,15 @@ FormulaMut.CalculateFunction = function(fname, operand, sheet, coord) {
       argnum = fobj[1];
       scf.CopyFunctionArgs(operand, foperand);
 
+      // Bare name and empty-call share RPN (function_start + name), so N and N()
+      // are indistinguishable here. Prefer a defined sheet name over FunctionList
+      // when there are no arguments: `name define N =…` / `SUM =…` / `PI =…`.
+      // Must run before IO StoreIoEventFormula so named BUTTON/EMAIL* do not register.
+      if (foperand.length === 0 && sheet.names && sheet.names[fname.toUpperCase()]) {
+         scf.PushOperand(operand, "name", fname);
+         return "";
+         }
+
 	  // eddy CalculateFunction {
    if(fobj[6] && fobj[6] != "") {	  
 	   SocialCalc.DebugLog("action:"+fname);		
@@ -1197,27 +1206,15 @@ FormulaMut.CalculateFunction = function(fname, operand, sheet, coord) {
 		
 	  }
 	  // }
-	  
       if (argnum != 100) {
          if (argnum < 0) {
             if (foperand.length < -argnum) {
-               // N()/T() collide with column letters in range syntax (N:N, T:T).
-               // See unknown-function handling below — zero args with an outer
-               // "start" still on the stack means a name ref, not a call.
-               if (foperand.length === 0 && operand.length > 0) {
-                  scf.PushOperand(operand, "name", fname);
-                  return "";
-                  }
                errortext = scf.FunctionArgsError(fname, operand);
                return errortext;
                }
             }
          else {
             if (foperand.length != argnum) {
-               if (foperand.length === 0 && operand.length > 0) {
-                  scf.PushOperand(operand, "name", fname);
-                  return "";
-                  }
                errortext = scf.FunctionArgsError(fname, operand);
                return errortext;
                }
@@ -2019,10 +2016,14 @@ FormulaMut.LookupFunctions = function(fname, operand, foperand, sheet) {
    var PushOperand = function(t: any, v: any) {operand.push({type: t, value: v});};
 
    lookupvalue = operand_value_and_type(sheet, foperand);
+   if (lookupvalue.type.charAt(0) == "e") {
+      // Error lookup keys must propagate (VLOOKUP(1/0,…) → #DIV/0!), not scan as #N/A.
+      PushOperand(lookupvalue.type, 0);
+      return;
+      }
    if (typeof lookupvalue.value == "string") {
       lookupvalue.value = (lookupvalue.value as any).toLowerCase();
       }
-
    range = scf.TopOfStackValueAndType(sheet, foperand);
 
    rangelookup = 1; // default to true or 1

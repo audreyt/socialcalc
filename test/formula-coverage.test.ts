@@ -3061,14 +3061,18 @@ test("OperandAsNumber: text convertible via DetermineValueType (L1039/L1040)", a
     expect(r.value).toBe(123.5);
 });
 
-test("OperandAsNumber: text non-numeric → 0 with text type (L1043-L1046)", async () => {
+test("OperandAsNumber: text non-numeric → 0 with e#VALUE! type", async () => {
     const SC = await loadSocialCalc();
     resetFormulaGlobals(SC);
     const sheet = new SC.Sheet();
     const op = [{ type: "t", value: "hello" }];
     const r = SC.Formula.OperandAsNumber(sheet, op);
     expect(r.value).toBe(0);
-    expect(r.type.charAt(0)).not.toBe("n");
+    expect(r.type).toBe("e#VALUE!");
+
+    const empty = SC.Formula.OperandAsNumber(sheet, [{ type: "t", value: "" }]);
+    expect(empty.value).toBe(0);
+    expect(empty.type).toBe("e#VALUE!");
 });
 
 test("OperandAsText: numeric → formatted text (L1072-L1077)", async () => {
@@ -3195,6 +3199,10 @@ test("OperandAsType: wrong type → e#REF! (L1223-L1225)", async () => {
     const op = [{ type: "n", value: 5 }];
     const r = SC.Formula.OperandAsCoord(sheet, op);
     expect(r.type).toBe("e#REF!");
+
+    const empty = SC.Formula.OperandAsCoord(sheet, []);
+    expect(empty.type).toBe("e#REF!");
+    expect(empty.error).toContain("no operand on stack");
 });
 
 test("OperandAsType: name resolves then checks type (L1216)", async () => {
@@ -5080,4 +5088,37 @@ test("ConvertInfixToPolish: equality has comparison precedence with +", async ()
     const result = SC.Formula.evaluate_parsed_formula(tokens, sheet, false);
     expect(result.type).toBe("nl");
     expect(result.value).toBe(0); // false: 1 == 5
+});
+
+test("VLOOKUP/MATCH: error lookup keys propagate (not #N/A)", async () => {
+    const { getVT } = await buildSheet([
+        "set A1 value n 1",
+        "set A2 value n 2",
+        "set B1 value n 10",
+        "set B2 value n 20",
+        "set C1 formula VLOOKUP(1/0,A1:B2,2,FALSE())",
+        "set C2 formula MATCH(NA(),A1:A2,0)",
+        "set C3 formula HLOOKUP(1/0,A1:B1,1,FALSE())",
+    ]);
+    expect(getVT("C1")).toBe("e#DIV/0!");
+    expect(getVT("C2")).toBe("e#N/A");
+    expect(getVT("C3")).toBe("e#DIV/0!");
+});
+
+test("specialvalue lexer accepts #NAME? and #N/A literals", async () => {
+    const SC = await loadSocialCalc();
+    resetFormulaGlobals(SC);
+    const sheet = new SC.Sheet();
+
+    for (const [f, typ] of [
+        ["#NAME?", "e#NAME?"],
+        ["#N/A", "e#N/A"],
+        ["#REF!", "e#REF!"],
+        ["1+#N/A", "e#N/A"],
+    ] as const) {
+        const tokens = SC.Formula.ParseFormulaIntoTokens(f);
+        expect(tokens.some((t: { type: number }) => t.type === SC.Formula.TokenType.error)).toBe(false);
+        const r = SC.Formula.evaluate_parsed_formula(tokens, sheet, false);
+        expect(r.type).toBe(typ);
+    }
 });

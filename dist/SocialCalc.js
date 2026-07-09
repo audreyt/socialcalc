@@ -11183,7 +11183,8 @@ FormulaMut.SpecialConstants = {
   "#DIV/0!": "0,e#DIV/0!",
   "#VALUE!": "0,e#VALUE!",
   "#REF!": "0,e#REF!",
-  "#NAME?": "0,e#NAME?"
+  "#NAME?": "0,e#NAME?",
+  "#N/A": "0,e#N/A"
 };
 FormulaMut.TokenPrecedence = {
   "!": 1,
@@ -11741,6 +11742,10 @@ FormulaMut.CalculateFunction = function(fname, operand, sheet, coord) {
     ffunc = fobj[0];
     argnum = fobj[1];
     scf.CopyFunctionArgs(operand, foperand);
+    if (foperand.length === 0 && sheet.names && sheet.names[fname.toUpperCase()]) {
+      scf.PushOperand(operand, "name", fname);
+      return "";
+    }
     if (fobj[6] && fobj[6] != "") {
       SocialCalc.DebugLog("action:" + fname);
       scf.StoreIoEventFormula(fname, coord, foperand, sheet, fobj[6]);
@@ -11748,19 +11753,11 @@ FormulaMut.CalculateFunction = function(fname, operand, sheet, coord) {
     if (argnum != 100) {
       if (argnum < 0) {
         if (foperand.length < -argnum) {
-          if (foperand.length === 0 && operand.length > 0) {
-            scf.PushOperand(operand, "name", fname);
-            return "";
-          }
           errortext = scf.FunctionArgsError(fname, operand);
           return errortext;
         }
       } else {
         if (foperand.length != argnum) {
-          if (foperand.length === 0 && operand.length > 0) {
-            scf.PushOperand(operand, "name", fname);
-            return "";
-          }
           errortext = scf.FunctionArgsError(fname, operand);
           return errortext;
         }
@@ -12254,6 +12251,10 @@ FormulaMut.LookupFunctions = function(fname, operand, foperand, sheet) {
     operand.push({ type: t, value: v });
   };
   lookupvalue = operand_value_and_type(sheet, foperand);
+  if (lookupvalue.type.charAt(0) == "e") {
+    PushOperand(lookupvalue.type, 0);
+    return;
+  }
   if (typeof lookupvalue.value == "string") {
     lookupvalue.value = lookupvalue.value.toLowerCase();
   }
@@ -14996,8 +14997,8 @@ FormulaParseMut.ParseFormulaIntoTokens = function(line) {
         state = 0;
       }
     } else if (state == parsestate.specialvalue) {
-      if (str.charAt(str.length - 1) == "!") {
-        pushtoken(parseinfo, str, tokentype.name, 0);
+      if (str.charAt(str.length - 1) == "!" || scf.SpecialConstants && scf.SpecialConstants[str.toUpperCase()]) {
+        pushtoken(parseinfo, str.toUpperCase(), tokentype.name, 0);
         state = 0;
       } else if (cclass == charclass.eof) {
         pushtoken(parseinfo, scc.s_parseerrspecialvalue, tokentype.error, 0);
@@ -15266,7 +15267,7 @@ FormulaOperandMut.OperandAsNumber = function(sheet, operand) {
       operandinfo.type = valueinfo.type;
     } else {
       operandinfo.value = 0;
-      operandinfo.type = valueinfo.type;
+      operandinfo.type = valueinfo.type.charAt(0) == "e" ? valueinfo.type : "e#VALUE!";
     }
   }
   return operandinfo;
@@ -15345,6 +15346,12 @@ FormulaOperandMut.OperandAsType = function(sheet, operand, operandtype) {
   var scf = SocialCalc.Formula;
   var result = { type: "", value: "" };
   var stacklen = operand.length;
+  if (!stacklen) {
+    result.type = "e#REF!";
+    result.value = 0;
+    result.error = SocialCalc.Constants.s_InternalError + "no operand on stack";
+    return result;
+  }
   result.value = operand[stacklen - 1].value;
   result.type = operand[stacklen - 1].type;
   operand.pop();

@@ -208,10 +208,14 @@ FormulaParseMut.ParseFormulaIntoTokens = function (
             }
          }
 
-      else if (state == parsestate.specialvalue) { // special values like #REF!
-         if (str.charAt(str.length-1) == "!") { // done - save value as a name
-            pushtoken(parseinfo, str, tokentype.name, 0);
-            state = 0; // drop through to process
+      else if (state == parsestate.specialvalue) { // special values like #REF!, #NAME?, #N/A
+         // Complete when we already hold a finished special (ends with ! or known
+         // SpecialConstants entry such as #NAME? / #N/A). Current char is the
+         // delimiter and drops through after state→0, same as the ! path.
+         if (str.charAt(str.length-1) == "!"
+               || (scf.SpecialConstants && scf.SpecialConstants[str.toUpperCase()])) {
+            pushtoken(parseinfo, str.toUpperCase(), tokentype.name, 0);
+            state = 0; // drop through to process current char
             }
          else if (cclass == charclass.eof) {
             pushtoken(parseinfo, scc.s_parseerrspecialvalue, tokentype.error, 0);

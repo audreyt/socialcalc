@@ -27,6 +27,17 @@ Fixes
 - Formula-ref Offset/Adjust/Replace re-emit string/sheet tokens via
   `quoteFormulaString`: apostrophe payloads use `'…''…'`, double both quote
   characters so reparse survives the shared quote lexer class.
+- VLOOKUP/MATCH/HLOOKUP propagate error lookup keys (`VLOOKUP(1/0,…)` →
+  `#DIV/0!`) instead of scanning and returning `#N/A`.
+- Named values that collide with FunctionList (`name define N/SUM/PI =…`) win
+  on zero-arg RPN (bare name and empty `()` share the same stack shape); range
+  calls like `SUM(A1:A1)` still use the builtin. Without a sheet name, arity
+  rules stay: `PI` is builtin, bare `N`/`SUM`/`AND()` still FunctionArgsError.
+- Formula literals `#NAME?` and `#N/A` lex as specials (SpecialConstants +
+  specialvalue completion); `#N/A` added to SpecialConstants.
+- `OperandAsNumber` maps non-numeric text/`""` to `e#VALUE!` (not empty type);
+  `OperandAsCoord`/`OperandAsType` empty stack returns soft `e#REF!` instead of
+  throwing.
 
 Toolchain and build
 - Converted all core SocialCalc JavaScript sources under js/ to global-script

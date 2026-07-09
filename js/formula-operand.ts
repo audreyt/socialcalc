@@ -89,8 +89,10 @@ FormulaOperandMut.OperandAsNumber = function (
          operandinfo.type = valueinfo.type;
          }
       else {
+         // Non-numeric text (including "") must not leave type "" — LookupResultType
+         // has no "" key and would surface as an internal error type.
          operandinfo.value = 0;
-         operandinfo.type = valueinfo.type;
+         operandinfo.type = valueinfo.type.charAt(0) == "e" ? valueinfo.type : "e#VALUE!";
          }
       }
 
@@ -236,6 +238,13 @@ FormulaOperandMut.OperandAsType = function (
    var result: SocialCalc.FormulaValueResult = {type: "", value: ""};
 
    var stacklen = operand.length;
+
+   if (!stacklen) { // make sure something is there
+      result.type = "e#REF!";
+      result.value = 0;
+      result.error = SocialCalc.Constants.s_InternalError+"no operand on stack";
+      return result;
+      }
 
    result.value = operand[stacklen-1]!.value; // get top of stack
    result.type = operand[stacklen-1]!.type;
