@@ -22,3 +22,9 @@
     }
 }(typeof globalThis !== 'undefined' ? globalThis : this, function (window) {
 "use strict";
+// Factory-local bag. Formerly created in socialcalcconstants.js as
+// `var SocialCalc; if (!SocialCalc) SocialCalc = {}`. Hoisted here so
+// converted TypeScript sources can typecheck against the ambient
+// `declare namespace SocialCalc` without a runtime `var SocialCalc`
+// that would shadow/collapse the namespace during `tsc`.
+var SocialCalc = {};

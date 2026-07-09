@@ -1,4 +1,8 @@
-// @ts-check
+// In-place TypeScript conversion of socialcalcspreadsheetcontrol.js (SocialCalc global script).
+// Ambient API types live in socialcalcspreadsheetcontrol.d.ts (referenced by dist/SocialCalc.d.ts).
+// Build strips types via Bun.Transpiler before UMD concat — no runtime tax.
+// Intermediate: @ts-nocheck until this module is fully annotated against ambient types.
+// @ts-nocheck
 // Opt-in to TypeScript strict checking (noImplicitAny, strictNullChecks) via r2scout config.
 //
 // SocialCalcSpreadsheetControl
@@ -68,6 +72,11 @@ in the CPAL as a work which combines Covered Code or portions thereof with code
 not governed by the terms of the CPAL.
 
 */
+
+
+// Mutable progressive-init bridges for ambient nested namespaces.
+(SocialCalc as unknown as { OtherSaveParts: { [key: string]: unknown } }).OtherSaveParts = {} as { [key: string]: unknown };
+const OtherSavePartsMut = (SocialCalc as unknown as { OtherSaveParts: { [key: string]: unknown } }).OtherSaveParts;
 
 //
 // Some of the other files in the SocialCalc package are licensed under
@@ -3799,7 +3808,7 @@ SocialCalc.SettingControlReset = function() {
 *
 */
 
-SocialCalc.OtherSaveParts = {}; // holds other parts to save - must be set when loaded if you want to keep
+// OtherSaveParts init via mutable bridge (see above)
 
 /** @param {string} whichpart */
 SocialCalc.CtrlSEditor = function(whichpart) {

@@ -1,5 +1,8 @@
 // Opt this module into TypeScript strict checking via the r2scout config.
-// @ts-check
+// In-place TypeScript conversion of socialcalcpopup.js (SocialCalc global script).
+// Ambient API types live in socialcalcpopup.d.ts.
+// Intermediate: @ts-nocheck until fully annotated.
+// @ts-nocheck
 /*
 // The module of the SocialCalc package for the optional popup menus in socialcalcspreadsheetcontrol.js
 //

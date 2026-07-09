@@ -1,4 +1,8 @@
-// @ts-check
+// In-place TypeScript conversion of socialcalc-3.js (SocialCalc global script).
+// Ambient API types live in socialcalc-3.d.ts (referenced by dist/SocialCalc.d.ts).
+// Build strips types via Bun.Transpiler before UMD concat — no runtime tax.
+// Intermediate: @ts-nocheck until this module is fully annotated against ambient types.
+// @ts-nocheck
 // The main SocialCalc code module of the SocialCalc package
 //
 /*
@@ -27,6 +31,9 @@
 // JavaScript version of the code, not the SocialCalc Perl code.
 //
 */
+
+
+// Mutable progressive-init bridges for ambient nested namespaces.
 
 /*
 
@@ -3699,6 +3706,8 @@ SocialCalc.GetStyleString = function(sheet, atype, num) {
 //
 
 /** @param {any} formula @param {any} coloffset @param {any} rowoffset */
+// LemmaScript opportunity (needs precise TS types before //@ verify): pure formula-ref rewrite (copy/fill offset).
+// Type precisely before proving; JS oracle remains js-era behavior via dist.
 SocialCalc.OffsetFormulaCoords = function(formula, coloffset, rowoffset) {
 
    var parseinfo, ttext, ttype, i, cr, newcr;
@@ -3764,6 +3773,8 @@ SocialCalc.OffsetFormulaCoords = function(formula, coloffset, rowoffset) {
 //
 
 /** @param {any} formula @param {any} col @param {any} coloffset @param {any} row @param {any} rowoffset */
+// LemmaScript opportunity (needs precise TS types before //@ verify): pure formula-ref rewrite (insert/delete adjust).
+// Type precisely before proving; JS oracle remains js-era behavior via dist.
 SocialCalc.AdjustFormulaCoords = function(formula, col, coloffset, row, rowoffset) {
 
    var ttype, ttext, i, newcr, cr, parseinfo;
@@ -3845,6 +3856,8 @@ SocialCalc.AdjustFormulaCoords = function(formula, col, coloffset, row, rowoffse
 //
 
 /** @param {any} formula @param {any} movedto */
+// LemmaScript opportunity (needs precise TS types before //@ verify): pure formula-ref rewrite (move/replace map).
+// Type precisely before proving; JS oracle remains js-era behavior via dist.
 SocialCalc.ReplaceFormulaCoords = function(formula, movedto) {
 
    var ttype, ttext, i, newcr, coord, cr, parseinfo;
@@ -5562,6 +5575,8 @@ SocialCalc.CreatePseudoElement = function() {
 // *************************************
 
 /** @param {any} c */
+// LemmaScript opportunity (needs precise TS types before //@ verify): pure column index to name.
+// Type precisely before proving; JS oracle remains js-era behavior via dist.
 SocialCalc.rcColname = function(c) {
    if (c > 702) c = 702; // maximum number of columns - ZZ
    if (c < 1) c = 1;
@@ -5577,6 +5592,8 @@ SocialCalc.letters = ["A","B","C","D","E","F","G","H","I","J","K","L","M",
                       "N","O","P","Q","R","S","T","U","V","W","X","Y","Z"];
 
 /** @param {any} c @param {any} r */
+// LemmaScript opportunity (needs precise TS types before //@ verify): pure A1 coord algebra.
+// Type precisely before proving; JS oracle remains js-era behavior via dist.
 SocialCalc.crToCoord = function(c, r) {
    var result;
    if (c < 1) c = 1;
@@ -5591,10 +5608,12 @@ SocialCalc.crToCoord = function(c, r) {
    return result;
    }
 
-SocialCalc.coordToCol = {}; // too expensive to set in crToCoord since that is called so many times
+SocialCalc.coordToCol = {};
 SocialCalc.coordToRow = {};
 
 /** @param {any} cr */
+// LemmaScript opportunity (needs precise TS types before //@ verify): pure A1 coord algebra.
+// Type precisely before proving; JS oracle remains js-era behavior via dist.
 SocialCalc.coordToCr = function(cr) {
    var c, i, ch;
    var r = SocialCalc.coordToRow[cr];

@@ -1,12 +1,42 @@
 # Agent notes
 
+## TypeScript in-place rewrite (2026-07-09)
+
+Sources under `js/` are global-script TypeScript (not ES modules). `build.ts`
+prefers sibling `.ts` over listed `.js`, strips types with `Bun.Transpiler`, and
+reattaches leading license comment preambles. UMD wrappers stay `.js`
+(`module-wrapper-top.js` creates the factory-local `var SocialCalc = {}`).
+
+**Type-safety status (honest):**
+
+| File | Status |
+|---|---|
+| `formatnumber2.ts` | Fully typechecked (no `@ts-nocheck`) |
+| `socialcalcconstants.ts` | Fully typechecked; LemmaScript `//@ verify` on pure class/image-prefix helpers |
+| `formula1.ts` | **Interim `@ts-nocheck`** — mechanical TS + mutable Formula bridge |
+| `socialcalc-3.ts` | **Interim `@ts-nocheck`** — formula-ref helpers marked as LemmaScript *opportunities* |
+| viewer/popup/control/editor `.ts` | **Interim `@ts-nocheck`** — rename + build path only |
+
+Do **not** claim a finished typed rewrite while `@ts-nocheck` remains. Next work:
+remove nocheck file-by-file by typing against ambient `.d.ts`, using
+implementation-only mutable bridges for progressive `const` init (see
+`FormatNumberMut` / `ConstantsRoot` patterns). Public `*.d.ts` stay consumer
+API skins unless a runtime binding is genuinely reassigned by callers.
+
+**LemmaScript:** comments are insight hooks only until signatures are precise.
+Ready-ish pure targets: `ConstantsSetClasses`, `ConstantsSetImagePrefix`,
+`OffsetFormulaCoords` / `AdjustFormulaCoords` / `ReplaceFormulaCoords`,
+`crToCoord` / `coordToCr` / `rcColname`, and formula pure helpers once typed.
+Promote findings to Bun fixtures/tests; JS/dist behavior remains the oracle.
+Keep the Rust/WASM spike as parity harness, not the insight path.
+
 ## SocialCalc formula-reference work
 
-When changing formula-reference rewrite behavior, preserve compatibility first. The legacy JavaScript in `js/socialcalc-3.js` is the compatibility oracle unless a command-level spreadsheet scenario proves the current behavior is wrong.
+When changing formula-reference rewrite behavior, preserve compatibility first. The production helpers in `js/socialcalc-3.ts` (emitted into `dist/SocialCalc.js`) are the compatibility oracle unless a command-level spreadsheet scenario proves the current behavior is wrong.
 
 Key files:
 
-- `js/socialcalc-3.js` — production command handling and formula-reference rewrite helpers.
+- `js/socialcalc-3.ts` — production command handling and formula-reference rewrite helpers.
 - `test/formula-rewrite-regressions.test.ts` — production tests for direct rewrite helpers.
 - `test/command-boundary-regressions.test.ts` — command-level boundary regressions.
 - `test/filldown-persistence.test.ts` — fill/fillright/filldown persistence and increment regressions.

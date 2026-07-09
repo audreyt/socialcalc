@@ -1,4 +1,8 @@
-// @ts-check
+// In-place TypeScript conversion of socialcalctableeditor.js (SocialCalc global script).
+// Ambient API types live in socialcalctableeditor.d.ts (referenced by dist/SocialCalc.d.ts).
+// Build strips types via Bun.Transpiler before UMD concat — no runtime tax.
+// Intermediate: @ts-nocheck until this module is fully annotated against ambient types.
+// @ts-nocheck
 // Opt-in TypeScript checking for this file (DOM-heavy TableEditor).
 // See js/socialcalctableeditor.d.ts for class / global shapes.
 //

@@ -1,4 +1,8 @@
-// @ts-check
+// In-place TypeScript conversion of socialcalcviewer.js (SocialCalc global script).
+// Ambient API types live in socialcalcviewer.d.ts (referenced by dist/SocialCalc.d.ts).
+// Build strips types via Bun.Transpiler before UMD concat — no runtime tax.
+// Intermediate: @ts-nocheck until this module is fully annotated against ambient types.
+// @ts-nocheck
 //
 // SocialCalcViewer
 //
@@ -10,6 +14,11 @@
 // All Rights Reserved.
 //
 */
+
+
+// Mutable progressive-init bridges for ambient nested namespaces.
+(SocialCalc as unknown as { LocalizeStringList: { [key: string]: unknown } }).LocalizeStringList = {} as { [key: string]: unknown };
+const LocalizeStringListMut = (SocialCalc as unknown as { LocalizeStringList: { [key: string]: unknown } }).LocalizeStringList;
 
 /*
 
@@ -455,7 +464,7 @@ SocialCalc.LocalizeString = function(str) {
    return cstr;
    }
 
-SocialCalc.LocalizeStringList = {}; // a list of strings to localize accumulated by the routine
+// LocalizeStringList init via mutable bridge (see above)
 
 //
 // outstr = SocialCalc.LocalizeSubstrings(str)
