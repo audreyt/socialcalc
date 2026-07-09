@@ -44,7 +44,7 @@ bun run verify:lean          # gen + assert non-empty Lean artifacts
 bun run verify:lean:build    # optional lake build (sibling ../velvet, ../loom, ../LemmaScript)
 ```
 
-**Useful rewards now:** Dafny CI-locks pure A1/`#REF!` overflow algebra (15 VCs);
+**Useful rewards now:** Dafny CI-locks pure A1/`#REF!` overflow algebra (16 VCs);
 Bun `test/lemma-a1-facade.test.ts` cross-checks facade vs shipping
 `rcColname`/`crToCoord`/`OffsetFormulaCoords`. Lean gen feeds Leanstral goal
 packs (`a1.proof.lean`). Grow `lemma/*.ts` only; promote only to Bun fixtures.

@@ -41,7 +41,7 @@ Testing
   TypeScript rewrite.
 - LemmaScript-files.txt lists lemma/a1.ts; lsc cannot extract global-script js/*.ts.
 - test/lemma-a1-facade.test.ts locks pure A1/#REF! overflow helpers against shipping
-  rcColname/crToCoord/OffsetFormulaCoords (Dafny 15 VCs + Bun oracle cross-check).
+  rcColname/crToCoord/OffsetFormulaCoords (Dafny 16 VCs + Bun oracle cross-check).
 
 ==============================================================================
 v3.0.5 — 2026-07-05
