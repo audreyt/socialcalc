@@ -493,14 +493,31 @@ FormulaMut.EvaluatePolish = function(parseinfo, revpolish, sheet, allowrangeretu
 
       // function or name
 
+      // function or name
       else if (ttype == tokentype.name) {
-	  
-//         errortext = scf.CalculateFunction(ttext, operand, sheet);
-         errortext = scf.CalculateFunction(ttext, operand, sheet, (parseinfo as any).coord); // eddy also pass the cell id
-		 
-         if (errortext) break;
-		 
-		 
+         // Names adjacent to ":" are treated as range endpoints, not function
+         // names. This preserves full-column references like N:N and T:T
+         // while keeping bare N() and T() as function-call errors.
+         if (
+            (rii > 0 &&
+             parseinfo[rii - 1]!.type == tokentype.op &&
+             parseinfo[rii - 1]!.text == ":") ||
+            (rii + 1 < parseinfo.length &&
+             parseinfo[rii + 1]!.type == tokentype.op &&
+             parseinfo[rii + 1]!.text == ":")
+         ) {
+            if (operand.length && operand[operand.length - 1]!.type == "start") {
+                operand.pop();
+            }
+            PushOperand("name", ttext);
+            }
+         else {
+            // eddy CalculateFunction {
+            errortext = scf.CalculateFunction(ttext, operand, sheet, (parseinfo as any).coord); // eddy also pass the cell id
+            // }
+            if (errortext) break;
+            }
+
          }
 
 		 

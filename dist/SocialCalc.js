@@ -11457,9 +11457,16 @@ FormulaMut.EvaluatePolish = function(parseinfo, revpolish, sheet, allowrangeretu
         }
       }
     } else if (ttype == tokentype.name) {
-      errortext = scf.CalculateFunction(ttext, operand, sheet, parseinfo.coord);
-      if (errortext)
-        break;
+      if (rii > 0 && parseinfo[rii - 1].type == tokentype.op && parseinfo[rii - 1].text == ":" || rii + 1 < parseinfo.length && parseinfo[rii + 1].type == tokentype.op && parseinfo[rii + 1].text == ":") {
+        if (operand.length && operand[operand.length - 1].type == "start") {
+          operand.pop();
+        }
+        PushOperand("name", ttext);
+      } else {
+        errortext = scf.CalculateFunction(ttext, operand, sheet, parseinfo.coord);
+        if (errortext)
+          break;
+      }
     } else {
       errortext = scc.s_InternalError + "Unknown token " + ttype + " (" + ttext + "). ";
       break;
