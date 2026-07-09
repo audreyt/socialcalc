@@ -149,11 +149,21 @@ method offsetA1 (col : Int) (row : Int) (absCol : Bool) (absRow : Bool) (coloffs
 method adjustAxis (value : Int) (start : Int) (delta : Int) (isCol : Bool) return (res : Int)
   ensures res = -1 ∨ isCol = true ∧ res ≥ 1 ∧ res ≤ 702 ∨ isCol = false ∧ res ≥ 1
   ensures delta = 0 → res = value ∨ res = -1
+  ensures delta < 0 → value ≥ start → value < start - delta → res = -1
+  ensures value < start → isCol = true → value ≥ 1 → value ≤ 702 → res = value
+  ensures value < start → isCol = false → value ≥ 1 → res = value
   do
     return Pure.adjustAxis value start delta isCol
 
+method wouldAdjustRef (col : Int) (row : Int) (startCol : Int) (coloffset : Int) (startRow : Int) (rowoffset : Int) return (res : Bool)
+  ensures res = true ∨ res = false
+  ensures res = true ↔ Pure.adjustAxis col startCol coloffset true = -1 ∨ Pure.adjustAxis row startRow rowoffset false = -1
+  do
+    return Pure.wouldAdjustRef col row startCol coloffset startRow rowoffset
+
 method adjustA1 (col : Int) (row : Int) (absCol : Bool) (absRow : Bool) (startCol : Int) (coloffset : Int) (startRow : Int) (rowoffset : Int) return (res : String)
   ensures res.length ≥ 2
+  ensures Pure.wouldAdjustRef col row startCol coloffset startRow rowoffset = true → res = "#REF!"
   do
     let _t8 ← adjustAxis col startCol coloffset true
     let c := _t8
@@ -163,3 +173,19 @@ method adjustA1 (col : Int) (row : Int) (absCol : Bool) (absRow : Bool) (startCo
       return "#REF!"
     let _t10 ← formatA1Parts c r absCol absRow
     return _t10
+
+method colFromRcRanks (colhigh : Int) (collow : Int) return (res : Int)
+  ensures res = -1 ∨ res ≥ 1 ∧ res ≤ 702
+  ensures collow ≥ 0 → collow ≤ 25 → colhigh = 0 → res = collow + 1
+  ensures collow ≥ 0 → collow ≤ 25 → colhigh ≥ 1 → colhigh ≤ 26 → res = colhigh * 26 + collow + 1
+  ensures collow < 0 ∨ collow > 25 ∨ colhigh < 0 ∨ colhigh > 26 → res = -1
+  do
+    return Pure.colFromRcRanks colhigh collow
+
+method colToRcRanks (c : Int) return (res : ColToRcRanksResult)
+  ensures res.collow ≥ 0
+  ensures res.collow ≤ 25
+  ensures res.colhigh ≥ 0
+  ensures res.colhigh ≤ 26
+  do
+    return Pure.colToRcRanks c

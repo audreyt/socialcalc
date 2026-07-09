@@ -279,6 +279,9 @@ export function adjustAxis(
   //@ verify
   //@ ensures \result === -1 || (isCol === true && \result >= 1 && \result <= 702) || (isCol === false && \result >= 1)
   //@ ensures delta === 0 ==> (\result === value || \result === -1)
+  //@ ensures delta < 0 && value >= start && value < start - delta ==> \result === -1
+  //@ ensures value < start && isCol === true && value >= 1 && value <= 702 ==> \result === value
+  //@ ensures value < start && isCol === false && value >= 1 ==> \result === value
   if (delta < 0 && value >= start && value < start - delta) {
     return -1;
   }
@@ -289,6 +292,26 @@ export function adjustAxis(
   }
   if (shifted < 1) return -1;
   return shifted;
+}
+
+/**
+ * Whether a structural adjust of one cell would become #REF!.
+ * Separated from string emission (same role as wouldOffsetRef).
+ */
+export function wouldAdjustRef(
+  col: number,
+  row: number,
+  startCol: number,
+  coloffset: number,
+  startRow: number,
+  rowoffset: number,
+): boolean {
+  //@ verify
+  //@ ensures \result === true || \result === false
+  //@ ensures \result === true <==> adjustAxis(col, startCol, coloffset, true) === -1 || adjustAxis(row, startRow, rowoffset, false) === -1
+  const c = adjustAxis(col, startCol, coloffset, true);
+  const r = adjustAxis(row, startRow, rowoffset, false);
+  return c === -1 || r === -1;
 }
 
 /**
@@ -307,8 +330,41 @@ export function adjustA1(
 ): string {
   //@ verify
   //@ ensures \result.length >= 2
+  //@ ensures wouldAdjustRef(col, row, startCol, coloffset, startRow, rowoffset) === true ==> \result === "#REF!"
   const c = adjustAxis(col, startCol, coloffset, true);
   const r = adjustAxis(row, startRow, rowoffset, false);
   if (c === -1 || r === -1) return "#REF!";
   return formatA1Parts(c, r, absCol, absRow);
+}
+
+/**
+ * Rebuild a column index from the ranks rcColname uses.
+ * collow: 0..25 (low letter A..Z).
+ * colhigh: 0 = single letter A..Z; 1..26 = high letter A..Z of AA..ZZ.
+ * Not a 0-based first-letter rank: AA is colhigh=1, not 0.
+ */
+export function colFromRcRanks(colhigh: number, collow: number): number {
+  //@ verify
+  //@ ensures \result === -1 || (\result >= 1 && \result <= 702)
+  //@ ensures collow >= 0 && collow <= 25 && colhigh === 0 ==> \result === collow + 1
+  //@ ensures collow >= 0 && collow <= 25 && colhigh >= 1 && colhigh <= 26 ==> \result === colhigh * 26 + collow + 1
+  //@ ensures collow < 0 || collow > 25 || colhigh < 0 || colhigh > 26 ==> \result === -1
+  if (collow < 0 || collow > 25) return -1;
+  if (colhigh < 0 || colhigh > 26) return -1;
+  if (colhigh === 0) return collow + 1;
+  return colhigh * 26 + collow + 1;
+}
+
+/**
+ * Split a clamped column into the ranks rcColname uses (floor/mod of col-1).
+ * Out-of-band input is clamped first (matches shipping rcColname).
+ */
+export function colToRcRanks(c: number): { colhigh: number; collow: number } {
+  //@ verify
+  //@ ensures \result.collow >= 0 && \result.collow <= 25
+  //@ ensures \result.colhigh >= 0 && \result.colhigh <= 26
+  const col = clampCol(c);
+  const collow = (col - 1) % 26;
+  const colhigh = Math.floor((col - 1) / 26);
+  return { colhigh, collow };
 }

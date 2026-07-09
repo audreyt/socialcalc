@@ -9,3 +9,5 @@
 /lake-manifest.json
 *.ts.json
 *.dfy.base
+*.swp
+*.swo

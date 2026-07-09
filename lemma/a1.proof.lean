@@ -42,6 +42,25 @@ prove_correct offsetA1Parts by
 prove_correct adjustAxis by
   unfold Pure.adjustAxis; loom_solve
 
+prove_correct wouldAdjustRef by
+  unfold Pure.wouldAdjustRef Pure.adjustAxis; loom_solve
+
+prove_correct colFromRcRanks by
+  unfold Pure.colFromRcRanks; loom_solve
+
+prove_correct colToRcRanks by
+  unfold Pure.colToRcRanks Pure.clampCol
+  loom_solve
+  all_goals (try {
+    have h0 : ((if c < 1 then 1 else if c > 702 then 702 else c) - 1) ≥ 0 := by
+      split_ifs <;> omega
+    have hmod_nonneg : ((if c < 1 then 1 else if c > 702 then 702 else c) - 1).tmod 26 ≥ 0 :=
+      Int.tmod_nonneg 26 h0
+    have hmod_lt : ((if c < 1 then 1 else if c > 702 then 702 else c) - 1).tmod 26 < 26 :=
+      Int.tmod_lt_of_pos _ (by decide)
+    omega
+  })
+
 prove_correct rcColname by
   loom_solve
   all_goals (try rw [String.length_append])
@@ -118,5 +137,7 @@ prove_correct offsetA1 by
   all_goals (try { native_decide })
 
 prove_correct adjustA1 by
+  -- Keep formatA1Parts folded so its |res| ≥ 2 ensure discharges the goal.
+  unfold adjustAxis Pure.wouldAdjustRef Pure.adjustAxis
   loom_solve
   all_goals (try { native_decide })

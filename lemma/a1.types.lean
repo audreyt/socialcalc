@@ -8,6 +8,11 @@ structure OffsetA1PartsResult where
   row : Int
 deriving Repr, Inhabited, DecidableEq
 
+structure ColToRcRanksResult where
+  colhigh : Int
+  collow : Int
+deriving Repr, Inhabited, DecidableEq
+
 namespace Pure
 
 def clampCol (c : Int) : Int :=
@@ -88,5 +93,28 @@ def adjustAxis (value : Int) (start : Int) (delta : Int) (isCol : Bool) : Int :=
         -1
       else
         shifted
+
+def wouldAdjustRef (col : Int) (row : Int) (startCol : Int) (coloffset : Int) (startRow : Int) (rowoffset : Int) : Bool :=
+  let c := adjustAxis col startCol coloffset true
+  let r := adjustAxis row startRow rowoffset false
+  c = -1 ∨ r = -1
+
+def colFromRcRanks (colhigh : Int) (collow : Int) : Int :=
+  if collow < 0 ∨ collow > 25 then
+    -1
+  else
+    if colhigh < 0 ∨ colhigh > 26 then
+      -1
+    else
+      if colhigh = 0 then
+        collow + 1
+      else
+        colhigh * 26 + collow + 1
+
+def colToRcRanks (c : Int) : ColToRcRanksResult :=
+  let col := clampCol c
+  let collow := Int.tmod (col - 1) 26
+  let colhigh := (col - 1) / 26
+  { colhigh := colhigh, collow := collow }
 
 end Pure

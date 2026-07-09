@@ -33,6 +33,8 @@ function IntToString(n: int): string
 
 datatype OffsetA1PartsResult = OffsetA1PartsResult(col: int, row: int)
 
+datatype ColToRcRanksResult = ColToRcRanksResult(colhigh: int, collow: int)
+
 function clampCol(c: int): int
 {
   if (c < 1) then
@@ -202,6 +204,60 @@ function adjustAxis(value: int, start: int, delta: int, isCol: bool): int
 lemma adjustAxis_ensures(value: int, start: int, delta: int, isCol: bool)
   ensures (((adjustAxis(value, start, delta, isCol) == -1) || (((isCol == true) && (adjustAxis(value, start, delta, isCol) >= 1)) && (adjustAxis(value, start, delta, isCol) <= 702))) || ((isCol == false) && (adjustAxis(value, start, delta, isCol) >= 1)))
   ensures ((delta == 0) ==> ((adjustAxis(value, start, delta, isCol) == value) || (adjustAxis(value, start, delta, isCol) == -1)))
+  ensures ((delta < 0) ==> (value >= start) ==> (value < (start - delta)) ==> (adjustAxis(value, start, delta, isCol) == -1))
+  ensures ((value < start) ==> (isCol == true) ==> (value >= 1) ==> (value <= 702) ==> (adjustAxis(value, start, delta, isCol) == value))
+  ensures ((value < start) ==> (isCol == false) ==> (value >= 1) ==> (adjustAxis(value, start, delta, isCol) == value))
+{
+}
+
+function wouldAdjustRef(col: int, row: int, startCol: int, coloffset: int, startRow: int, rowoffset: int): bool
+{
+  var c := adjustAxis(col, startCol, coloffset, true);
+  var r := adjustAxis(row, startRow, rowoffset, false);
+  ((c == -1) || (r == -1))
+}
+
+lemma wouldAdjustRef_ensures(col: int, row: int, startCol: int, coloffset: int, startRow: int, rowoffset: int)
+  ensures ((wouldAdjustRef(col, row, startCol, coloffset, startRow, rowoffset) == true) || (wouldAdjustRef(col, row, startCol, coloffset, startRow, rowoffset) == false))
+  ensures ((wouldAdjustRef(col, row, startCol, coloffset, startRow, rowoffset) == true) <==> ((adjustAxis(col, startCol, coloffset, true) == -1) || (adjustAxis(row, startRow, rowoffset, false) == -1)))
+{
+}
+
+function colFromRcRanks(colhigh: int, collow: int): int
+{
+  if ((collow < 0) || (collow > 25)) then
+    -1
+  else
+    if ((colhigh < 0) || (colhigh > 26)) then
+      -1
+    else
+      if (colhigh == 0) then
+        (collow + 1)
+      else
+        (((colhigh * 26) + collow) + 1)
+}
+
+lemma colFromRcRanks_ensures(colhigh: int, collow: int)
+  ensures ((colFromRcRanks(colhigh, collow) == -1) || ((colFromRcRanks(colhigh, collow) >= 1) && (colFromRcRanks(colhigh, collow) <= 702)))
+  ensures ((collow >= 0) ==> (collow <= 25) ==> (colhigh == 0) ==> (colFromRcRanks(colhigh, collow) == (collow + 1)))
+  ensures ((collow >= 0) ==> (collow <= 25) ==> (colhigh >= 1) ==> (colhigh <= 26) ==> (colFromRcRanks(colhigh, collow) == (((colhigh * 26) + collow) + 1)))
+  ensures (((((collow < 0) || (collow > 25)) || (colhigh < 0)) || (colhigh > 26)) ==> (colFromRcRanks(colhigh, collow) == -1))
+{
+}
+
+function colToRcRanks(c: int): ColToRcRanksResult
+{
+  var col := clampCol(c);
+  var collow := JSRem((col - 1), 26);
+  var colhigh := JSFloorDiv((col - 1), 26);
+  ColToRcRanksResult(colhigh, collow)
+}
+
+lemma colToRcRanks_ensures(c: int)
+  ensures (colToRcRanks(c).collow >= 0)
+  ensures (colToRcRanks(c).collow <= 25)
+  ensures (colToRcRanks(c).colhigh >= 0)
+  ensures (colToRcRanks(c).colhigh <= 26)
 {
 }
 
@@ -298,6 +354,7 @@ method offsetA1(col: int, row: int, absCol: bool, absRow: bool, coloffset: int, 
 
 method adjustA1(col: int, row: int, absCol: bool, absRow: bool, startCol: int, coloffset: int, startRow: int, rowoffset: int) returns (res: string)
   ensures (|res| >= 2)
+  ensures ((wouldAdjustRef(col, row, startCol, coloffset, startRow, rowoffset) == true) ==> (res == "#REF!"))
 {
   var i_t8 := adjustAxis(col, startCol, coloffset, true);
   var c := i_t8;

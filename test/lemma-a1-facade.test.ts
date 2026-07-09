@@ -7,6 +7,8 @@ import {
   applyAxisOffset,
   clampCol,
   clampRow,
+  colFromRcRanks,
+  colToRcRanks,
   composeOffsets,
   crToCoord,
   formatA1Parts,
@@ -18,6 +20,7 @@ import {
   offsetRelativeA1,
   offsetRow,
   rcColname,
+  wouldAdjustRef,
   wouldOffsetRef,
 } from "../lemma/a1";
 import { loadSocialCalc } from "./helpers/socialcalc";
@@ -152,6 +155,54 @@ describe("lemma/a1 facade laws (Dafny/Lean surface)", () => {
     expect(adjustAxis(2, 2, -2, true)).toBe(-1);
     expect(adjustAxis(3, 2, -2, true)).toBe(-1);
     expect(adjustAxis(4, 2, -2, true)).toBe(2);
+  });
+
+  test("wouldAdjustRef iff adjustA1 is #REF!", () => {
+    const matrix: Array<[number, number, number, number, number, number]> = [
+      [1, 1, 2, -1, 1, 0], // A stays
+      [2, 1, 2, -1, 1, 0], // B deleted
+      [3, 1, 2, -1, 1, 0], // C → B
+      [2, 1, 2, -2, 1, 0], // wide delete band
+      [3, 1, 2, -2, 1, 0],
+      [4, 1, 2, -2, 1, 0],
+      [1, 2, 1, 0, 2, -1], // delete row 2
+      [1, 3, 1, 0, 2, -1],
+      [702, 1, 702, 1, 1, 0], // insert at ZZ shifts past band
+      [1, 1, 1, 0, 1, 0], // zero deltas
+    ];
+    for (const [c, r, sc, dc, sr, dr] of matrix) {
+      const ref = wouldAdjustRef(c, r, sc, dc, sr, dr);
+      const out = adjustA1(c, r, false, false, sc, dc, sr, dr);
+      expect(ref).toBe(out === "#REF!");
+    }
+  });
+
+  test("adjustAxis left-of-start identity on in-band", () => {
+    expect(adjustAxis(1, 5, -2, true)).toBe(1);
+    expect(adjustAxis(4, 5, 3, true)).toBe(4);
+    expect(adjustAxis(3, 5, -1, false)).toBe(3);
+    // out-of-band left stays -1 after "no shift"
+    expect(adjustAxis(0, 5, -1, true)).toBe(-1);
+    expect(adjustAxis(0, 5, 1, false)).toBe(-1);
+  });
+
+  test("colFromRcRanks inverse of colToRcRanks", () => {
+    for (const c of [1, 2, 26, 27, 28, 52, 53, 100, 701, 702]) {
+      const { colhigh, collow } = colToRcRanks(c);
+      expect(colFromRcRanks(colhigh, collow)).toBe(c);
+      expect(rcColname(c)).toBe(
+        colhigh === 0
+          ? String.fromCharCode(65 + collow)
+          : String.fromCharCode(64 + colhigh) + String.fromCharCode(65 + collow),
+      );
+    }
+    expect(colFromRcRanks(0, 0)).toBe(1);
+    expect(colFromRcRanks(0, 25)).toBe(26);
+    expect(colFromRcRanks(1, 0)).toBe(27);
+    expect(colFromRcRanks(26, 25)).toBe(702);
+    expect(colFromRcRanks(-1, 0)).toBe(-1);
+    expect(colFromRcRanks(0, 26)).toBe(-1);
+    expect(colFromRcRanks(27, 0)).toBe(-1);
   });
 });
 
