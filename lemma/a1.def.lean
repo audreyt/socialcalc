@@ -112,3 +112,64 @@ method offsetRelativeA1 (col : Int) (row : Int) (coloffset : Int) (rowoffset : I
       return "#REF!"
     let _t2 ← crToCoord c r
     return _t2
+
+method offsetA1Parts (col : Int) (row : Int) (absCol : Bool) (absRow : Bool) (coloffset : Int) (rowoffset : Int) return (res : OffsetA1PartsResult)
+  ensures absCol = true → res.col = col ∨ res.col = -1 ∨ res.row = -1
+  ensures absRow = true → res.row = row ∨ res.col = -1 ∨ res.row = -1
+  do
+    return Pure.offsetA1Parts col row absCol absRow coloffset rowoffset
+
+method formatA1Parts (col : Int) (row : Int) (absCol : Bool) (absRow : Bool) return (res : String)
+  ensures res.length ≥ 2
+  do
+    let _t3 ← isColInBounds col
+    let _t4 ← isRowInBounds row
+    if !(_t3) || !(_t4) then
+      return "#REF!"
+    let mut s : String := ""
+    if absCol then
+      s := s ++ "$"
+    let _t5 ← rcColname col
+    s := s ++ _t5
+    if absRow then
+      s := s ++ "$"
+    s := s ++ toString row
+    return s
+
+method offsetA1 (col : Int) (row : Int) (absCol : Bool) (absRow : Bool) (coloffset : Int) (rowoffset : Int) return (res : String)
+  ensures res.length ≥ 2
+  do
+    let _t6 ← offsetA1Parts col row absCol absRow coloffset rowoffset
+    let p := _t6
+    if p.col = -1 || p.row = -1 then
+      return "#REF!"
+    let _t7 ← formatA1Parts p.col p.row absCol absRow
+    return _t7
+
+method adjustAxis (value : Int) (start : Int) (delta : Int) (isCol : Bool) return (res : Int)
+  ensures res = -1 ∨ isCol = true ∧ res ≥ 1 ∧ res ≤ 702 ∨ isCol = false ∧ res ≥ 1
+  ensures delta = 0 → res = value ∨ res = -1
+  do
+    let mut v : Int := value
+    if delta < 0 && v ≥ start && v < start - delta then
+      return -1
+    if v ≥ start then
+      v := v + delta
+    if isCol then
+      if v < 1 || v > 702 then
+        return -1
+    else if v < 1 then
+      return -1
+    return v
+
+method adjustA1 (col : Int) (row : Int) (absCol : Bool) (absRow : Bool) (startCol : Int) (coloffset : Int) (startRow : Int) (rowoffset : Int) return (res : String)
+  ensures res.length ≥ 2
+  do
+    let _t8 ← adjustAxis col startCol coloffset true
+    let c := _t8
+    let _t9 ← adjustAxis row startRow rowoffset false
+    let r := _t9
+    if c = -1 || r = -1 then
+      return "#REF!"
+    let _t10 ← formatA1Parts c r absCol absRow
+    return _t10

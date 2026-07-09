@@ -3,6 +3,11 @@
 -/
 import LemmaScript
 
+structure OffsetA1PartsResult where
+  col : Int
+  row : Int
+deriving Repr, Inhabited, DecidableEq
+
 namespace Pure
 
 def clampCol (c : Int) : Int :=
@@ -56,5 +61,16 @@ def wouldOffsetRef (col : Int) (row : Int) (coloffset : Int) (rowoffset : Int) :
   let c := offsetCol col coloffset
   let r := offsetRow row rowoffset
   c = -1 ∨ r = -1
+
+def offsetA1Parts (col : Int) (row : Int) (absCol : Bool) (absRow : Bool) (coloffset : Int) (rowoffset : Int) : OffsetA1PartsResult :=
+  let c := applyAxisOffset col coloffset absCol true
+  let r := applyAxisOffset row rowoffset absRow false
+  if c = -1 ∨ r = -1 then
+    { col := -1, row := -1 }
+  else
+    if ¬(isColInBounds c) ∨ ¬(isRowInBounds r) then
+      { col := -1, row := -1 }
+    else
+      { col := c, row := r }
 
 end Pure

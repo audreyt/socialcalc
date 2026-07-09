@@ -2,13 +2,18 @@ import { describe, expect, test } from "bun:test";
 
 import {
   MAX_COL,
+  adjustA1,
+  adjustAxis,
   applyAxisOffset,
   clampCol,
   clampRow,
   composeOffsets,
   crToCoord,
+  formatA1Parts,
   isColInBounds,
   isRowInBounds,
+  offsetA1,
+  offsetA1Parts,
   offsetCol,
   offsetRelativeA1,
   offsetRow,
@@ -112,6 +117,42 @@ describe("lemma/a1 facade laws (Dafny/Lean surface)", () => {
     }
     expect(offsetRow(10, 0)).toBe(10);
   });
+
+  test("offsetA1Parts absolute locks", () => {
+    // $A1 + (1,1) → $A2 (col locked)
+    expect(offsetA1Parts(1, 1, true, false, 1, 1)).toEqual({ col: 1, row: 2 });
+    // A$1 + (1,1) → B$1 (row locked)
+    expect(offsetA1Parts(1, 1, false, true, 1, 1)).toEqual({ col: 2, row: 1 });
+    // $A$1 + (1,1) → $A$1
+    expect(offsetA1Parts(1, 1, true, true, 1, 1)).toEqual({ col: 1, row: 1 });
+    // ZZ relative col +1 → REF
+    expect(offsetA1Parts(702, 1, false, false, 1, 0)).toEqual({
+      col: -1,
+      row: -1,
+    });
+  });
+
+  test("formatA1Parts markers and REF", () => {
+    expect(formatA1Parts(1, 1, true, false)).toBe("$A1");
+    expect(formatA1Parts(1, 1, false, true)).toBe("A$1");
+    expect(formatA1Parts(1, 1, true, true)).toBe("$A$1");
+    expect(formatA1Parts(0, 1, false, false)).toBe("#REF!");
+  });
+
+  test("adjustAxis delete band and insert shift", () => {
+    // delete col 2 (delta -1): B→REF, C→B, A stays
+    expect(adjustAxis(1, 2, -1, true)).toBe(1);
+    expect(adjustAxis(2, 2, -1, true)).toBe(-1);
+    expect(adjustAxis(3, 2, -1, true)).toBe(2);
+    // insert 1 col at 2: B→C, A stays
+    expect(adjustAxis(1, 2, 1, true)).toBe(1);
+    expect(adjustAxis(2, 2, 1, true)).toBe(3);
+    // wide delete cols 2..3 (start=2, delta=-2)
+    expect(adjustAxis(1, 2, -2, true)).toBe(1);
+    expect(adjustAxis(2, 2, -2, true)).toBe(-1);
+    expect(adjustAxis(3, 2, -2, true)).toBe(-1);
+    expect(adjustAxis(4, 2, -2, true)).toBe(2);
+  });
 });
 
 describe("lemma/a1 facade vs shipping SocialCalc oracle", () => {
@@ -137,7 +178,6 @@ describe("lemma/a1 facade vs shipping SocialCalc oracle", () => {
       ["ZZ1", 1, 0],
       ["ZY1", 1, 0],
       ["A1", 0, -1],
-      // Leanstral pump edges (2026-07-09)
       ["ZZ1", 0, 0],
       ["A1", 701, 0],
       ["ZY1", 0, -1],
@@ -148,6 +188,58 @@ describe("lemma/a1 facade vs shipping SocialCalc oracle", () => {
       expect(offsetRelativeA1(cr.col, cr.row, dCol, dRow)).toBe(
         SC.OffsetFormulaCoords(coord, dCol, dRow),
       );
+    }
+  });
+
+  test("offsetA1 matches OffsetFormulaCoords with absolute markers", async () => {
+    const SC = await loadSocialCalc();
+    const cases: Array<[string, number, number]> = [
+      ["$A1", 1, 1],
+      ["A$1", 1, 1],
+      ["$A$1", 2, 2],
+      ["$A1", 0, 1],
+      ["A$1", 1, 0],
+      ["$ZZ1", 1, 0],
+      ["ZZ$1", 1, 0],
+      ["$A$1", -1, 0],
+      ["B$2", 0, -1],
+    ];
+    for (const [coord, dCol, dRow] of cases) {
+      const cr = SC.coordToCr(coord);
+      const absCol = coord.charAt(0) === "$";
+      const absRow = coord.indexOf("$", 1) !== -1;
+      expect(offsetA1(cr.col, cr.row, absCol, absRow, dCol, dRow)).toBe(
+        SC.OffsetFormulaCoords(coord, dCol, dRow),
+      );
+    }
+  });
+
+  test("adjustA1 matches AdjustFormulaCoords on single coords", async () => {
+    const SC = await loadSocialCalc();
+    // AdjustFormulaCoords(formula, col, coloffset, row, rowoffset)
+    const cases: Array<[string, number, number, number, number]> = [
+      ["B1", 2, -1, 1, 0], // delete col B → #REF!
+      ["C1", 2, -1, 1, 0], // C → B
+      ["A1", 2, -1, 1, 0], // A stays
+      ["D1", 2, -2, 1, 0], // wide delete B:C → D becomes B
+      ["B1", 2, -2, 1, 0], // in band → REF
+      ["C1", 2, -2, 1, 0], // in band → REF
+      ["A1+B1", 2, -1, 1, 0], // multi-token: only check single tokens below
+      ["$B1", 2, -1, 1, 0],
+      ["B$1", 2, -1, 1, 0],
+      ["A2", 1, 0, 2, -1], // delete row 2
+      ["A3", 1, 0, 2, -1], // A3 → A2
+      ["A1", 1, 0, 2, -1], // stays
+      ["B1", 2, 1, 1, 0], // insert col at B → C1
+    ];
+    for (const [coord, startCol, dCol, startRow, dRow] of cases) {
+      if (coord.includes("+")) continue; // multi-token covered by formula fixtures
+      const cr = SC.coordToCr(coord);
+      const absCol = coord.charAt(0) === "$";
+      const absRow = coord.indexOf("$", 1) !== -1;
+      expect(
+        adjustA1(cr.col, cr.row, absCol, absRow, startCol, dCol, startRow, dRow),
+      ).toBe(SC.AdjustFormulaCoords(coord, startCol, dCol, startRow, dRow));
     }
   });
 

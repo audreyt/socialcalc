@@ -185,10 +185,133 @@ export function offsetRelativeA1(
   //@ verify
   //@ ensures \result.length >= 2
   //@ ensures wouldOffsetRef(col, row, coloffset, rowoffset) === true ==> \result === "#REF!"
-  // Converse (!wouldOffsetRef ==> not "#REF!") is locked by Bun matrix in
-  // test/lemma-a1-facade.test.ts; Dafny cannot yet prove crToCoord never emits "#REF!".
+  // Converse (!wouldOffsetRef ==> not "#REF!") is locked by Bun matrix;
+  // Dafny cannot yet prove crToCoord never emits "#REF!".
   const c = offsetCol(col, coloffset);
   const r = offsetRow(row, rowoffset);
   if (c === -1 || r === -1) return "#REF!";
   return crToCoord(c, r);
+}
+
+/**
+ * Offset one A1 coordinate with independent absolute locks on each axis.
+ * Mirrors OffsetFormulaCoords token rewrite for $A1 / A$1 / $A$1 / A1.
+ * Returns col=-1 or row=-1 when the result is #REF!.
+ */
+export function offsetA1Parts(
+  col: number,
+  row: number,
+  absCol: boolean,
+  absRow: boolean,
+  coloffset: number,
+  rowoffset: number,
+): { col: number; row: number } {
+  //@ verify
+  //@ ensures absCol === true ==> \result.col === col || \result.col === -1 || \result.row === -1
+  //@ ensures absRow === true ==> \result.row === row || \result.col === -1 || \result.row === -1
+  const c = applyAxisOffset(col, coloffset, absCol, true);
+  const r = applyAxisOffset(row, rowoffset, absRow, false);
+  if (c === -1 || r === -1) {
+    return { col: -1, row: -1 };
+  }
+  // Absolute axes keep original values but final cell must still be in-band.
+  if (!isColInBounds(c) || !isRowInBounds(r)) {
+    return { col: -1, row: -1 };
+  }
+  return { col: c, row: r };
+}
+
+/**
+ * Format A1 with optional $ markers; invalid parts → "#REF!".
+ */
+export function formatA1Parts(
+  col: number,
+  row: number,
+  absCol: boolean,
+  absRow: boolean,
+): string {
+  //@ verify
+  //@ ensures \result.length >= 2
+  if (!isColInBounds(col) || !isRowInBounds(row)) return "#REF!";
+  let s = "";
+  if (absCol) s += "$";
+  s += rcColname(col);
+  if (absRow) s += "$";
+  s += row;
+  return s;
+}
+
+/**
+ * Full single-token OffsetFormulaCoords for one coord with abs markers.
+ */
+export function offsetA1(
+  col: number,
+  row: number,
+  absCol: boolean,
+  absRow: boolean,
+  coloffset: number,
+  rowoffset: number,
+): string {
+  //@ verify
+  //@ ensures \result.length >= 2
+  const p = offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset);
+  if (p.col === -1 || p.row === -1) return "#REF!";
+  return formatA1Parts(p.col, p.row, absCol, absRow);
+}
+
+/**
+ * Structural adjust on one axis (column or row), mirroring AdjustFormulaCoords
+ * for a non-sheet-qualified coordinate.
+ *
+ * start = first deleted/inserted index (1-based).
+ * delta = coloffset/rowoffset (negative for delete, positive for insert).
+ * isCol = true for column axis (bounds [1,702]); false for row (bounds >=1).
+ *
+ * Delete band (delta < 0): values in [start, start - delta) become -1 (#REF!).
+ * Then values >= start shift by delta. Final out-of-band → -1.
+ */
+export function adjustAxis(
+  value: number,
+  start: number,
+  delta: number,
+  isCol: boolean,
+): number {
+  //@ verify
+  //@ ensures \result === -1 || (isCol === true && \result >= 1 && \result <= 702) || (isCol === false && \result >= 1)
+  //@ ensures delta === 0 ==> (\result === value || \result === -1)
+  let v = value;
+  if (delta < 0 && v >= start && v < start - delta) {
+    return -1;
+  }
+  if (v >= start) {
+    v = v + delta;
+  }
+  if (isCol) {
+    if (v < 1 || v > 702) return -1;
+  } else {
+    if (v < 1) return -1;
+  }
+  return v;
+}
+
+/**
+ * Structural adjust of one A1 cell (non-sheet-qualified).
+ * abs markers only affect emission, not whether the underlying coord moves.
+ */
+export function adjustA1(
+  col: number,
+  row: number,
+  absCol: boolean,
+  absRow: boolean,
+  startCol: number,
+  coloffset: number,
+  startRow: number,
+  rowoffset: number,
+): string {
+  //@ verify
+  //@ ensures \result.length >= 2
+  const c = adjustAxis(col, startCol, coloffset, true);
+  const r = adjustAxis(row, startRow, rowoffset, false);
+  if (c === -1 || r === -1) return "#REF!";
+  return formatA1Parts(c, r, absCol, absRow);
 }

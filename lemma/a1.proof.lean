@@ -2,8 +2,8 @@
   Hand-written Lean proofs for lemma/a1.ts (LemmaScript Lean backend).
   Generated: a1.types.lean, a1.def.lean — re-run `bun run verify:lean:gen`.
 
-  Pure helpers (Pure.* mirrors) are intended for loom_solve.
-  Imperative Velvet methods stay open until verify:lean:build is green.
+  Pure helpers (Pure.*) target loom_solve once `verify:lean:build` is green.
+  Remaining open sorries are imperative string builders / structural adjust.
 -/
 import «a1.def»
 
@@ -37,6 +37,10 @@ prove_correct composeOffsets by
 prove_correct wouldOffsetRef by
   unfold Pure.wouldOffsetRef Pure.offsetCol Pure.offsetRow; loom_solve
 
+prove_correct offsetA1Parts by
+  unfold Pure.offsetA1Parts Pure.applyAxisOffset Pure.offsetCol Pure.offsetRow Pure.isColInBounds Pure.isRowInBounds
+  loom_solve
+
 prove_correct rcColname by
   loom_goals_intro
   all_goals sorry
@@ -46,5 +50,21 @@ prove_correct crToCoord by
   all_goals sorry
 
 prove_correct offsetRelativeA1 by
+  loom_goals_intro
+  all_goals sorry
+
+prove_correct formatA1Parts by
+  loom_goals_intro
+  all_goals sorry
+
+prove_correct offsetA1 by
+  loom_goals_intro
+  all_goals sorry
+
+prove_correct adjustAxis by
+  loom_goals_intro
+  all_goals sorry
+
+prove_correct adjustA1 by
   loom_goals_intro
   all_goals sorry

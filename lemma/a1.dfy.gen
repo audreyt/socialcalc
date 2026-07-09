@@ -31,6 +31,8 @@ function IntToString(n: int): string
   if n < 0 then "-" + NatToString(-n) else NatToString(n)
 }
 
+datatype OffsetA1PartsResult = OffsetA1PartsResult(col: int, row: int)
+
 function clampCol(c: int): int
 {
   if (c < 1) then
@@ -160,6 +162,25 @@ lemma wouldOffsetRef_ensures(col: int, row: int, coloffset: int, rowoffset: int)
 {
 }
 
+function offsetA1Parts(col: int, row: int, absCol: bool, absRow: bool, coloffset: int, rowoffset: int): OffsetA1PartsResult
+{
+  var c := applyAxisOffset(col, coloffset, absCol, true);
+  var r := applyAxisOffset(row, rowoffset, absRow, false);
+  if ((c == -1) || (r == -1)) then
+    OffsetA1PartsResult(-1, -1)
+  else
+    if (!(isColInBounds(c)) || !(isRowInBounds(r))) then
+      OffsetA1PartsResult(-1, -1)
+    else
+      OffsetA1PartsResult(c, r)
+}
+
+lemma offsetA1Parts_ensures(col: int, row: int, absCol: bool, absRow: bool, coloffset: int, rowoffset: int)
+  ensures ((absCol == true) ==> (((offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset).col == col) || (offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset).col == -1)) || (offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset).row == -1)))
+  ensures ((absRow == true) ==> (((offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset).row == row) || (offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset).col == -1)) || (offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset).row == -1)))
+{
+}
+
 const LETTERS: seq<string> := ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
 
 method rcColname(c: int) returns (res: string)
@@ -216,4 +237,72 @@ method offsetRelativeA1(col: int, row: int, coloffset: int, rowoffset: int) retu
   }
   var i_t2 := crToCoord(c, r);
   return i_t2;
+}
+
+method formatA1Parts(col: int, row: int, absCol: bool, absRow: bool) returns (res: string)
+  ensures (|res| >= 2)
+{
+  var i_t3 := isColInBounds(col);
+  var i_t4 := isRowInBounds(row);
+  if (!(i_t3) || !(i_t4)) {
+    return "#REF!";
+  }
+  var s := "";
+  if absCol {
+    s := (s + "$");
+  }
+  var i_t5 := rcColname(col);
+  s := (s + i_t5);
+  if absRow {
+    s := (s + "$");
+  }
+  s := (s + IntToString(row));
+  return s;
+}
+
+method offsetA1(col: int, row: int, absCol: bool, absRow: bool, coloffset: int, rowoffset: int) returns (res: string)
+  ensures (|res| >= 2)
+{
+  var i_t6 := offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset);
+  var p := i_t6;
+  if ((p.col == -1) || (p.row == -1)) {
+    return "#REF!";
+  }
+  var i_t7 := formatA1Parts(p.col, p.row, absCol, absRow);
+  return i_t7;
+}
+
+method adjustAxis(value: int, start: int, delta: int, isCol: bool) returns (res: int)
+  ensures (((res == -1) || (((isCol == true) && (res >= 1)) && (res <= 702))) || ((isCol == false) && (res >= 1)))
+  ensures ((delta == 0) ==> ((res == value) || (res == -1)))
+{
+  var v := value;
+  if (((delta < 0) && (v >= start)) && (v < (start - delta))) {
+    return -1;
+  }
+  if (v >= start) {
+    v := (v + delta);
+  }
+  if isCol {
+    if ((v < 1) || (v > 702)) {
+      return -1;
+    }
+  } else if (v < 1) {
+    return -1;
+  }
+  return v;
+}
+
+method adjustA1(col: int, row: int, absCol: bool, absRow: bool, startCol: int, coloffset: int, startRow: int, rowoffset: int) returns (res: string)
+  ensures (|res| >= 2)
+{
+  var i_t8 := adjustAxis(col, startCol, coloffset, true);
+  var c := i_t8;
+  var i_t9 := adjustAxis(row, startRow, rowoffset, false);
+  var r := i_t9;
+  if ((c == -1) || (r == -1)) {
+    return "#REF!";
+  }
+  var i_t10 := formatA1Parts(c, r, absCol, absRow);
+  return i_t10;
 }
