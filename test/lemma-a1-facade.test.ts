@@ -13,6 +13,7 @@ import {
   offsetRelativeA1,
   offsetRow,
   rcColname,
+  wouldOffsetRef,
 } from "../lemma/a1";
 import { loadSocialCalc } from "./helpers/socialcalc";
 
@@ -82,6 +83,35 @@ describe("lemma/a1 facade laws (Dafny/Lean surface)", () => {
     expect(offsetRelativeA1(MAX_COL, 1, 1, 0)).toBe("#REF!");
     expect(offsetRelativeA1(MAX_COL, 1, 0, 0)).toBe("ZZ1");
   });
+
+  test("wouldOffsetRef iff offsetRelativeA1 is #REF!", () => {
+    const matrix: Array<[number, number, number, number]> = [
+      [1, 1, 0, 0],
+      [1, 1, 1, 0],
+      [1, 1, -1, 0],
+      [MAX_COL, 1, 1, 0],
+      [MAX_COL, 1, 0, 0],
+      [5, 1, 0, -1],
+      [1, 5, 0, -5],
+      [26, 2, 1, 1],
+    ];
+    for (const [c, r, dc, dr] of matrix) {
+      const ref = wouldOffsetRef(c, r, dc, dr);
+      const out = offsetRelativeA1(c, r, dc, dr);
+      expect(ref).toBe(out === "#REF!");
+      if (!ref) {
+        expect(out).toBe(crToCoord(c + dc, r + dr));
+      }
+    }
+  });
+
+  test("zero-offset identity on in-band cells", () => {
+    for (const c of [1, 26, 27, 702]) {
+      expect(offsetCol(c, 0)).toBe(c);
+      expect(offsetRelativeA1(c, 3, 0, 0)).toBe(crToCoord(c, 3));
+    }
+    expect(offsetRow(10, 0)).toBe(10);
+  });
 });
 
 describe("lemma/a1 facade vs shipping SocialCalc oracle", () => {
@@ -107,6 +137,11 @@ describe("lemma/a1 facade vs shipping SocialCalc oracle", () => {
       ["ZZ1", 1, 0],
       ["ZY1", 1, 0],
       ["A1", 0, -1],
+      // Leanstral pump edges (2026-07-09)
+      ["ZZ1", 0, 0],
+      ["A1", 701, 0],
+      ["ZY1", 0, -1],
+      ["AA1", -1, 0],
     ];
     for (const [coord, dCol, dRow] of cases) {
       const cr = SC.coordToCr(coord);

@@ -44,37 +44,48 @@ method crToCoord (c : Int) (r : Int) return (res : String)
 method clampCol (c : Int) return (res : Int)
   ensures res ≥ 1
   ensures res ≤ 702
+  ensures c ≥ 1 → c ≤ 702 → res = c
   do
     return Pure.clampCol c
 
 method clampRow (r : Int) return (res : Int)
   ensures res ≥ 1
+  ensures r ≥ 1 → res = r
   do
     return Pure.clampRow r
 
 method isColInBounds (c : Int) return (res : Bool)
   ensures res = true ∨ res = false
+  ensures res = true ↔ c ≥ 1 ∧ c ≤ 702
   do
     return Pure.isColInBounds c
 
 method isRowInBounds (r : Int) return (res : Bool)
   ensures res = true ∨ res = false
+  ensures res = true ↔ r ≥ 1
   do
     return Pure.isRowInBounds r
 
 method offsetCol (col : Int) (coloffset : Int) return (res : Int)
   ensures res = -1 ∨ res ≥ 1 ∧ res ≤ 702
+  ensures res ≠ -1 → res = col + coloffset
+  ensures coloffset = 0 → col ≥ 1 → col ≤ 702 → res = col
+  ensures col + coloffset < 1 ∨ col + coloffset > 702 → res = -1
   do
     return Pure.offsetCol col coloffset
 
 method offsetRow (row : Int) (rowoffset : Int) return (res : Int)
   ensures res = -1 ∨ res ≥ 1
+  ensures res ≠ -1 → res = row + rowoffset
+  ensures rowoffset = 0 → row ≥ 1 → res = row
+  ensures row + rowoffset < 1 → res = -1
   do
     return Pure.offsetRow row rowoffset
 
 method applyAxisOffset (value : Int) (offset : Int) (abs : Bool) (isCol : Bool) return (res : Int)
   ensures abs = true → res = value
-  ensures res = -1 ∨ isCol = true ∧ res ≥ 1 ∧ res ≤ 702 ∨ isCol = false ∧ res ≥ 1 ∨ abs = true
+  ensures abs = false → isCol = true → res = Pure.offsetCol value offset
+  ensures abs = false → isCol = false → res = Pure.offsetRow value offset
   do
     return Pure.applyAxisOffset value offset abs isCol
 
@@ -83,8 +94,15 @@ method composeOffsets (a : Int) (b : Int) return (res : Int)
   do
     return Pure.composeOffsets a b
 
+method wouldOffsetRef (col : Int) (row : Int) (coloffset : Int) (rowoffset : Int) return (res : Bool)
+  ensures res = true ∨ res = false
+  ensures res = true ↔ Pure.offsetCol col coloffset = -1 ∨ Pure.offsetRow row rowoffset = -1
+  do
+    return Pure.wouldOffsetRef col row coloffset rowoffset
+
 method offsetRelativeA1 (col : Int) (row : Int) (coloffset : Int) (rowoffset : Int) return (res : String)
   ensures res.length ≥ 2
+  ensures Pure.wouldOffsetRef col row coloffset rowoffset = true → res = "#REF!"
   do
     let _t0 ← offsetCol col coloffset
     let c := _t0

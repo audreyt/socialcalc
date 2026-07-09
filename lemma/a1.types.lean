@@ -52,4 +52,9 @@ def applyAxisOffset (value : Int) (offset : Int) (abs : Bool) (isCol : Bool) : I
 def composeOffsets (a : Int) (b : Int) : Int :=
   a + b
 
+def wouldOffsetRef (col : Int) (row : Int) (coloffset : Int) (rowoffset : Int) : Bool :=
+  let c := offsetCol col coloffset
+  let r := offsetRow row rowoffset
+  c = -1 ∨ r = -1
+
 end Pure

@@ -3,8 +3,7 @@
   Generated: a1.types.lean, a1.def.lean — re-run `bun run verify:lean:gen`.
 
   Pure helpers (Pure.* mirrors) are intended for loom_solve.
-  Imperative Velvet methods (rcColname/crToCoord/offsetRelativeA1) stay open
-  until verify:lean:build is green on this machine.
+  Imperative Velvet methods stay open until verify:lean:build is green.
 -/
 import «a1.def»
 
@@ -35,7 +34,9 @@ prove_correct applyAxisOffset by
 prove_correct composeOffsets by
   unfold Pure.composeOffsets; loom_solve
 
--- Imperative builders / string #REF! path: scaffold goals for Leanstral backlog.
+prove_correct wouldOffsetRef by
+  unfold Pure.wouldOffsetRef Pure.offsetCol Pure.offsetRow; loom_solve
+
 prove_correct rcColname by
   loom_goals_intro
   all_goals sorry

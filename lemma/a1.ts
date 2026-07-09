@@ -61,6 +61,7 @@ export function clampCol(c: number): number {
   //@ verify
   //@ ensures \result >= 1
   //@ ensures \result <= 702
+  //@ ensures c >= 1 && c <= 702 ==> \result === c
   if (c < 1) return 1;
   if (c > 702) return 702;
   return c;
@@ -69,6 +70,7 @@ export function clampCol(c: number): number {
 export function clampRow(r: number): number {
   //@ verify
   //@ ensures \result >= 1
+  //@ ensures r >= 1 ==> \result === r
   if (r < 1) return 1;
   return r;
 }
@@ -80,12 +82,14 @@ export function clampRow(r: number): number {
 export function isColInBounds(c: number): boolean {
   //@ verify
   //@ ensures \result === true || \result === false
+  //@ ensures \result === true <==> c >= 1 && c <= 702
   return c >= 1 && c <= 702;
 }
 
 export function isRowInBounds(r: number): boolean {
   //@ verify
   //@ ensures \result === true || \result === false
+  //@ ensures \result === true <==> r >= 1
   return r >= 1;
 }
 
@@ -96,6 +100,9 @@ export function isRowInBounds(r: number): boolean {
 export function offsetCol(col: number, coloffset: number): number {
   //@ verify
   //@ ensures \result === -1 || (\result >= 1 && \result <= 702)
+  //@ ensures \result !== -1 ==> \result === col + coloffset
+  //@ ensures coloffset === 0 && col >= 1 && col <= 702 ==> \result === col
+  //@ ensures col + coloffset < 1 || col + coloffset > 702 ==> \result === -1
   const c = col + coloffset;
   if (c < 1 || c > 702) return -1;
   return c;
@@ -108,6 +115,9 @@ export function offsetCol(col: number, coloffset: number): number {
 export function offsetRow(row: number, rowoffset: number): number {
   //@ verify
   //@ ensures \result === -1 || \result >= 1
+  //@ ensures \result !== -1 ==> \result === row + rowoffset
+  //@ ensures rowoffset === 0 && row >= 1 ==> \result === row
+  //@ ensures row + rowoffset < 1 ==> \result === -1
   const r = row + rowoffset;
   if (r < 1) return -1;
   return r;
@@ -126,7 +136,8 @@ export function applyAxisOffset(
 ): number {
   //@ verify
   //@ ensures abs === true ==> \result === value
-  //@ ensures \result === -1 || (isCol === true && \result >= 1 && \result <= 702) || (isCol === false && \result >= 1) || abs === true
+  //@ ensures abs === false && isCol === true ==> \result === offsetCol(value, offset)
+  //@ ensures abs === false && isCol === false ==> \result === offsetRow(value, offset)
   if (abs) return value;
   if (isCol) return offsetCol(value, offset);
   return offsetRow(value, offset);
@@ -143,10 +154,27 @@ export function composeOffsets(a: number, b: number): number {
 }
 
 /**
+ * Whether a relative single-cell offset would become #REF!.
+ * Separated from string emission so Dafny/Lean can prove the policy without
+ * string equality on "#REF!".
+ */
+export function wouldOffsetRef(
+  col: number,
+  row: number,
+  coloffset: number,
+  rowoffset: number,
+): boolean {
+  //@ verify
+  //@ ensures \result === true || \result === false
+  //@ ensures \result === true <==> offsetCol(col, coloffset) === -1 || offsetRow(row, rowoffset) === -1
+  const c = offsetCol(col, coloffset);
+  const r = offsetRow(row, rowoffset);
+  return c === -1 || r === -1;
+}
+
+/**
  * Single-cell relative offset to A1 text or "#REF!".
- * Mirrors OffsetFormulaCoords on a single relative (non-$) coord:
- * shift both axes; out-of-band → "#REF!"; else crToCoord (which clamps only
- * for display of in-band cells — we pre-check bounds so no silent ZZ clamp).
+ * Mirrors OffsetFormulaCoords on a single relative (non-$) coord.
  */
 export function offsetRelativeA1(
   col: number,
@@ -156,6 +184,9 @@ export function offsetRelativeA1(
 ): string {
   //@ verify
   //@ ensures \result.length >= 2
+  //@ ensures wouldOffsetRef(col, row, coloffset, rowoffset) === true ==> \result === "#REF!"
+  // Converse (!wouldOffsetRef ==> not "#REF!") is locked by Bun matrix in
+  // test/lemma-a1-facade.test.ts; Dafny cannot yet prove crToCoord never emits "#REF!".
   const c = offsetCol(col, coloffset);
   const r = offsetRow(row, rowoffset);
   if (c === -1 || r === -1) return "#REF!";

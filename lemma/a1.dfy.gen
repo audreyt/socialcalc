@@ -45,6 +45,7 @@ function clampCol(c: int): int
 lemma clampCol_ensures(c: int)
   ensures (clampCol(c) >= 1)
   ensures (clampCol(c) <= 702)
+  ensures ((c >= 1) ==> (c <= 702) ==> (clampCol(c) == c))
 {
 }
 
@@ -58,6 +59,7 @@ function clampRow(r: int): int
 
 lemma clampRow_ensures(r: int)
   ensures (clampRow(r) >= 1)
+  ensures ((r >= 1) ==> (clampRow(r) == r))
 {
 }
 
@@ -68,6 +70,7 @@ function isColInBounds(c: int): bool
 
 lemma isColInBounds_ensures(c: int)
   ensures ((isColInBounds(c) == true) || (isColInBounds(c) == false))
+  ensures ((isColInBounds(c) == true) <==> ((c >= 1) && (c <= 702)))
 {
 }
 
@@ -78,6 +81,7 @@ function isRowInBounds(r: int): bool
 
 lemma isRowInBounds_ensures(r: int)
   ensures ((isRowInBounds(r) == true) || (isRowInBounds(r) == false))
+  ensures ((isRowInBounds(r) == true) <==> (r >= 1))
 {
 }
 
@@ -92,6 +96,9 @@ function offsetCol(col: int, coloffset: int): int
 
 lemma offsetCol_ensures(col: int, coloffset: int)
   ensures ((offsetCol(col, coloffset) == -1) || ((offsetCol(col, coloffset) >= 1) && (offsetCol(col, coloffset) <= 702)))
+  ensures ((offsetCol(col, coloffset) != -1) ==> (offsetCol(col, coloffset) == (col + coloffset)))
+  ensures ((coloffset == 0) ==> (col >= 1) ==> (col <= 702) ==> (offsetCol(col, coloffset) == col))
+  ensures ((((col + coloffset) < 1) || ((col + coloffset) > 702)) ==> (offsetCol(col, coloffset) == -1))
 {
 }
 
@@ -106,6 +113,9 @@ function offsetRow(row: int, rowoffset: int): int
 
 lemma offsetRow_ensures(row: int, rowoffset: int)
   ensures ((offsetRow(row, rowoffset) == -1) || (offsetRow(row, rowoffset) >= 1))
+  ensures ((offsetRow(row, rowoffset) != -1) ==> (offsetRow(row, rowoffset) == (row + rowoffset)))
+  ensures ((rowoffset == 0) ==> (row >= 1) ==> (offsetRow(row, rowoffset) == row))
+  ensures (((row + rowoffset) < 1) ==> (offsetRow(row, rowoffset) == -1))
 {
 }
 
@@ -122,7 +132,8 @@ function applyAxisOffset(value: int, offset: int, abs: bool, isCol: bool): int
 
 lemma applyAxisOffset_ensures(value: int, offset: int, abs: bool, isCol: bool)
   ensures ((abs == true) ==> (applyAxisOffset(value, offset, abs, isCol) == value))
-  ensures ((((applyAxisOffset(value, offset, abs, isCol) == -1) || (((isCol == true) && (applyAxisOffset(value, offset, abs, isCol) >= 1)) && (applyAxisOffset(value, offset, abs, isCol) <= 702))) || ((isCol == false) && (applyAxisOffset(value, offset, abs, isCol) >= 1))) || (abs == true))
+  ensures ((abs == false) ==> (isCol == true) ==> (applyAxisOffset(value, offset, abs, isCol) == offsetCol(value, offset)))
+  ensures ((abs == false) ==> (isCol == false) ==> (applyAxisOffset(value, offset, abs, isCol) == offsetRow(value, offset)))
 {
 }
 
@@ -133,6 +144,19 @@ function composeOffsets(a: int, b: int): int
 
 lemma composeOffsets_ensures(a: int, b: int)
   ensures (composeOffsets(a, b) == (a + b))
+{
+}
+
+function wouldOffsetRef(col: int, row: int, coloffset: int, rowoffset: int): bool
+{
+  var c := offsetCol(col, coloffset);
+  var r := offsetRow(row, rowoffset);
+  ((c == -1) || (r == -1))
+}
+
+lemma wouldOffsetRef_ensures(col: int, row: int, coloffset: int, rowoffset: int)
+  ensures ((wouldOffsetRef(col, row, coloffset, rowoffset) == true) || (wouldOffsetRef(col, row, coloffset, rowoffset) == false))
+  ensures ((wouldOffsetRef(col, row, coloffset, rowoffset) == true) <==> ((offsetCol(col, coloffset) == -1) || (offsetRow(row, rowoffset) == -1)))
 {
 }
 
@@ -181,6 +205,7 @@ method crToCoord(c: int, r: int) returns (res: string)
 
 method offsetRelativeA1(col: int, row: int, coloffset: int, rowoffset: int) returns (res: string)
   ensures (|res| >= 2)
+  ensures ((wouldOffsetRef(col, row, coloffset, rowoffset) == true) ==> (res == "#REF!"))
 {
   var i_t0 := offsetCol(col, coloffset);
   var c := i_t0;
