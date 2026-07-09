@@ -97,7 +97,7 @@ const TriggerIoMut: TriggerIoMutable =
       "*": 6, "/": 6,
       "+": 7, "-": 7,
       "&": 8,
-      "<": 9, ">": 9, "G": 9, "L": 9, "N": 9
+      "<": 9, ">": 9, "=": 9, "G": 9, "L": 9, "N": 9
       };
 
    // Convert one-char token text to input text:
@@ -472,13 +472,21 @@ FormulaMut.EvaluatePolish = function(parseinfo, revpolish, sheet, allowrangeretu
                   }
                }
             else if (ttext == '^') {
-               value1.value = Math.pow(value1.value, value2.value);
-               value1.type = "n"; // gives plain numeric result type
-               if (isNaN(value1.value)) {
-                  value1.value = 0;
-                  value1.type = "e#NUM!";
+               // Error operands must win over Math.pow coercion (errors are 0).
+               // 2^#REF! / #REF!^2 must stay #REF!, not 1 / #NUM!.
+               resulttype = lookup_result_type(value1.type, value2.type, typelookup.plus);
+               if (resulttype.charAt(0) == "e") {
+                  PushOperand(resulttype, 0);
                   }
-               PushOperand(value1.type, value1.value);
+               else {
+                  value1.value = Math.pow(value1.value, value2.value);
+                  value1.type = "n"; // plain numeric result
+                  if (isNaN(value1.value)) {
+                     value1.value = 0;
+                     value1.type = "e#NUM!";
+                     }
+                  PushOperand(value1.type, value1.value);
+                  }
                }
             }
          }
@@ -2513,6 +2521,11 @@ FormulaMut.IfFunction = function(fname, operand, foperand, sheet) {
 
    cond = SocialCalc.Formula.OperandValueAndType(sheet, foperand);
    t = cond.type.charAt(0);
+   if (t == "e") {
+      // Preserve condition error type (#DIV/0!, #REF!, #N/A, …), not collapse to #VALUE!.
+      operand.push({type: cond.type, value: 0});
+      return;
+      }
    if (t != "n" && t != "b") {
       operand.push({type: "e#VALUE!", value: 0});
       return;
@@ -5955,28 +5968,37 @@ FormulaMut.TestCriteria = function(value, type, criteria) {
       }
 
    criteria = criteria + "";
-   comparitor = criteria.charAt(0); // look for comparitor
-   if (comparitor == "=" || comparitor == "<" || comparitor == ">") {
-      basestring = criteria.substring(1);
+   // Two-char comparators first (>=, <=, <>); then single-char =/< />.
+   // Peeling only the first char made ">=3" into ">" + "=3" (text), so COUNTIF/SUMIF/D*
+   // silently matched nothing or everything.
+   if (criteria.substring(0, 2) == ">=" || criteria.substring(0, 2) == "<=" || criteria.substring(0, 2) == "<>") {
+      comparitor = criteria.substring(0, 2);
+      basestring = criteria.substring(2);
       }
    else {
-      // check for '*' or '?' in search string - wildcard
-      if (criteria.search(/([^~]\*|^\*)/) != -1 || criteria.search(/([^~]\?|^\?)/) != -1) {
-         comparitor = "regex";
-         if (criteria == "*") {
-            // "*" means cell contains 'anything'
-            basestring = ".+";
-         } else {
-             // convert Excel syntax to regex syntax. * -> .*    ? -> .?    ~* -> \*    ~? -> \?
-             // there are no negative lookbehinds in Javascript. Reverse the string and do negative lookaheads on ~? and ~*
-             basestring = criteria.split("").reverse().join("");
-             basestring = basestring.replace(/\?(?=[^~])|\?$/g, "?.").replace(/\?~/g, "?\\").replace(/\*(?=[^~])|\*$/g, "*.").replace(/\*~/, "*\\");
-             basestring = basestring.split("").reverse().join("");
+      comparitor = criteria.charAt(0); // look for comparitor
+      if (comparitor == "=" || comparitor == "<" || comparitor == ">") {
+         basestring = criteria.substring(1);
          }
-         basestring = "^" + basestring + "$";
-      } else {
-          comparitor = "none";
-          basestring = criteria;
+      else {
+         // check for '*' or '?' in search string - wildcard
+         if (criteria.search(/([^~]\*|^\*)/) != -1 || criteria.search(/([^~]\?|^\?)/) != -1) {
+            comparitor = "regex";
+            if (criteria == "*") {
+               // "*" means cell contains 'anything'
+               basestring = ".+";
+            } else {
+                // convert Excel syntax to regex syntax. * -> .*    ? -> .?    ~* -> \*    ~? -> \?
+                // there are no negative lookbehinds in Javascript. Reverse the string and do negative lookaheads on ~? and ~*
+                basestring = criteria.split("").reverse().join("");
+                basestring = basestring.replace(/\?(?=[^~])|\?$/g, "?.").replace(/\?~/g, "?\\").replace(/\*(?=[^~])|\*$/g, "*.").replace(/\*~/, "*\\");
+                basestring = basestring.split("").reverse().join("");
+            }
+            basestring = "^" + basestring + "$";
+         } else {
+             comparitor = "none";
+             basestring = criteria;
+         }
       }
    }
 
@@ -6007,6 +6029,10 @@ FormulaMut.TestCriteria = function(value, type, criteria) {
             cond = value < basevalue.value;
             break;
 
+         case "<=":
+            cond = value <= basevalue.value;
+            break;
+
          case "=":
          case "none":
             cond = value == basevalue.value;
@@ -6014,6 +6040,14 @@ FormulaMut.TestCriteria = function(value, type, criteria) {
 
          case ">":
             cond = value > basevalue.value;
+            break;
+
+         case ">=":
+            cond = value >= basevalue.value;
+            break;
+
+         case "<>":
+            cond = value != basevalue.value;
             break;
          }
       }
@@ -6042,6 +6076,10 @@ FormulaMut.TestCriteria = function(value, type, criteria) {
             cond = value < basevalue.value;
             break;
 
+         case "<=":
+            cond = value <= basevalue.value;
+            break;
+
          case "=":
             cond = value == basevalue.value;
             break;
@@ -6052,6 +6090,14 @@ FormulaMut.TestCriteria = function(value, type, criteria) {
 
          case ">":
             cond = value > basevalue.value;
+            break;
+
+         case ">=":
+            cond = value >= basevalue.value;
+            break;
+
+         case "<>":
+            cond = value != basevalue.value;
             break;
 
          case "regex":

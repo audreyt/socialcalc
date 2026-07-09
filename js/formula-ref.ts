@@ -161,6 +161,19 @@ FormulaRefRoot.ParseRange = function (
 //   when no intermediate #REF!.
 // - relative coords shift by offsets; absolute $ legs stay fixed;
 //   overflow col>702 or row/col <1 → #REF!; strings/ops preserved.
+// Re-emit a formula string/sheet-name token so the result re-parses.
+// The lexer treats ' and " as the same quote class and does not remember the
+// opener, so both characters must be doubled inside the payload. Outer form:
+// apostrophe-bearing payloads use single quotes (Excel-style sheet names);
+// everything else keeps the historical double-quote emission.
+function quoteFormulaString(text: string): string {
+    const escaped = text.replace(/'/g, "''").replace(/"/g, '""');
+    if (text.indexOf("'") >= 0) {
+        return "'" + escaped + "'";
+    }
+    return '"' + escaped + '"';
+}
+
 FormulaRefRoot.OffsetFormulaCoords = function (
     formula: string,
     coloffset: number,
@@ -201,12 +214,7 @@ FormulaRefRoot.OffsetFormulaCoords = function (
             }
             updatedformula += newcr;
         } else if (ttype === token_string) {
-            if (ttext.indexOf('"') >= 0) {
-                // quotes to double
-                updatedformula += '"' + ttext.replace(/"/g, '""') + '"';
-            } else {
-                updatedformula += '"' + ttext + '"';
-            }
+            updatedformula += quoteFormulaString(ttext);
         } else if (ttype === token_op) {
             updatedformula += tokenOpExpansion[ttext] || ttext; // short tokens (e.g. "G") → ">="
         } else {
@@ -292,10 +300,7 @@ FormulaRefRoot.AdjustFormulaCoords = function (
             }
             ttext = newcr;
         } else if (ttype === token_string) {
-            ttext =
-                '"' +
-                (ttext.indexOf('"') >= 0 ? ttext.replace(/"/g, '""') : ttext) +
-                '"';
+            ttext = quoteFormulaString(ttext);
         }
         updatedformula += ttext;
     }
@@ -361,10 +366,7 @@ FormulaRefRoot.ReplaceFormulaCoords = function (
                 ttext = newcr;
             }
         } else if (ttype === token_string) {
-            ttext =
-                '"' +
-                (ttext.indexOf('"') >= 0 ? ttext.replace(/"/g, '""') : ttext) +
-                '"';
+            ttext = quoteFormulaString(ttext);
         }
         updatedformula += ttext;
     }

@@ -5029,3 +5029,55 @@ test("sheet: formula cell divisor that is #REF! propagates #REF! not #DIV/0!", a
     // true zero/error-from-div still #DIV/0!
     expect(getVT("F1")).toBe("e#DIV/0!");
 });
+
+test("EvaluatePolish: power propagates error operands (not 1 or #NUM!)", async () => {
+    const SC = await loadSocialCalc();
+    resetFormulaGlobals(SC);
+    const sheet = new SC.Sheet();
+
+    const rightErr = SC.Formula.evaluate_parsed_formula(
+        SC.Formula.ParseFormulaIntoTokens("2^#REF!"),
+        sheet,
+        false,
+    );
+    expect(rightErr.type).toBe("e#REF!");
+
+    const leftErr = SC.Formula.evaluate_parsed_formula(
+        SC.Formula.ParseFormulaIntoTokens("#REF!^2"),
+        sheet,
+        false,
+    );
+    expect(leftErr.type).toBe("e#REF!");
+
+    const textPow = SC.Formula.evaluate_parsed_formula(
+        SC.Formula.ParseFormulaIntoTokens('2^"x"'),
+        sheet,
+        false,
+    );
+    expect(textPow.type).toBe("e#VALUE!");
+
+    const ok = SC.Formula.evaluate_parsed_formula(
+        SC.Formula.ParseFormulaIntoTokens("2^3"),
+        sheet,
+        false,
+    );
+    expect(ok.type).toBe("n");
+    expect(ok.value).toBe(8);
+});
+
+test("ConvertInfixToPolish: equality has comparison precedence with +", async () => {
+    const SC = await loadSocialCalc();
+    resetFormulaGlobals(SC);
+    const sheet = new SC.Sheet();
+
+    const tokens = SC.Formula.ParseFormulaIntoTokens("1=2+3");
+    const rpn = SC.Formula.ConvertInfixToPolish(tokens);
+    expect(Array.isArray(rpn)).toBe(true);
+    // Expected RPN texts: 1, 2, 3, +, =  (add before compare)
+    const texts = (rpn as number[]).map((i) => tokens[i]?.text);
+    expect(texts).toEqual(["1", "2", "3", "+", "="]);
+
+    const result = SC.Formula.evaluate_parsed_formula(tokens, sheet, false);
+    expect(result.type).toBe("nl");
+    expect(result.value).toBe(0); // false: 1 == 5
+});

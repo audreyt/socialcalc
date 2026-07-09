@@ -191,6 +191,38 @@
       "args": { "col": 2, "coloffset": -2, "row": 1, "rowoffset": 0 },
       "expected": "A1+#REF!+#REF!+B1",
       "invariant": "Deleting two columns from col 2 invalidates B1 and C1 while D1 shifts back to B1."
+    },
+    {
+      "name": "offset preserves apostrophe sheet name while shifting coord",
+      "method": "offset",
+      "formula": "'O''Brien'!A1",
+      "args": { "coloffset": 1, "rowoffset": 0 },
+      "expected": "'O''Brien'!B1",
+      "invariant": "Apostrophe-bearing sheet names re-emit with single quotes and doubled apostrophes so OffsetFormulaCoords output re-parses."
+    },
+    {
+      "name": "offset preserves apostrophe string literal while shifting coord",
+      "method": "offset",
+      "formula": "CONCATENATE('O''Brien',A1)",
+      "args": { "coloffset": 1, "rowoffset": 0 },
+      "expected": "CONCATENATE('O''Brien',B1)",
+      "invariant": "STRING_PRESERVATION for apostrophe payloads: single-quote emission with doubled apostrophes; only the coord token shifts."
+    },
+    {
+      "name": "adjust preserves apostrophe sheet name while skipping sheet-qualified coord",
+      "method": "adjust",
+      "formula": "'O''Brien'!A1",
+      "args": { "col": 1, "coloffset": 1, "row": 1, "rowoffset": 0 },
+      "expected": "'O''Brien'!A1",
+      "invariant": "SHEETREF_SKIP: AdjustFormulaCoords leaves sheet-qualified A1 alone while re-emitting the apostrophe sheet name with single quotes."
+    },
+    {
+      "name": "replace keeps apostrophe sheet-qualified ref sticky while replacing local",
+      "method": "replace",
+      "formula": "'O''Brien'!A1+C1",
+      "args": { "movedto": { "C1": "F6" } },
+      "expected": "'O''Brien'!A1+F6",
+      "invariant": "Sheet-qualified A1 stays sticky under ReplaceFormulaCoords; local C1 is replaced; apostrophe sheet name re-emits with single quotes."
     }
   ],
   "commandCases": [

@@ -11200,6 +11200,7 @@ FormulaMut.TokenPrecedence = {
   "&": 8,
   "<": 9,
   ">": 9,
+  "=": 9,
   G: 9,
   L: 9,
   N: 9
@@ -11416,13 +11417,18 @@ FormulaMut.EvaluatePolish = function(parseinfo, revpolish, sheet, allowrangeretu
             PushOperand("e#DIV/0!", 0);
           }
         } else if (ttext == "^") {
-          value1.value = Math.pow(value1.value, value2.value);
-          value1.type = "n";
-          if (isNaN(value1.value)) {
-            value1.value = 0;
-            value1.type = "e#NUM!";
+          resulttype = lookup_result_type(value1.type, value2.type, typelookup.plus);
+          if (resulttype.charAt(0) == "e") {
+            PushOperand(resulttype, 0);
+          } else {
+            value1.value = Math.pow(value1.value, value2.value);
+            value1.type = "n";
+            if (isNaN(value1.value)) {
+              value1.value = 0;
+              value1.type = "e#NUM!";
+            }
+            PushOperand(value1.type, value1.value);
           }
-          PushOperand(value1.type, value1.value);
         }
       }
     } else if (ttype == tokentype.name) {
@@ -12616,6 +12622,10 @@ FormulaMut.IfFunction = function(fname, operand, foperand, sheet) {
   var scf = SocialCalc.Formula;
   cond = SocialCalc.Formula.OperandValueAndType(sheet, foperand);
   t = cond.type.charAt(0);
+  if (t == "e") {
+    operand.push({ type: cond.type, value: 0 });
+    return;
+  }
   if (t != "n" && t != "b") {
     operand.push({ type: "e#VALUE!", value: 0 });
     return;
@@ -14732,23 +14742,28 @@ FormulaMut.TestCriteria = function(value, type, criteria) {
     return false;
   }
   criteria = criteria + "";
-  comparitor = criteria.charAt(0);
-  if (comparitor == "=" || comparitor == "<" || comparitor == ">") {
-    basestring = criteria.substring(1);
+  if (criteria.substring(0, 2) == ">=" || criteria.substring(0, 2) == "<=" || criteria.substring(0, 2) == "<>") {
+    comparitor = criteria.substring(0, 2);
+    basestring = criteria.substring(2);
   } else {
-    if (criteria.search(/([^~]\*|^\*)/) != -1 || criteria.search(/([^~]\?|^\?)/) != -1) {
-      comparitor = "regex";
-      if (criteria == "*") {
-        basestring = ".+";
-      } else {
-        basestring = criteria.split("").reverse().join("");
-        basestring = basestring.replace(/\?(?=[^~])|\?$/g, "?.").replace(/\?~/g, "?\\").replace(/\*(?=[^~])|\*$/g, "*.").replace(/\*~/, "*\\");
-        basestring = basestring.split("").reverse().join("");
-      }
-      basestring = "^" + basestring + "$";
+    comparitor = criteria.charAt(0);
+    if (comparitor == "=" || comparitor == "<" || comparitor == ">") {
+      basestring = criteria.substring(1);
     } else {
-      comparitor = "none";
-      basestring = criteria;
+      if (criteria.search(/([^~]\*|^\*)/) != -1 || criteria.search(/([^~]\?|^\?)/) != -1) {
+        comparitor = "regex";
+        if (criteria == "*") {
+          basestring = ".+";
+        } else {
+          basestring = criteria.split("").reverse().join("");
+          basestring = basestring.replace(/\?(?=[^~])|\?$/g, "?.").replace(/\?~/g, "?\\").replace(/\*(?=[^~])|\*$/g, "*.").replace(/\*~/, "*\\");
+          basestring = basestring.split("").reverse().join("");
+        }
+        basestring = "^" + basestring + "$";
+      } else {
+        comparitor = "none";
+        basestring = criteria;
+      }
     }
   }
   basevalue = SocialCalc.DetermineValueType(basestring);
@@ -14775,12 +14790,21 @@ FormulaMut.TestCriteria = function(value, type, criteria) {
       case "<":
         cond = value < basevalue.value;
         break;
+      case "<=":
+        cond = value <= basevalue.value;
+        break;
       case "=":
       case "none":
         cond = value == basevalue.value;
         break;
       case ">":
         cond = value > basevalue.value;
+        break;
+      case ">=":
+        cond = value >= basevalue.value;
+        break;
+      case "<>":
+        cond = value != basevalue.value;
         break;
     }
   } else if (type.charAt(0) == "e") {
@@ -14800,6 +14824,9 @@ FormulaMut.TestCriteria = function(value, type, criteria) {
       case "<":
         cond = value < basevalue.value;
         break;
+      case "<=":
+        cond = value <= basevalue.value;
+        break;
       case "=":
         cond = value == basevalue.value;
         break;
@@ -14808,6 +14835,12 @@ FormulaMut.TestCriteria = function(value, type, criteria) {
         break;
       case ">":
         cond = value > basevalue.value;
+        break;
+      case ">=":
+        cond = value >= basevalue.value;
+        break;
+      case "<>":
+        cond = value != basevalue.value;
         break;
       case "regex":
         try {
@@ -15557,6 +15590,13 @@ FormulaRefRoot.ParseRange = function(range) {
     cr2: { row: p0.row, col: p0.col, coord: range }
   };
 };
+function quoteFormulaString(text) {
+  const escaped = text.replace(/'/g, "''").replace(/"/g, '""');
+  if (text.indexOf("'") >= 0) {
+    return "'" + escaped + "'";
+  }
+  return '"' + escaped + '"';
+}
 FormulaRefRoot.OffsetFormulaCoords = function(formula, coloffset, rowoffset) {
   const scf = SocialCalc.Formula;
   const tokentype = scf.TokenType;
@@ -15589,11 +15629,7 @@ FormulaRefRoot.OffsetFormulaCoords = function(formula, coloffset, rowoffset) {
       }
       updatedformula += newcr;
     } else if (ttype === token_string) {
-      if (ttext.indexOf('"') >= 0) {
-        updatedformula += '"' + ttext.replace(/"/g, '""') + '"';
-      } else {
-        updatedformula += '"' + ttext + '"';
-      }
+      updatedformula += quoteFormulaString(ttext);
     } else if (ttype === token_op) {
       updatedformula += tokenOpExpansion[ttext] || ttext;
     } else {
@@ -15655,7 +15691,7 @@ FormulaRefRoot.AdjustFormulaCoords = function(formula, col, coloffset, row, rowo
       }
       ttext = newcr;
     } else if (ttype === token_string) {
-      ttext = '"' + (ttext.indexOf('"') >= 0 ? ttext.replace(/"/g, '""') : ttext) + '"';
+      ttext = quoteFormulaString(ttext);
     }
     updatedformula += ttext;
   }
@@ -15703,7 +15739,7 @@ FormulaRefRoot.ReplaceFormulaCoords = function(formula, movedto) {
         ttext = newcr;
       }
     } else if (ttype === token_string) {
-      ttext = '"' + (ttext.indexOf('"') >= 0 ? ttext.replace(/"/g, '""') : ttext) + '"';
+      ttext = quoteFormulaString(ttext);
     }
     updatedformula += ttext;
   }

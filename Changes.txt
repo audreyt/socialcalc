@@ -15,6 +15,18 @@ Fixes
   `#REF!`) instead of treating coerced error zeros as `#DIV/0!`. Text divisors
   such as `1/"x"` become `#VALUE!`. Concat `&` uses both operand types so a
   right-hand error (e.g. `"x"&#REF!`) is preserved.
+- Formula arithmetic `^` propagates error operands (`2^#REF!` / `#REF!^2` stay
+  `#REF!`) instead of Math.pow on coerced zeros.
+- `TokenPrecedence` includes `=` so `1=2+3` is RPN `1 2 3 + =` (false), not a
+  broken compare-before-add stack that returned the sum.
+- `TestCriteria` peels two-char `>=` / `<=` / `<>` before single-char `=`/`</>`;
+  COUNTIF/SUMIF/D* multi-char criteria now match numerically (was legacy
+  text-branch quirk).
+- `IF` preserves condition error types (`IF(1/0,…)` → `#DIV/0!`, `IF(NA(),…)` →
+  `#N/A`) instead of collapsing every non-n/b condition to `#VALUE!`.
+- Formula-ref Offset/Adjust/Replace re-emit string/sheet tokens via
+  `quoteFormulaString`: apostrophe payloads use `'…''…'`, double both quote
+  characters so reparse survives the shared quote lexer class.
 
 Toolchain and build
 - Converted all core SocialCalc JavaScript sources under js/ to global-script

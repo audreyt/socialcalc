@@ -257,21 +257,18 @@ test("TestCriteria: various comparators and number-vs-text coercion", async () =
     const SC = await loadSocialCalc();
     resetFormulaGlobals(SC);
 
-    // NOTE: TestCriteria strips only the single first character when it is
-    // =, <, or >. So "<=10" is really comparitor=="<" with basestring "=10",
-    // which DetermineValueType recognises as text. The "<=", "<>", ">=" code
-    // path at L6847-6853 only fires if the first char isn't one of =/</>,
-    // which is effectively dead unless a caller pre-strips those.
+    // Two-char comparators peel correctly (>=, <=, <>), then single-char =/</>.
+    expect(SC.Formula.TestCriteria(5, "n", "<=10")).toBe(true);
+    expect(SC.Formula.TestCriteria(5, "n", ">=10")).toBe(false);
+    expect(SC.Formula.TestCriteria(5, "n", ">=5")).toBe(true);
+    expect(SC.Formula.TestCriteria(5, "n", "<>6")).toBe(true);
+    expect(SC.Formula.TestCriteria(6, "n", "<>6")).toBe(false);
 
-    // Single-char comparators against numbers:
-    expect(typeof SC.Formula.TestCriteria(5, "n", "<=10")).toBe("boolean");
-    expect(typeof SC.Formula.TestCriteria(5, "n", ">=10")).toBe("boolean");
-    expect(typeof SC.Formula.TestCriteria(5, "n", "<>6")).toBe("boolean");
-
-    // The two-char comparitors against a text value (takes text branch).
-    expect(typeof SC.Formula.TestCriteria("apple", "t", "<=banana")).toBe("boolean");
-    expect(typeof SC.Formula.TestCriteria("banana", "t", ">=apple")).toBe("boolean");
-    expect(typeof SC.Formula.TestCriteria("apple", "t", "<>apple")).toBe("boolean");
+    // Two-char comparators against text values.
+    expect(SC.Formula.TestCriteria("apple", "t", "<=banana")).toBe(true);
+    expect(SC.Formula.TestCriteria("banana", "t", ">=apple")).toBe(true);
+    expect(SC.Formula.TestCriteria("apple", "t", "<>apple")).toBe(false);
+    expect(SC.Formula.TestCriteria("apple", "t", "<>pear")).toBe(true);
 
     // Mixed: criterion is number, cell value is text-but-numeric.
     expect(SC.Formula.TestCriteria("5", "t", ">3")).toBe(true);
@@ -455,12 +452,16 @@ test("IF: error condition propagates, extra args error", async () => {
         "set A3 formula IF(1)",
         // IF with 4 args -> FunctionArgsError
         "set A4 formula IF(1,2,3,4)",
+        "set A5 formula IF(NA(),10,20)",
+        "set A6 formula IF(#REF!,10,20)",
     ]);
 
-    expect(getVT("A1").charAt(0)).toBe("e");
+    expect(getVT("A1")).toBe("e#DIV/0!");
     expect(getVT("A2").charAt(0)).toBe("e");
     expect(getVT("A3").charAt(0)).toBe("e");
     expect(getVT("A4").charAt(0)).toBe("e");
+    expect(getVT("A5")).toBe("e#N/A");
+    expect(getVT("A6")).toBe("e#REF!");
 });
 
 test("AND/OR: empty args and all-blank branches", async () => {
@@ -1507,7 +1508,7 @@ test("ConditionalFunctions: CountifSumifFunctions with text-text, number-number 
         "set C2 formula COUNTIF(B1:B4,3)",
         // Greater-than numeric
         'set C3 formula COUNTIF(B1:B4,">2")',
-        // "<>2" is parsed as "<" + ">2"; hits legacy text-comparison branch
+        // Not-equal numeric
         'set C4 formula COUNTIF(B1:B4,"<>2")',
         // Text equality (=)
         'set C5 formula COUNTIF(A1:A4,"=alpha")',
@@ -1520,12 +1521,10 @@ test("ConditionalFunctions: CountifSumifFunctions with text-text, number-number 
     expect(getDV("C1")).toBe(2);
     expect(getDV("C2")).toBe(1);
     expect(getDV("C3")).toBe(2);
-    // "<>2" parses as "<" + ">2"; numbers stringified are all < ">2" lexically
-    expect(typeof getDV("C4")).toBe("number");
+    expect(getDV("C4")).toBe(3); // 1,3,4
     expect(getDV("C5")).toBe(2);
     expect(getDV("C6")).toBe(2); // "alpha" x2
-    // "<=beta" parses as "<" + "=beta"; all text values compared as ">=" / "<"
-    expect(typeof getDV("C7")).toBe("number");
+    expect(getDV("C7")).toBe(3); // alpha,alpha,beta
 });
 
 test("SUMIF with implicit sum range (two-arg form) skips error cells", async () => {
@@ -1839,25 +1838,25 @@ test("ExactFunction: v1=error trumps, v2=error path", async () => {
     expect(getVT("A2").charAt(0)).toBe("e");
 });
 
-test("CountifSumifFunctions: with criteria comparitor variants (legacy quirk)", async () => {
+test("CountifSumifFunctions: multi-char criteria >= <= <>", async () => {
     const { getDV } = await buildSheet([
         "set A1 value n 1",
         "set A2 value n 2",
         "set A3 value n 3",
         "set A4 value n 4",
         "set A5 value n 5",
-        // SocialCalc only strips the first char for comparitors when it is
-        // =/</>. So "<=3" becomes "<" plus "=3" (text), "<>3" becomes "<"
-        // plus ">3", etc. These exercise the text-mode comparator branch.
         'set B1 formula COUNTIF(A1:A5,"<=3")',
         'set B2 formula COUNTIF(A1:A5,">=3")',
         'set B3 formula COUNTIF(A1:A5,"<>3")',
+        'set B4 formula SUMIF(A1:A5,">=3")',
+        'set B5 formula SUMIF(A1:A5,"<>3")',
     ]);
 
-    // Every number stringifies to a char less than "=" or ">" lexically.
-    expect(typeof getDV("B1")).toBe("number");
-    expect(typeof getDV("B2")).toBe("number");
-    expect(typeof getDV("B3")).toBe("number");
+    expect(getDV("B1")).toBe(3);
+    expect(getDV("B2")).toBe(3);
+    expect(getDV("B3")).toBe(4);
+    expect(getDV("B4")).toBe(12);
+    expect(getDV("B5")).toBe(12);
 });
 
 test("StoreIoEventFormula: TimeTrigger with coord operand[0]", async () => {

@@ -15,6 +15,42 @@ describe("formula reference rewrite regressions (Leanstral oracle)", () => {
         expect(SC.AdjustFormulaCoords(inner, 1, 1, 1, 0)).toBe('CONCATENATE("a""b""c",B1)');
     });
 
+    test("OffsetFormulaCoords preserves apostrophe sheet name while shifting coord", async () => {
+        const SC = await loadSocialCalc();
+        expect(SC.OffsetFormulaCoords("'O''Brien'!A1", 1, 0)).toBe("'O''Brien'!B1");
+    });
+
+    test("OffsetFormulaCoords preserves apostrophe string while shifting coord", async () => {
+        const SC = await loadSocialCalc();
+        expect(SC.OffsetFormulaCoords("CONCATENATE('O''Brien',A1)", 1, 0)).toBe(
+            "CONCATENATE('O''Brien',B1)",
+        );
+    });
+
+    test("AdjustFormulaCoords preserves apostrophe sheet name while skipping sheet-qualified coord", async () => {
+        const SC = await loadSocialCalc();
+        expect(SC.AdjustFormulaCoords("'O''Brien'!A1", 1, 1, 1, 0)).toBe("'O''Brien'!A1");
+    });
+
+    test("ReplaceFormulaCoords keeps apostrophe sheet sticky while replacing local", async () => {
+        const SC = await loadSocialCalc();
+        expect(SC.ReplaceFormulaCoords("'O''Brien'!A1+C1", { C1: "F6" })).toBe(
+            "'O''Brien'!A1+F6",
+        );
+    });
+
+    test("quote re-emit doubles inner double-quotes and stays reparsable", async () => {
+        const SC = await loadSocialCalc();
+        // Content with " is only representable via doubled "" inside double quotes.
+        const out = SC.OffsetFormulaCoords('CONCATENATE("say ""hi""",A1)', 1, 0);
+        expect(out).toBe('CONCATENATE("say ""hi""",B1)');
+        const tokens = SC.Formula.ParseFormulaIntoTokens(out);
+        const stringTok = tokens.find(
+            (t: { type: number; text: string }) => t.type === SC.Formula.TokenType.string,
+        );
+        expect(stringTok?.text).toBe('say "hi"');
+    });
+
     test("whole-column name tokens N:N and T:T are not rewritten on offset", async () => {
         const SC = await loadSocialCalc();
         expect(SC.OffsetFormulaCoords("SUM(N:N)+SUM(T:T)", 1, 0)).toBe("SUM(N:N)+SUM(T:T)");
