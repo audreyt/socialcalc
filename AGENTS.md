@@ -35,6 +35,7 @@ surface is exported facades under `lemma/`:
 
 - `lemma/a1.ts` — A1 clamp/coord + overflow `#REF!` rewrite policy (26 Dafny VCs)
 - `lemma/eval-ops.ts` — pure `/` and `&` error-propagation lattice (4 Dafny VCs)
+- `lemma/lookup-result.ts` — pure LookupResultType string-table core (1 Dafny VC on resolveToken; Bun locks full row-scan)
 
 Both backends are scaffolded:
 
@@ -47,9 +48,10 @@ bun run verify:lean:gen      # → lemma/*.types.lean + *.def.lean
 bun run verify:lean:build    # lake build (sibling ../velvet, ../loom, ../LemmaScript)
 ```
 
-**Useful rewards now:** Dafny CI-locks pure A1/`#REF!` overflow algebra (26 VCs)
-and `/`/`&` error lattice (4 VCs). Bun `test/lemma-a1-facade.test.ts` and
-`test/lemma-eval-ops-facade.test.ts` cross-check facades vs shipping oracles.
+**Useful rewards now:** Dafny CI-locks pure A1/`#REF!` overflow algebra (26 VCs),
+`/`/`&` error lattice (4 VCs), and LookupResultType token resolve (1 VC). Bun
+`test/lemma-a1-facade.test.ts`, `test/lemma-eval-ops-facade.test.ts`, and
+`test/lemma-lookup-result-facade.test.ts` cross-check facades vs shipping oracles.
 Lean gen feeds Leanstral goal packs. Grow `lemma/*.ts` only; promote only to
 Bun fixtures. Do not formalize command/DOM. After TS facade edits:
 `verify:dafny:regen` then `verify:dafny` (`.dfy` is proof-bearing; plain `gen`

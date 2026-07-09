@@ -78,3 +78,9 @@ lean_lib EvalOps where
   srcDir := "lemma"
   roots := #[`«eval-ops.types», `«eval-ops.def», `«eval-ops.proof»]
   extraDepTargets := #[``downloadDependencies]
+
+@[default_target]
+lean_lib LookupResult where
+  srcDir := "lemma"
+  roots := #[`«lookup-result.types», `«lookup-result.def», `«lookup-result.proof»]
+  extraDepTargets := #[``downloadDependencies]

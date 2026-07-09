@@ -98,13 +98,14 @@ global scripts, so LemmaScript cannot extract them. Exported facades under
 
 - `lemma/a1.ts` — pure A1 clamp/coord algebra and overflow `#REF!` policy
 - `lemma/eval-ops.ts` — pure `/` and `&` error-propagation lattice
+- `lemma/lookup-result.ts` — pure LookupResultType string-table algorithm
 
 **Dafny backend** (requires `dafny` on PATH) — generate + verify:
 
 ```bash
 bun run verify:dafny:gen
 bun run verify:dafny
-# 26 VCs on lemma/a1.dfy + 4 VCs on lemma/eval-ops.dfy
+# 26 VCs on lemma/a1.dfy + 4 VCs on lemma/eval-ops.dfy + 1 VC on lemma/lookup-result.dfy
 ```
 
 **Lean backend** (requires `lemmascript` / `lsc`) — generate models:
@@ -115,9 +116,10 @@ bun run verify:lean          # gen + assert non-empty artifacts
 ```
 Optional full Lean proof build (`bun run verify:lean:build` / `lake build`) needs
 sibling checkouts at `../velvet`, `../loom` (`lemma` branches), and
-`../LemmaScript`. Pure helpers prove with `loom_solve` (a1 + eval-ops; a1 string
-builders use `a1.spec.lean` length lemmas) — no `sorry`. CI runs Dafny
-`lsc check` and Lean `lsc gen` smoke. File list: `LemmaScript-files.txt`.
+`../LemmaScript`. Pure helpers prove with `loom_solve` (a1 + eval-ops +
+lookup-result resolveToken; a1 string builders use `a1.spec.lean` length lemmas)
+— no `sorry`. CI runs Dafny `lsc check` and Lean `lsc gen` smoke. File list:
+`LemmaScript-files.txt`.
 
 Both: `bun run verify:both`
 
