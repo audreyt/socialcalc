@@ -126,6 +126,61 @@ test("insertrow adjacent to existing merge expands the span", async () => {
     expect(sheet.cells.A1.rowspan).toBe(4);
 });
 
+test("insertcol into merge then unmerge leaves no colspan ghost or cellskip", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 1",
+        "set B1 value n 2",
+        "set C1 value n 3",
+    ]);
+    await scheduleCommands(SC, sheet, ["merge A1:C1"]);
+    await scheduleCommands(SC, sheet, ["insertcol B"]);
+    expect(sheet.cells.A1.colspan).toBe(4);
+    // Newly inserted B1 must not inherit A1's span as a format attribute.
+    expect(sheet.cells.B1?.colspan).toBeUndefined();
+    expect(sheet.cells.B1?.rowspan).toBeUndefined();
+
+    await scheduleCommands(SC, sheet, ["unmerge A1"]);
+    expect(sheet.cells.A1.colspan).toBeUndefined();
+    expect(sheet.cells.A1.rowspan).toBeUndefined();
+    expect(sheet.cells.B1?.colspan).toBeUndefined();
+    expect(sheet.cells.B1?.rowspan).toBeUndefined();
+
+    const ctx = new SC.RenderContext(sheet);
+    ctx.CalculateCellSkipData();
+    expect(ctx.cellskip.B1).toBeUndefined();
+    expect(ctx.cellskip.C1).toBeUndefined();
+    expect(ctx.cellskip.D1).toBeUndefined();
+});
+
+test("insertrow into merge then unmerge leaves no rowspan ghost or cellskip", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+        "set A1 value n 1",
+        "set A2 value n 2",
+        "set A3 value n 3",
+    ]);
+    await scheduleCommands(SC, sheet, ["merge A1:A3"]);
+    await scheduleCommands(SC, sheet, ["insertrow 2"]);
+    expect(sheet.cells.A1.rowspan).toBe(4);
+    expect(sheet.cells.A2?.colspan).toBeUndefined();
+    expect(sheet.cells.A2?.rowspan).toBeUndefined();
+
+    await scheduleCommands(SC, sheet, ["unmerge A1"]);
+    expect(sheet.cells.A1.colspan).toBeUndefined();
+    expect(sheet.cells.A1.rowspan).toBeUndefined();
+    expect(sheet.cells.A2?.colspan).toBeUndefined();
+    expect(sheet.cells.A2?.rowspan).toBeUndefined();
+
+    const ctx = new SC.RenderContext(sheet);
+    ctx.CalculateCellSkipData();
+    expect(ctx.cellskip.A2).toBeUndefined();
+    expect(ctx.cellskip.A3).toBeUndefined();
+    expect(ctx.cellskip.A4).toBeUndefined();
+});
+
 // ===========================================================================
 // Section 30: Parse class edge cases.
 // ===========================================================================

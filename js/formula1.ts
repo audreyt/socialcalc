@@ -822,6 +822,12 @@ FormulaMut.StepThroughRangeDown = function(operand, rangevalue) {
 
    rp = scf.OrderRangeParts(value1, value2);
 
+   // Invalid band (col outside A..ZZ / row < 1) → #REF!, do not loop.
+   if (rp.c1 < 1 || rp.c2 < 1 || rp.c1 > 702 || rp.c2 > 702
+       || rp.r1 < 1 || rp.r2 < 1) {
+      return {value: 0, type: "e#REF!"};
+      }
+
    count = 0;
    for (r=rp.r1; r<=rp.r2; r++) {
       for (c=rp.c1; c<=rp.c2; c++) {
@@ -886,6 +892,13 @@ FormulaMut.DecodeRangeParts = function(sheetdata, range) {
       }
 
    rp = scf.OrderRangeParts(value1, value2);
+
+   // Invalid band (col outside A..ZZ / row < 1) → null so callers can #REF!
+   // instead of looping huge/negative ranges (e.g. ZZZ1 → col 18278).
+   if (rp.c1 < 1 || rp.c2 < 1 || rp.c1 > 702 || rp.c2 > 702
+       || rp.r1 < 1 || rp.r2 < 1) {
+      return null;
+      }
 
    return {sheetdata: coordsheetdata, sheetname: sheet1, col1num: rp.c1, ncols: rp.c2-rp.c1+1, row1num: rp.r1, nrows: rp.r2-rp.r1+1}
 
@@ -1061,9 +1074,18 @@ FormulaMut.StoreIoEventFormula = function(function_name, coord, operand_reverse,
   
   //IF GUI widget is "Input"
   if(io_parameters == "Input" ) {
-    var formDataViewer = (SocialCalc.CurrentSpreadsheetControlObject != null) 
-          ? SocialCalc.CurrentSpreadsheetControlObject.formDataViewer 
-          : SocialCalc.CurrentSpreadsheetViewerObject!.formDataViewer;
+    // Headless sheets have neither control nor viewer object — skip form-data
+    // side effects without throwing so TEXTBOX recalc can finish.
+    var formDataViewer = null;
+    if (SocialCalc.CurrentSpreadsheetControlObject != null) {
+      formDataViewer = SocialCalc.CurrentSpreadsheetControlObject.formDataViewer;
+      }
+    else if (SocialCalc.CurrentSpreadsheetViewerObject != null) {
+      formDataViewer = SocialCalc.CurrentSpreadsheetViewerObject.formDataViewer;
+      }
+    if (formDataViewer == null) {
+      return;
+      }
     
     if(formDataViewer != null && formDataViewer.loaded == true) {
       
@@ -1836,7 +1858,8 @@ CRITERIAROW:
          break;
 
       case "DPRODUCT": // may handle cases with text differently than some other spreadsheets
-         PushOperand(resulttypesum, product);
+         // Zero matching numeric rows → 0 (not the multiplicative identity 1).
+         PushOperand(resulttypesum, count == 0 ? 0 : product);
          break;
 
       case "DMIN":
@@ -3879,13 +3902,22 @@ FormulaMut.ColumnsRowsFunctions = function(fname, operand, foperand, sheet) {
 
    else if (value1.type == "range") {
       rangeinfo = scf.DecodeRangeParts(sheet, value1.value);
-      if (fname == "COLUMNS") {
-         result = rangeinfo!.ncols;
+      if (!rangeinfo) {
+         result = 0;
+         resulttype = "e#REF!";
+         }
+      else if (fname == "COLUMNS") {
+         result = rangeinfo.ncols;
+         resulttype = "n";
          }
       else if (fname == "ROWS") {
-         result = rangeinfo!.nrows;
+         result = rangeinfo.nrows;
+         resulttype = "n";
          }
-      resulttype = "n";
+      else {
+         result = 0;
+         resulttype = "n";
+         }
       }
    else {
       result = 0;
@@ -4425,6 +4457,7 @@ FormulaMut.IRRFunction = function(fname, operand, foperand, sheet) {
    var value1, guess, oldsum, maxloop, tries, epsilon, rate, oldrate, m, sum, factor, i;
    var rangeoperand: any[] = [];
    var cashflows = [];
+   var hasNumericCashflow = false;
 
    var scf = SocialCalc.Formula;
 
@@ -4432,8 +4465,14 @@ FormulaMut.IRRFunction = function(fname, operand, foperand, sheet) {
 
    while (rangeoperand.length) { // get values from range so we can do iterative approximations
       value1 = scf.OperandValueAndType(sheet, rangeoperand);
+      // Numeric, blank, and text cashflows each occupy a period (blank/text as 0),
+      // matching NPV so a middle blank does not collapse later periods.
       if (value1.type.charAt(0) == "n") {
          cashflows.push(value1.value);
+         hasNumericCashflow = true;
+         }
+      else if (value1.type.charAt(0) == "b" || value1.type.charAt(0) == "t") {
+         cashflows.push(0);
          }
       else if (value1.type.charAt(0) == "e") {
          scf.PushOperand(operand, "e#VALUE!", 0);
@@ -4441,7 +4480,7 @@ FormulaMut.IRRFunction = function(fname, operand, foperand, sheet) {
          }
       }
 
-   if (!cashflows.length) {
+   if (!cashflows.length || !hasNumericCashflow) {
       scf.PushOperand(operand, "e#NUM!", 0);
       return;
       }

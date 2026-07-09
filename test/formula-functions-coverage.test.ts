@@ -525,6 +525,30 @@ test("COLUMNS/ROWS on coord, range, and invalid input", async () => {
     expect(getVT("C5")).toBe("e#VALUE!");
 });
 
+test("named invalid:bad range does not hang COLUMNS/SUM", async () => {
+    // Regression: coordToCr used to parse INVALID → col ~2.9e9, so
+    // DecodeRangeParts/StepThroughRangeDown walked multi-billion columns.
+    const { getDV, getVT } = await buildSheet([
+        "name define BAD invalid:bad",
+        "set A1 formula COLUMNS(BAD)",
+        "set A2 formula SUM(BAD)",
+        "set A3 formula ROWS(BAD)",
+    ]);
+
+    expect(getVT("A1")).toBe("e#REF!");
+    expect(getDV("A1")).toBe(0);
+    expect(getVT("A2")).toBe("e#REF!");
+    expect(getDV("A2")).toBe(0);
+    expect(getVT("A3")).toBe("e#REF!");
+    expect(getDV("A3")).toBe(0);
+
+    // Legitimate A..ZZ bounds still parse.
+    const SC = await loadSocialCalc();
+    expect(SC.coordToCr("ZZ1")).toEqual({ col: 702, row: 1 });
+    expect(SC.coordToCr("INVALID")).toEqual({ col: 0, row: 0 });
+    expect(SC.coordToCr("AAA1")).toEqual({ col: 0, row: 1 });
+});
+
 test("DDB with cost < salvage and method=1", async () => {
     const { getDV, getVT } = await buildSheet([
         // DDB with salvage larger than cost - depreciation stays zero
@@ -2148,4 +2172,83 @@ test("SumProduct: single-column range error & single range works", async () => {
     // Single range: sum of all values
     expect(getDV("B1")).toBe(9);
     expect(getVT("B2").charAt(0)).toBe("e");
+});
+
+test("IRR: blank/text middle cashflow occupies a period as 0", async () => {
+    const { getDV, getVT } = await buildSheet([
+        "set A1 value n -100",
+        "set A2 value n 0",
+        "set A3 value n 110",
+        "set B1 value n -100",
+        // B2 intentionally blank
+        "set B3 value n 110",
+        "set C1 value n -100",
+        "set C2 text t mid",
+        "set C3 value n 110",
+        "set D1 formula IRR(A1:A3)",
+        "set D2 formula IRR(B1:B3)",
+        "set D3 formula IRR(C1:C3)",
+        // all-text still #NUM! (no numeric cashflows)
+        "set E1 text t x",
+        "set E2 text t y",
+        "set D4 formula IRR(E1:E2)",
+    ]);
+
+    // Blank or text in the middle counts as a 0 period — same IRR as explicit 0s
+    expect(getDV("D2")).toBe(getDV("D1"));
+    expect(getDV("D3")).toBe(getDV("D1"));
+    expect(getVT("D4")).toBe("e#NUM!");
+});
+
+test("DPRODUCT: zero matching rows returns 0 not 1", async () => {
+    const { getDV, getVT } = await buildSheet([
+        "set A1 text t Name",
+        "set B1 text t Score",
+        "set A2 text t Alice",
+        "set B2 value n 90",
+        "set A3 text t Bob",
+        "set B3 value n 80",
+        "set D1 text t Score",
+        "set D2 text t >999",
+        'set E1 formula DPRODUCT(A1:B3,"Score",D1:D2)',
+        'set E2 formula DSUM(A1:B3,"Score",D1:D2)',
+        // still multiplies when matches exist
+        "set D3 text t Score",
+        "set D4 text t >75",
+        'set E3 formula DPRODUCT(A1:B3,"Score",D3:D4)',
+    ]);
+
+    expect(getDV("E1")).toBe(0);
+    expect(getVT("E1").charAt(0)).toBe("n");
+    expect(getDV("E2")).toBe(0);
+    expect(getDV("E3")).toBe(7200);
+});
+
+test("StoreIoEventFormula Input: headless TEXTBOX finishes recalc", async () => {
+    const SC = await loadSocialCalc();
+    // Ensure formDataViewer path is null even if a prior test left a Control shell.
+    const prevControl = SC.CurrentSpreadsheetControlObject;
+    const prevViewer = SC.CurrentSpreadsheetViewerObject;
+    try {
+        if (SC.CurrentSpreadsheetControlObject) {
+            SC.CurrentSpreadsheetControlObject.formDataViewer = null;
+        }
+        if (SC.CurrentSpreadsheetViewerObject) {
+            SC.CurrentSpreadsheetViewerObject.formDataViewer = null;
+        }
+        const { getDV, getVT } = await buildSheet([
+            'set A1 formula TEXTBOX("hello")',
+            "set A2 formula 1+1",
+            "set A3 formula A2*3",
+        ]);
+
+        expect(getVT("A1")).toBe("tiTEXTBOX");
+        expect(getDV("A1")).toBe("hello");
+        // Neighbor formulas must still evaluate after TEXTBOX store path
+        expect(getDV("A2")).toBe(2);
+        expect(getDV("A3")).toBe(6);
+    } finally {
+        SC.CurrentSpreadsheetControlObject = prevControl;
+        SC.CurrentSpreadsheetViewerObject = prevViewer;
+    }
 });

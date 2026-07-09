@@ -100,6 +100,8 @@ FormulaRefRoot.coordToRow = {};
 //@ ensures \result.col >= 0
 //@ ensures \result.row >= 0
 // LemmaScript: parse A1 / $A$1 into 1-based col/row; caches results.
+// Column letters are A..ZZ only (1..702). Longer letter runs (INVALID, AAA, …)
+// must fail closed to col=0 so range walkers never iterate multi-billion spans.
 FormulaRefRoot.coordToCr = function (cr: string): CrParts {
     const cachedRow = FormulaRefRoot.coordToRow[cr];
     if (cachedRow) {
@@ -120,6 +122,7 @@ FormulaRefRoot.coordToCr = function (cr: string): CrParts {
             c = 26 * c + ch - 64;
         }
     }
+    if (c > 702) c = 0; // invalid letter string — not a SocialCalc column
     FormulaRefRoot.coordToCol[cr] = c;
     FormulaRefRoot.coordToRow[cr] = r;
     return { row: r, col: c };

@@ -281,7 +281,23 @@ FormulaOperandMut.OperandsAsCoordOnSheet = function (
    operand.pop(); // we have data - pop stack
 
    sheetname = scf.OperandAsSheetName(sheet, operand); // get sheetname as text
-   othersheet = scf.FindInSheetCache(sheetname.value);
+   if (sheetname.type.charAt(0) == "e" || sheetname.error) {
+      // Preserve LookupName errors (#DIV/0!) and sheetnamemissing; do not
+      // rewrite them as "Sheet unavailable: …".
+      if (sheetname.type.charAt(0) == "e") {
+         result.type = sheetname.type;
+         result.value = sheetname.value;
+         }
+      else {
+         result.type = "e#REF!";
+         result.value = 0;
+         }
+      if (sheetname.error) {
+         result.error = sheetname.error;
+         }
+      return result;
+      }
+   othersheet = scf.FindInSheetCache(sheetname.value as string);
    if (othersheet == null) { // unavailable
       result.type = "e#REF!";
       result.value = 0;
@@ -384,11 +400,19 @@ FormulaOperandMut.OperandAsSheetName = function (
    operand.pop(); // we have data - pop stack
    if (result.type == "name") {
       nvalue = SocialCalc.Formula.LookupName(sheet, result.value);
-      if (!nvalue.value) { // not a known name - return bare name as the name value
+      // Unknown name (e#NAME? with empty value): bare sheet name, e.g. Sheet1!A1.
+      // Do not treat falsy values (0, "", #DIV/0!) as unknown — that loses real errors.
+      if (nvalue.type == "e#NAME?" && nvalue.value === "") {
          return result;
          }
       result.value = nvalue.value;
       result.type = nvalue.type;
+      if (nvalue.error) {
+         result.error = nvalue.error;
+         }
+      }
+   if (result.type.charAt(0) == "e") { // preserve LookupName / prior errors
+      return result;
       }
    if (result.type == "coord") { // value is a coord reference, follow it to find sheet name
       cell = sheet.cells[SocialCalc.Formula.PlainCoord(result.value)];

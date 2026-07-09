@@ -3404,6 +3404,54 @@ test("OperandAsSheetName: name not found → bare name (L1364-L1366)", async () 
     expect(r.value).toBe("UNKNOWNNAME");
 });
 
+test("OperandAsSheetName: name resolving to #DIV/0! keeps error (not bare sheet)", async () => {
+    const SC = await loadSocialCalc();
+    resetFormulaGlobals(SC);
+    const sheet = new SC.Sheet();
+    sheet.names = { ERR: { definition: "=1/0", desc: "" } };
+
+    const r = SC.Formula.OperandAsSheetName(sheet, [{ type: "name", value: "ERR" }]);
+    expect(r.type).toBe("e#DIV/0!");
+    expect(r.value).toBe(0);
+    expect(String(r.error || "")).not.toContain("Sheet unavailable");
+    expect(String(r.error || "")).not.toBe(SC.Constants.s_calcerrsheetnamemissing);
+});
+
+test("OperandAsSheetName: name resolving to 0 → sheetnamemissing (not bare name)", async () => {
+    const SC = await loadSocialCalc();
+    resetFormulaGlobals(SC);
+    const sheet = new SC.Sheet();
+    sheet.names = { ZERO: { definition: "=0", desc: "" } };
+
+    const r = SC.Formula.OperandAsSheetName(sheet, [{ type: "name", value: "ZERO" }]);
+    expect(r.error).toBe(SC.Constants.s_calcerrsheetnamemissing);
+    expect(r.value).toBe("");
+    expect(r.type).not.toBe("name");
+});
+
+test("OperandAsSheetName: name resolving to empty text is text, not bare name", async () => {
+    const SC = await loadSocialCalc();
+    resetFormulaGlobals(SC);
+    const sheet = new SC.Sheet();
+    sheet.names = { EMPTY: { definition: '=""', desc: "" } };
+
+    const r = SC.Formula.OperandAsSheetName(sheet, [{ type: "name", value: "EMPTY" }]);
+    expect(r.type.charAt(0)).toBe("t");
+    expect(r.value).toBe("");
+});
+
+test("OperandsAsCoordOnSheet: ERR!A1 preserves #DIV/0! (not Sheet unavailable)", async () => {
+    const SC = await loadSocialCalc();
+    resetFormulaGlobals(SC);
+    const sheet = new SC.Sheet();
+    sheet.names = { ERR: { definition: "=1/0", desc: "" } };
+
+    const tokens = SC.Formula.ParseFormulaIntoTokens("ERR!A1");
+    const val = SC.Formula.evaluate_parsed_formula(tokens, sheet, 0);
+    expect(val.type).toBe("e#DIV/0!");
+    expect(String(val.error || "")).not.toContain("Sheet unavailable");
+});
+
 test("OperandAsSheetName: coord resolves to cell text (L1370-L1379)", async () => {
     const SC = await loadSocialCalc();
     resetFormulaGlobals(SC);

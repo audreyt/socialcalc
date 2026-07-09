@@ -107,6 +107,17 @@ describe("percent formats", () => {
         expect(SC.format_number_for_display(0.125, "n%", "")).toBe("12.5%");
         expect(SC.format_number_for_display(0.25, "n%", "Auto")).toBe("25.0%");
     });
+
+    test("percent scientific after *100 keeps scaled sci form and %", async () => {
+        const SC = await loadSocialCalc({ browser: true });
+        // 1e19 * 100 = 1e21 stringifies with "e"; old path early-returned rawvalue
+        // without "%" (e.g. "10000000000000000000"). Must keep *100 scale and %.
+        expect(SC.FormatNumber.formatNumberWithFormat(1e19, "0%")).toBe("1e+21%");
+        expect(SC.format_number_for_display(1e19, "n", "0%")).toBe("1e+21%");
+        expect(SC.FormatNumber.formatNumberWithFormat(-1e19, "0%")).toBe("-1e+21%");
+        // Non-percent scientific sneak still returns plain raw (locked policy)
+        expect(SC.FormatNumber.formatNumberWithFormat(1e21, "#,##0")).toBe("1e+21");
+    });
 });
 
 // ---------------------------------------------------------------------------

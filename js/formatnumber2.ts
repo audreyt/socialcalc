@@ -265,6 +265,15 @@ FormatNumberMut.formatNumberWithFormat = function(
       }
 
    if (strvalue.indexOf("e")>=0) { // converted to scientific notation
+      if (sectionPercent > 0) {
+         // Percent scale pushed value into sci form; keep scaled value and trailing %.
+         // Digit placeholders cannot parse "e" strings, so emit sci + % here.
+         var scipct = (negativevalue ? "-" : "") + strvalue;
+         for (i=0; i<sectionPercent; i++) {
+            scipct += "%";
+            }
+         return scipct;
+         }
       return rawvalue+""; // Just return plain converted raw value
       }
 

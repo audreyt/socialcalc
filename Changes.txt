@@ -48,6 +48,18 @@ Fixes
   shift); errors still short-circuit.
 - Sort: `OffsetFormulaCoords` optional band freezes external relative refs
   outside the sorted rectangle (`Z1` stays `Z1`); in-band relatives still move.
+- IRR blank/text cashflows occupy discount periods as 0 (mirror NPV); DPRODUCT
+  zero-match returns 0 not product identity 1.
+- StoreIoEventFormula Input: null formDataViewer no-ops so headless TEXTBOX does
+  not abort recalc.
+- Percent formats that scale into scientific notation keep scaled sci + `%`
+  (no longer early-return raw unscaled value).
+- insertcol/insertrow format copy skips colspan/rowspan (no ghost merge after
+  insert-into-merge then unmerge).
+- coordToCr rejects letter runs past ZZ (col 0) so named garbage ranges like
+  `invalid:bad` yield #REF! instead of multi-billion COLUMNS/SUM hangs.
+- OperandAsSheetName preserves LookupName errors (e.g. `ERR!A1` with ERR=1/0
+  keeps #DIV/0!) instead of bare-name “Sheet unavailable”.
 
 Toolchain and build
 - Converted all core SocialCalc JavaScript sources under js/ to global-script

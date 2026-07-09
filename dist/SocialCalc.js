@@ -2796,6 +2796,8 @@ SC.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
           basecell = sheet.GetAssuredCell(crbase);
           for (attrib in cellProperties) {
             if (cellProperties[attrib] == 2) {
+              if (attrib == "colspan" || attrib == "rowspan")
+                continue;
               cell[attrib] = basecell[attrib];
             }
           }
@@ -10376,6 +10378,13 @@ FormatNumberMut.formatNumberWithFormat = function(rawvalue, format_string, curre
     negativevalue = 0;
   }
   if (strvalue.indexOf("e") >= 0) {
+    if (sectionPercent > 0) {
+      var scipct = (negativevalue ? "-" : "") + strvalue;
+      for (i = 0;i < sectionPercent; i++) {
+        scipct += "%";
+      }
+      return scipct;
+    }
     return rawvalue + "";
   }
   strparts = strvalue.match(/^\+{0,1}(\d*)(?:\.(\d*)){0,1}$/);
@@ -11573,6 +11582,9 @@ FormulaMut.StepThroughRangeDown = function(operand, rangevalue) {
     sheet1 = "";
   }
   rp = scf.OrderRangeParts(value1, value2);
+  if (rp.c1 < 1 || rp.c2 < 1 || rp.c1 > 702 || rp.c2 > 702 || rp.r1 < 1 || rp.r2 < 1) {
+    return { value: 0, type: "e#REF!" };
+  }
   count = 0;
   for (r = rp.r1;r <= rp.r2; r++) {
     for (c = rp.c1;c <= rp.c2; c++) {
@@ -11609,6 +11621,9 @@ FormulaMut.DecodeRangeParts = function(sheetdata, range) {
     }
   }
   rp = scf.OrderRangeParts(value1, value2);
+  if (rp.c1 < 1 || rp.c2 < 1 || rp.c1 > 702 || rp.c2 > 702 || rp.r1 < 1 || rp.r2 < 1) {
+    return null;
+  }
   return { sheetdata: coordsheetdata, sheetname: sheet1, col1num: rp.c1, ncols: rp.c2 - rp.c1 + 1, row1num: rp.r1, nrows: rp.r2 - rp.r1 + 1 };
 };
 if (!SocialCalc.Formula.FunctionList) {
@@ -11689,7 +11704,15 @@ FormulaMut.StoreIoEventFormula = function(function_name, coord, operand_reverse,
     }
   }
   if (io_parameters == "Input") {
-    var formDataViewer = SocialCalc.CurrentSpreadsheetControlObject != null ? SocialCalc.CurrentSpreadsheetControlObject.formDataViewer : SocialCalc.CurrentSpreadsheetViewerObject.formDataViewer;
+    var formDataViewer = null;
+    if (SocialCalc.CurrentSpreadsheetControlObject != null) {
+      formDataViewer = SocialCalc.CurrentSpreadsheetControlObject.formDataViewer;
+    } else if (SocialCalc.CurrentSpreadsheetViewerObject != null) {
+      formDataViewer = SocialCalc.CurrentSpreadsheetViewerObject.formDataViewer;
+    }
+    if (formDataViewer == null) {
+      return;
+    }
     if (formDataViewer != null && formDataViewer.loaded == true) {
       if (formDataViewer.formFields == null)
         SocialCalc.Formula.LoadFormFields();
@@ -12156,7 +12179,7 @@ FormulaMut.DSeriesFunctions = function(fname, operand, foperand, sheet) {
       PushOperand(resulttypesum, sum);
       break;
     case "DPRODUCT":
-      PushOperand(resulttypesum, product);
+      PushOperand(resulttypesum, count == 0 ? 0 : product);
       break;
     case "DMIN":
       PushOperand(resulttypesum, minval || 0);
@@ -13495,12 +13518,19 @@ FormulaMut.ColumnsRowsFunctions = function(fname, operand, foperand, sheet) {
     resulttype = "n";
   } else if (value1.type == "range") {
     rangeinfo = scf.DecodeRangeParts(sheet, value1.value);
-    if (fname == "COLUMNS") {
+    if (!rangeinfo) {
+      result = 0;
+      resulttype = "e#REF!";
+    } else if (fname == "COLUMNS") {
       result = rangeinfo.ncols;
+      resulttype = "n";
     } else if (fname == "ROWS") {
       result = rangeinfo.nrows;
+      resulttype = "n";
+    } else {
+      result = 0;
+      resulttype = "n";
     }
-    resulttype = "n";
   } else {
     result = 0;
     resulttype = "e#VALUE!";
@@ -13844,18 +13874,22 @@ FormulaMut.IRRFunction = function(fname, operand, foperand, sheet) {
   var value1, guess, oldsum, maxloop, tries, epsilon, rate, oldrate, m, sum, factor, i;
   var rangeoperand = [];
   var cashflows = [];
+  var hasNumericCashflow = false;
   var scf = SocialCalc.Formula;
   rangeoperand.push(foperand.pop());
   while (rangeoperand.length) {
     value1 = scf.OperandValueAndType(sheet, rangeoperand);
     if (value1.type.charAt(0) == "n") {
       cashflows.push(value1.value);
+      hasNumericCashflow = true;
+    } else if (value1.type.charAt(0) == "b" || value1.type.charAt(0) == "t") {
+      cashflows.push(0);
     } else if (value1.type.charAt(0) == "e") {
       scf.PushOperand(operand, "e#VALUE!", 0);
       return;
     }
   }
-  if (!cashflows.length) {
+  if (!cashflows.length || !hasNumericCashflow) {
     scf.PushOperand(operand, "e#NUM!", 0);
     return;
   }
@@ -15395,6 +15429,19 @@ FormulaOperandMut.OperandsAsCoordOnSheet = function(sheet, operand) {
   value1.type = operand[stacklen - 1].type;
   operand.pop();
   sheetname = scf.OperandAsSheetName(sheet, operand);
+  if (sheetname.type.charAt(0) == "e" || sheetname.error) {
+    if (sheetname.type.charAt(0) == "e") {
+      result.type = sheetname.type;
+      result.value = sheetname.value;
+    } else {
+      result.type = "e#REF!";
+      result.value = 0;
+    }
+    if (sheetname.error) {
+      result.error = sheetname.error;
+    }
+    return result;
+  }
   othersheet = scf.FindInSheetCache(sheetname.value);
   if (othersheet == null) {
     result.type = "e#REF!";
@@ -15467,11 +15514,17 @@ FormulaOperandMut.OperandAsSheetName = function(sheet, operand) {
   operand.pop();
   if (result.type == "name") {
     nvalue = SocialCalc.Formula.LookupName(sheet, result.value);
-    if (!nvalue.value) {
+    if (nvalue.type == "e#NAME?" && nvalue.value === "") {
       return result;
     }
     result.value = nvalue.value;
     result.type = nvalue.type;
+    if (nvalue.error) {
+      result.error = nvalue.error;
+    }
+  }
+  if (result.type.charAt(0) == "e") {
+    return result;
   }
   if (result.type == "coord") {
     cell = sheet.cells[SocialCalc.Formula.PlainCoord(result.value)];
@@ -15591,6 +15644,8 @@ FormulaRefRoot.coordToCr = function(cr) {
       c = 26 * c + ch - 64;
     }
   }
+  if (c > 702)
+    c = 0;
   FormulaRefRoot.coordToCol[cr] = c;
   FormulaRefRoot.coordToRow[cr] = r;
   return { row: r, col: c };

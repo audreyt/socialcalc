@@ -2779,6 +2779,7 @@ SC.ExecuteSheetCommand = function(sheet: any,cmd: any,saveundo: any) {
                basecell = sheet.GetAssuredCell(crbase);
                for (attrib in cellProperties) {
                   if (cellProperties[attrib] == 2) { // copy only format attributes
+                     if (attrib == "colspan" || attrib == "rowspan") continue; // do not copy span
                      cell[attrib] = basecell[attrib];
                      }
                   }
