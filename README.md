@@ -51,11 +51,12 @@ dropped from the wrapper) so downstream callers don't need to change.
 ### TypeScript sources (in-place)
 
 All core modules under `js/` are global-script `.ts` (zero `js/*.js`). UMD
-wrappers are inlined in `build.ts`. Fully typechecked pure cores today:
-`formatnumber2.ts`, `socialcalcconstants.ts`, `formula-parse.ts`,
-`formula-operand.ts`, `formula-ref.ts`. Remaining modules still carry interim
-`// @ts-nocheck` (evaluator/commands/UI). LemmaScript `//@ verify` marks typed
-pure helpers (see `AGENTS.md`).
+wrappers are inlined in `build.ts`. Fully typechecked today: `formatnumber2.ts`, `socialcalcconstants.ts`,
+`formula-parse.ts`, `formula-operand.ts`, `formula-ref.ts`,
+`socialcalcviewer.ts`, `socialcalcpopup.ts`. Still interim `// @ts-nocheck`:
+`formula1.ts`, `socialcalc-3.ts`, `socialcalcspreadsheetcontrol.ts`,
+`socialcalctableeditor.ts`. LemmaScript `//@ verify` marks typed pure helpers
+(see `AGENTS.md`).
 
 ## Formula-reference rewrite spike
 

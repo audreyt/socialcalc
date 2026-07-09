@@ -1,8 +1,7 @@
 // In-place TypeScript conversion of socialcalcspreadsheetcontrol.js (SocialCalc global script).
 // Ambient API types live in socialcalcspreadsheetcontrol.d.ts (referenced by dist/SocialCalc.d.ts).
 // Build strips types via Bun.Transpiler before UMD concat — no runtime tax.
-// Intermediate: @ts-nocheck remains — constructor/prototype shape fixed;
-// full peel blocked on ~700 ambient/nullability errors.
+// Intermediate: @ts-nocheck — full peel still ~700 ambient/nullability errors.
 // @ts-nocheck
 // Opt-in to TypeScript strict checking (noImplicitAny, strictNullChecks) via r2scout config.
 //
