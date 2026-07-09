@@ -15325,7 +15325,7 @@ FormulaOperandMut.TopOfStackValueAndType = function(sheet, operand) {
   result.type = operand[stacklen - 1].type;
   operand.pop();
   if (result.type == "name") {
-    result = scf.LookupName(sheet, String(result.value));
+    result = scf.LookupName(sheet, result.value);
   }
   return result;
 };
@@ -15334,16 +15334,16 @@ FormulaOperandMut.OperandAsNumber = function(sheet, operand) {
   var operandinfo = SocialCalc.Formula.OperandValueAndType(sheet, operand);
   t = operandinfo.type.charAt(0);
   if (t == "n") {
-    operandinfo.value = Number(operandinfo.value);
+    operandinfo.value = operandinfo.value - 0;
   } else if (t == "b") {
     operandinfo.type = "n";
     operandinfo.value = 0;
   } else if (t == "e") {
     operandinfo.value = 0;
   } else {
-    valueinfo = SocialCalc.DetermineValueType ? SocialCalc.DetermineValueType(operandinfo.value) : { value: Number(operandinfo.value), type: "n" };
+    valueinfo = SocialCalc.DetermineValueType ? SocialCalc.DetermineValueType(operandinfo.value) : { value: operandinfo.value - 0, type: "n" };
     if (valueinfo.type.charAt(0) == "n") {
-      operandinfo.value = Number(valueinfo.value);
+      operandinfo.value = valueinfo.value - 0;
       operandinfo.type = valueinfo.type;
     } else {
       operandinfo.value = 0;
@@ -15383,16 +15383,14 @@ FormulaOperandMut.OperandValueAndType = function(sheet, operand) {
   result.type = operand[stacklen - 1].type;
   operand.pop();
   if (result.type == "name") {
-    result = scf.LookupName(sheet, String(result.value));
+    result = scf.LookupName(sheet, result.value);
   }
   if (result.type == "range") {
-    const stepped = scf.StepThroughRangeDown(operand, result.value);
-    if (stepped)
-      result = stepped;
+    result = scf.StepThroughRangeDown(operand, result.value);
   }
   if (result.type == "coord") {
     coordsheet = sheet;
-    const coordText = String(result.value);
+    const coordText = result.value;
     pos = coordText.indexOf("!");
     if (pos != -1) {
       coordsheet = scf.FindInSheetCache(coordText.substring(pos + 1));
@@ -15404,7 +15402,7 @@ FormulaOperandMut.OperandValueAndType = function(sheet, operand) {
       }
       result.value = coordText.substring(0, pos);
     }
-    cell = coordsheet.cells[SocialCalc.Formula.PlainCoord(String(result.value))];
+    cell = coordsheet.cells[SocialCalc.Formula.PlainCoord(result.value)];
     if (cell) {
       cellvtype = cell.valuetype;
       result.value = cell.datavalue;
@@ -15460,13 +15458,13 @@ FormulaOperandMut.OperandsAsCoordOnSheet = function(sheet, operand) {
     return result;
   }
   if (value1.type == "name") {
-    value1 = scf.LookupName(othersheet, String(value1.value));
+    value1 = scf.LookupName(othersheet, value1.value);
   }
   result.type = value1.type;
   if (value1.type == "coord") {
-    result.value = String(value1.value) + "!" + sheetname.value;
+    result.value = value1.value + "!" + sheetname.value;
   } else if (value1.type == "range") {
-    const rv = String(value1.value);
+    const rv = value1.value;
     pos1 = rv.indexOf("|");
     pos2 = rv.indexOf("|", pos1 + 1);
     result.value = rv.substring(0, pos1) + "!" + sheetname.value + "|" + rv.substring(pos1 + 1, pos2) + "|";
@@ -15494,7 +15492,7 @@ FormulaOperandMut.OperandsAsRangeOnSheet = function(sheet, operand) {
     return { value: 0, type: "e#REF!" };
   }
   othersheet = sheet;
-  const leftCoord = String(value1.value);
+  const leftCoord = value1.value;
   pos1 = leftCoord.indexOf("!");
   if (pos1 != -1) {
     pos2 = leftCoord.indexOf("|", pos1 + 1);
@@ -15504,13 +15502,12 @@ FormulaOperandMut.OperandsAsRangeOnSheet = function(sheet, operand) {
     if (othersheet == null) {
       return { value: 0, type: "e#REF!", error: scc.s_sheetunavailable + " " + leftCoord.substring(pos1 + 1, pos2) };
     }
-    value1.value = leftCoord;
   }
   if (value2.type == "name") {
-    value2 = scf.LookupName(othersheet, String(value2.value), "end");
+    value2 = scf.LookupName(othersheet, value2.value, "end");
   }
   if (value2.type == "coord") {
-    return { value: String(value1.value) + "|" + String(value2.value) + "|", type: "range" };
+    return { value: value1.value + "|" + value2.value + "|", type: "range" };
   } else {
     return { value: scc.s_calcerrcellrefmissing, type: "e#REF!" };
   }

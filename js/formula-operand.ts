@@ -51,7 +51,7 @@ FormulaOperandMut.TopOfStackValueAndType = function (
    operand.pop(); // we have data - pop stack
 
    if (result.type == "name") {
-      result = scf.LookupName(sheet, String(result.value));
+      result = scf.LookupName(sheet, result.value as string);
       }
 
    return result;
@@ -72,7 +72,7 @@ FormulaOperandMut.OperandAsNumber = function (
    t = operandinfo.type.charAt(0);
 
    if (t == "n") {
-      operandinfo.value = Number(operandinfo.value);
+      operandinfo.value = (operandinfo.value as number) - 0;
       }
    else if (t == "b") { // blank cell
       operandinfo.type = "n";
@@ -83,9 +83,9 @@ FormulaOperandMut.OperandAsNumber = function (
       }
    else {
       valueinfo = SocialCalc.DetermineValueType ? SocialCalc.DetermineValueType(operandinfo.value) :
-                                                    {value: Number(operandinfo.value), type: "n"}; // if without rest of SocialCalc
+                                                    {value: (operandinfo.value as number) - 0, type: "n"}; // if without rest of SocialCalc
       if (valueinfo.type.charAt(0) == "n") {
-         operandinfo.value = Number(valueinfo.value);
+         operandinfo.value = (valueinfo.value as number) - 0;
          operandinfo.type = valueinfo.type;
          }
       else {
@@ -161,17 +161,17 @@ FormulaOperandMut.OperandValueAndType = function (
    operand.pop(); // we have data - pop stack
 
    if (result.type == "name") {
-      result = scf.LookupName(sheet, String(result.value));
+      result = scf.LookupName(sheet, result.value as string);
       }
 
    if (result.type == "range") {
-      const stepped = scf.StepThroughRangeDown(operand, result.value);
-      if (stepped) result = stepped;
+      // Ambient return includes undefined; legacy path assigns directly when type is range.
+      result = scf.StepThroughRangeDown(operand, result.value as string)!;
       }
 
    if (result.type == "coord") { // value is a coord reference
       coordsheet = sheet;
-      const coordText = String(result.value);
+      const coordText = result.value as string;
       pos = coordText.indexOf("!");
       if (pos != -1) { // sheet reference
          coordsheet = scf.FindInSheetCache(coordText.substring(pos+1)); // get other sheet
@@ -184,7 +184,7 @@ FormulaOperandMut.OperandValueAndType = function (
          result.value = coordText.substring(0, pos); // get coord part
          }
 
-      cell = coordsheet.cells[SocialCalc.Formula.PlainCoord(String(result.value))];
+      cell = coordsheet.cells[SocialCalc.Formula.PlainCoord(result.value as string)];
       if (cell) {
          cellvtype = cell.valuetype; // get type of value in the cell it points to
          result.value = cell.datavalue;
@@ -281,14 +281,14 @@ FormulaOperandMut.OperandsAsCoordOnSheet = function (
       }
 
    if (value1.type == "name") {
-      value1 = scf.LookupName(othersheet, String(value1.value));
+      value1 = scf.LookupName(othersheet, value1.value as string);
       }
    result.type = value1.type;
    if (value1.type == "coord") { // value is a coord reference
-      result.value = String(value1.value) + "!" + sheetname.value; // return in the format as used on stack
+      result.value = (value1.value as string) + "!" + sheetname.value; // return in the format as used on stack
       }
    else if (value1.type == "range") { // value is a range reference
-      const rv = String(value1.value);
+      const rv = value1.value as string;
       pos1 = rv.indexOf("|");
       pos2 = rv.indexOf("|", pos1+1);
       result.value = rv.substring(0, pos1) + "!" + sheetname.value +
@@ -331,7 +331,7 @@ FormulaOperandMut.OperandsAsRangeOnSheet = function (
       }
 
    othersheet = sheet;
-   const leftCoord = String(value1.value);
+   const leftCoord = value1.value as string;
    pos1 = leftCoord.indexOf("!");
    if (pos1 != -1) { // sheet reference
       pos2 = leftCoord.indexOf("|", pos1+1);
@@ -340,15 +340,14 @@ FormulaOperandMut.OperandsAsRangeOnSheet = function (
       if (othersheet == null) { // unavailable
          return {value: 0, type: "e#REF!", error: scc.s_sheetunavailable+" "+leftCoord.substring(pos1+1,pos2)};
          }
-      value1.value = leftCoord; // keep string form for combine
       }
 
    if (value2.type == "name") { // coord:name is allowed, if name is just one cell
-      value2 = scf.LookupName(othersheet, String(value2.value), "end");
+      value2 = scf.LookupName(othersheet, value2.value as string, "end");
       }
 
    if (value2.type == "coord") { // value is a coord reference, so return the combined range
-      return {value: String(value1.value)+"|"+String(value2.value)+"|", type: "range"}; // return range in the format as used on stack
+      return {value: (value1.value as string)+"|"+(value2.value as string)+"|", type: "range"}; // return range in the format as used on stack
       }
    else { // bad form
       return {value: scc.s_calcerrcellrefmissing, type: "e#REF!"};
