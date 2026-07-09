@@ -53,7 +53,7 @@ dropped from the wrapper) so downstream callers don't need to change.
 All core modules under `js/` are global-script `.ts` (zero `js/*.js`). UMD
 wrappers are inlined in `build.ts`. Fully typechecked today: `formatnumber2.ts`, `socialcalcconstants.ts`,
 `formula-parse.ts`, `formula-operand.ts`, `formula-ref.ts`, `formula1.ts`,
-`socialcalc-3.ts`, `socialcalcspreadsheetcontrol.ts`, `socialcalcviewer.ts`,
+`socialcalc-3.ts`, `socialcalcspreadsheetcontrol.ts`, `socialcalctableeditor.ts`, `socialcalcviewer.ts`,
 `socialcalcpopup.ts`. LemmaScript `//@ verify` marks typed pure helpers
 (see `AGENTS.md`).
 

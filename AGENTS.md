@@ -24,11 +24,10 @@ reattaches leading license comment preambles. UMD open/close wrappers are
 | `socialcalctableeditor.ts` | Fully typechecked (table editor / DOM) |
 
 
-Do **not** claim a finished typed rewrite while `@ts-nocheck` remains. Next work:
-remove nocheck file-by-file by typing against ambient `.d.ts`, using
-implementation-only mutable bridges for progressive `const` init (see
-`FormatNumberMut` / `ConstantsRoot` / `FormulaRefRoot` patterns). Public `*.d.ts`
-stay consumer API skins unless a runtime binding is genuinely reassigned by callers.
+Do **not** claim a finished typed rewrite while `@ts-nocheck` remains. All core
+`js/*.ts` modules are now fully typechecked. Next work: tighten remaining `any`
+bridges and improve public `*.d.ts` coverage only when runtime surfaces a
+missing API.
 
 **LemmaScript:** `//@ verify` on typed pure helpers in `formula-ref.ts`,
 `formula-parse.ts`, `formula-operand.ts`, and `socialcalcconstants.ts`. Remaining
