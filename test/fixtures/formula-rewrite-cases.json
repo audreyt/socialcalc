@@ -94,7 +94,7 @@
       "formula": "A1>=B1",
       "args": { "coloffset": 0, "rowoffset": 0 },
       "expected": "A1>=B1",
-      "invariant": "Current JS parser compresses >= to G then TokenOpExpansion re-emits >=; Rust preserves spelling directly."
+      "invariant": "JS parser compresses >= to G then TokenOpExpansion re-emits >= on rewrite."
     },
     {
       "name": "<> operator expansion preserves not-equal spelling",
@@ -102,7 +102,7 @@
       "formula": "A1<>B1",
       "args": { "coloffset": 0, "rowoffset": 0 },
       "expected": "A1<>B1",
-      "invariant": "Current JS parser compresses <> to N then TokenOpExpansion re-emits <>; Rust preserves spelling directly."
+      "invariant": "JS parser compresses <> to N then TokenOpExpansion re-emits <> on rewrite."
     },
     {
       "name": "adjust sheet-qualified range Sheet1!A1:B1 unchanged when sheetref persists across colon",

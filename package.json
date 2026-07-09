@@ -54,7 +54,6 @@
   "devDependencies": {
     "@stryker-mutator/core": "^9.6.1",
     "@types/bun": "latest",
-    "binaryen": "130.0.0",
     "typescript": "^7.0.2"
   }
 }

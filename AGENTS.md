@@ -33,7 +33,8 @@ missing API.
 `formula-parse.ts`, `formula-operand.ts`, and `socialcalcconstants.ts`. Remaining
 formula1 evaluator helpers still need extraction/typing before prove. Promote
 findings to Bun fixtures/tests; shipping `dist/SocialCalc.js` remains the
-compatibility oracle. Keep the Rust/WASM spike as parity harness, not the insight path.
+compatibility oracle. The former Rust/WASM formula-ref spike was removed once its
+fixtures and Leanstral invariants lived on the TS/LemmaScript + Bun side.
 
 ## SocialCalc formula-reference work
 
@@ -46,35 +47,24 @@ handling and call sites only.
 
 Key files:
 
-- `js/formula-ref.ts` — pure formula-reference rewrite helpers and A1 coord algebra.
+- `js/formula-ref.ts` — pure formula-reference rewrite helpers and A1 coord algebra (LemmaScript `//@ verify`).
 - `js/socialcalc-3.ts` — production command handling (calls formula-ref helpers).
+- `test/fixtures/formula-rewrite-cases.json` — data-driven direct + command rewrite cases (ported from the retired Leanstral/Rust spike).
+- `test/formula-rewrite-cases.test.ts` — runs every fixture case against the shipping bundle.
 - `test/formula-rewrite-regressions.test.ts` — production tests for direct rewrite helpers.
 - `test/command-boundary-regressions.test.ts` — command-level boundary regressions.
 - `test/filldown-persistence.test.ts` — fill/fillright/filldown persistence and increment regressions.
 - `test/sheet-coverage-b.test.ts` — sheet command undo/name coverage.
-- `spikes/leanstral-formula-ref/` — Rust/WASM parity spike and Leanstral handoff material.
-- `spikes/leanstral-formula-ref/fixtures/formula-rewrite-cases.json` — shared JS/Rust parity fixtures.
 
 Required verification after formula-reference changes:
 
 ```bash
 bun run build.ts
-bun test test/formula-rewrite-regressions.test.ts spikes/leanstral-formula-ref/formula-ref-core.parity.test.ts
+bun test test/formula-rewrite-cases.test.ts test/formula-rewrite-regressions.test.ts
 bun run typecheck
 ```
 
-If `crates/formula-ref-core/src/lib.rs` changes, regenerate the Rust artifacts before parity testing:
-
-```bash
-cargo test -p formula-ref-core
-bun spikes/leanstral-formula-ref/build-rust-backend.mjs
-bun run build.ts
-bun test spikes/leanstral-formula-ref/formula-ref-core.parity.test.ts
-```
-
-`bun run build.ts` rebuilds the JavaScript bundle only. It does not regenerate `spikes/leanstral-formula-ref/dist/formula_ref_core.wasm` or `formula_ref_core.fallback.mjs`.
-
-Lessons from the 2026-07-05 Leanstral/oracle pass:
+Lessons from the 2026-07-05 Leanstral/oracle pass (still apply after the Rust drop):
 
 - Do not promote model output by prose alone. Convert it into a fixture or a Bun regression with exact calls, commands, and expected outputs.
 - Direct helper tests are not enough for command bugs. Use `ScheduleSheetCommands`/`loadSocialCalc()` command-level tests for copy, paste, fill, insert, delete, and undo behavior.

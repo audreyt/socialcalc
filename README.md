@@ -57,20 +57,20 @@ wrappers are inlined in `build.ts`. Fully typechecked today: `formatnumber2.ts`,
 `socialcalcpopup.ts`. LemmaScript `//@ verify` marks typed pure helpers
 (see `AGENTS.md`).
 
-## Formula-reference rewrite spike
+## Formula-reference rewrite coverage
 
-This branch includes a narrow Leanstral-assisted Rust/WASM spike for SocialCalc's formula-reference rewrite helpers: `OffsetFormulaCoords`, `AdjustFormulaCoords`, and `ReplaceFormulaCoords`. The spike lives under `spikes/leanstral-formula-ref/`; it is a parity oracle and research harness, not a replacement for the full JavaScript formula engine.
+`OffsetFormulaCoords`, `AdjustFormulaCoords`, and `ReplaceFormulaCoords` live in
+shipping TypeScript (`js/formula-ref.ts`) with LemmaScript `//@ verify` marks.
+The former Leanstral-assisted Rust/WASM parity spike was removed after its
+fixtures and invariants moved onto the TS/LemmaScript + Bun side.
 
-Use it when changing formula-reference rewrites:
+When changing formula-reference rewrites:
 
 ```bash
-cargo test -p formula-ref-core
-bun spikes/leanstral-formula-ref/build-rust-backend.mjs
 bun run build.ts
-bun test spikes/leanstral-formula-ref/formula-ref-core.parity.test.ts
+bun test test/formula-rewrite-cases.test.ts test/formula-rewrite-regressions.test.ts
+bun run typecheck
 ```
-
-`build-rust-backend.mjs` is required after any `crates/formula-ref-core/src/lib.rs` change. The parity test loads the generated `spikes/leanstral-formula-ref/dist/formula_ref_core.wasm` and `formula_ref_core.fallback.mjs`; `bun run build.ts` alone does not regenerate those artifacts.
 
 Lessons from the Leanstral/oracle pass:
 
@@ -83,8 +83,9 @@ Lessons from the Leanstral/oracle pass:
 
 Relevant tests:
 
-- `test/formula-rewrite-regressions.test.ts` — production coverage for formula-helper edge cases suggested by Leanstral/oracle review.
-- `spikes/leanstral-formula-ref/formula-ref-core.parity.test.ts` — JS/WASM/fallback parity over fixture cases.
+- `test/fixtures/formula-rewrite-cases.json` — data-driven direct + command cases ported from the retired spike.
+- `test/formula-rewrite-cases.test.ts` — runs every fixture case against the shipping bundle.
+- `test/formula-rewrite-regressions.test.ts` — production coverage for formula-helper edge cases.
 - `test/command-boundary-regressions.test.ts` — command-level max-column behavior.
 - `test/filldown-persistence.test.ts` — headless and interactive fill persistence/increment behavior.
 - `test/sheet-coverage-b.test.ts` — command undo/name-reference coverage.

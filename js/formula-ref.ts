@@ -152,8 +152,15 @@ FormulaRefRoot.ParseRange = function (
 
 //@ verify
 //@ ensures \result.length >= 0
-// LemmaScript: relative coords shift by offsets; absolute $ legs stay fixed;
-// overflow col>702 or row/col <1 → #REF!; strings/ops preserved.
+// LemmaScript invariants (ported from Leanstral/Rust spike):
+// - STRING_PRESERVATION: string payloads preserved (quotes re-escaped).
+// - NAME_VS_COORD: whole-column names (N:N, AA:AA) are never coords.
+// - OFFSET_ZERO_IDENTITY: offset(f,0,0) == parse-reconstruct(f)
+//   (TokenOpExpansion + quote re-emission; whitespace may normalize).
+// - OFFSET_COMPOSITION: offset(offset(f,c1,r1),c2,r2) == offset(f,c1+c2,r1+r2)
+//   when no intermediate #REF!.
+// - relative coords shift by offsets; absolute $ legs stay fixed;
+//   overflow col>702 or row/col <1 → #REF!; strings/ops preserved.
 FormulaRefRoot.OffsetFormulaCoords = function (
     formula: string,
     coloffset: number,
@@ -213,8 +220,11 @@ FormulaRefRoot.OffsetFormulaCoords = function (
 
 //@ verify
 //@ ensures \result.length >= 0
-// LemmaScript: structural insert/delete adjust; sheetref sticky through ':';
-// deleted-band refs → #REF! when not sheet-qualified.
+// LemmaScript invariants (ported from Leanstral/Rust spike):
+// - SHEETREF_SKIP: sheetref set by '!' and NOT reset by ':'; sheet-qualified
+//   range endpoints (Sheet1!A1:B1) stay sticky through ':'.
+// - structural insert/delete adjust; deleted-band refs → #REF! when not
+//   sheet-qualified; absolute markers reapplied after underlying coord moves.
 FormulaRefRoot.AdjustFormulaCoords = function (
     formula: string,
     col: number,
@@ -295,7 +305,11 @@ FormulaRefRoot.AdjustFormulaCoords = function (
 
 //@ verify
 //@ ensures \result.length >= 0
-// LemmaScript: remap coords in movedto map; sheet-qualified refs skip remap.
+// LemmaScript invariants (ported from Leanstral/Rust spike):
+// - REPLACE_RANGE_INDEPENDENT: range endpoints rewritten independently via
+//   movedto map (SUM(A1:B2) with only A1 mapped → SUM(C3:B2)).
+// - SHEETREF_SKIP: sheet-qualified refs skip remap; ':' does not reset sheetref.
+// - absolute markers from the original coord are copied onto replacements.
 FormulaRefRoot.ReplaceFormulaCoords = function (
     formula: string,
     movedto: MovedToMap,
