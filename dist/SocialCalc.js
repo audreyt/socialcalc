@@ -11105,9 +11105,7 @@ SocialCalc.intFunc = function(n) {
 
 // In-place TypeScript conversion of formula1.js (SocialCalc global script).
 // Ambient API types live in formula1.d.ts (referenced by dist/SocialCalc.d.ts).
-// Build strips types via Bun.Transpiler before UMD concat — no runtime tax.
-// Intermediate: // @ts-nocheck until JSDoc-driven param types are complete for this module.
-// @ts-nocheck
+// Intermediate: typechecked core after removing @ts-nocheck.
 // Opts this module into strict TypeScript checking; sibling .d.ts provides types.
 //
 /*
@@ -11737,7 +11735,7 @@ FormulaMut.StoreIoEventFormula = function(function_name, coord, operand_reverse,
     var triggerTimeCellId = SocialCalc.Formula.PlainCoord(operand[0].value);
     var currentTriggerTimeList = [];
     if (operand[0].type == "range") {
-      var rangeinfo = SocialCalc.Formula.DecodeRangeParts(sheet, triggerTimeCellId);
+      let rangeinfo = SocialCalc.Formula.DecodeRangeParts(sheet, triggerTimeCellId);
       for (var i = 0;i < rangeinfo.ncols; i++) {
         for (var j = 0;j < rangeinfo.nrows; j++) {
           var cellCoord = SocialCalc.crToCoord(rangeinfo.col1num + i, rangeinfo.row1num + j);
@@ -12145,7 +12143,7 @@ FormulaMut.SumProductFunction = function(fname, operand, foperand, sheet) {
 };
 SocialCalc.Formula.FunctionList["SUMPRODUCT"] = [SocialCalc.Formula.SumProductFunction, -1, "rangen", "", "stat"];
 FormulaMut.DSeriesFunctions = function(fname, operand, foperand, sheet) {
-  var tostype, cr, dbrange, fieldname, criteriarange, dbinfo, criteriainfo;
+  var tostype, cr, dbrange, fieldname, criteriarange;
   var fieldasnum, targetcol, i, j, k, cell, criteriafieldnums, criterianum;
   var testok, criteriacr, criteria, testcol, testcr;
   var t, v1;
@@ -12170,6 +12168,7 @@ FormulaMut.DSeriesFunctions = function(fname, operand, foperand, sheet) {
   dbrange = scf.TopOfStackValueAndType(sheet, foperand);
   fieldname = scf.OperandValueAndType(sheet, foperand);
   criteriarange = scf.TopOfStackValueAndType(sheet, foperand);
+  var dbinfo, criteriainfo;
   if (dbrange.type != "range" || criteriarange.type != "range") {
     return scf.FunctionArgsError(fname, operand);
   }
@@ -13600,7 +13599,7 @@ SocialCalc.Formula.FunctionList["COLUMNS"] = [SocialCalc.Formula.ColumnsRowsFunc
 SocialCalc.Formula.FunctionList["ROWS"] = [SocialCalc.Formula.ColumnsRowsFunctions, 1, "range", "", "lookup"];
 FormulaMut.ZeroArgFunctions = function(fname, operand, foperand, sheet) {
   var startval, tzoffset, start_1_1_1970, seconds_in_a_day, nowdays;
-  var result = { value: 0 };
+  var result = { value: 0, type: "" };
   switch (fname) {
     case "FALSE":
       result.type = "nl";
@@ -13896,7 +13895,7 @@ SocialCalc.Formula.FunctionList["RATE"] = [SocialCalc.Formula.InterestFunctions,
 FormulaMut.NPVFunction = function(fname, operand, foperand, sheet) {
   var resulttypenpv, rate, sum, factor, value1;
   var scf = SocialCalc.Formula;
-  var rate = scf.OperandAsNumber(sheet, foperand);
+  rate = scf.OperandAsNumber(sheet, foperand);
   if (scf.CheckForErrorValue(operand, rate))
     return;
   sum = 0;
@@ -14395,7 +14394,7 @@ TriggerIoMut.Button = function(triggerCellId) {
         var commandsParameter;
         sheetCommandList = "";
         if (conditionsParameter != null) {
-          var commandsParameter = SocialCalc.Formula.getStandardizedValues(sheet, parameters[2]);
+          commandsParameter = SocialCalc.Formula.getStandardizedValues(sheet, parameters[2]);
           if (conditionsParameter.ncols != commandsParameter.ncols || conditionsParameter.nrows != commandsParameter.nrows)
             break;
         } else {
@@ -14718,7 +14717,7 @@ FormulaMut.getStandardizedParameter = function(sheet, parameterData, includeCell
     }
   } else {
     var scf = SocialCalc.Formula;
-    var sourcerangeinfo;
+    var sourcerangeinfo = null;
     if (parameterData.type == "coord") {
       var sourceCoord = SocialCalc.Formula.PlainCoord(parameterData.value);
       sourcerangeinfo = scf.DecodeRangeParts(sheet, sourceCoord + "|" + sourceCoord + "|");
@@ -16850,8 +16849,7 @@ SocialCalc.Popup.Types.ColorChooser.CloseOK = function(e) {
 // In-place TypeScript conversion of socialcalcspreadsheetcontrol.js (SocialCalc global script).
 // Ambient API types live in socialcalcspreadsheetcontrol.d.ts (referenced by dist/SocialCalc.d.ts).
 // Build strips types via Bun.Transpiler before UMD concat — no runtime tax.
-// Intermediate: @ts-nocheck remains — constructor/prototype shape fixed;
-// full peel blocked on ~700 ambient/nullability errors.
+// Intermediate: @ts-nocheck — full peel still ~700 ambient/nullability errors.
 // @ts-nocheck
 // Opt-in to TypeScript strict checking (noImplicitAny, strictNullChecks) via r2scout config.
 //

@@ -51,21 +51,21 @@ declare namespace SocialCalc {
     interface FormulaOperand {
         type: FormulaOperandType;
         value: any;
-        error?: string;
+        error?: string | number | null | undefined;
         [key: string]: any;
     }
 
     interface FormulaValueResult {
         value: any;
         type: FormulaOperandType;
-        error?: string;
+        error?: string | number | null | undefined;
         [key: string]: any;
     }
 
     interface FormulaEvaluateResult {
         value: any;
         type: FormulaOperandType;
-        error: string;
+        error: string | number | null | undefined;
         [key: string]: any;
     }
 
@@ -107,13 +107,11 @@ declare namespace SocialCalc {
      * one result onto `operand`. Return non-null/non-undefined error text
      * to signal an error.
      */
-    type FormulaFunctionImpl = (
-        fname: string,
-        operand: FormulaOperand[],
-        foperand: FormulaOperand[],
-        sheet: Sheet,
-        coord?: string
-    ) => string | null | undefined | void;
+    type FormulaFunctionImpl = (fname: string,
+    operand: FormulaOperand[],
+    foperand: FormulaOperand[],
+    sheet: Sheet,
+    coord?: string) => string | number | null | undefined | void;
 
     /**
      * FunctionList tuple:
@@ -252,7 +250,7 @@ declare namespace SocialCalc {
         /**
          * @param range stack-style range value e.g. "A1|B3|" (optional !sheetname segment)
          */
-        function DecodeRangeParts(sheetdata: Sheet, range: string): FormulaDecodedRange | null;
+        function DecodeRangeParts(sheetdata: Sheet, range: string, rangeType?: string): FormulaDecodedRange | null;
 
         // --------------------------------------------------------------
         // I/O event / form utilities (eddy extensions)
@@ -277,7 +275,7 @@ declare namespace SocialCalc {
             operand: FormulaOperand[],
             sheet: Sheet,
             coord?: string
-        ): string;
+        ): string | number | null | undefined;
 
         function PushOperand(operand: FormulaOperand[], t: FormulaOperandType, v: any): void;
         function CopyFunctionArgs(operand: FormulaOperand[], foperand: FormulaOperand[]): void;
@@ -401,7 +399,7 @@ declare namespace SocialCalc {
             sourceData: FormulaStandardizedParameter,
             destcr: { col: number; row: number; [key: string]: any }
         ): string;
-        function Email(emailFormulaCellId: string, optionalTriggerCellId?: string | null): any[];
+        function Email(emailFormulaCellId: string, optionalTriggerCellId?: string | null): any[] | undefined;
         function Submit(triggerCellId: string): void;
         function SelectList(selectListCellId: string): void;
         function AutoComplete(autoCompleteCellId: string): void;
