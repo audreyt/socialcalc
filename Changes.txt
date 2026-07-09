@@ -27,6 +27,10 @@ Toolchain and build
   binaryen devDependency used only for WASM fallback generation.
 - Updated Stryker mutation scripts, tsconfig.json, and README.md/AGENTS.md to
   reflect the TypeScript source layout and the Rust drop.
+- Wired LemmaScript dual-backend scaffolding: exported facade lemma/a1.ts,
+  Dafny gen/check (8 verified / 0 errors), Lean gen smoke, scripts
+  verify:dafny / verify:lean / verify:both, and CI workflow lemmascript.yml.
+  Full lake build remains optional (sibling Loom/Velvet/LemmaScript).
 
 Testing
 - Ported formula-rewrite fixture cases into test/fixtures/formula-rewrite-cases.json
@@ -35,6 +39,7 @@ Testing
 - Formula-rewrite regressions and the full Bun suite continue to guard the
   TypeScript rewrite.
 - No @ts-nocheck remains in any core js/*.ts module.
+- LemmaScript-files.txt lists lemma/a1.ts; lsc cannot extract global-script js/*.ts.
 
 ==============================================================================
 v3.0.5 — 2026-07-05

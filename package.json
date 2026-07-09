@@ -26,7 +26,15 @@
     "mutate:file": "bun run stryker-file.mjs",
     "mutate:format": "bun run stryker-file.mjs js/formatnumber2.ts",
     "mutate:sheet": "bun run stryker-file.mjs js/socialcalc-3.ts",
-    "mutate:formula": "bun run stryker-file.mjs js/formula1.ts"
+    "mutate:formula": "bun run stryker-file.mjs js/formula1.ts",
+    "verify": "lsc check --backend=dafny",
+    "verify:dafny": "lsc check --backend=dafny",
+    "verify:dafny:gen": "lsc gen --backend=dafny",
+    "verify:dafny:regen": "lsc check --backend=dafny --regen",
+    "verify:lean:gen": "lsc gen --backend=lean lemma/a1.ts",
+    "verify:lean": "bun run verify:lean:gen && test -s lemma/a1.types.lean && test -s lemma/a1.def.lean && test -s lemma/a1.proof.lean",
+    "verify:lean:build": "lake build",
+    "verify:both": "bun run verify:dafny && bun run verify:lean"
   },
   "repository": {
     "type": "git",
@@ -54,6 +62,7 @@
   "devDependencies": {
     "@stryker-mutator/core": "^9.6.1",
     "@types/bun": "latest",
+    "lemmascript": "0.5.13",
     "typescript": "^7.0.2"
   }
 }

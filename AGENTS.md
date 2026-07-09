@@ -29,12 +29,24 @@ Do **not** claim a finished typed rewrite while `@ts-nocheck` remains. All core
 bridges and improve public `*.d.ts` coverage only when runtime surfaces a
 missing API.
 
-**LemmaScript:** `//@ verify` on typed pure helpers in `formula-ref.ts`,
-`formula-parse.ts`, `formula-operand.ts`, and `socialcalcconstants.ts`. Remaining
-formula1 evaluator helpers still need extraction/typing before prove. Promote
-findings to Bun fixtures/tests; shipping `dist/SocialCalc.js` remains the
-compatibility oracle. The former Rust/WASM formula-ref spike was removed once its
-fixtures and Leanstral invariants lived on the TS/LemmaScript + Bun side.
+**LemmaScript:** Shipping pure cores keep `//@ verify` marks in place, but
+`lsc` cannot extract global-script `js/*.ts` (no exports). The verification
+surface is the exported facade under `lemma/` (currently `lemma/a1.ts` for pure
+A1 clamp/coord algebra). Both backends are scaffolded:
+
+```bash
+bun run verify:both          # Dafny check + Lean gen smoke
+bun run verify:dafny:gen     # → lemma/a1.dfy + a1.dfy.gen
+bun run verify:dafny         # lsc check --backend=dafny (LemmaScript-files.txt)
+bun run verify:lean:gen      # → lemma/a1.types.lean + a1.def.lean
+bun run verify:lean          # gen + assert non-empty Lean artifacts
+bun run verify:lean:build    # optional full lake build (sibling ../velvet, ../loom, ../LemmaScript)
+```
+
+Promote findings to Bun fixtures/tests; shipping `dist/SocialCalc.js` remains
+the compatibility oracle. Dafny proofs live as additions in `*.dfy` (not
+`*.dfy.gen`). Lean proofs live in hand-written `*.proof.lean`. Full `lake build`
+is optional and needs sibling Loom/Velvet/LemmaScript checkouts (see README).
 
 ## SocialCalc formula-reference work
 

@@ -1,0 +1,64 @@
+name: LemmaScript
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dafny:
+    name: lsc check (Dafny)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Dafny
+        uses: dafny-lang/setup-dafny-action@v1
+        with:
+          dafny-version: "4.9.0"
+
+      - name: Install LemmaScript
+        run: npm install -g lemmascript@0.5.13
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate + check Dafny models
+        run: bun run verify:dafny
+
+  lean-gen:
+    name: lsc gen (Lean)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install LemmaScript
+        run: npm install -g lemmascript@0.5.13
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Full `lake build` needs sibling Loom/Velvet/LemmaScript checkouts and
+      # solver downloads; CI only asserts Lean backend generation succeeds.
+      - name: Generate Lean models from facade
+        run: bun run verify:lean:gen
+
+      - name: Assert Lean artifacts non-empty
+        shell: bash
+        run: |
+          test -s lemma/a1.types.lean
+          test -s lemma/a1.def.lean
+          test -s lemma/a1.proof.lean
