@@ -40,8 +40,7 @@ bun run verify:dafny:gen     # → lemma/a1.dfy.gen
 bun run verify:dafny:regen   # merge gen into proof-bearing a1.dfy
 bun run verify:dafny         # lsc check --backend=dafny (LemmaScript-files.txt)
 bun run verify:lean:gen      # → lemma/a1.types.lean + a1.def.lean
-bun run verify:lean          # gen + assert non-empty Lean artifacts
-bun run verify:lean:build    # optional lake build (sibling ../velvet, ../loom, ../LemmaScript)
+bun run verify:lean:build    # lake build (sibling ../velvet, ../loom, ../LemmaScript)
 ```
 
 **Useful rewards now:** Dafny CI-locks pure A1/`#REF!` overflow algebra plus
