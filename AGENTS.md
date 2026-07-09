@@ -20,7 +20,8 @@ reattaches leading license comment preambles. UMD open/close wrappers are
 | `socialcalc-3.ts` | Fully typechecked (command/caller core) |
 | `socialcalcviewer.ts` | Fully typechecked |
 | `socialcalcpopup.ts` | Fully typechecked |
-| control/editor `.ts` | **Interim `@ts-nocheck`** (~700–900 errors each) |
+| `socialcalcspreadsheetcontrol.ts` | Fully typechecked (toolbar/tab/save UI) |
+| `socialcalctableeditor.ts` | **Interim `@ts-nocheck`** (~700–900 errors) |
 
 
 Do **not** claim a finished typed rewrite while `@ts-nocheck` remains. Next work:
