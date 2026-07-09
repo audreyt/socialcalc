@@ -2227,8 +2227,11 @@ test("DPRODUCT: zero matching rows returns 0 not 1", async () => {
 test("StoreIoEventFormula Input: headless TEXTBOX finishes recalc", async () => {
     const SC = await loadSocialCalc();
     // Ensure formDataViewer path is null even if a prior test left a Control shell.
+    // Capture property values (not just object refs) so finally restores them.
     const prevControl = SC.CurrentSpreadsheetControlObject;
     const prevViewer = SC.CurrentSpreadsheetViewerObject;
+    const prevControlFDV = prevControl ? prevControl.formDataViewer : undefined;
+    const prevViewerFDV = prevViewer ? prevViewer.formDataViewer : undefined;
     try {
         if (SC.CurrentSpreadsheetControlObject) {
             SC.CurrentSpreadsheetControlObject.formDataViewer = null;
@@ -2248,6 +2251,12 @@ test("StoreIoEventFormula Input: headless TEXTBOX finishes recalc", async () => 
         expect(getDV("A2")).toBe(2);
         expect(getDV("A3")).toBe(6);
     } finally {
+        if (prevControl) {
+            prevControl.formDataViewer = prevControlFDV;
+        }
+        if (prevViewer) {
+            prevViewer.formDataViewer = prevViewerFDV;
+        }
         SC.CurrentSpreadsheetControlObject = prevControl;
         SC.CurrentSpreadsheetViewerObject = prevViewer;
     }
