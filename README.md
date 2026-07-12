@@ -36,15 +36,60 @@ This package also works in Node.js. You do not need to call
 
 ## Trust boundary and host security
 
-SocialCalc renders some cell content as HTML: the `text-html` format and the
-`@r` (raw text) custom format are inserted without escaping. URL/link formats
-can create links, and `text-image` renders an image URL. Treat workbook cells
-and save strings as hostile input: they are **not safe by default**.
+SocialCalc renders some cell content as HTML: the `text-html` format, the
+`@r` (raw text) custom format, wiki-callback output (`Callbacks.expand_wiki`/
+`expand_markup`), and text-custom format templates can all inject markup.
+URL/link formats (`text-url`, `text-image`, `text-link`, the `@u` custom
+placeholder) can create links or embed images. **The legacy default (see
+below) treats all of this as trusted and is not safe for untrusted input.**
 
-The host application is responsible for sanitizing untrusted content before
-rendering or saving, and for applying an appropriate Content Security Policy
-(including image and link restrictions). SocialCalc does not provide a secure
-mode or a host-wide sanitizer.
+### Default (legacy) mode is unsafe by default
+
+`SocialCalc.Callbacks.untrustedContent` defaults to `false`. In this mode,
+behavior is byte-for-byte identical to versions before 3.1.0: raw HTML passes
+through untouched and link/image URLs are not scheme-checked. Treat workbook
+cells and save strings as hostile input in this mode — they are **not safe by
+default**.
+
+### Opt-in untrusted-content mode
+
+Set `SocialCalc.Callbacks.untrustedContent = true` before rendering a sheet
+sourced from an untrusted party (a shared/collaborative document, an
+uploaded file, an API response) to enable escaping/validation across every
+sheet-derived HTML sink and host callback (see
+`docs/security-sink-inventory.md` for the full, evidence-backed enumeration).
+With it enabled:
+
+- Raw HTML content (`text-html`, the `@r` placeholder, wiki-callback output,
+  and text-custom format templates) is HTML-escaped by default.
+- Link/image/data URLs are validated against
+  `SocialCalc.Callbacks.securityPolicy.allowedUrlSchemes` (default
+  `["http:", "https:", "mailto:"]`); `data:` URLs are rejected unless their
+  MIME type is listed in `securityPolicy.allowedDataMimeTypes` (default
+  `[]`, i.e. all `data:` URLs rejected). Rejected URLs fall back to inert,
+  escaped text rather than being dropped or throwing.
+- The formula-widget `cell_html` rendering path is disabled entirely, since
+  it interpolates sheet-authored parameters directly into live,
+  event-handler-capable markup that cannot be safely escaped field-by-field.
+
+### Host sanitizer contract
+
+To allow rich (not merely escaped) HTML from a trusted-but-not-fully-vetted
+source, set `SocialCalc.Callbacks.securityPolicy.sanitizeHtml` to a function
+`(html: string) => string` that returns safe HTML (e.g. backed by DOMPurify
+or an equivalent). It is consulted only when `untrustedContent` is `true`,
+and only for the raw-HTML sinks listed above — it does not affect URL/scheme
+validation. SocialCalc ships no sanitizer implementation itself and does not
+attempt to detect or reject an unsafe one; the host is responsible for the
+function's correctness. `SocialCalc.SafeUrlForRender(rawurl, policy?)` and
+`SocialCalc.EscapeUntrustedHtml(html, policy?)` are also exported directly if
+a host needs to apply the same validation/escaping logic outside of normal
+cell rendering (e.g. before saving, or in a custom widget).
+
+Regardless of mode, the host application remains responsible for applying an
+appropriate Content Security Policy (including image and link restrictions)
+and for any sanitization needed outside SocialCalc's own rendering paths
+(e.g. of values it receives back through host callbacks).
 
 ## Build and quality gates
 

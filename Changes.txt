@@ -33,6 +33,24 @@ Toolchain and testing
   throws under strict Node execution while preserving the existing token
   swallowing behavior.
 
+Security
+- Added an opt-in, off-by-default policy for rendering sheets from
+  untrusted/third-party sources (`SocialCalc.Callbacks.untrustedContent`,
+  default `false`; legacy default output is unaffected). When enabled, raw
+  HTML cell content, wiki-callback output, and text-custom format templates
+  are HTML-escaped (or passed through an optional host
+  `SocialCalc.Callbacks.securityPolicy.sanitizeHtml` callback), and
+  link/image/data URLs are validated against
+  `securityPolicy.allowedUrlSchemes` / `allowedDataMimeTypes` allowlists. See
+  `docs/security-sink-inventory.md` for the full enumerated sink list and
+  `README.md`'s "Trust boundary and host security" section for usage.
+- Fixed `RecalcLoadedSheet` throwing when neither a sheet name nor a cached
+  `SheetCache.waitingForLoading` name was available (e.g. a `start_wait`
+  timer tick with no host `LoadSheet` callback and nothing queued): it no
+  longer coerces a missing name into `""` and hands it to
+  `NormalizeSheetName`/`AddSheetToCache`, which previously threw a
+  deterministic `TypeError`; it now skips the cache-add step entirely.
+
 
 ==============================================================================
 v3.0.8 — 2026-07-09
