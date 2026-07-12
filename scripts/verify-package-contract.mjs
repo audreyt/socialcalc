@@ -78,6 +78,13 @@ const EXPECTED_TARBALL_MEMBERS = [
   "js/socialcalctableeditor.d.ts",
   "js/socialcalcviewer.d.ts",
 ];
+// Size ceilings are explicit package-contract values, not snapshots: they
+// leave room for ordinary source growth while catching accidental inclusion
+// of dependencies or other release artifacts. Baseline measured 2026-07-12:
+// 1,297,267 raw member bytes and a 273,712-byte npm tarball (gzip).
+const MAX_PACKAGE_RAW_BYTES = 1_600_000;
+const MAX_PACKAGE_GZIP_BYTES = 350_000;
+
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
@@ -274,25 +281,39 @@ async function main() {
       return createHash("sha256").update(readFileSync(filePath)).digest("hex");
     }
 
-    record("packed artifacts are nonempty and the minified bundle is smaller (sha256 reported, not pinned)", () => {
+    record("packed artifacts are nonempty and stay within explicit raw/gzip size budgets (sha256 reported, not pinned)", () => {
       const sizes = {
-        tarball: statSync(tarballPath).size,
+        gzip: statSync(tarballPath).size,
+        rawPackage: EXPECTED_TARBALL_MEMBERS.reduce(
+          (total, member) => total + statSync(path.join(packageDir, member)).size,
+          0,
+        ),
         normal: statSync(rootJsPath).size,
         minified: statSync(minJsPath).size,
       };
       for (const [name, size] of Object.entries(sizes)) {
         if (!(size > 0)) throw new Error(`${name} artifact is empty (${size} bytes)`);
       }
+      if (sizes.rawPackage > MAX_PACKAGE_RAW_BYTES) {
+        throw new Error(
+          `raw package size ${sizes.rawPackage}B exceeds the ${MAX_PACKAGE_RAW_BYTES}B budget`,
+        );
+      }
+      if (sizes.gzip > MAX_PACKAGE_GZIP_BYTES) {
+        throw new Error(
+          `gzip package size ${sizes.gzip}B exceeds the ${MAX_PACKAGE_GZIP_BYTES}B budget`,
+        );
+      }
       if (!(sizes.minified < sizes.normal)) {
         throw new Error(`expected minified bundle smaller than normal — normal=${sizes.normal} minified=${sizes.minified}`);
       }
       const hashes = {
-        tarball: sha256(tarballPath),
+        gzip: sha256(tarballPath),
         normal: sha256(rootJsPath),
         minified: sha256(minJsPath),
       };
       return (
-        `tarball ${sizes.tarball}B sha256:${hashes.tarball} | ` +
+        `raw package ${sizes.rawPackage}B | gzip ${sizes.gzip}B sha256:${hashes.gzip} | ` +
         `normal ${sizes.normal}B sha256:${hashes.normal} | ` +
         `minified ${sizes.minified}B sha256:${hashes.minified}`
       );

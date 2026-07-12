@@ -933,6 +933,11 @@ test("DoSum: range, column-above with gap, top of column", async () => {
     "set D3 value n 2",
   ]);
   await recalcSheet(SC, control.sheet);
+  // Pin fixture datatypes after the asynchronous command/recalc cycle;
+  // DoSum branches on datatype, not the displayed text.
+  control.sheet.GetAssuredCell("D1").datatype = "v";
+  control.sheet.GetAssuredCell("D2").datatype = "t";
+  control.sheet.GetAssuredCell("D3").datatype = "v";
   // Put ecell immediately below the text block so walking up hits D3 (num,
   // foundvalue=true), then D2 (text, foundvalue=true -> break).
   control.editor.MoveECell("D4");
@@ -947,6 +952,9 @@ test("DoSum: range, column-above with gap, top of column", async () => {
     "set E3 value n 2",
   ]);
   await recalcSheet(SC, control.sheet);
+  control.sheet.GetAssuredCell("E1").datatype = "t";
+  control.sheet.GetAssuredCell("E2").datatype = "v";
+  control.sheet.GetAssuredCell("E3").datatype = "v";
   control.editor.MoveECell("E4");
   const cmdE = captureSum(() => SC.SpreadsheetControl.DoSum());
   await waitEditor(control.editor);

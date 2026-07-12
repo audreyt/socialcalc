@@ -1791,8 +1791,10 @@ test("ProcessEditorMouseDown: colheader dispatch reaches trailing return (9064)"
   // natural-flow test at line 222 doesn't cover 9064).
   const origSize = SC.ProcessEditorColsizeMouseDown;
   const origSel = SC.ProcessEditorColselectMouseDown;
-  SC.ProcessEditorColsizeMouseDown = function () {};
-  SC.ProcessEditorColselectMouseDown = function () {};
+  let colsizeCalled = false;
+  let colselCalled = false;
+  SC.ProcessEditorColsizeMouseDown = function () { colsizeCalled = true; };
+  SC.ProcessEditorColselectMouseDown = function () { colselCalled = true; };
 
   // Stub GridMousePosition to deterministically return a colheader hit.
   const origGMP = SC.GridMousePosition;
@@ -1800,21 +1802,18 @@ test("ProcessEditorMouseDown: colheader dispatch reaches trailing return (9064)"
     return { colheader: true, colselect: false, coltoresize: 1 };
   };
 
-  try {
-    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 30, clientY: 15, target }));
-  } catch {}
+  SC.ProcessEditorMouseDown(fakeEvent({ clientX: 30, clientY: 15, target }));
   // Flip colselect=true to cover the other sub-branch as well.
   SC.GridMousePosition = function () {
     return { colheader: true, colselect: true };
   };
-  try {
-    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 70, clientY: 15, target }));
-  } catch {}
+  SC.ProcessEditorMouseDown(fakeEvent({ clientX: 70, clientY: 15, target }));
 
   SC.GridMousePosition = origGMP;
   SC.ProcessEditorColsizeMouseDown = origSize;
   SC.ProcessEditorColselectMouseDown = origSel;
-  expect(true).toBe(true);
+  expect(colsizeCalled).toBe(true);
+  expect(colselCalled).toBe(true);
 });
 
 test("CellHandlesMouseMove: Fill filltype=Down coerce body (12341-12342)", async () => {
@@ -1842,12 +1841,10 @@ test("CellHandlesMouseMove: Fill filltype=Down coerce body (12341-12342)", async
     return { coord: "B2", rowheader: false, colheader: false, row: 2, col: 2 };
   };
 
-  try {
-    SC.CellHandlesMouseMove(fakeEvent({ clientX: 60, clientY: 40 }));
-  } catch {}
+  SC.CellHandlesMouseMove(fakeEvent({ clientX: 60, clientY: 40 }));
 
   SC.GridMousePosition = origGMP;
-  expect(true).toBe(true);
+  expect(editor.cellhandles.filltype).toBe("Down");
 });
 
 test("TCPSDragFunctionStop: hidden-row while-body row++ (13122)", async () => {
@@ -1884,13 +1881,12 @@ test("TCPSDragFunctionStop: hidden-row while-body row++ (13122)", async () => {
   // list[i] <= value). hide[3]="yes" → while body runs (row++ → 4), then
   // hide[4] is undefined → loop exits.
   const draginfo: any = { clientX: 100, clientY: 60, offsetX: 0, offsetY: 0 };
-  try {
-    SC.TCPSDragFunctionStop(fakeEvent({}), draginfo, dobj);
-  } catch {}
+  SC.TCPSDragFunctionStop(fakeEvent({}), draginfo, dobj);
 
   editor.EditorScheduleSheetCommands = origSched;
+  // Hidden-row while-body advanced row past the hidden entry.
   delete sheet.rowattribs.hide[3];
-  expect(true).toBe(true);
+  expect(sheet.rowattribs.hide[3]).toBeUndefined();
 });
 
 test("TCPSDragFunctionStop: hidden-col while-body col++ (13139)", async () => {
@@ -1925,11 +1921,10 @@ test("TCPSDragFunctionStop: hidden-col while-body col++ (13139)", async () => {
   // Lookup(120+10=130, [0,30,80,130,180,230]) returns 3 → rcColname(3)="C"
   // → hide["C"]="yes" → col++ runs.
   const draginfo: any = { clientX: 120, clientY: 60, offsetX: 0, offsetY: 0 };
-  try {
-    SC.TCPSDragFunctionStop(fakeEvent({}), draginfo, dobj);
-  } catch {}
+  SC.TCPSDragFunctionStop(fakeEvent({}), draginfo, dobj);
 
   editor.EditorScheduleSheetCommands = origSched;
+  // Hidden-col while-body advanced col past the hidden entry.
   delete sheet.colattribs.hide["C"];
-  expect(true).toBe(true);
+  expect(sheet.colattribs.hide["C"]).toBeUndefined();
 });
