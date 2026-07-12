@@ -5743,22 +5743,21 @@ SC.SafeUrlForRender = function (
   // below, passes validation, and is then decoded by the BROWSER'S HTML
   // PARSER - independently of any URL parsing - into a live "javascript:"
   // scheme or a quote that breaks out of the attribute into a new one
-  // (e.g. onmouseover=). HTML-escaping the already percent-encoded string
-  // closes this: it must happen on every accepted return path below,
-  // including the schemeless/relative and "data:" branches, and it must
+  // (e.g. onmouseover=). HTML-escaping the already percent-encoded string must
   // be the LAST step, after scheme/mime validation (which still inspects
   // the un-escaped `stripped`/`afterScheme` values). A legitimate "&" in
   // e.g. a query string ("?a=1&b=2") becomes "&amp;", which the browser
   // decodes back to a literal "&" for the actual href/src - so real URL
   // semantics are unchanged - but an attacker's literal "&#58;" becomes
   // "&amp;#58;", which decodes to the inert text "&#58;" (entity decoding
-  // is one pass, not recursive), never reinterpreted as a colon. Computed
-  // once here and reused on every accepted return path below.
-  const htmlSafe = SocialCalc.special_chars(encoded);
+  // is one pass, not recursive), never reinterpreted as a colon. Applied
+  // once per accepted return path below (schemeless/relative, allowed
+  // "data:" MIME, allowed scheme) - a rejected/malicious URL returns
+  // `null` directly and never pays for this escape.
 
   const schemeMatch = stripped.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/);
   if (!schemeMatch) {
-    return htmlSafe; // no scheme: relative/path-only URL, cannot invoke a scheme handler
+    return SocialCalc.special_chars(encoded); // no scheme: relative/path-only URL, cannot invoke a scheme handler
   }
 
   const scheme = schemeMatch[1].toLowerCase() + ":";
@@ -5770,14 +5769,14 @@ SC.SafeUrlForRender = function (
     if (!mime) return null;
     const allowedDataMimeTypes = policy.allowedDataMimeTypes;
     for (let i = 0; i < allowedDataMimeTypes.length; i++) {
-      if (allowedDataMimeTypes[i].toLowerCase() === mime) return htmlSafe;
+      if (allowedDataMimeTypes[i].toLowerCase() === mime) return SocialCalc.special_chars(encoded);
     }
     return null;
   }
 
   const allowedUrlSchemes = policy.allowedUrlSchemes;
   for (let i = 0; i < allowedUrlSchemes.length; i++) {
-    if (allowedUrlSchemes[i].toLowerCase() === scheme) return htmlSafe;
+    if (allowedUrlSchemes[i].toLowerCase() === scheme) return SocialCalc.special_chars(encoded);
   }
   return null;
 };
