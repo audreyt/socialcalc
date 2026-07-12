@@ -261,7 +261,11 @@ PopupMut.Reset = function (type: string): void {
   var sp = SocialCalc.Popup;
   var spt = sp.Types;
 
-  if (spt[type].Reset) spt[type].Reset!(type);
+  // Other dispatchers (SetValue/GetValue/CClick) all guard with `pt && ...
+  //`; Reset historically dereferenced `spt[type].Reset` directly, so a
+  // typo or stale type name threw a TypeError. Treat an unknown type the
+  // same way handler-less types are treated: as a silent no-op.
+  if (spt[type] && spt[type].Reset) spt[type].Reset!(type);
 };
 
 //
@@ -529,6 +533,23 @@ PopupMut.DestroyPopupDiv = function (
 //
 
 /**
+ * File-private 8-bit channel clamp shared by ToHex, makeRGB, splitRGB, and
+ * RGBToHex's parse layer so all four share one integer-rounding policy:
+ *   - non-finite or <0  -> 0
+ *   - >255               -> 255
+ *   - otherwise          -> Math.trunc(v) (explicit integer rounding)
+ * Hoisted out of per-call allocation so splitRGB/etc. don't recreate an
+ * inner closure on each invocation. Not exported on SocialCalc.Popup —
+ * this is a script-local color normalization helper, not part of the
+ * public type surface.
+ */
+function PopupClamp255(v: number): number {
+  if (!Number.isFinite(v) || v < 0) return 0;
+  if (v > 255) return 255;
+  return Math.trunc(v);
+}
+
+/**
  * @param {string} val
  * @returns {string}
  */
@@ -538,10 +559,16 @@ PopupMut.RGBToHex = function (val: string) {
   if (val == "") {
     return "000000";
   }
-  var rgbvals = val.match(/(\d+)\D+(\d+)\D+(\d+)/);
+  // Capture optional leading sign so "(−5, 0, 0)" no longer parses the
+  // trailing digit "5" as "+5"; each channel is normalized through the
+  // shared PopupClamp255 helper at the parse boundary before ToHex does
+  // its own final clamp (cheap, explicit parity at every consumer).
+  var rgbvals = val.match(/(-?\d+)\D+(-?\d+)\D+(-?\d+)/);
   if (rgbvals) {
     return (
-      sp.ToHex(Number(rgbvals[1])) + sp.ToHex(Number(rgbvals[2])) + sp.ToHex(Number(rgbvals[3]))
+      sp.ToHex(PopupClamp255(Number(rgbvals[1]))) +
+      sp.ToHex(PopupClamp255(Number(rgbvals[2]))) +
+      sp.ToHex(PopupClamp255(Number(rgbvals[3])))
     );
   } else {
     return "000000";
@@ -556,8 +583,14 @@ PopupMut.HexDigits = "0123456789ABCDEF";
  */
 PopupMut.ToHex = function (num: number) {
   var sp = SocialCalc.Popup;
-  var first = Math.floor(num / 16);
-  var second = num % 16;
+  // Reuses the file-private clamp so hex formatting, RGBToHex parsing, and
+  // makeRGB all share one integer-rounding policy (Math.trunc inside the
+  // clamp; Math.floor on the already-integral clamped value below for the
+  // nibble split is intentionally preserved as hex's own combinatorial
+  // rounding, not redundant channel rounding).
+  var v = PopupClamp255(num);
+  var first = Math.floor(v / 16);
+  var second = v % 16;
   return sp.HexDigits.charAt(first) + sp.HexDigits.charAt(second);
 };
 
@@ -597,7 +630,7 @@ PopupMut.HexToRGB = function (val: string) {
  * @returns {string}
  */
 PopupMut.makeRGB = function (r: number, g: number, b: number): string {
-  return "rgb(" + (r > 0 ? r : 0) + "," + (g > 0 ? g : 0) + "," + (b > 0 ? b : 0) + ")";
+  return "rgb(" + PopupClamp255(r) + "," + PopupClamp255(g) + "," + PopupClamp255(b) + ")";
 };
 
 /**
@@ -605,12 +638,19 @@ PopupMut.makeRGB = function (r: number, g: number, b: number): string {
  * @returns {{r: number, g: number, b: number}}
  */
 PopupMut.splitRGB = function (rgb: string): SocialCalc.Popup.RGBParts {
-  var parts = rgb.match(/(\d+)\D+(\d+)\D+(\d+)\D/);
+  var parts = rgb.match(/(-?\d+)\D+(-?\d+)\D+(-?\d+)\D/);
   if (!parts) {
     return { r: 0, g: 0, b: 0 };
-  } else {
-    return { r: Number(parts[1]), g: Number(parts[2]), b: Number(parts[3]) };
   }
+  // Both the sign-aware regex above and the shared clamp at the parse
+  // boundary replace the older inline-and-duplicated clampChannel that was
+  // allocated on every call. Channels are integer-rounded via Math.trunc
+  // inside PopupClamp255; non-finite / <0 -> 0; >255 -> 255.
+  return {
+    r: PopupClamp255(Number(parts[1])),
+    g: PopupClamp255(Number(parts[2])),
+    b: PopupClamp255(Number(parts[3])),
+  };
 };
 
 // * * * * * * * * * * * * * * * *
@@ -731,7 +771,6 @@ SocialCalc.Popup.Types.List.SetValue = function (type: string, id: string, value
  * @param {boolean} disabled
  */
 SocialCalc.Popup.Types.List.SetDisabled = function (type: string, id: string, disabled: boolean) {
-
   var sp = SocialCalc.Popup;
   var spc = sp.Controls;
   var spcdata = spc[id]!.data;
@@ -915,7 +954,6 @@ SocialCalc.Popup.Types.List.MakeList = function (type: string, id: string) {
  */
 SocialCalc.Popup.Types.List.MakeCustom = function (type: string, id: string) {
   var SPLoc = SocialCalc.Popup.LocalizeString;
-
 
   var sp = SocialCalc.Popup;
   var spc = sp.Controls;
@@ -1339,7 +1377,6 @@ SocialCalc.Popup.Types.ColorChooser.Show = function (type: string, id: string) {
  * @returns {string}
  */
 SocialCalc.Popup.Types.ColorChooser.MakeCustom = function (type: string, id: string) {
-
   var sp = SocialCalc.Popup;
   var spc = sp.Controls;
   var spcdata = spc[id]!.data;
@@ -1385,8 +1422,7 @@ SocialCalc.Popup.Types.ColorChooser.ItemClicked = function (_id: string, _num: n
 /**
  * @param {string} id
  */
-SocialCalc.Popup.Types.ColorChooser.CustomToList = function (_id: string) {
-};
+SocialCalc.Popup.Types.ColorChooser.CustomToList = function (_id: string) {};
 
 /**
  * @param {string} type

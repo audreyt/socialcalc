@@ -16800,7 +16800,7 @@ PopupMut.Initialize = function(id, data) {
 PopupMut.Reset = function(type) {
 	var sp = SocialCalc.Popup;
 	var spt = sp.Types;
-	if (spt[type].Reset) spt[type].Reset(type);
+	if (spt[type] && spt[type].Reset) spt[type].Reset(type);
 };
 PopupMut.CClick = function(id) {
 	var sp = SocialCalc.Popup;
@@ -16931,14 +16931,19 @@ PopupMut.DestroyPopupDiv = function(ele, dragregistered) {
 		ele.parentNode.removeChild(ele);
 	}
 };
+function PopupClamp255(v) {
+	if (!Number.isFinite(v) || v < 0) return 0;
+	if (v > 255) return 255;
+	return Math.trunc(v);
+}
 PopupMut.RGBToHex = function(val) {
 	var sp = SocialCalc.Popup;
 	if (val == "") {
 		return "000000";
 	}
-	var rgbvals = val.match(/(\d+)\D+(\d+)\D+(\d+)/);
+	var rgbvals = val.match(/(-?\d+)\D+(-?\d+)\D+(-?\d+)/);
 	if (rgbvals) {
-		return sp.ToHex(Number(rgbvals[1])) + sp.ToHex(Number(rgbvals[2])) + sp.ToHex(Number(rgbvals[3]));
+		return sp.ToHex(PopupClamp255(Number(rgbvals[1]))) + sp.ToHex(PopupClamp255(Number(rgbvals[2]))) + sp.ToHex(PopupClamp255(Number(rgbvals[3])));
 	} else {
 		return "000000";
 	}
@@ -16946,8 +16951,9 @@ PopupMut.RGBToHex = function(val) {
 PopupMut.HexDigits = "0123456789ABCDEF";
 PopupMut.ToHex = function(num) {
 	var sp = SocialCalc.Popup;
-	var first = Math.floor(num / 16);
-	var second = num % 16;
+	var v = PopupClamp255(num);
+	var first = Math.floor(v / 16);
+	var second = v % 16;
 	return sp.HexDigits.charAt(first) + sp.HexDigits.charAt(second);
 };
 PopupMut.FromHex = function(str) {
@@ -16961,23 +16967,22 @@ PopupMut.HexToRGB = function(val) {
 	return "rgb(" + sp.FromHex(val.substring(1, 3)) + "," + sp.FromHex(val.substring(3, 5)) + "," + sp.FromHex(val.substring(5, 7)) + ")";
 };
 PopupMut.makeRGB = function(r, g, b) {
-	return "rgb(" + (r > 0 ? r : 0) + "," + (g > 0 ? g : 0) + "," + (b > 0 ? b : 0) + ")";
+	return "rgb(" + PopupClamp255(r) + "," + PopupClamp255(g) + "," + PopupClamp255(b) + ")";
 };
 PopupMut.splitRGB = function(rgb) {
-	var parts = rgb.match(/(\d+)\D+(\d+)\D+(\d+)\D/);
+	var parts = rgb.match(/(-?\d+)\D+(-?\d+)\D+(-?\d+)\D/);
 	if (!parts) {
 		return {
 			r: 0,
 			g: 0,
 			b: 0
 		};
-	} else {
-		return {
-			r: Number(parts[1]),
-			g: Number(parts[2]),
-			b: Number(parts[3])
-		};
 	}
+	return {
+		r: PopupClamp255(Number(parts[1])),
+		g: PopupClamp255(Number(parts[2])),
+		b: PopupClamp255(Number(parts[3]))
+	};
 };
 PopupMut.Types.List = {};
 SocialCalc.Popup.Types.List.Create = function(type, id, attribs) {
@@ -20623,3 +20628,4 @@ SocialCalc.SpreadsheetViewerDecodeSpreadsheetSave = function(spreadsheet, str) {
     // Just return a value to define the module export.
     return SocialCalc;
 }));
+//# sourceMappingURL=SocialCalc.js.map
