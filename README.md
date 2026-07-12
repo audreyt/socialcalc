@@ -8,6 +8,13 @@ See it in action at [ethercalc.net](http://ethercalc.net)!
 ## Requirements
 
 - jQuery (only on the client-side)
+- Node.js >= 22 (see `package.json`'s `engines.node`) when running in
+  Node.js rather than a browser. CI tests every release against Node 22
+  and 24 (see `.github/workflows/ci.yml`'s `node-compat` matrix job);
+  those are the only versions this project actively maintains support
+  for. Older Node.js releases may work but are best-effort only — not
+  CI-tested, and a compatibility report against them will not be
+  treated as a supported-version regression.
 
 ## Usage
 

@@ -32,12 +32,52 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, mkdirSync, cpSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, mkdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import { exerciseCommandFormulaSaveLoad } from "./lib/sheet-smoke.mjs";
+
+// --- Pinned package contract ---------------------------------------------
+// Both lists are literal, hand-maintained pins — NOT derived from
+// package.json's own "files" field or the tarball's own member list at
+// run time. package.json metadata is an intentional, curated contract
+// (unlike e.g. a bundle's runtime top-level key count, deliberately NOT
+// pinned below): deriving "expected" from the very value under test would
+// let an unreviewed addition to "files" bless itself. Update both,
+// deliberately, whenever "files" or the shipped file set changes.
+const EXPECTED_FILES_FIELD = [
+  "dist/SocialCalc.js",
+  "dist/SocialCalc.min.js",
+  "dist/SocialCalc.d.ts",
+  "dist/socialcalc.css",
+  "js/*.d.ts",
+  "css/socialcalc.css",
+  "LICENSE.txt",
+  "LEGAL.txt",
+  "README.md",
+];
+
+const EXPECTED_TARBALL_MEMBERS = [
+  "package.json",
+  "README.md",
+  "LICENSE.txt",
+  "LEGAL.txt",
+  "css/socialcalc.css",
+  "dist/SocialCalc.js",
+  "dist/SocialCalc.min.js",
+  "dist/SocialCalc.d.ts",
+  "dist/socialcalc.css",
+  "js/formatnumber2.d.ts",
+  "js/formula1.d.ts",
+  "js/socialcalc-3.d.ts",
+  "js/socialcalcconstants.d.ts",
+  "js/socialcalcpopup.d.ts",
+  "js/socialcalcspreadsheetcontrol.d.ts",
+  "js/socialcalctableeditor.d.ts",
+  "js/socialcalcviewer.d.ts",
+];
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
@@ -162,6 +202,18 @@ async function main() {
     }
   });
 
+  record('package.json "files" field matches the pinned intended manifest (no unreviewed drift)', () => {
+    const actual = pkg.files;
+    const expected = EXPECTED_FILES_FIELD;
+    const extra = actual.filter((f) => !expected.includes(f));
+    const missing = expected.filter((f) => !actual.includes(f));
+    if (extra.length || missing.length) {
+      throw new Error(
+        `package.json "files" drifted from the pinned manifest — unexpected=${JSON.stringify(extra)} missing=${JSON.stringify(missing)}`,
+      );
+    }
+  });
+
   const workDir = mkdtempSync(path.join(tmpdir(), "socialcalc-package-contract-"));
   const tarballPath = path.join(workDir, "socialcalc-pack.tgz");
   const extractDir = path.join(workDir, "extracted");
@@ -177,7 +229,7 @@ async function main() {
       return tarballPath;
     });
 
-    record("tarball contains exactly the package.json \"files\" allowlist", () => {
+    record("tarball contains exactly the pinned 17-member contract (no extra or missing member)", () => {
       mkdirSync(extractDir, { recursive: true });
       const extractResult = run("tar", ["-xzf", tarballPath, "-C", extractDir]);
       if (extractResult.status !== 0) {
@@ -191,15 +243,28 @@ async function main() {
           .filter(Boolean)
           .map((entry) => entry.replace(/^package\//, "")),
       );
-      const expected = expandFilesField(pkg.files, repoRoot);
+      const expected = new Set(EXPECTED_TARBALL_MEMBERS);
       const extra = [...actual].filter((f) => !expected.has(f));
       const missing = [...expected].filter((f) => !actual.has(f));
       if (extra.length || missing.length) {
         throw new Error(
-          `tarball allowlist mismatch — unexpected=${JSON.stringify(extra)} missing=${JSON.stringify(missing)}`,
+          `tarball member set drifted from the pinned contract — unexpected=${JSON.stringify(extra)} missing=${JSON.stringify(missing)}`,
         );
       }
-      return `${actual.size} members, all within "files"`;
+      // Cross-check: the dynamic glob expansion of the (already pinned-
+      // verified) package.json "files" patterns against the real repo file
+      // listing must independently agree with the same pinned set — proving
+      // the patterns and the static pin are not coincidentally stale in the
+      // same way at once.
+      const dynamicallyExpanded = expandFilesField(pkg.files, repoRoot);
+      const dynExtra = [...dynamicallyExpanded].filter((f) => !expected.has(f));
+      const dynMissing = [...expected].filter((f) => !dynamicallyExpanded.has(f));
+      if (dynExtra.length || dynMissing.length) {
+        throw new Error(
+          `"files" glob expansion disagrees with the pinned tarball contract — unexpected=${JSON.stringify(dynExtra)} missing=${JSON.stringify(dynMissing)}`,
+        );
+      }
+      return `${actual.size} members, exactly the pinned contract`;
     });
 
     const rootJsPath = path.join(packageDir, "dist", "SocialCalc.js");
@@ -235,12 +300,58 @@ async function main() {
 
     // A real consumer resolves "socialcalc" (and its deep subpaths) through
     // node_modules by package specifier, not by requiring/importing dist/*.js
-    // by absolute file path. Build that exact layout once and reuse it for
-    // every package-specifier check below, plus the external tsc compile
-    // further down.
+    // by absolute file path — and gets there via a real `npm install` of the
+    // tarball, which applies npm's own extraction/normalization, not a
+    // hand-rolled directory copy that would silently skip whatever a real
+    // install does differently. This is an intentional, documented
+    // exception to "no bare npm/bun outside vp": exercising the actual `npm
+    // install <tarball>` behavior a consumer gets is exactly what this
+    // check is for, and `vp`/bun cannot perform an npm-specific install.
+    // `--offline`: socialcalc ships zero runtime "dependencies", so this
+    // never needs the registry regardless, but the flag makes that a hard
+    // guarantee rather than an accident of the current dependency graph.
+    // `--ignore-scripts`/`--no-package-lock`: deterministic, no lifecycle
+    // side effects, no lockfile churn for a throwaway scratch project.
     const consumerDir = path.join(workDir, "consumer");
-    mkdirSync(path.join(consumerDir, "node_modules"), { recursive: true });
-    cpSync(packageDir, path.join(consumerDir, "node_modules", "socialcalc"), { recursive: true });
+    mkdirSync(consumerDir, { recursive: true });
+    writeFileSync(
+      path.join(consumerDir, "package.json"),
+      JSON.stringify({ name: "package-contract-consumer", private: true, version: "0.0.0" }, null, 2),
+    );
+
+    record("npm install <tarball> into an empty consumer project (real install, not a directory copy)", () => {
+      const result = run(
+        "npm",
+        ["install", "--ignore-scripts", "--no-package-lock", "--offline", tarballPath],
+        { cwd: consumerDir },
+      );
+      if (result.status !== 0) {
+        throw new Error(
+          `npm install of the packed tarball failed (exit ${result.status}):\n${result.stdout}\n${result.stderr}`,
+        );
+      }
+      return path.join(consumerDir, "node_modules", "socialcalc");
+    });
+
+    const installedDir = path.join(consumerDir, "node_modules", "socialcalc");
+    const installedRootJsPath = path.join(installedDir, "dist", "SocialCalc.js");
+    const installedMinJsPath = path.join(installedDir, "dist", "SocialCalc.min.js");
+
+    record("npm-installed package bytes are byte-identical to the extracted tarball members", () => {
+      const mismatches = [];
+      for (const member of EXPECTED_TARBALL_MEMBERS) {
+        const extractedHash = sha256(path.join(packageDir, member));
+        const installedHash = sha256(path.join(installedDir, member));
+        if (extractedHash !== installedHash) {
+          mismatches.push(`${member}: extracted=${extractedHash} installed=${installedHash}`);
+        }
+      }
+      if (mismatches.length) {
+        throw new Error(`npm install altered file bytes vs the raw tar extraction — ${mismatches.join("; ")}`);
+      }
+      return `${EXPECTED_TARBALL_MEMBERS.length} files byte-identical`;
+    });
+
     const requireFromConsumer = createRequire(path.join(consumerDir, "noop.cjs"));
 
     let cjsRoot, cjsMinDeep, esmDefaultShape, vmNormal, vmMinified;
@@ -284,12 +395,12 @@ async function main() {
     });
 
     record("normal bundle runs as a pure browser global (VM sandbox, no CJS host)", () => {
-      vmNormal = loadInVm(rootJsPath);
+      vmNormal = loadInVm(installedRootJsPath);
       return `${Object.keys(vmNormal).length} top-level keys`;
     });
 
     record("minified bundle runs as a pure browser global (VM sandbox, no CJS host)", () => {
-      vmMinified = loadInVm(minJsPath);
+      vmMinified = loadInVm(installedMinJsPath);
       return `${Object.keys(vmMinified).length} top-level keys`;
     });
 
