@@ -527,10 +527,14 @@ declare namespace SocialCalc {
   function encodeForSave(s: string): string;
   function special_chars(string: string): string;
 
-  // Validates rawurl against securityPolicy.allowedUrlSchemes (and, for
-  // "data:" URLs, allowedDataMimeTypes). Returns an HTML-attribute-safe,
-  // percent-encoded and HTML-escaped URL suitable for href="..."/src="...",
-  // or null if rawurl must not be rendered as an active link/image target.
+  // Non-"data:" URLs are validated against policy.allowedUrlSchemes;
+  // "data:" URLs are validated SOLELY against policy.allowedDataMimeTypes
+  // (never allowedUrlSchemes). Returns a percent-encoded, HTML-attribute-
+  // escaped string suitable ONLY for building href="..."/src="..." markup
+  // that will itself be HTML-parsed (e.g. via innerHTML) - never for
+  // storage/saving or direct assignment to a DOM URL property
+  // (Element.href/.src), which is not HTML-parsed and would send the
+  // literal escaped text as part of the URL instead of decoding it back.
   function SafeUrlForRender(rawurl: string, policy?: RenderSecurityPolicy): string | null;
   // Renders raw HTML safely under the untrusted-content policy: applies
   // policy.sanitizeHtml if configured, otherwise HTML-escapes the value.

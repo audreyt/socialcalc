@@ -15,11 +15,13 @@ jobs:
     name: typecheck / build / test
     runs-on: ubuntu-latest
     steps:
+      # actions/checkout v4.3.0
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
 
+      # voidzero-dev/setup-vp v1.1.0
       - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@v1
+        uses: voidzero-dev/setup-vp@e1609b468742ba9232ce5e12b3a77bdf14495277
         with:
           cache: true
 
@@ -45,3 +47,50 @@ jobs:
         run: |
           vp pm pack --out /tmp/socialcalc.tgz
           tar -tzf /tmp/socialcalc.tgz package/dist/SocialCalc.min.js
+
+  node-compat:
+    name: Node.js runtime compatibility (${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The only two Node.js majors this project actively maintains and
+        # CI-tests (package.json "engines.node": ">=22"; see README's Node
+        # compatibility note). Proves the PACKED, npm-installable tarball —
+        # not just the Bun-based `vp` dev toolchain used to build it — is
+        # functionally correct under a real Node.js interpreter.
+        node-version: [22, 24]
+    steps:
+      # actions/checkout v4.3.0
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+
+      # voidzero-dev/setup-vp v1.1.0
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@e1609b468742ba9232ce5e12b3a77bdf14495277
+        with:
+          cache: true
+
+      - name: Install dependencies
+        run: vp install --frozen-lockfile
+
+      - name: Pack a fresh tarball (runs prepack -> vp build --minify)
+        run: vp pm pack --out /tmp/socialcalc-compat.tgz
+
+      - name: Extract into a scratch node_modules/socialcalc layout
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/node-compat-consumer/node_modules
+          tar -xzf /tmp/socialcalc-compat.tgz -C /tmp
+          mv /tmp/package /tmp/node-compat-consumer/node_modules/socialcalc
+
+      # actions/setup-node v4.4.0 — installs the matrixed Node.js version
+      # and puts it first on PATH, ahead of vp's Bun-managed toolchain
+      # (already used above for the pack step; not needed again below).
+      - name: Setup Node ${{ matrix.node-version }} (compatibility target)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Verify Node.js ${{ matrix.node-version }} compatibility (CJS root, minified deep require, native ESM default import)
+        run: node scripts/verify-node-compat.mjs /tmp/node-compat-consumer

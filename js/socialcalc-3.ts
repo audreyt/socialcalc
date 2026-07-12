@@ -5692,10 +5692,20 @@ SC.encodeForSave = function (s: any) {
 //
 // result = SocialCalc.SafeUrlForRender(rawurl, policy)
 //
-// Validates rawurl against an allowlist of URL schemes (and, for "data:"
-// URLs, an allowlist of MIME types) before it is used as an href/src
-// attribute value. Returns an HTML-attribute-safe, encoded URL, or null if
-// rawurl must not be rendered as an active link/image target.
+// Non-"data:" URLs are validated against policy.allowedUrlSchemes; "data:"
+// URLs are validated SOLELY against policy.allowedDataMimeTypes (never
+// consulting allowedUrlSchemes at all - a "data:" URL with an allowed MIME
+// type is accepted regardless of what allowedUrlSchemes contains).
+//
+// On success, returns a percent-encoded, HTML-ATTRIBUTE-escaped string
+// (e.g. a literal "&" becomes "&amp;") meant ONLY for building an
+// href="..."/src="..." attribute inside markup that will itself be parsed
+// by an HTML parser (assignment via innerHTML, or SocialCalc's own cell
+// rendering). Do NOT persist the return value (e.g. in a saved sheet) or
+// assign it directly to a DOM URL property (Element.href/.src - property
+// assignment is not HTML-parsed, so the literal "&amp;" would be sent as
+// part of the URL instead of decoding back to "&"). Returns null if
+// rawurl must not be rendered as an active link/image target at all.
 //
 // Only consulted by rendering code when SocialCalc.Callbacks.untrustedContent
 // is true; see SocialCalc.Callbacks.securityPolicy for the default policy.

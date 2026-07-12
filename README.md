@@ -69,12 +69,13 @@ With it enabled:
 
 - Raw HTML content (`text-html`, the `@r` placeholder, wiki-callback output,
   and text-custom format templates) is HTML-escaped by default.
-- Link/image/data URLs are validated against
+- Non-`data:` link/image URLs are validated against
   `SocialCalc.Callbacks.securityPolicy.allowedUrlSchemes` (default
-  `["http:", "https:", "mailto:"]`); `data:` URLs are rejected unless their
-  MIME type is listed in `securityPolicy.allowedDataMimeTypes` (default
-  `[]`, i.e. all `data:` URLs rejected). Rejected URLs fall back to inert,
-  escaped text rather than being dropped or throwing.
+  `["http:", "https:", "mailto:"]`). `data:` URLs are validated separately
+  and SOLELY against `securityPolicy.allowedDataMimeTypes` (default `[]`,
+  i.e. all `data:` URLs rejected) — `allowedUrlSchemes` is never consulted
+  for a `data:` URL, even if `"data:"` were listed there. Rejected URLs
+  fall back to inert, escaped text rather than being dropped or throwing.
 - The formula-widget `cell_html` rendering path is disabled entirely, since
   it interpolates sheet-authored parameters directly into live,
   event-handler-capable markup that cannot be safely escaped field-by-field.
@@ -89,9 +90,16 @@ and only for the raw-HTML sinks listed above — it does not affect URL/scheme
 validation. SocialCalc ships no sanitizer implementation itself and does not
 attempt to detect or reject an unsafe one; the host is responsible for the
 function's correctness. `SocialCalc.SafeUrlForRender(rawurl, policy?)` and
-`SocialCalc.EscapeUntrustedHtml(html, policy?)` are also exported directly if
-a host needs to apply the same validation/escaping logic outside of normal
-cell rendering (e.g. before saving, or in a custom widget).
+`SocialCalc.EscapeUntrustedHtml(html, policy?)` are also exported directly
+for a host building its own `href="..."`/`src="..."` or raw-HTML markup
+outside of normal cell rendering (e.g. a custom widget). `SafeUrlForRender`
+returns an HTML-**attribute**-escaped string (a literal `&` becomes
+`&amp;`) meant only to be embedded in markup that will itself be parsed by
+an HTML parser (e.g. via `innerHTML`) — do not persist its return value
+(such as in a saved sheet) or assign it directly to a DOM URL property
+(`Element.href`/`.src`), since property assignment is not HTML-parsed and
+would send the literal escaped text as part of the URL instead of
+decoding it back.
 
 Regardless of mode, the host application remains responsible for applying an
 appropriate Content Security Policy (including image and link restrictions)
