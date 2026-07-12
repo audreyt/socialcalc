@@ -2,7 +2,7 @@ import Mathlib.Tactic.IntervalCases
 import «a1.spec»
 /-
   Hand-written Lean proofs for lemma/a1.ts (LemmaScript Lean backend).
-  Generated: a1.types.lean, a1.def.lean — re-run `bun run verify:lean:gen`.
+  Generated: a1.types.lean, a1.def.lean — re-run `vp run verify:lean:gen`.
   LETTERS lemmas live here (not a1.spec) so a1.def can import a1.spec
   without a build cycle after regen.
 -/

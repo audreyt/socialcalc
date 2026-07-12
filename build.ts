@@ -1,25 +1,28 @@
-#!/usr/bin/env bun
-// Bun-powered replacement for the original Gulpfile.
+// Vite+ plugin for SocialCalc's ordered global-script build.
 // Concatenates SocialCalc sources (order matters — files share the
-// factory-local `SocialCalc` bag) and writes them to ./dist.
+// factory-local `SocialCalc` bag) and emits the package artifacts to ./dist.
 //
 // UMD open/close wrappers live here as strings (not js/*.js files): the
 // halves are intentionally not standalone-parseable, so they cannot be
-// per-file TypeScript sources under Bun.Transpiler.
+// individual Vite module entries.
 //
 // Core entries may be `.js` or `.ts`. A listed `.js` path prefers a sibling
-// `.ts` when present. TypeScript sources are stripped to plain JS via
-// Bun.Transpiler before concat so dist/SocialCalc.js stays a browser-ready
-// UMD bundle with no runtime TS tax.
+// `.ts` when present. Vite+'s Oxc transformer strips TypeScript before concat
+// so dist/SocialCalc.js stays a browser-ready UMD bundle with no runtime tax.
 
+import type { MinifyResult, Plugin } from "vite-plus";
+import { minify, transformWithOxc } from "vite-plus";
 import { existsSync } from "node:fs";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = new URL(".", import.meta.url).pathname;
+const root = fileURLToPath(new URL(".", import.meta.url));
 const jsDir = join(root, "js");
 const cssDir = join(root, "css");
-const distDir = join(root, "dist");
+
+export const socialCalcBuildInput = "virtual:socialcalc-build";
+const resolvedBuildInput = `\0${socialCalcBuildInput}`;
 
 // UMD open (formerly js/module-wrapper-top.js). Creates factory-local bag.
 const umdWrapperTop = `// Opening half of a UMD IIFE. Inlined in build.ts — not a standalone module.
@@ -110,14 +113,7 @@ const coreFiles = [
 
 const cssFiles = ["socialcalc.css"];
 
-const tsTranspiler = new Bun.Transpiler({
-  loader: "ts",
-  target: "browser",
-});
-
-// Bun.Transpiler drops comments. Reattach the leading // and /* */ preamble
-// (copyright / Artistic License / module banner) so dist keeps legal headers.
-function leadingCommentPreamble(source: string): string {
+function splitLeadingCommentPreamble(source: string) {
   let i = 0;
   const n = source.length;
   while (i < n) {
@@ -138,8 +134,19 @@ function leadingCommentPreamble(source: string): string {
     }
     break;
   }
-  if (i === 0) return "";
-  return `${source.slice(0, i).replace(/\s+$/u, "")}\n\n`;
+  return {
+    body: source.slice(i),
+    preamble: i === 0 ? "" : `${source.slice(0, i).replace(/\s+$/u, "")}\n\n`,
+  };
+}
+
+function assertMinified(filename: string, result: MinifyResult) {
+  if (result.errors.length > 0) {
+    throw new Error(
+      `Failed to process ${filename}:\n${result.errors.map((error) => error.message).join("\n")}`,
+    );
+  }
+  return result.code;
 }
 
 function resolveJsSource(name: string): string {
@@ -160,11 +167,28 @@ function resolveJsSource(name: string): string {
 
 async function readJsSource(name: string): Promise<string> {
   const resolved = resolveJsSource(name);
-  const text = await readFile(join(jsDir, resolved), "utf8");
-  if (resolved.endsWith(".ts")) {
-    return leadingCommentPreamble(text) + tsTranspiler.transformSync(text);
+  const sourcePath = join(jsDir, resolved);
+  const text = await readFile(sourcePath, "utf8");
+  if (!resolved.endsWith(".ts")) {
+    return text;
   }
-  return text;
+
+  const { body, preamble } = splitLeadingCommentPreamble(text);
+  const transformed = await transformWithOxc(body, sourcePath, {
+    target: "esnext",
+  });
+  for (const warning of transformed.warnings) {
+    console.warn(warning);
+  }
+  const normalized = await minify(sourcePath, transformed.code, {
+    codegen: {
+      legalComments: "none",
+      removeWhitespace: false,
+    },
+    compress: false,
+    mangle: false,
+  });
+  return preamble + assertMinified(sourcePath, normalized);
 }
 
 async function concatCore(files: readonly string[]): Promise<string> {
@@ -177,31 +201,56 @@ async function concatCss(dir: string, files: readonly string[]): Promise<string>
   return parts.join("\n");
 }
 
-await mkdir(distDir, { recursive: true });
+export function socialCalcBuildPlugin(): Plugin {
+  let emitMinified = false;
 
-const core = await concatCore(coreFiles);
-const js = `${umdWrapperTop}\n${core}\n${umdWrapperBottom}`;
-await writeFile(join(distDir, "SocialCalc.js"), js);
+  return {
+    name: "socialcalc-build",
+    apply: "build",
+    configResolved(config) {
+      emitMinified = config.build.minify !== false;
+    },
+    resolveId(source) {
+      return source === socialCalcBuildInput ? resolvedBuildInput : null;
+    },
+    load(id) {
+      return id === resolvedBuildInput ? "globalThis;" : null;
+    },
+    buildStart() {
+      for (const name of coreFiles) {
+        this.addWatchFile(join(jsDir, resolveJsSource(name)));
+      }
+      for (const name of cssFiles) {
+        this.addWatchFile(join(cssDir, name));
+      }
+    },
+    async generateBundle(_options, bundle) {
+      for (const fileName of Object.keys(bundle)) {
+        delete bundle[fileName];
+      }
 
-const css = await concatCss(cssDir, cssFiles);
-await writeFile(join(distDir, "socialcalc.css"), css);
+      const core = await concatCore(coreFiles);
+      const js = `${umdWrapperTop}\n${core}\n${umdWrapperBottom}`;
+      this.emitFile({
+        type: "asset",
+        fileName: "SocialCalc.js",
+        source: js,
+      });
 
-// Optional minified variant — emitted only when `--minify` is passed so local
-// development stays fast.
-if (process.argv.includes("--minify")) {
-  const out = await Bun.build({
-    entrypoints: [join(distDir, "SocialCalc.js")],
-    minify: true,
-    target: "browser",
-    format: "iife",
-    outdir: distDir,
-    naming: "SocialCalc.min.js",
-  });
-  if (!out.success) {
-    console.error(out.logs);
-    process.exit(1);
-  }
+      if (emitMinified) {
+        const result = await minify("SocialCalc.min.js", js);
+        this.emitFile({
+          type: "asset",
+          fileName: "SocialCalc.min.js",
+          source: assertMinified("SocialCalc.min.js", result),
+        });
+      }
+
+      this.emitFile({
+        type: "asset",
+        fileName: "socialcalc.css",
+        source: await concatCss(cssDir, cssFiles),
+      });
+    },
+  };
 }
-
-console.log(`wrote ${join(distDir, "SocialCalc.js")} (${js.length} bytes)`);
-console.log(`wrote ${join(distDir, "socialcalc.css")} (${css.length} bytes)`);

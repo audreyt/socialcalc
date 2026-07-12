@@ -1,7 +1,7 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 // Run Stryker against a single source file in fast in-place mode.
 //
-// Usage: bun run mutate:file <path/to/source.js|.ts> [startLine-endLine]
+// Usage: vp run mutate:file <path/to/source.js|.ts> [startLine-endLine]
 //
 // Maps each source file to its relevant test subset so a mutant only has to
 // run the ~100 tests that exercise that module, not all 315.
@@ -13,7 +13,7 @@ import { existsSync } from "node:fs";
 const [, , rawTarget, range] = process.argv;
 
 if (!rawTarget) {
-  console.error("usage: bun run mutate:file <path/to/source.js|.ts> [startLine-endLine]");
+  console.error("usage: vp run mutate:file <path/to/source.js|.ts> [startLine-endLine]");
   process.exit(2);
 }
 
@@ -68,8 +68,8 @@ const mutateSpec = range ? `${relativeTarget}:${range}` : relativeTarget;
 const incrementalFile = `.stryker-tmp/incremental-${basename(absolute)}.json`;
 
 const child = spawn(
-  "bunx",
-  ["stryker", "run", "--mutate", mutateSpec, "--incrementalFile", incrementalFile],
+  "vp",
+  ["exec", "stryker", "run", "--mutate", mutateSpec, "--incrementalFile", incrementalFile],
   {
     stdio: "inherit",
     env: {

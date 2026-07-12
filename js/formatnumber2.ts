@@ -1,6 +1,6 @@
 // In-place TypeScript conversion of the SocialCalc number-formatting module.
 // Ambient API types live in formatnumber2.d.ts (referenced by dist/SocialCalc.d.ts).
-// Build strips types via Bun.Transpiler before UMD concat — no runtime tax.
+// Vite+ strips types with Oxc before UMD concat — no runtime tax.
 //
 /*
 // SocialCalc Number Formatting Library

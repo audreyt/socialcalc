@@ -13,6 +13,14 @@ Toolchain and testing
 - Switched the JavaScript test regime from `bun test` to Vite+ (`vp test`) and
   its `vite-plus/test` Vitest API, including package scripts, mutation runs,
   coverage reporting, and CI.
+- Moved the ordered global-script bundle onto `vp build`. `build.ts` is now a
+  Vite plugin that uses Oxc for TypeScript erasure, preserves each source's
+  leading license preamble, emits CSS, and optionally emits
+  `SocialCalc.min.js` for `vp build --minify`.
+- Standardized dependency and script entry points on Vite+: `vp install`,
+  `vp run`, `vp exec`, and `vp node` now drive local development, mutation
+  testing, and both CI workflows. Bun remains the package manager pinned and
+  provisioned by Vite+ rather than a directly invoked project command.
 - The test harness now compiles the UMD bundle once per isolated test worker,
   preserves host global descriptors around the browser shim, and reuses the
   SocialCalc instance within a file. This avoids query-expanded bundle copies

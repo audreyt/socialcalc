@@ -1,6 +1,6 @@
 // In-place TypeScript conversion of socialcalcconstants.js (SocialCalc global script).
 // Ambient API types live in socialcalcconstants.d.ts (referenced by dist/SocialCalc.d.ts).
-// Build strips types via Bun.Transpiler before UMD concat — no runtime tax.
+// Vite+ strips types with Oxc before UMD concat — no runtime tax.
 // Runtime SocialCalc bag is created in module-wrapper-top.js (UMD factory-local).
 //
 /*

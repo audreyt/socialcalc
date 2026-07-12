@@ -27,19 +27,13 @@ jobs:
         run: vp install --frozen-lockfile
 
       - name: Typecheck
-        run: bun run typecheck
+        run: vp run typecheck
 
-      - name: Typecheck (strict, if configured)
-        shell: bash
-        run: |
-          if bun -e "const pkg = await Bun.file('./package.json').json(); process.exit(pkg.scripts?.['typecheck:strict'] ? 0 : 1)"; then
-            bun run typecheck:strict
-          else
-            echo "typecheck:strict script not defined; skipping"
-          fi
+      - name: Typecheck (strict)
+        run: vp run typecheck:strict
 
       - name: Build
-        run: bun run build
+        run: vp build
 
       - name: Test
         run: vp test

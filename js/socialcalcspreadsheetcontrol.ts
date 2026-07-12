@@ -1,6 +1,6 @@
 // In-place TypeScript conversion of socialcalcspreadsheetcontrol.js (SocialCalc global script).
 // Ambient API types live in socialcalcspreadsheetcontrol.d.ts (referenced by dist/SocialCalc.d.ts).
-// Build strips types via Bun.Transpiler before UMD concat — no runtime tax.
+// Vite+ strips types with Oxc before UMD concat — no runtime tax.
 // Typechecked core after removing @ts-nocheck.
 
 // Opt-in to TypeScript strict checking (noImplicitAny, strictNullChecks) via r2scout config.

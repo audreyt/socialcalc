@@ -24,7 +24,7 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
 
-    "types": ["bun"]
+    "types": ["node"]
   },
   "include": ["build.ts", "js/**/*.js", "js/**/*.ts", "test/**/*.ts", "dist/SocialCalc.d.ts"],
   "exclude": ["node_modules", "dist"]

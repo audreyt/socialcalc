@@ -1,6 +1,6 @@
 // In-place TypeScript conversion of socialcalc-3.js (SocialCalc global script).
 // Ambient API types live in socialcalc-3.d.ts (referenced by dist/SocialCalc.d.ts).
-// Build strips types via Bun.Transpiler before UMD concat — no runtime tax.
+// Vite+ strips types with Oxc before UMD concat — no runtime tax.
 // Typechecked core after removing @ts-nocheck.
 
 // The main SocialCalc code module of the SocialCalc package
@@ -6330,9 +6330,7 @@ SC.DetermineValueType = function (rawvalue: any) {
       type = "ndt";
     }
   } else if (
-    (matches = value.match(
-      /^(\d{4})[/-](\d{1,2})[/-](\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})\s*$/,
-    ))
+    (matches = value.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})\s*$/))
   ) {
     // YYYY-MM-DD, YYYY/MM/DD HH:MM:SS
     // eddy added YYYY-MM-DD, YYYY/MM/DD HH:MM:SS

@@ -2,18 +2,18 @@
 //
 // Two modes:
 //
-// 1. Full sandbox run (`bun run mutate`) — Stryker copies the project into
+// 1. Full sandbox run (`vp run mutate`) — Stryker copies the project into
 //    parallel sandboxes and mutates everything in the `mutate` list. Slow
 //    but isolated; run it once overall coverage/mutation scores look good.
 //
-// 2. In-place single-file iteration (`bun run mutate:file <path>`) — the
+// 2. In-place single-file iteration (`vp run mutate:file <path>`) — the
 //    helper sets MUTATE_TESTS to the subset of test files that exercise the
 //    target module, flips Stryker to inPlace mode, and uses concurrency=1.
 //    This is the fast loop you run during development.
 //
-// Speed math: a filtered test run is ~20 ms vs ~12 s for the full suite.
-// With a ~400 ms rebuild per mutant, inPlace iteration on formatnumber2.ts
-// (~93 mutants in a 50-line slice) finishes in well under a minute.
+// Speed math: a filtered test run is milliseconds vs ~7 s for the full suite.
+// With a ~30 ms Vite+ rebuild per mutant, inPlace iteration keeps feedback
+// tight even for a 50-line slice.
 
 const testsFilter = process.env.MUTATE_TESTS?.trim();
 const inPlace = process.env.MUTATE_IN_PLACE === "1";
@@ -34,7 +34,7 @@ export default {
 
   testRunner: "command",
   commandRunner: {
-    command: `bun run build.ts && ${testCommand}`,
+    command: `vp build && ${testCommand}`,
   },
   coverageAnalysis: "off",
 

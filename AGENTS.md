@@ -3,28 +3,32 @@
 ## Source and quality-gate operations
 
 SocialCalc's shipping implementation is assembled from global-script TypeScript,
-not ES modules. `build.ts` owns the ordered source list, prefers a sibling `.ts`
-when a listed `.js` name has one, strips types with `Bun.Transpiler`, and writes
-the generated `dist/SocialCalc.js` and `dist/socialcalc.css`. Its UMD wrappers
-are inline strings in `build.ts`; they are not standalone files. Edit `js/` and
-`css/` sources, never generated `dist/` output.
+not ES modules. `build.ts` exports the Vite plugin configured by
+`vite.config.ts`; it owns the ordered source list, prefers sibling `.ts`
+implementations, strips types with Oxc, and emits `dist/SocialCalc.js` plus
+`dist/socialcalc.css`. Its UMD wrappers are inline strings because they are not
+standalone modules. Edit `js/` and `css/` sources, never generated `dist/` output.
 
 Normal source-only changes use this matrix:
 
-| Change                                | Required checks                                                                                         |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Ordinary `js/` or build-source change | `bun run build`, `bun run typecheck`, `vp lint --type-check --type-aware`, then the focused Vite+ tests |
-| Formula-reference rewrite             | The matrix below, plus the focused command tests                                                        |
-| LemmaScript facade                    | The facade matrix below; optional full Lean build when sibling repos are available                      |
+| Change                                | Required checks                                                                    |
+| ------------------------------------- | ---------------------------------------------------------------------------------- |
+| Ordinary `js/` or build-source change | `vp build`, `vp run typecheck`, `vp lint`, then the focused Vite+ tests            |
+| Formula-reference rewrite             | The matrix below, plus the focused command tests                                   |
+| LemmaScript facade                    | The facade matrix below; optional full Lean build when sibling repos are available |
 
-`bun run typecheck` is the ordinary `tsc --noEmit` compiler check from
-`tsconfig.json`. `bun run typecheck:strict` is a separate narrower check:
+`vp run typecheck` is the ordinary `tsc --noEmit` compiler check from
+`tsconfig.json`. `vp run typecheck:strict` is a separate narrower check:
 `tsconfig.strict.json` includes only `build.ts` and disallows JavaScript input.
 
-`vp lint --type-check --type-aware` is the Vite+ lint/type-aware gate. It has no
-package script: invoke `vp` directly. `vite.config.ts` sets
-`lint.options.denyWarnings: true`, so warnings fail the gate, and ignores
-`dist/**` because generated artifacts must be corrected in their `js/` source.
+Use `vp install`, `vp add`, `vp remove`, and `vp update` as the package-management
+surface. Vite+ delegates to the Bun version pinned in `devEngines`; direct
+`bun install`/`bun add` commands are not the project workflow.
+
+`vp lint` is the Vite+ lint/type-aware gate. `vite.config.ts` enables
+`typeAware`, `typeCheck`, and `denyWarnings`, so the bare command performs full
+type-aware linting, typechecks, and fails on warnings. It ignores `dist/**`
+because generated artifacts must be corrected in their `js/` source.
 Do not add `oxlint-disable`, `@ts-ignore`, or other suppressions to hide a
 source diagnostic.
 
@@ -64,10 +68,10 @@ are checked by Dafny; direct reproduction is:
 | `lemma/*.dfy.gen`, `lemma/*.types.lean`, `lemma/*.def.lean` | Generated from facades                      |
 
 After a facade edit, run its focused Vite+ oracle test, then
-`bun run verify:dafny:regen` (three-way merge) and `bun run verify:dafny`.
-Run `bun run verify:lean` for Lean generation/non-empty assertions; run
-`bun run verify:lean:build` only when `../velvet`, `../loom`, and
-`../LemmaScript` are present. `bun run verify:both` is Dafny check plus Lean
+`vp run verify:dafny:regen` (three-way merge) and `vp run verify:dafny`.
+Run `vp run verify:lean` for Lean generation/non-empty assertions; run
+`vp run verify:lean:build` only when `../velvet`, `../loom`, and
+`../LemmaScript` are present. `vp run verify:both` is Dafny check plus Lean
 generation/non-empty smoke, not `lake build`. Plain `verify:dafny:gen` creates
 `.dfy.gen` files but does not update checked proof-bearing `.dfy`; never
 routinely copy `.dfy.gen` over `.dfy`.
@@ -109,10 +113,10 @@ contains command handling and call sites.
 Required formula-reference matrix:
 
 ```bash
-bun run build.ts
+vp build
 vp test run test/formula-rewrite-cases.test.ts test/formula-rewrite-regressions.test.ts
-bun run typecheck
-vp lint --type-check --type-aware
+vp run typecheck
+vp lint
 ```
 
 Use `ScheduleSheetCommands`/`loadSocialCalc()` command-level tests for copy,

@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * Mechanical in-place conversion: js/<name>.js → js/<name>.ts
  *
@@ -9,13 +9,14 @@
  * - Do not touch module-wrapper-*.js
  * - Do not rewrite public *.d.ts
  *
- * Usage: bun scripts/js-to-ts-global.mjs [file.js ...]
+ * Usage: vp node scripts/js-to-ts-global.mjs [file.js ...]
  */
 
 import { existsSync, readdirSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { basename, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const jsDir = join(import.meta.dir, "..", "js");
+const jsDir = join(fileURLToPath(new URL("..", import.meta.url)), "js");
 const SKIP = new Set(["module-wrapper-top.js", "module-wrapper-bottom.js"]);
 
 function mapJsDocType(jsType) {
@@ -136,11 +137,11 @@ function convertHeader(text, filename) {
   // Drop @ts-check banners; keep license block comments.
   text = text.replace(
     /^\/\/ Opt-in TypeScript checking[\s\S]*?\/\/ @ts-check\n/m,
-    `// In-place TypeScript conversion of ${filename} (SocialCalc global script).\n// Ambient API types live in the matching .d.ts (referenced by dist/SocialCalc.d.ts).\n// Build strips types via Bun.Transpiler before UMD concat — no runtime tax.\n`,
+    `// In-place TypeScript conversion of ${filename} (SocialCalc global script).\n// Ambient API types live in the matching .d.ts (referenced by dist/SocialCalc.d.ts).\n// Vite+ strips types with Oxc before UMD concat — no runtime tax.\n`,
   );
   text = text.replace(
     /^\/\/ @ts-check\n(?:\/\/[^\n]*\n)*/m,
-    `// In-place TypeScript conversion of ${filename} (SocialCalc global script).\n// Ambient API types live in the matching .d.ts (referenced by dist/SocialCalc.d.ts).\n// Build strips types via Bun.Transpiler before UMD concat — no runtime tax.\n`,
+    `// In-place TypeScript conversion of ${filename} (SocialCalc global script).\n// Ambient API types live in the matching .d.ts (referenced by dist/SocialCalc.d.ts).\n// Vite+ strips types with Oxc before UMD concat — no runtime tax.\n`,
   );
   return text;
 }

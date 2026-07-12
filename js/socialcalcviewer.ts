@@ -1,6 +1,6 @@
 // In-place TypeScript conversion of socialcalcviewer.js (SocialCalc global script).
 // Ambient API types live in socialcalcviewer.d.ts (referenced by dist/SocialCalc.d.ts).
-// Build strips types via Bun.Transpiler before UMD concat — no runtime tax.
+// Vite+ strips types with Oxc before UMD concat — no runtime tax.
 // Typechecked global-script module (no @ts-nocheck).
 //
 // SocialCalcViewer

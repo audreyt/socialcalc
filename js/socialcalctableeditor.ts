@@ -1,6 +1,6 @@
 // In-place TypeScript conversion of socialcalctableeditor.js (SocialCalc global script).
 // Ambient API types live in socialcalctableeditor.d.ts (referenced by dist/SocialCalc.d.ts).
-// Build strips types via Bun.Transpiler before UMD concat — no runtime tax.
+// Vite+ strips types with Oxc before UMD concat — no runtime tax.
 // Typechecked core after removing @ts-nocheck.
 
 // See js/socialcalctableeditor.d.ts for class / global shapes.
@@ -2207,7 +2207,10 @@ TableEditorSC.SetDragAutoRepeat = function (editor: any, mouseinfo: any, callbac
 
   if (!repeatinfo.timer) {
     // start if not already running
-    repeatinfo.timer = window.setTimeout(TableEditorSC.DragAutoRepeat as () => void, repeatinfo.repeatinterval);
+    repeatinfo.timer = window.setTimeout(
+      TableEditorSC.DragAutoRepeat as () => void,
+      repeatinfo.repeatinterval,
+    );
   }
 
   return;
@@ -2241,7 +2244,10 @@ TableEditorSC.DragAutoRepeat = function () {
     if (coord) repeatinfo.editor.EditorMouseRange(coord);
   }
 
-  repeatinfo.timer = window.setTimeout(TableEditorSC.DragAutoRepeat as () => void, repeatinfo.repeatinterval);
+  repeatinfo.timer = window.setTimeout(
+    TableEditorSC.DragAutoRepeat as () => void,
+    repeatinfo.repeatinterval,
+  );
 };
 
 //
@@ -4716,7 +4722,10 @@ TableEditorSC.CellHandlesMouseMoveOnHandle = function (e: any) {
       window.clearTimeout(cellhandles.timer);
       cellhandles.timer = null;
     }
-    cellhandles.timer = window.setTimeout(TableEditorSC.CellHandlesHoverTimeout as () => void, 3000);
+    cellhandles.timer = window.setTimeout(
+      TableEditorSC.CellHandlesHoverTimeout as () => void,
+      3000,
+    );
   }
 
   return;
@@ -6540,7 +6549,10 @@ TableEditorSC.ButtonRepeat = function () {
   if (bobj && bobj.functionobj && bobj.functionobj.Repeat)
     bobj.functionobj.Repeat(null, buttoninfo, bobj);
 
-  buttoninfo.timer = window.setTimeout(TableEditorSC.ButtonRepeat as () => void, bobj.repeatinterval || 100);
+  buttoninfo.timer = window.setTimeout(
+    TableEditorSC.ButtonRepeat as () => void,
+    bobj.repeatinterval || 100,
+  );
 };
 
 // *************************************

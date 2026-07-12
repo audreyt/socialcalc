@@ -1,7 +1,7 @@
 /-
   Hand-written Lean proofs for lemma/eval-ops.ts (LemmaScript Lean backend).
   Generated: eval-ops.types.lean, eval-ops.def.lean — re-run:
-    bunx lsc gen --backend=lean lemma/eval-ops.ts
+    vp exec lsc gen --backend=lean lemma/eval-ops.ts
 -/
 import «eval-ops.def»
 

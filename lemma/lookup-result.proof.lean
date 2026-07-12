@@ -1,7 +1,7 @@
 /-
   Hand-written Lean proofs for lemma/lookup-result.ts (LemmaScript Lean backend).
   Generated: lookup-result.types.lean, lookup-result.def.lean — re-run:
-    bunx lsc gen --backend=lean lemma/lookup-result.ts
+    vp exec lsc gen --backend=lean lemma/lookup-result.ts
 -/
 import «lookup-result.def»
 
