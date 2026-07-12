@@ -187,6 +187,15 @@ class FakeDocument {
   getElementById(id: string) {
     return this.nodesById.get(id) || null;
   }
+
+  // Mirrors FakeElement's addEventListener/removeEventListener no-ops
+  // above: document-level capture-phase listeners (SetMouseMoveUp/
+  // RemoveMouseMoveUp, ProcessEditorMouseDown's resize/drag paths,
+  // DragMouseDown, ...) call these directly on `document`, not on an
+  // individual element, so FakeDocument needs the same supported surface.
+  addEventListener() {}
+
+  removeEventListener() {}
 }
 
 function clearBrowserShim() {

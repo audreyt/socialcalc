@@ -210,11 +210,12 @@ test("TableEditor: prototype passthrough methods", async () => {
   expect(editor.cancelBubble).toBe(true);
   expect(editor.returnValue).toBe(false);
   // SetMouseMoveUp/RemoveMouseMoveUp prototype versions only forward `this`
-  // as the first arg (`move`), leaving `event` undefined; StopPropagation
-  // is always invoked with that undefined event and throws before either
-  // call can complete.
-  expect(() => editor.SetMouseMoveUp()).toThrow();
-  expect(() => editor.RemoveMouseMoveUp()).toThrow();
+  // as the first arg (`move`), leaving `event` undefined; StopPropagation is
+  // always invoked with that undefined event, which throws a specific,
+  // deterministic TypeError reading `.stopPropagation` off `undefined`
+  // before either call can complete.
+  expect(() => editor.SetMouseMoveUp()).toThrow(/Cannot read propert(y|ies) of undefined.*stopPropagation/);
+  expect(() => editor.RemoveMouseMoveUp()).toThrow(/Cannot read propert(y|ies) of undefined.*stopPropagation/);
   expect(editor.context).toBeDefined();
 });
 
@@ -404,19 +405,19 @@ test("StopPropagation / SetMouseMoveUp / RemoveMouseMoveUp: IE branches", async 
   // With addEventListener/removeEventListener forced unavailable, both
   // calls reach document.addEventListener/removeEventListener directly
   // (there is no separate IE fallback path in SetMouseMoveUp/RemoveMouseMoveUp
-  // itself) and reliably throw.
+  // itself) and reliably throw a specific "is not a function" TypeError.
   expect(() => {
     const ele = document.createElement("div");
     (ele as any).setCapture = function () {};
     (ele as any).releaseCapture = function () {};
     SC.SetMouseMoveUp(noop, noop, ele, { preventDefault() {} });
-  }).toThrow();
+  }).toThrow(/document\.addEventListener is not a function/);
   expect(() => {
     const ele = document.createElement("div");
     (ele as any).setCapture = function () {};
     (ele as any).releaseCapture = function () {};
     SC.RemoveMouseMoveUp(noop, noop, ele, { preventDefault() {} });
-  }).toThrow();
+  }).toThrow(/document\.removeEventListener is not a function/);
   (document as any).addEventListener = savedAddListener;
   (document as any).removeEventListener = savedRemoveListener;
 });

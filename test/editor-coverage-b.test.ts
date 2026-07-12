@@ -266,43 +266,45 @@ test("ProcessEditorMouseDown: row/col header + footer branches via synthetic gri
   // Force row header hit by setting clientX < headposition.left.
   editor.headposition = { left: 30, top: 30 };
   editor.gridposition = { left: 0, top: 0 };
-  // ProcessEditorMouseDown always finishes a successful hit by calling
-  // SetMouseMoveUp(), which unconditionally calls document.addEventListener();
-  // the FakeDocument shim (test/helpers/socialcalc.ts) never defines that
-  // method on `document`, so any branch that reaches a real hit deterministically
-  // throws here. This still proves the row-header branch was taken (rather than
-  // silently no-oping) before the shim gap is hit.
-  expect(() =>
-    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 10, clientY: 80, target })),
-  ).toThrow(/addEventListener/);
-  // Col header band.
-  expect(() =>
-    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 10, target })),
-  ).toThrow(/addEventListener/);
+  // ProcessEditorRowselectMouseDown anchors+extends a full-row range and
+  // installs document-level move/up listeners via SetMouseMoveUp(), which
+  // FakeDocument now supports as a no-op (test/helpers/socialcalc.ts) —
+  // asserting the resulting range state proves the row-header branch was
+  // actually taken, not just "didn't crash".
+  SC.ProcessEditorMouseDown(fakeEvent({ clientX: 10, clientY: 80, target }));
+  expect(editor.range.hasrange).toBe(true);
+
+  // Col header band: same ColselectMouseDown range-anchoring contract.
+  editor.RangeRemove();
+  SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 10, target }));
+  expect(editor.range.hasrange).toBe(true);
 
   // Force resize hit (colsize): clientX matches colpositions + colwidth.
   editor.colpositions = [0, 0, 50];
   editor.colwidth = [0, 30, 50];
-  // See comment above: hits the resize branch, then throws in SetMouseMoveUp
-  // due to the FakeDocument addEventListener gap.
-  expect(() =>
-    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 30, clientY: 10, target })),
-  ).toThrow(/addEventListener/);
+  // ProcessEditorColsizeMouseDown records the column being resized on the
+  // shared EditorMouseInfo singleton; reset it first so the assertion
+  // proves this call set it, not a stale value from an earlier test.
+  SC.EditorMouseInfo.mouseresizecolnum = 0;
+  SC.ProcessEditorMouseDown(fakeEvent({ clientX: 30, clientY: 10, target }));
+  expect(SC.EditorMouseInfo.mouseresizecolnum).toBeTruthy();
 
   // Force rowsize (rowheader + rowtoresize within pane): clientY near row-2
   // boundary so rowtoresize=2 and it's visible, hitting the else branch
   // in ProcessEditorMouseDown (bundle 9098-9099).
   primeGridLayout(editor);
-  expect(() =>
-    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 10, clientY: 70, target })),
-  ).toThrow(/addEventListener/);
+  SC.EditorMouseInfo.mouseresizerownum = 0;
+  SC.ProcessEditorMouseDown(fakeEvent({ clientX: 10, clientY: 70, target }));
+  expect(SC.EditorMouseInfo.mouseresizerownum).toBeTruthy();
 
-  // Force colsize (colheader + coltoresize within pane): clientX near
-  // col-2 boundary → coltoresize=2 visible → else branch 9107-9108.
+  // Force col-header select (clientX=80 lands inside col 2's band under
+  // primeGridLayout's default colpositions/colwidth, not near any resize
+  // boundary — verified empirically: it takes ProcessEditorColselectMouseDown,
+  // the same range-anchoring branch as the earlier col-header block above).
   primeGridLayout(editor);
-  expect(() =>
-    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 80, clientY: 10, target })),
-  ).toThrow(/addEventListener/);
+  editor.RangeRemove();
+  SC.ProcessEditorMouseDown(fakeEvent({ clientX: 80, clientY: 10, target }));
+  expect(editor.range.hasrange).toBe(true);
 });
 
 test("InputEcho: SetInputEchoText function-detect branches", async () => {
@@ -408,13 +410,12 @@ test("ProcessEditorMouseUp: result has no coord path", async () => {
   SC.EditorMouseInfo.mousedowncoord = "A1";
   SC.EditorMouseInfo.mouselastcoord = "A1";
   // Click past grid → result has no coord → falls back to ecell.coord, then
-  // ProcessEditorMouseUp finishes by calling RemoveMouseMoveUp(), which
-  // unconditionally calls document.removeEventListener(); the FakeDocument
-  // shim never defines that method, so this deterministically throws once the
-  // no-coord fallback branch has run.
-  expect(() =>
-    SC.ProcessEditorMouseUp(fakeEvent({ clientX: 0, clientY: 0, target: editor.fullgrid })),
-  ).toThrow(/removeEventListener/);
+  // ProcessEditorMouseUp finishes by clearing EditorMouseInfo.editor and
+  // calling RemoveMouseMoveUp() (now a supported FakeDocument no-op, see
+  // test/helpers/socialcalc.ts) — asserting the cleared singleton proves
+  // the full function body ran, not an early return.
+  SC.ProcessEditorMouseUp(fakeEvent({ clientX: 0, clientY: 0, target: editor.fullgrid }));
+  expect(SC.EditorMouseInfo.editor).toBeNull();
 });
 
 test("TableEditor: noEdit constructor option", async () => {
@@ -570,12 +571,19 @@ test("CellHandlesMouseUp dragtype=Nothing / FillC / MoveC / MoveIC paths", async
   editor.MoveECell("B2");
   editor.range2 = { hasrange: true, top: 2, bottom: 2, left: 2, right: 2 };
   // CellHandlesMouseUp finishes every dragtype branch by cleaning up via
-  // RemoveMouseMoveUp(), which unconditionally calls
-  // document.removeEventListener(); the FakeDocument shim never defines that
-  // method, so this deterministically throws once the drag-end branch runs.
-  expect(() => SC.CellHandlesMouseUp(fakeEvent({ clientX: 100, clientY: 80 }))).toThrow(
-    /removeEventListener/,
-  );
+  // mouseinfo.editor = null and RemoveMouseMoveUp() (document.
+  // removeEventListener, now a supported FakeDocument no-op — see
+  // test/helpers/socialcalc.ts). Asserting the singleton was cleared after
+  // each call proves that specific dragtype branch's body ran to
+  // completion (an early return or a thrown exception mid-branch would
+  // leave it untouched), and re-setting `editor` immediately before each
+  // subsequent call keeps this a fresh assertion, not a stale carry-over.
+  //
+  // Nothing branch (movedmouse=false forces dragtype="Nothing" regardless
+  // of the "Fill" set above): Range2Remove()/RangeRemove() clear range2.
+  SC.CellHandlesMouseUp(fakeEvent({ clientX: 100, clientY: 80 }));
+  expect(SC.EditorMouseInfo.editor).toBeNull();
+  expect(editor.range2.hasrange).toBe(false);
 
   // movedmouse=true + FillC + Right filltype.
   editor.cellhandles.mouseDown = true;
@@ -585,9 +593,8 @@ test("CellHandlesMouseUp dragtype=Nothing / FillC / MoveC / MoveIC paths", async
   editor.cellhandles.startingcoord = "B2";
   SC.EditorMouseInfo.editor = editor;
   SC.EditorMouseInfo.ignore = true;
-  expect(() => SC.CellHandlesMouseUp(fakeEvent({ clientX: 150, clientY: 60 }))).toThrow(
-    /removeEventListener/,
-  );
+  SC.CellHandlesMouseUp(fakeEvent({ clientX: 150, clientY: 60 }));
+  expect(SC.EditorMouseInfo.editor).toBeNull();
 
   // MoveC dragtype.
   editor.cellhandles.mouseDown = true;
@@ -597,9 +604,10 @@ test("CellHandlesMouseUp dragtype=Nothing / FillC / MoveC / MoveIC paths", async
   editor.range2 = { hasrange: true, top: 2, bottom: 3, left: 2, right: 3 };
   SC.EditorMouseInfo.editor = editor;
   SC.EditorMouseInfo.ignore = true;
-  expect(() => SC.CellHandlesMouseUp(fakeEvent({ clientX: 150, clientY: 60 }))).toThrow(
-    /removeEventListener/,
-  );
+  SC.CellHandlesMouseUp(fakeEvent({ clientX: 150, clientY: 60 }));
+  expect(SC.EditorMouseInfo.editor).toBeNull();
+  // Move/MoveC clears range2 unconditionally after scheduling movepaste.
+  expect(editor.range2.hasrange).toBe(false);
 
   // MoveIC dragtype.
   editor.cellhandles.mouseDown = true;
@@ -610,9 +618,12 @@ test("CellHandlesMouseUp dragtype=Nothing / FillC / MoveC / MoveIC paths", async
   editor.range2 = { hasrange: true, top: 2, bottom: 3, left: 2, right: 3 };
   SC.EditorMouseInfo.editor = editor;
   SC.EditorMouseInfo.ignore = true;
-  expect(() => SC.CellHandlesMouseUp(fakeEvent({ clientX: 150, clientY: 60 }))).toThrow(
-    /removeEventListener/,
-  );
+  SC.CellHandlesMouseUp(fakeEvent({ clientX: 150, clientY: 60 }));
+  expect(SC.EditorMouseInfo.editor).toBeNull();
+  // MoveI/MoveIC clears range2 after scheduling moveinsert, then re-anchors
+  // editor.range around the inserted destination (RangeAnchor+RangeExtend).
+  expect(editor.range2.hasrange).toBe(false);
+  expect(editor.range.hasrange).toBe(true);
 
   // MoveI with Vertical filltype.
   editor.cellhandles.mouseDown = true;
@@ -623,9 +634,9 @@ test("CellHandlesMouseUp dragtype=Nothing / FillC / MoveC / MoveIC paths", async
   editor.range2 = { hasrange: true, top: 2, bottom: 3, left: 2, right: 3 };
   SC.EditorMouseInfo.editor = editor;
   SC.EditorMouseInfo.ignore = true;
-  expect(() => SC.CellHandlesMouseUp(fakeEvent({ clientX: 150, clientY: 60 }))).toThrow(
-    /removeEventListener/,
-  );
+  SC.CellHandlesMouseUp(fakeEvent({ clientX: 150, clientY: 60 }));
+  expect(SC.EditorMouseInfo.editor).toBeNull();
+  expect(editor.range2.hasrange).toBe(false);
 
   SC.EditorMouseInfo.ignore = false;
 });
@@ -740,14 +751,12 @@ test("DragRegister with custom functionobj + DragMouseUp with Z-index restore", 
     },
     editor.toplevel,
   );
-  // DragMouseDown calls SetMouseMoveUp() (document.addEventListener) before
-  // invoking functionobj.MouseDown, and the FakeDocument shim never defines
-  // that method, so this throws deterministically and the custom callbacks
-  // above (and DragMouseMove/DragMouseUp) never run.
-  expect(() =>
-    SC.DragMouseDown(fakeEvent({ clientX: 10, clientY: 10, target: el })),
-  ).toThrow(/addEventListener/);
-  expect(fired).toEqual({ down: false, move: false, up: false });
+  // DragMouseDown calls SetMouseMoveUp() (document.addEventListener, now a
+  // supported FakeDocument no-op, see test/helpers/socialcalc.ts) before
+  // invoking functionobj.MouseDown — asserting the custom callback actually
+  // ran proves the full function body executed past that point.
+  SC.DragMouseDown(fakeEvent({ clientX: 10, clientY: 10, target: el }));
+  expect(fired).toEqual({ down: true, move: false, up: false });
   SC.DragUnregister(el);
 });
 
