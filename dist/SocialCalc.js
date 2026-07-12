@@ -4696,10 +4696,6 @@ SC.encodeForSave = function(s) {
 	return s;
 };
 SC.SafeUrlForRender = function(rawurl, policy = SocialCalc.Callbacks.securityPolicy) {
-	const allowedSchemes = Object.create(null);
-	for (const scheme of policy.allowedUrlSchemes) allowedSchemes[scheme.toLowerCase()] = true;
-	const allowedDataMimeTypes = Object.create(null);
-	for (const mime of policy.allowedDataMimeTypes) allowedDataMimeTypes[mime.toLowerCase()] = true;
 	const noTabsOrNewlines = rawurl.replace(/[\t\n\r]/g, "");
 	let start = 0;
 	let end = noTabsOrNewlines.length;
@@ -4714,16 +4710,25 @@ SC.SafeUrlForRender = function(rawurl, policy = SocialCalc.Callbacks.securityPol
 	}
 	const schemeMatch = stripped.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/);
 	if (!schemeMatch) {
-		return encoded;
+		return SocialCalc.special_chars(encoded);
 	}
 	const scheme = schemeMatch[1].toLowerCase() + ":";
 	if (scheme === "data:") {
 		const afterScheme = stripped.slice(schemeMatch[0].length);
 		const mimeMatch = afterScheme.match(/^([^,;]*)/);
 		const mime = mimeMatch ? mimeMatch[1].toLowerCase() : "";
-		return mime && allowedDataMimeTypes[mime] === true ? encoded : null;
+		if (!mime) return null;
+		const allowedDataMimeTypes = policy.allowedDataMimeTypes;
+		for (let i = 0; i < allowedDataMimeTypes.length; i++) {
+			if (allowedDataMimeTypes[i].toLowerCase() === mime) return SocialCalc.special_chars(encoded);
+		}
+		return null;
 	}
-	return allowedSchemes[scheme] === true ? encoded : null;
+	const allowedUrlSchemes = policy.allowedUrlSchemes;
+	for (let i = 0; i < allowedUrlSchemes.length; i++) {
+		if (allowedUrlSchemes[i].toLowerCase() === scheme) return SocialCalc.special_chars(encoded);
+	}
+	return null;
 };
 SC.EscapeUntrustedHtml = function(html, policy = SocialCalc.Callbacks.securityPolicy) {
 	if (typeof policy.sanitizeHtml === "function") {
