@@ -11,16 +11,40 @@ See it in action at [ethercalc.net](http://ethercalc.net)!
 
 ## Usage
 
-You can `require('socialcalc')` or include `node_modules/socialcalc/dist/SocialCalc.js` on your web page using a script tag.
-
-In order to create an editor instance use:
+CommonJS consumers can require the package:
 
 ```js
-var socialCalcControl = new SocialCalc.SpreadsheetControl();
+const SocialCalc = require("socialcalc");
+const socialCalcControl = new SocialCalc.SpreadsheetControl();
 socialCalcControl.InitializeSpreadsheetControl(el /*, height, width, spacebelow*/);
 ```
 
-This package also works in Node.js. You do not need to call `InitializeSpreadsheetControl` there; that method only initializes rendering.
+The package is also CommonJS-compatible when loaded through Node's native ESM
+loader, which supports a default import:
+
+```js
+import SocialCalc from "socialcalc";
+const socialCalcControl = new SocialCalc.SpreadsheetControl();
+```
+
+Do not rely on native named imports; the supported ESM form is the default
+import above. In a browser, include `node_modules/socialcalc/dist/SocialCalc.js`
+with a script tag and use the `SocialCalc` global.
+
+This package also works in Node.js. You do not need to call
+`InitializeSpreadsheetControl` there; that method only initializes rendering.
+
+## Trust boundary and host security
+
+SocialCalc renders some cell content as HTML: the `text-html` format and the
+`@r` (raw text) custom format are inserted without escaping. URL/link formats
+can create links, and `text-image` renders an image URL. Treat workbook cells
+and save strings as hostile input: they are **not safe by default**.
+
+The host application is responsible for sanitizing untrusted content before
+rendering or saving, and for applying an appropriate Content Security Policy
+(including image and link restrictions). SocialCalc does not provide a secure
+mode or a host-wide sanitizer.
 
 ## Build and quality gates
 

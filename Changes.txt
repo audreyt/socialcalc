@@ -6,7 +6,7 @@ with the original 2007–2010 development log preserved verbatim at the bottom.
 
 
 ==============================================================================
-v3.1.0 — Unreleased — 2026-07-12
+v3.1.0 — Unreleased (changes since v3.0.8; snapshot 2026-07-12)
 ==============================================================================
 
 Toolchain and testing
@@ -32,6 +32,24 @@ Toolchain and testing
 - Removed an undeclared no-op assignment in partial AM/PM format parsing that
   throws under strict Node execution while preserving the existing token
   swallowing behavior.
+
+
+==============================================================================
+v3.0.8 — 2026-07-09
+==============================================================================
+
+Package and release
+- Published to npm as `socialcalc@3.0.8` (npm registry publication: 2026-07-09).
+- Exposed the UMD bundle through the package entry point so CommonJS
+  `require("socialcalc")` receives the SocialCalc API.
+
+
+==============================================================================
+v3.0.7 — 2026-07-09 (GitHub tag only; not published to npm)
+==============================================================================
+
+Fixes
+- Fixed range-endpoint name handling for `N:T`-style references.
 
 
 ==============================================================================
