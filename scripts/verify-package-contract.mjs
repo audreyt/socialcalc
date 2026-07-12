@@ -14,6 +14,20 @@
 // actual top-level key sets of each loaded entry point, ...). None of it
 // hardcodes an incidental fact about the current build, such as its
 // current top-level key count, as if it were a frozen public API.
+//
+// Deliberately NOT here: an are-the-types-wrong (ATTW) check. An earlier
+// revision ran `bunx --bun @arethetypeswrong/cli <tarball>` as a
+// best-effort, non-gating step. That made this durable CI gate
+// non-deterministic (network-dependent, and this project prohibits
+// invoking bun/bunx directly outside `vp`) — removed. The finding that
+// prompted adding it in the first place is preserved as documentation,
+// not as a live check: `import SC from "socialcalc"` (default import,
+// the only ESM entry point this script verifies and the package
+// promises) works under native Node ESM; `import { Sheet } from
+// "socialcalc"` (named import) does not, because cjs-module-lexer
+// cannot statically detect names inside the UMD IIFE's
+// `module.exports = exported` reassignment. That is inherent to the
+// CJS `export =` shape of the bundle, not a regression to watch for.
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -400,46 +414,6 @@ async function main() {
       }
     });
 
-    // --- Best-effort, network-dependent: are-the-types-wrong -----------------
-    // This is deliberately NOT part of the pass/fail gate above: it needs to
-    // fetch @arethetypeswrong/cli over the network on first use, which is not
-    // guaranteed in every environment this script runs in (offline CI, etc).
-    // See the ATTW limitation note in the task report for what it does and
-    // does not tell us here.
-    const attwDir = path.join(workDir, "attw-scratch");
-    mkdirSync(attwDir, { recursive: true });
-    const attwResult = spawnSync("bunx", ["--bun", "@arethetypeswrong/cli", tarballPath], {
-      cwd: attwDir,
-      encoding: "utf8",
-      timeout: 60_000,
-    });
-    const attwDidNotRun = Boolean(attwResult.error) || (attwResult.status !== 0 && !attwResult.stdout);
-    if (attwDidNotRun) {
-      console.warn("skip - are-the-types-wrong (network/tool unavailable in this environment)");
-      if (attwResult.stdout) console.warn(attwResult.stdout);
-      if (attwResult.stderr) console.warn(attwResult.stderr);
-    } else {
-      // attw exits non-zero whenever it has any finding to report, including
-      // the expected/accepted one below — that is not a script failure.
-      console.log("info - are-the-types-wrong report:");
-      console.log(attwResult.stdout);
-      const requiredGreen = ["node10", "bundler"];
-      const attwLines = attwResult.stdout.split("\n");
-      const missingGreen = requiredGreen.filter(
-        (row) => !attwLines.some((line) => line.includes(row) && line.includes("🟢")),
-      );
-      // Soft assertion only: log rather than fail the whole gate, since this
-      // check depends on a third-party tool and network access that are not
-      // guaranteed here. See the task report for the concrete finding
-      // (named ESM imports of this CJS package are unsupported by design;
-      // default import, which this script verifies directly above, is not
-      // affected).
-      if (missingGreen.length) {
-        console.warn(`note - are-the-types-wrong did not report green for: ${missingGreen.join(", ")}`);
-      } else {
-        console.log("info - are-the-types-wrong: node10, node16-from-cjs, and bundler resolution all green");
-      }
-    }
   } finally {
     if (!process.env.SC_KEEP_PACKAGE_CONTRACT_TMP) {
       rmSync(workDir, { recursive: true, force: true });
