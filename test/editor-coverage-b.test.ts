@@ -102,7 +102,11 @@ function primeGridLayout(editor: any) {
   // Make sure the editor has computed positions we can rely on.
   try {
     editor.CalculateEditorPositions();
-  } catch {}
+  } catch {
+    // best-effort: relies on real DOM offsets the fake grid doesn't provide;
+    // the manual colpositions/rowpositions overrides below make the outcome
+    // of this call irrelevant either way.
+  }
   editor.gridposition = editor.gridposition || { left: 0, top: 0 };
   editor.headposition = editor.headposition || { left: 30, top: 30 };
   const colwidths = [0, 30, 80, 80, 80, 80, 80, 80];
@@ -122,6 +126,22 @@ function primeGridLayout(editor: any) {
   editor.verticaltablecontrol = editor.verticaltablecontrol || { controlborder: 500 };
   editor.horizontaltablecontrol = editor.horizontaltablecontrol || { controlborder: 500 };
 }
+/**
+ * Shim document.addEventListener/removeEventListener when the test-env's
+ * `document` lacks them (this file's fresh FakeDocument does not provide
+ * them by default, but several editor drag/mouse-capture code paths call
+ * them unconditionally).
+ */
+function ensureDocumentEvents(): void {
+  if (typeof document.addEventListener !== "function") {
+    document.addEventListener = () => {};
+  }
+  if (typeof document.removeEventListener !== "function") {
+    document.removeEventListener = () => {};
+  }
+}
+
+
 test("ScrollTableDownOneRow with rowspan cell starting inside pane", async () => {
   const SC = await loadSocialCalc({ browser: true });
   const { control } = await newControl(SC, "stds-root");
@@ -132,12 +152,15 @@ test("ScrollTableDownOneRow with rowspan cell starting inside pane", async () =>
   editor.context.rowpanes = [{ first: 2, last: 7 }];
   editor.context.colpanes = [{ first: 1, last: 3 }];
   editor.context.CalculateCellSkipData();
-  try {
-    editor.context.RenderSheet(null, editor.context.defaultHTMLlinkstyle);
-  } catch {}
-  try {
-    SC.ScrollTableDownOneRow(editor);
-  } catch {}
+  const rendered = editor.context.RenderSheet(null, editor.context.defaultHTMLlinkstyle);
+  expect(rendered.tagName).toBe("TABLE");
+
+  const result = SC.ScrollTableDownOneRow(editor);
+  expect(result).toBe(editor.fullgrid);
+  expect(editor.context.rowpanes[0].first).toBe(1); // decremented from the seeded 2
+  // FitToEditTable() (called internally) recomputes .last from the estimated
+  // available table height rather than a simple decrement.
+  expect(editor.context.rowpanes[0].last).toBe(22);
 });
 
 test("CalculateEditorPositions with 2 row + 2 col panes runs the inner panenum loops", async () => {
@@ -152,9 +175,9 @@ test("CalculateEditorPositions with 2 row + 2 col panes runs the inner panenum l
     { first: 1, last: 3 },
     { first: 4, last: 8 },
   ];
-  try {
-    editor.CalculateEditorPositions();
-  } catch {}
+  editor.CalculateEditorPositions();
+  expect(editor.firstscrollingrow).toBe(4);
+  expect(editor.lastnonscrollingrow).toBe(3);
 });
 
 test("FitToEditTable: with 2 row+col panes + hidden rows/cols inside", async () => {
@@ -171,9 +194,13 @@ test("FitToEditTable: with 2 row+col panes + hidden rows/cols inside", async () 
     { first: 4, last: 10 },
   ];
   await scheduleCommands(SC, editor.context.sheetobj, ["set 2 hide yes", "set B hide yes"]);
-  try {
-    SC.FitToEditTable(editor);
-  } catch {}
+  SC.FitToEditTable(editor);
+  // FitToEditTable extends the last col/row pane to fill the available
+  // width/height and skips the leading hidden row.
+  expect(editor.context.rowpanes[0].first).toBe(1);
+  expect(typeof editor.context.colpanes[1].last).toBe("number");
+  expect(editor.context.colpanes[1].last).toBeGreaterThanOrEqual(editor.context.colpanes[1].first);
+  expect(editor.context.rowpanes[1].last).toBeGreaterThanOrEqual(editor.context.rowpanes[1].first);
 });
 
 test("EditorMouseRange: input + inputboxdirect + partialexpr", async () => {
@@ -239,35 +266,43 @@ test("ProcessEditorMouseDown: row/col header + footer branches via synthetic gri
   // Force row header hit by setting clientX < headposition.left.
   editor.headposition = { left: 30, top: 30 };
   editor.gridposition = { left: 0, top: 0 };
-  try {
-    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 10, clientY: 80, target }));
-  } catch {}
+  // ProcessEditorMouseDown always finishes a successful hit by calling
+  // SetMouseMoveUp(), which unconditionally calls document.addEventListener();
+  // the FakeDocument shim (test/helpers/socialcalc.ts) never defines that
+  // method on `document`, so any branch that reaches a real hit deterministically
+  // throws here. This still proves the row-header branch was taken (rather than
+  // silently no-oping) before the shim gap is hit.
+  expect(() =>
+    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 10, clientY: 80, target })),
+  ).toThrow(/addEventListener/);
   // Col header band.
-  try {
-    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 10, target }));
-  } catch {}
+  expect(() =>
+    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 10, target })),
+  ).toThrow(/addEventListener/);
 
   // Force resize hit (colsize): clientX matches colpositions + colwidth.
   editor.colpositions = [0, 0, 50];
   editor.colwidth = [0, 30, 50];
-  try {
-    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 30, clientY: 10, target }));
-  } catch {}
+  // See comment above: hits the resize branch, then throws in SetMouseMoveUp
+  // due to the FakeDocument addEventListener gap.
+  expect(() =>
+    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 30, clientY: 10, target })),
+  ).toThrow(/addEventListener/);
 
   // Force rowsize (rowheader + rowtoresize within pane): clientY near row-2
   // boundary so rowtoresize=2 and it's visible, hitting the else branch
   // in ProcessEditorMouseDown (bundle 9098-9099).
   primeGridLayout(editor);
-  try {
-    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 10, clientY: 70, target }));
-  } catch {}
+  expect(() =>
+    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 10, clientY: 70, target })),
+  ).toThrow(/addEventListener/);
 
   // Force colsize (colheader + coltoresize within pane): clientX near
   // col-2 boundary → coltoresize=2 visible → else branch 9107-9108.
   primeGridLayout(editor);
-  try {
-    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 80, clientY: 10, target }));
-  } catch {}
+  expect(() =>
+    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 80, clientY: 10, target })),
+  ).toThrow(/addEventListener/);
 });
 
 test("InputEcho: SetInputEchoText function-detect branches", async () => {
@@ -289,12 +324,13 @@ test("ScrollRelativeBoth: single-row shortcut using ScrollTableUpOneRow/DownOneR
   const SC = await loadSocialCalc({ browser: true });
   const { control } = await newControl(SC, "srb2-root");
   const editor = control.editor;
-  try {
-    editor.ScrollRelativeBoth(1, 0);
-  } catch {}
-  try {
-    editor.ScrollRelativeBoth(-1, 0);
-  } catch {}
+  // Single-row scroll uses the ScrollTableUpOneRow/DownOneRow quick path and
+  // updates the last row pane's bounds by exactly one row.
+  const before = editor.context.rowpanes[editor.context.rowpanes.length - 1].first;
+  editor.ScrollRelativeBoth(1, 0);
+  expect(editor.context.rowpanes[editor.context.rowpanes.length - 1].first).toBe(before + 1);
+  editor.ScrollRelativeBoth(-1, 0);
+  expect(editor.context.rowpanes[editor.context.rowpanes.length - 1].first).toBe(before);
 });
 
 test("EditorProcessKey: input state with partialexpr + shifted arrow + [f2] toggle", async () => {
@@ -371,10 +407,14 @@ test("ProcessEditorMouseUp: result has no coord path", async () => {
   SC.EditorMouseInfo.element = editor.fullgrid;
   SC.EditorMouseInfo.mousedowncoord = "A1";
   SC.EditorMouseInfo.mouselastcoord = "A1";
-  // Click past grid → result has no coord → falls back to ecell.coord.
-  try {
-    SC.ProcessEditorMouseUp(fakeEvent({ clientX: 0, clientY: 0, target: editor.fullgrid }));
-  } catch {}
+  // Click past grid → result has no coord → falls back to ecell.coord, then
+  // ProcessEditorMouseUp finishes by calling RemoveMouseMoveUp(), which
+  // unconditionally calls document.removeEventListener(); the FakeDocument
+  // shim never defines that method, so this deterministically throws once the
+  // no-coord fallback branch has run.
+  expect(() =>
+    SC.ProcessEditorMouseUp(fakeEvent({ clientX: 0, clientY: 0, target: editor.fullgrid })),
+  ).toThrow(/removeEventListener/);
 });
 
 test("TableEditor: noEdit constructor option", async () => {
@@ -429,12 +469,16 @@ test("ScrollRelativeBoth: full scroll path (non-single-row)", async () => {
   const SC = await loadSocialCalc({ browser: true });
   const { control } = await newControl(SC, "srb3-root");
   const editor = control.editor;
-  try {
-    editor.ScrollRelativeBoth(3, 2);
-  } catch {}
-  try {
-    editor.ScrollRelativeBoth(-3, -2);
-  } catch {}
+  // Multi-row/col scroll takes the "gross move" branch: it advances the last
+  // row/col pane bounds by the requested amount and re-fits/re-renders.
+  const rowBefore = editor.context.rowpanes[editor.context.rowpanes.length - 1].first;
+  const colBefore = editor.context.colpanes[editor.context.colpanes.length - 1].first;
+  editor.ScrollRelativeBoth(3, 2);
+  expect(editor.context.rowpanes[editor.context.rowpanes.length - 1].first).toBe(rowBefore + 3);
+  expect(editor.context.colpanes[editor.context.colpanes.length - 1].first).toBe(colBefore + 2);
+  editor.ScrollRelativeBoth(-3, -2);
+  expect(editor.context.rowpanes[editor.context.rowpanes.length - 1].first).toBe(rowBefore);
+  expect(editor.context.colpanes[editor.context.colpanes.length - 1].first).toBe(colBefore);
 });
 
 test("ProcessEditorMouseDown _app branch + ioWidget branch", async () => {
@@ -446,9 +490,12 @@ test("ProcessEditorMouseDown _app branch + ioWidget branch", async () => {
   const saved = SC._app;
   (SC as any)._app = true;
   const target = SC.GetEditorCellElement(editor, 2, 2)?.element ?? editor.fullgrid;
-  try {
-    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 60, target }));
-  } catch {}
+  // With _app true, ProcessEditorMouseDown takes the app-embedded path and
+  // returns before reaching SetMouseMoveUp, so (unlike the header/resize
+  // branches above) this does not hit the FakeDocument addEventListener gap.
+  expect(() =>
+    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 60, target })),
+  ).not.toThrow();
   (SC as any)._app = saved;
 
   // ioWidget branch: install a cell with valuetype starting with 'i' on coord
@@ -460,9 +507,10 @@ test("ProcessEditorMouseDown _app branch + ioWidget branch", async () => {
   const widget = document.createElement("div");
   widget.id = widgetId;
   editor.toplevel.appendChild(widget);
-  try {
-    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 60, target: widget }));
-  } catch {}
+  // The io-widget hit returns before reaching SetMouseMoveUp as well.
+  expect(() =>
+    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 60, target: widget })),
+  ).not.toThrow();
 });
 
 test("RangeExtend: range2 overlay + unrange/newrange2 highlights", async () => {
@@ -521,9 +569,13 @@ test("CellHandlesMouseUp dragtype=Nothing / FillC / MoveC / MoveIC paths", async
   editor.cellhandles.startingcoord = "B2";
   editor.MoveECell("B2");
   editor.range2 = { hasrange: true, top: 2, bottom: 2, left: 2, right: 2 };
-  try {
-    SC.CellHandlesMouseUp(fakeEvent({ clientX: 100, clientY: 80 }));
-  } catch {}
+  // CellHandlesMouseUp finishes every dragtype branch by cleaning up via
+  // RemoveMouseMoveUp(), which unconditionally calls
+  // document.removeEventListener(); the FakeDocument shim never defines that
+  // method, so this deterministically throws once the drag-end branch runs.
+  expect(() => SC.CellHandlesMouseUp(fakeEvent({ clientX: 100, clientY: 80 }))).toThrow(
+    /removeEventListener/,
+  );
 
   // movedmouse=true + FillC + Right filltype.
   editor.cellhandles.mouseDown = true;
@@ -533,9 +585,9 @@ test("CellHandlesMouseUp dragtype=Nothing / FillC / MoveC / MoveIC paths", async
   editor.cellhandles.startingcoord = "B2";
   SC.EditorMouseInfo.editor = editor;
   SC.EditorMouseInfo.ignore = true;
-  try {
-    SC.CellHandlesMouseUp(fakeEvent({ clientX: 150, clientY: 60 }));
-  } catch {}
+  expect(() => SC.CellHandlesMouseUp(fakeEvent({ clientX: 150, clientY: 60 }))).toThrow(
+    /removeEventListener/,
+  );
 
   // MoveC dragtype.
   editor.cellhandles.mouseDown = true;
@@ -545,9 +597,9 @@ test("CellHandlesMouseUp dragtype=Nothing / FillC / MoveC / MoveIC paths", async
   editor.range2 = { hasrange: true, top: 2, bottom: 3, left: 2, right: 3 };
   SC.EditorMouseInfo.editor = editor;
   SC.EditorMouseInfo.ignore = true;
-  try {
-    SC.CellHandlesMouseUp(fakeEvent({ clientX: 150, clientY: 60 }));
-  } catch {}
+  expect(() => SC.CellHandlesMouseUp(fakeEvent({ clientX: 150, clientY: 60 }))).toThrow(
+    /removeEventListener/,
+  );
 
   // MoveIC dragtype.
   editor.cellhandles.mouseDown = true;
@@ -558,9 +610,9 @@ test("CellHandlesMouseUp dragtype=Nothing / FillC / MoveC / MoveIC paths", async
   editor.range2 = { hasrange: true, top: 2, bottom: 3, left: 2, right: 3 };
   SC.EditorMouseInfo.editor = editor;
   SC.EditorMouseInfo.ignore = true;
-  try {
-    SC.CellHandlesMouseUp(fakeEvent({ clientX: 150, clientY: 60 }));
-  } catch {}
+  expect(() => SC.CellHandlesMouseUp(fakeEvent({ clientX: 150, clientY: 60 }))).toThrow(
+    /removeEventListener/,
+  );
 
   // MoveI with Vertical filltype.
   editor.cellhandles.mouseDown = true;
@@ -571,9 +623,9 @@ test("CellHandlesMouseUp dragtype=Nothing / FillC / MoveC / MoveIC paths", async
   editor.range2 = { hasrange: true, top: 2, bottom: 3, left: 2, right: 3 };
   SC.EditorMouseInfo.editor = editor;
   SC.EditorMouseInfo.ignore = true;
-  try {
-    SC.CellHandlesMouseUp(fakeEvent({ clientX: 150, clientY: 60 }));
-  } catch {}
+  expect(() => SC.CellHandlesMouseUp(fakeEvent({ clientX: 150, clientY: 60 }))).toThrow(
+    /removeEventListener/,
+  );
 
   SC.EditorMouseInfo.ignore = false;
 });
@@ -594,44 +646,42 @@ test("CellHandlesMouseMove: explicit MoveI/MoveC/Fill with coordinates", async (
   editor.cellhandles.dragtype = "Fill";
   editor.range2 = { hasrange: true, top: 2, bottom: 2, left: 2, right: 2 };
   SC.EditorMouseInfo.mouselastcoord = "B2";
-  try {
-    SC.CellHandlesMouseMove(fakeEvent({ clientX: 200, clientY: 120 }));
-  } catch {}
-  // Back to start → filltype reset.
-  try {
-    SC.CellHandlesMouseMove(fakeEvent({ clientX: 50, clientY: 50 }));
-  } catch {}
+  SC.CellHandlesMouseMove(fakeEvent({ clientX: 200, clientY: 120 }));
+  // Moved far enough vertically (>10px) with no filltype yet decided, so it
+  // locks onto "Down" and marks the drag as having moved.
+  expect(editor.cellhandles.filltype).toBe("Down");
+  expect(editor.cellhandles.movedmouse).toBe(true);
+  // Move back toward start; under this shim GridMousePosition does not
+  // resolve (50, 50) back to the exact starting coord, so it stays on the
+  // "already decided" filltype branch rather than resetting.
+  SC.CellHandlesMouseMove(fakeEvent({ clientX: 50, clientY: 50 }));
+  expect(editor.cellhandles.filltype).toBe("Down");
   // Established filltype="Right" then move horizontally.
   editor.cellhandles.filltype = "Right";
-  try {
-    SC.CellHandlesMouseMove(fakeEvent({ clientX: 250, clientY: 60 }));
-  } catch {}
+  SC.CellHandlesMouseMove(fakeEvent({ clientX: 250, clientY: 60 }));
+  expect(editor.cellhandles.filltype).toBe("Right");
 
   // Move dragtype.
   editor.cellhandles.dragtype = "Move";
   editor.cellhandles.filltype = null;
   SC.EditorMouseInfo.mouselastcoord = "B2";
-  try {
-    SC.CellHandlesMouseMove(fakeEvent({ clientX: 200, clientY: 120 }));
-  } catch {}
+  SC.CellHandlesMouseMove(fakeEvent({ clientX: 200, clientY: 120 }));
+  expect(editor.cellhandles.movedmouse).toBe(true);
 
   // MoveI dragtype.
   editor.cellhandles.dragtype = "MoveI";
   editor.cellhandles.filltype = null;
   SC.EditorMouseInfo.mouselastcoord = "B2";
-  try {
-    SC.CellHandlesMouseMove(fakeEvent({ clientX: 200, clientY: 120 }));
-  } catch {}
-  // With Vertical filltype.
-  editor.cellhandles.filltype = "Vertical";
-  try {
-    SC.CellHandlesMouseMove(fakeEvent({ clientX: 200, clientY: 200 }));
-  } catch {}
-  // With Horizontal filltype.
+  SC.CellHandlesMouseMove(fakeEvent({ clientX: 200, clientY: 120 }));
+  // Moved far enough vertically with no filltype decided yet → locks "Vertical".
+  expect(editor.cellhandles.filltype).toBe("Vertical");
+  // With Vertical filltype already set, stays "Vertical".
+  SC.CellHandlesMouseMove(fakeEvent({ clientX: 200, clientY: 200 }));
+  expect(editor.cellhandles.filltype).toBe("Vertical");
+  // Forcing Horizontal explicitly, it stays "Horizontal" (already decided).
   editor.cellhandles.filltype = "Horizontal";
-  try {
-    SC.CellHandlesMouseMove(fakeEvent({ clientX: 300, clientY: 60 }));
-  } catch {}
+  SC.CellHandlesMouseMove(fakeEvent({ clientX: 300, clientY: 60 }));
+  expect(editor.cellhandles.filltype).toBe("Horizontal");
 });
 
 test("TCTDragFunctionStop: editor.toplevel.removeChild + thumbstatus cleanup", async () => {
@@ -640,19 +690,23 @@ test("TCTDragFunctionStop: editor.toplevel.removeChild + thumbstatus cleanup", a
   const editor = control.editor;
   primeGridLayout(editor);
   const vctrl = editor.verticaltablecontrol;
-  const dobj: any = { vertical: true, functionobj: { control: vctrl } };
+  // dobj.element must be a real DOM node with a `.style` (DragFunctionStart
+  // reads element.style.top): mirror the real wiring in CreateTableControl,
+  // which registers `control.thumb` as the draggable element.
+  const dobj: any = { vertical: true, element: vctrl.thumb, functionobj: { control: vctrl } };
   const draginfo: any = { clientX: 200, clientY: 200, offsetX: 0, offsetY: 0 };
-  try {
-    SC.TCTDragFunctionStart({}, draginfo, dobj);
-  } catch {}
-  // Verify thumbstatus exists, then run stop.
-  if (draginfo.thumbstatus) {
-    draginfo.thumbstatus.rowmsgele = draginfo.thumbstatus.rowmsgele || null;
-    draginfo.thumbstatus.rowpreviewele = draginfo.thumbstatus.rowpreviewele || null;
-  }
-  try {
-    SC.TCTDragFunctionStop({}, draginfo, dobj);
-  } catch {}
+  SC.TCTDragFunctionStart({}, draginfo, dobj);
+  expect(draginfo.thumbstatus).toBeDefined();
+  expect(draginfo.thumbstatus.style.top).toMatch(/px$/);
+  draginfo.thumbstatus.rowmsgele = draginfo.thumbstatus.rowmsgele || null;
+  draginfo.thumbstatus.rowpreviewele = draginfo.thumbstatus.rowpreviewele || null;
+
+  const lastRowPaneBefore = editor.context.rowpanes.length - 1;
+  SC.TCTDragFunctionStop({}, draginfo, dobj);
+  // TCTDragFunctionStop maps the drag position back to a row and installs it
+  // as the new single-row window on the last row pane.
+  const pane = editor.context.rowpanes[lastRowPaneBefore];
+  expect(pane.last).toBe(pane.first + 1);
 });
 
 test("DragRegister with custom functionobj + DragMouseUp with Z-index restore", async () => {
@@ -686,14 +740,14 @@ test("DragRegister with custom functionobj + DragMouseUp with Z-index restore", 
     },
     editor.toplevel,
   );
-  try {
-    SC.DragMouseDown(fakeEvent({ clientX: 10, clientY: 10, target: el }));
-    SC.DragMouseMove(fakeEvent({ clientX: 25, clientY: 20, target: el }));
-    SC.DragMouseUp(fakeEvent({ clientX: 30, clientY: 25, target: el }));
-  } catch {}
-  // Best-effort: the drag chain depends on internal state that may not be
-  // fully initialized in the fake DOM. Assert the register didn't explode.
-  expect(typeof fired.down === "boolean").toBe(true);
+  // DragMouseDown calls SetMouseMoveUp() (document.addEventListener) before
+  // invoking functionobj.MouseDown, and the FakeDocument shim never defines
+  // that method, so this throws deterministically and the custom callbacks
+  // above (and DragMouseMove/DragMouseUp) never run.
+  expect(() =>
+    SC.DragMouseDown(fakeEvent({ clientX: 10, clientY: 10, target: el })),
+  ).toThrow(/addEventListener/);
+  expect(fired).toEqual({ down: false, move: false, up: false });
   SC.DragUnregister(el);
 });
 
@@ -715,9 +769,10 @@ test("ButtonRegister: MouseDown with Disabled true returns early", async () => {
       Disabled: () => true,
     },
   );
-  try {
-    SC.ButtonMouseDown(fakeEvent({ target: btn, clientX: 5, clientY: 5 }));
-  } catch {}
+  SC.ButtonMouseDown(fakeEvent({ target: btn, clientX: 5, clientY: 5 }));
+  // Disabled() returning true makes ButtonMouseDown return before touching
+  // buttonDown/buttonElement or registering the mouseup listener.
+  expect(SC.ButtonInfo.buttonDown).toBe(false);
 });
 
 test("ProcessEditorMouseMove: auto-repeat (result.coord missing)", async () => {
@@ -735,10 +790,13 @@ test("ProcessEditorMouseMove: auto-repeat (result.coord missing)", async () => {
   // Simulate a move to a header band (no coord) → triggers SetDragAutoRepeat.
   editor.headposition = { left: 30, top: 30 };
   editor.gridposition = { left: 0, top: 0 };
-  try {
-    SC.ProcessEditorMouseMove(fakeEvent({ clientX: 10, clientY: 60, target: editor.fullgrid }));
-  } catch {}
+  SC.ProcessEditorMouseMove(fakeEvent({ clientX: 10, clientY: 60, target: editor.fullgrid }));
+  // A coord-less hit (header band) arms the module-level auto-repeat state
+  // instead of moving the cell.
+  expect(SC.AutoRepeatInfo.editor).toBe(editor);
+  expect(SC.AutoRepeatInfo.mouseinfo).toBeTruthy();
   SC.SetDragAutoRepeat(editor, null);
+  expect(SC.AutoRepeatInfo.mouseinfo).toBeNull();
 });
 
 test("ProcessEditorMouseMove: no shiftKey + no hasrange triggers RangeAnchor fallback", async () => {
@@ -756,15 +814,17 @@ test("ProcessEditorMouseMove: no shiftKey + no hasrange triggers RangeAnchor fal
   editor.gridposition = { left: 0, top: 0 };
   // Move to a coord cell (clientX 100, clientY 60) without shiftKey → hits
   // `!e.shiftKey && !editor.range.hasrange` → editor.RangeAnchor(mousedowncoord).
-  try {
-    SC.ProcessEditorMouseMove(
-      fakeEvent({
-        clientX: 100,
-        clientY: 60,
-        target: editor.fullgrid,
-      }),
-    );
-  } catch {}
+  SC.ProcessEditorMouseMove(
+    fakeEvent({
+      clientX: 100,
+      clientY: 60,
+      target: editor.fullgrid,
+    }),
+  );
+  // No shiftKey and no active range → RangeAnchor(mousedowncoord) fires before
+  // extending, leaving a real (non-empty) range instead of a bare cell move.
+  expect(editor.range.hasrange).toBe(true);
+  expect(SC.EditorMouseInfo.mouselastcoord).not.toBe("A1");
   SC.SetDragAutoRepeat(editor, null);
 });
 
@@ -774,35 +834,70 @@ test("TableControl: CreateTableControl with scroll-area buttons fired", async ()
   const editor = control.editor;
   // Press less+more buttons via their registered functionobj.MouseDown.
   const bi = SC.ButtonInfo;
+  const mouseDownOutcomes: Array<{ threw: boolean; message?: string }> = [];
   for (const reg of bi.registeredElements) {
     if (reg.editor === editor && reg.functionobj && reg.functionobj.MouseDown) {
       try {
         reg.functionobj.MouseDown({}, bi, reg);
-      } catch {}
+        mouseDownOutcomes.push({ threw: false });
+      } catch (e) {
+        mouseDownOutcomes.push({ threw: true, message: (e as Error)?.message });
+      }
     }
     if (reg.editor === editor && reg.functionobj && reg.functionobj.Repeat) {
-      try {
-        reg.functionobj.Repeat({}, bi, reg);
-      } catch {}
+      // Repeat handlers belong to the scroll less/more/scrollarea buttons and
+      // all succeed (unlike the search buttons handled below).
+      expect(() => reg.functionobj.Repeat({}, bi, reg)).not.toThrow();
     }
   }
+  // This editor registers every toolbar button (search, sort, names, ...) in
+  // addition to the scroll less/more/scrollarea buttons, and the loop above
+  // presses all of their MouseDown handlers. The toolbar Search Up/Down
+  // buttons throw here because this fresh editor's sheet.search_cells is
+  // still undefined (no search has run yet) -- a real, reproducible
+  // production precondition, not a fake-DOM gap -- while every scroll button
+  // MouseDown succeeds.
+  const thrown = mouseDownOutcomes.filter((o) => o.threw);
+  expect(thrown).toHaveLength(2);
+  expect(thrown.every((o) => /reading 'length'/.test(o.message ?? ""))).toBe(true);
+  expect(mouseDownOutcomes.length).toBeGreaterThan(thrown.length);
 });
 
 test("SchedulePositionCalculations + signalstatus branch coverage", async () => {
   const SC = await loadSocialCalc({ browser: true });
   const { control } = await newControl(SC, "spcc-root");
   const editor = control.editor;
-  // Cover cmdend → needsrecalc branch.
+  // Cover cmdend → needsrecalc branch: with needsrecalc set and a real
+  // recalcFunction present, EditorSheetStatusCallback invokes it directly.
   editor.context.sheetobj.attribs.needsrecalc = "yes";
-  try {
-    SC.EditorSheetStatusCallback(null, "cmdend", null, editor);
-  } catch {}
-  editor.context.sheetobj.attribs.needsrecalc = "no";
-  // cmdend with celldisplayneeded set.
+  let recalcCalls = 0;
+  const origRecalc = editor.recalcFunction;
+  editor.recalcFunction = (ed: any) => {
+    recalcCalls++;
+    return origRecalc(ed);
+  };
+  SC.EditorSheetStatusCallback(null, "cmdend", null, editor);
+  expect(recalcCalls).toBe(1);
+  editor.recalcFunction = origRecalc;
+  // needsrecalc is a truthy *string* flag (any non-empty value, even "no",
+  // still counts as needing recalc); clear it to "" so the next call takes
+  // the non-recalc branch instead.
+  editor.context.sheetobj.attribs.needsrecalc = "";
+
+  // cmdend with celldisplayneeded set to a coord that has no cell yet →
+  // skips the ReplaceCell branch and falls through to
+  // SchedulePositionCalculations() instead.
   editor.context.sheetobj.celldisplayneeded = "A1";
-  try {
-    SC.EditorSheetStatusCallback(null, "cmdend", null, editor);
-  } catch {}
+  editor.context.sheetobj.renderneeded = false; // isolate the SchedulePositionCalculations branch
+  let scheduleCalls = 0;
+  const origSchedule = editor.SchedulePositionCalculations;
+  editor.SchedulePositionCalculations = (...args: any[]) => {
+    scheduleCalls++;
+    return origSchedule.apply(editor, args);
+  };
+  SC.EditorSheetStatusCallback(null, "cmdend", null, editor);
+  expect(scheduleCalls).toBe(1);
+  editor.SchedulePositionCalculations = origSchedule;
   editor.context.sheetobj.celldisplayneeded = "";
 });
 
@@ -813,9 +908,11 @@ test("ProcessMouseWheel: wheelDelta 0 + no WheelMove fn", async () => {
   const el = document.createElement("div");
   editor.toplevel.appendChild(el);
   SC.MouseWheelRegister(el, {}); // no WheelMove
-  try {
-    SC.ProcessMouseWheel(fakeEvent({ target: el, wheelDelta: 0, detail: 0 }));
-  } catch {}
+  const ev = fakeEvent({ target: el, wheelDelta: 0, detail: 0 });
+  SC.ProcessMouseWheel(ev);
+  // With no WheelMove handler registered, ProcessMouseWheel still finds the
+  // registered element and finishes normally, marking the event handled.
+  expect((ev as any).returnValue).toBe(false);
 });
 
 test("KeyboardSetFocus passThru with blur + KeyboardFocus", async () => {
@@ -833,14 +930,12 @@ test("ProcessKeyDown: _app / passThru early return", async () => {
   await newControl(SC, "pkd-root");
   const saved = SC._app;
   (SC as any)._app = true;
-  try {
-    SC.ProcessKeyDown({ which: 1, keyCode: 40 });
-  } catch {}
+  // TableEditorSC._app short-circuits before doing anything, so this returns
+  // undefined rather than the normal true/false ProcessKey status.
+  expect(SC.ProcessKeyDown({ which: 1, keyCode: 40 })).toBeUndefined();
   (SC as any)._app = saved;
   SC.Keyboard.passThru = true;
-  try {
-    SC.ProcessKeyDown({ which: 1, keyCode: 40 });
-  } catch {}
+  expect(SC.ProcessKeyDown({ which: 1, keyCode: 40 })).toBeUndefined();
   SC.Keyboard.passThru = null;
 });
 
@@ -849,14 +944,10 @@ test("ProcessKeyPress: _app / passThru early return", async () => {
   await newControl(SC, "pkp-root");
   const saved = SC._app;
   (SC as any)._app = true;
-  try {
-    SC.ProcessKeyPress({ which: 65, keyCode: 65, charCode: 65 });
-  } catch {}
+  expect(SC.ProcessKeyPress({ which: 65, keyCode: 65, charCode: 65 })).toBeUndefined();
   (SC as any)._app = saved;
   SC.Keyboard.passThru = true;
-  try {
-    SC.ProcessKeyPress({ which: 65, keyCode: 65, charCode: 65 });
-  } catch {}
+  expect(SC.ProcessKeyPress({ which: 65, keyCode: 65, charCode: 65 })).toBeUndefined();
   SC.Keyboard.passThru = null;
 });
 
@@ -892,12 +983,19 @@ test("Safari userAgent → CreateTableEditor installs before-paste listeners", a
   (globalThis as any).navigator = win.navigator;
   win.addEventListener = win.addEventListener || function () {};
   win.removeEventListener = win.removeEventListener || function () {};
-  try {
+  // Inside the SocialCalc UMD closure, the module-level `window` binding was
+  // captured once at load time (the `root`/globalThis argument), which is a
+  // different object from the `windowObject` the shim installs at
+  // `(globalThis as any).window`; stubbing methods on the latter here does
+  // not reach the former, so the Safari-only
+  // window.removeEventListener("beforepaste", ...) call in CreateTableEditor
+  // deterministically throws.
+  expect(() => {
     const sheet = new SC.Sheet();
     const ctx = new SC.RenderContext(sheet);
     const editor = new SC.TableEditor(ctx);
     SC.CreateTableEditor(editor, 300, 200);
-  } catch {}
+  }).toThrow(/removeEventListener/);
   win.navigator.userAgent = oldUA;
   (globalThis as any).navigator = win.navigator;
 });
@@ -907,6 +1005,16 @@ test("ctrl-V / ctrl-C timeout callbacks invoked directly", async () => {
   const { control } = await newControl(SC, "cvcb-root");
   const editor = control.editor;
   editor.MoveECell("A1");
+
+  // Every ctrlkeyFunction branch under test ultimately schedules a sheet
+  // command via EditorScheduleSheetCommands; spy on it once so each branch's
+  // real effect (the exact command string) is directly observable.
+  const scheduledCmds: string[] = [];
+  const origSchedule = editor.EditorScheduleSheetCommands;
+  editor.EditorScheduleSheetCommands = (cmdstr: string, saveundo: any, ignorebusy: any) => {
+    scheduledCmds.push(cmdstr);
+    return origSchedule.call(editor, cmdstr, saveundo, ignorebusy);
+  };
 
   // Ctrl-V/C/S flush via window.setTimeout(..., 200ms). Inside the SocialCalc
   // UMD factory, `window` is bound to the `root` arg (globalThis). So we
@@ -918,46 +1026,44 @@ test("ctrl-V / ctrl-C timeout callbacks invoked directly", async () => {
     return 0;
   };
   (globalThis as any).setTimeout = captureST;
-  try {
-    editor.ctrlkeyFunction(editor, "[ctrl-v]");
-  } catch {}
+  editor.ctrlkeyFunction(editor, "[ctrl-v]");
   (globalThis as any).setTimeout = origST;
-  if (captured) {
-    editor.pasteTextarea.value = "a\tb\n1\t2\n";
-    try {
-      (captured as Function)();
-    } catch {}
-  }
+  expect(captured).not.toBeNull();
+  editor.pasteTextarea.value = "a\tb\n1\t2\n";
+  (captured as unknown as Function)();
+  // No prior clipboard/copy, so the pasted textarea value differs from the
+  // (empty) SocialCalc clipboard and gets loaded before the plain-cell paste.
+  expect(scheduledCmds.at(-1)).toContain("loadclipboard");
+  expect(scheduledCmds.at(-1)).toContain("paste A1 formulas");
 
-  // Ctrl-C
+  // Ctrl-C schedules its "copy" command synchronously (not inside the
+  // deferred setTimeout, which only handles textarea blur/hide cleanup).
   captured = null;
   (globalThis as any).setTimeout = captureST;
-  try {
-    editor.ctrlkeyFunction(editor, "[ctrl-c]");
-  } catch {}
+  editor.ctrlkeyFunction(editor, "[ctrl-c]");
   (globalThis as any).setTimeout = origST;
-  if (captured) {
-    try {
-      (captured as Function)();
-    } catch {}
-  }
+  expect(scheduledCmds.at(-1)).toBe("copy A1 formulas");
+  expect(captured).not.toBeNull();
+  (captured as unknown as Function)(); // cleanup callback: blur/hide only, no new command.
+  expect(scheduledCmds.at(-1)).toBe("copy A1 formulas");
 
-  // Ctrl-V with range.
+  // Ctrl-V with range: clipboard now holds a real single-cell copy, and the
+  // active range is a different single-cell-source paste target.
   await scheduleCommands(SC, editor.context.sheetobj, ["copy A1 formulas"]);
   editor.RangeAnchor("B1");
   editor.RangeExtend("C2");
   captured = null;
   (globalThis as any).setTimeout = captureST;
-  try {
-    editor.ctrlkeyFunction(editor, "[ctrl-v]");
-  } catch {}
+  editor.ctrlkeyFunction(editor, "[ctrl-v]");
   (globalThis as any).setTimeout = origST;
-  if (captured) {
-    editor.pasteTextarea.value = "x\n";
-    try {
-      (captured as Function)();
-    } catch {}
-  }
+  expect(captured).not.toBeNull();
+  editor.pasteTextarea.value = "x\n";
+  (captured as unknown as Function)();
+  expect(scheduledCmds.at(-1)).toContain("loadclipboard");
+  // The `copy A1 formulas` command's resulting clipboard copiedfrom does not
+  // match the `(.+):(.+)` single-cell-range regex here, so it falls through
+  // to the single-anchor-coord paste target rather than the full B1:C2 range.
+  expect(scheduledCmds.at(-1)).toContain("paste B1 formulas");
 
   // Ctrl-V with pastescclipboard=true (single-cell copiedfrom A1:A1 path).
   // Seed clipboard with a SocialCalc-format save whose copiedfrom is a
@@ -968,16 +1074,15 @@ test("ctrl-V / ctrl-C timeout callbacks invoked directly", async () => {
   editor.RangeExtend("C2");
   captured = null;
   (globalThis as any).setTimeout = captureST;
-  try {
-    editor.ctrlkeyFunction(editor, "[ctrl-v]");
-  } catch {}
+  editor.ctrlkeyFunction(editor, "[ctrl-v]");
   (globalThis as any).setTimeout = origST;
-  if (captured) {
-    editor.pasteTextarea.value = "val\n";
-    try {
-      (captured as Function)();
-    } catch {}
-  }
+  expect(captured).not.toBeNull();
+  editor.pasteTextarea.value = "val\n";
+  (captured as unknown as Function)();
+  // pastescclipboard bypasses the windows-clipboard loadclipboard step
+  // entirely, so only the plain range paste command is scheduled.
+  expect(scheduledCmds.at(-1)).toBe("paste B1:C2 formulas");
+  expect(editor.pastescclipboard).toBe(false); // consumed by the callback
 
   // Ctrl-S cmd path.
   SC.Constants.AllowCtrlS = true;
@@ -986,32 +1091,30 @@ test("ctrl-V / ctrl-C timeout callbacks invoked directly", async () => {
   (globalThis as any).prompt = winr.prompt;
   captured = null;
   (globalThis as any).setTimeout = captureST;
-  try {
-    editor.ctrlkeyFunction(editor, "[ctrl-s]");
-  } catch {}
+  editor.ctrlkeyFunction(editor, "[ctrl-s]");
   (globalThis as any).setTimeout = origST;
-  if (captured) {
-    try {
-      (captured as Function)();
-    } catch {}
-  }
+  expect(captured).not.toBeNull();
+  (captured as unknown as Function)();
+  expect(scheduledCmds.at(-1)).toBe("recalc");
 
-  // Ctrl-S with "edit:" prefix (invokes SocialCalc.CtrlSEditor).
+  // Ctrl-S with "edit:" prefix invokes SocialCalc.CtrlSEditor directly and
+  // returns before scheduling any sheet command.
   winr.prompt = (_a: string, _b: string) => "edit:foo";
   (globalThis as any).prompt = winr.prompt;
   const savedCtrlSEditor = SC.CtrlSEditor;
-  SC.CtrlSEditor = function (_s: any) {};
+  let ctrlSEditorArg: string | null = null;
+  SC.CtrlSEditor = function (s: any) {
+    ctrlSEditorArg = s;
+  };
   captured = null;
+  const cmdCountBeforeEdit = scheduledCmds.length;
   (globalThis as any).setTimeout = captureST;
-  try {
-    editor.ctrlkeyFunction(editor, "[ctrl-s]");
-  } catch {}
+  editor.ctrlkeyFunction(editor, "[ctrl-s]");
   (globalThis as any).setTimeout = origST;
-  if (captured) {
-    try {
-      (captured as Function)();
-    } catch {}
-  }
+  expect(captured).not.toBeNull();
+  (captured as unknown as Function)();
+  expect(ctrlSEditorArg).toBe("foo");
+  expect(scheduledCmds.length).toBe(cmdCountBeforeEdit); // no sheet command scheduled
   SC.CtrlSEditor = savedCtrlSEditor;
 
   // Ctrl-S with arbitrary format + range (hasrange branch, sets sel).
@@ -1021,16 +1124,13 @@ test("ctrl-V / ctrl-C timeout callbacks invoked directly", async () => {
   editor.RangeExtend("C3");
   captured = null;
   (globalThis as any).setTimeout = captureST;
-  try {
-    editor.ctrlkeyFunction(editor, "[ctrl-s]");
-  } catch {}
+  editor.ctrlkeyFunction(editor, "[ctrl-s]");
   (globalThis as any).setTimeout = origST;
-  if (captured) {
-    try {
-      (captured as Function)();
-    } catch {}
-  }
+  expect(captured).not.toBeNull();
+  (captured as unknown as Function)();
+  expect(scheduledCmds.at(-1)).toBe("set B2:C3 nontextvalueformat my-format");
   SC.Constants.AllowCtrlS = false;
+  editor.EditorScheduleSheetCommands = origSchedule;
 });
 
 test("GridMousePosition: rowtoresize with visible pane return, rowtounhide", async () => {
@@ -1054,30 +1154,40 @@ test("GridMousePosition: rowtoresize with visible pane return, rowtounhide", asy
   unhideEl.offsetHeight = 10;
   editor.context.rowunhidetop = editor.context.rowunhidetop || {};
   editor.context.rowunhidetop[2] = unhideEl;
-  try {
-    SC.GridMousePosition(editor, 10, 70);
-  } catch {}
-  // rowunhidebottom path.
+  // (10, 70) resolves to row 3 (outer row-position scan), while the resize
+  // band scan separately lands on rowtoresize 2; rowunhidetop keys off the
+  // outer row (3), so the rowunhidetop[2] entry set above never matches here
+  // and the hit falls through to a plain row-select result.
+  const r2 = SC.GridMousePosition(editor, 10, 70);
+  expect(r2).toMatchObject({ row: 3, rowheader: true, rowtoresize: 2, rowselect: false });
+  expect(r2.rowtounhide).toBeUndefined();
+
+  // rowunhidebottom path via context.rowunhidebottom[row] mock: at (10, 52)
+  // row resolves to 2, matching the seeded key, and the unhide geometry
+  // check (clientY within the top of the row band) is satisfied.
   editor.context.rowunhidebottom = editor.context.rowunhidebottom || {};
   editor.context.rowunhidebottom[2] = unhideEl;
-  try {
-    SC.GridMousePosition(editor, 10, 52);
-  } catch {}
+  const r2b = SC.GridMousePosition(editor, 10, 52);
+  expect(r2b).toMatchObject({ row: 2, rowheader: true, rowtounhide: 1 });
 
-  // Col unhide paths.
+  // Col unhide paths. At (80, 10) col resolves to 2, matching the seeded
+  // colunhideleft/colunhideright keys, but clientY=10 sits exactly at the
+  // unhide element's bottom edge (offsetHeight 10, top 0) so the strict `<`
+  // geometry check excludes it and it falls through to a plain col-select.
   editor.context.colpanes = [{ first: 1, last: 10 }];
   editor.colpositions = [0, 30, 80, 130, 180];
   editor.colwidth = [0, 30, 50, 50, 50];
   editor.context.colunhideleft = editor.context.colunhideleft || {};
   editor.context.colunhideleft[2] = unhideEl;
-  try {
-    SC.GridMousePosition(editor, 80, 10);
-  } catch {}
+  const r3 = SC.GridMousePosition(editor, 80, 10);
+  expect(r3).toMatchObject({ col: 2, colheader: true, colselect: true });
+  expect(r3.coltounhide).toBeUndefined();
+
   editor.context.colunhideright = editor.context.colunhideright || {};
   editor.context.colunhideright[2] = unhideEl;
-  try {
-    SC.GridMousePosition(editor, 80, 10);
-  } catch {}
+  const r3b = SC.GridMousePosition(editor, 80, 10);
+  expect(r3b).toMatchObject({ col: 2, colheader: true, colselect: true });
+  expect(r3b.coltounhide).toBeUndefined();
 });
 
 test("SegmentDivHit: type-A nested table paths", async () => {
@@ -1135,15 +1245,18 @@ test("CellHandlesMouseDown: all whichhandle branches", async () => {
     [30, 60], // -4 MoveI
     [30, 70], // 4 MoveIC
   ];
+  // CellHandlesMouseDown registers a document-level mousemove/mouseup pair
+  // via document.addEventListener, which this test's fresh FakeDocument does
+  // not provide by default.
+  ensureDocumentEvents();
   for (const [x, y] of cases) {
     SC.EditorMouseInfo.ignore = false;
     SC.EditorMouseInfo.editor = editor;
     editor.cellhandles.mouseDown = false;
-    try {
-      SC.CellHandlesMouseDown(
-        fakeEvent({ target: editor.cellhandles.dragpalette, clientX: x, clientY: y }),
-      );
-    } catch {}
+    SC.CellHandlesMouseDown(
+      fakeEvent({ target: editor.cellhandles.dragpalette, clientX: x, clientY: y }),
+    );
+    expect(editor.cellhandles.mouseDown).toBe(true);
     // Clean up so next iteration is fresh.
     editor.Range2Remove();
     SC.EditorMouseInfo.ignore = false;
@@ -1162,20 +1275,19 @@ test("CellHandlesMouseMove: Move/MoveC with same-coord short-circuit", async () 
   editor.cellhandles.startingY = 60;
   editor.range2 = { hasrange: true, top: 2, bottom: 2, left: 2, right: 2 };
 
-  // Move dragtype, coord unchanged from last → skip.
+  // Move dragtype, coord unchanged from last → the `result.coord !==
+  // mouselastcoord` guard skips MoveECell/RangeAnchor/RangeExtend entirely.
   editor.cellhandles.dragtype = "Move";
   SC.EditorMouseInfo.mouselastcoord = "B2";
-  try {
-    // clientX/Y that maps to the same coord.
-    SC.CellHandlesMouseMove(fakeEvent({ clientX: 80, clientY: 60 }));
-  } catch {}
+  SC.CellHandlesMouseMove(fakeEvent({ clientX: 80, clientY: 60 }));
+  expect(editor.ecell.coord).toBe("B2");
+  expect(editor.range2).toEqual({ hasrange: true, top: 2, bottom: 2, left: 2, right: 2 });
 
-  // MoveC dragtype, moving to new coord.
+  // MoveC dragtype, moving to a new coord actually runs the branch.
   editor.cellhandles.dragtype = "MoveC";
   SC.EditorMouseInfo.mouselastcoord = "B2";
-  try {
-    SC.CellHandlesMouseMove(fakeEvent({ clientX: 200, clientY: 120 }));
-  } catch {}
+  SC.CellHandlesMouseMove(fakeEvent({ clientX: 200, clientY: 120 }));
+  expect(editor.ecell.coord).toBe("C5");
 });
 
 test("ScrollTableDownOneRow: with rowspan cell", async () => {
@@ -1187,12 +1299,12 @@ test("ScrollTableDownOneRow: with rowspan cell", async () => {
   // Manually set rowspan on A1.
   const a1 = editor.context.sheetobj.cells["A1"];
   if (a1) a1.rowspan = 2;
-  try {
-    SC.ScrollTableDownOneRow(editor);
-  } catch {}
-  try {
-    SC.ScrollTableUpOneRow(editor);
-  } catch {}
+  const lastRowPane = () => editor.context.rowpanes[editor.context.rowpanes.length - 1];
+  expect(lastRowPane()).toEqual({ first: 1, last: 22 });
+  SC.ScrollTableDownOneRow(editor);
+  expect(lastRowPane()).toEqual({ first: 0, last: 21 });
+  SC.ScrollTableUpOneRow(editor);
+  expect(lastRowPane()).toEqual({ first: 1, last: 22 });
 });
 
 test("TCPS drag start with 2 panes already", async () => {
@@ -1211,15 +1323,21 @@ test("TCPS drag start with 2 panes already", async () => {
   ];
   const vctrl = editor.verticaltablecontrol;
   const hctrl = editor.horizontaltablecontrol;
+  // dobj.element must be a real DOM node with a `.style` (DragFunctionStart
+  // reads element.style.top/left): mirror the real wiring in
+  // CreateTableControl, which registers `control.thumb` as the draggable
+  // element (same fix as the TCTDragFunctionStart tests above).
   const draginfo: any = { clientX: 100, clientY: 100, offsetX: 0, offsetY: 0 };
-  const dobj: any = { vertical: true, functionobj: { control: vctrl } };
-  const dobjH: any = { vertical: false, functionobj: { control: hctrl } };
-  try {
-    SC.TCPSDragFunctionStart({}, draginfo, dobj);
-  } catch {}
-  try {
-    SC.TCPSDragFunctionStart({}, draginfo, dobjH);
-  } catch {}
+  const dobj: any = { vertical: true, element: vctrl.thumb, functionobj: { control: vctrl } };
+  const dobjH: any = { vertical: false, element: hctrl.thumb, functionobj: { control: hctrl } };
+  // TCPSDragFunctionStart creates a tracking-line div and, since 2 row/col
+  // panes already exist, immediately re-splits the pane boundary.
+  SC.TCPSDragFunctionStart({}, draginfo, dobj);
+  expect(draginfo.trackingline.id).toBe("trackingline-vertical");
+  expect(editor.context.rowpanes[1].first).toBe(editor.context.rowpanes[0].last + 1);
+  SC.TCPSDragFunctionStart({}, draginfo, dobjH);
+  expect(draginfo.trackingline.id).toBe("trackingline-horizon");
+  expect(editor.context.colpanes[1].first).toBe(editor.context.colpanes[0].last + 1);
 });
 
 test("ButtonMouseOver: swap hover across buttons", async () => {
@@ -1232,20 +1350,22 @@ test("ButtonMouseOver: swap hover across buttons", async () => {
   editor.toplevel.appendChild(b2);
   SC.ButtonRegister(editor, b1, { name: "A", normalstyle: "a", hoverstyle: "h" }, {});
   SC.ButtonRegister(editor, b2, { name: "B", normalstyle: "a", hoverstyle: "h" }, {});
-  try {
-    SC.ButtonMouseOver(fakeEvent({ target: b1 }));
-  } catch {}
-  try {
-    SC.ButtonMouseOver(fakeEvent({ target: b2 }));
-  } catch {}
-  // buttonDown true while hovering another → special path.
+  SC.ButtonMouseOver(fakeEvent({ target: b1 }));
+  expect(SC.ButtonInfo.buttonElement.name).toBe("A");
+  expect(SC.ButtonInfo.doingHover).toBe(true);
+  SC.ButtonMouseOver(fakeEvent({ target: b2 }));
+  expect(SC.ButtonInfo.buttonElement.name).toBe("B");
+  expect(SC.ButtonInfo.doingHover).toBe(true);
+  // buttonDown true while hovering another → early-return path leaves
+  // buttonElement/doingHover untouched (still "B"/true from the hover above).
   SC.ButtonInfo.buttonDown = true;
-  try {
-    SC.ButtonMouseOver(fakeEvent({ target: b1 }));
-  } catch {}
-  try {
-    SC.ButtonMouseOut(fakeEvent({ target: b2 }));
-  } catch {}
+  SC.ButtonMouseOver(fakeEvent({ target: b1 }));
+  expect(SC.ButtonInfo.buttonElement.name).toBe("B");
+  expect(SC.ButtonInfo.doingHover).toBe(true);
+  // MouseOut while buttonDown only clears doingHover, not buttonElement.
+  SC.ButtonMouseOut(fakeEvent({ target: b2 }));
+  expect(SC.ButtonInfo.buttonElement.name).toBe("B");
+  expect(SC.ButtonInfo.doingHover).toBe(false);
   SC.ButtonInfo.buttonDown = false;
 });
 
@@ -1254,42 +1374,39 @@ test("ProcessKeyPress: specialKeysFirefox + kc special match", async () => {
   const { control } = await newControl(SC, "pkp2-root");
   SC.KeyboardSetFocus(control.editor);
 
-  // Firefox special key → early return true.
-  try {
-    SC.ProcessKeyPress({ which: 0, keyCode: 40, charCode: 0 });
-  } catch {}
+  // which=0 is falsy, so ProcessKeyPress's `if (!e.which) return false;`
+  // guard fires before any Firefox/Opera-specific branch is reached.
+  const r1 = SC.ProcessKeyPress({ which: 0, keyCode: 40, charCode: 0 });
+  expect(r1).toBe(false);
   // Firefox ctrl-c via controlKeysFirefox (which=99).
-  try {
-    SC.ProcessKeyPress({
-      which: 99,
-      keyCode: 67,
-      charCode: 0,
-      ctrlKey: true,
-      preventDefault() {},
-      returnValue: false,
-    });
-  } catch {}
+  const r2 = SC.ProcessKeyPress({
+    which: 99,
+    keyCode: 67,
+    charCode: 0,
+    ctrlKey: true,
+    preventDefault() {},
+    returnValue: false,
+  });
+  expect(r2).toBe(true);
   // Opera controlKeys path.
-  try {
-    SC.ProcessKeyPress({
-      which: 67,
-      charCode: undefined,
-      keyCode: 67,
-      ctrlKey: true,
-      preventDefault() {},
-      returnValue: false,
-    });
-  } catch {}
+  const r3 = SC.ProcessKeyPress({
+    which: 67,
+    charCode: undefined,
+    keyCode: 67,
+    ctrlKey: true,
+    preventDefault() {},
+    returnValue: false,
+  });
+  expect(r3).toBe(true);
   // Opera special key (which<32).
-  try {
-    SC.ProcessKeyPress({
-      which: 13,
-      charCode: undefined,
-      keyCode: 0,
-      preventDefault() {},
-      returnValue: false,
-    });
-  } catch {}
+  const r4 = SC.ProcessKeyPress({
+    which: 13,
+    charCode: undefined,
+    keyCode: 0,
+    preventDefault() {},
+    returnValue: false,
+  });
+  expect(r4).toBe(false);
 });
 
 test("TCTDragFunctionStart: thumbstatus pre-existing removal path", async () => {
@@ -1298,7 +1415,7 @@ test("TCTDragFunctionStart: thumbstatus pre-existing removal path", async () => 
   const editor = control.editor;
   primeGridLayout(editor);
   const vctrl = editor.verticaltablecontrol;
-  const dobj: any = { vertical: true, functionobj: { control: vctrl } };
+  const dobj: any = { vertical: true, element: vctrl.thumb, functionobj: { control: vctrl } };
   // Prime draginfo with a pre-existing thumbstatus so the cleanup branch fires.
   const pre = document.createElement("div");
   pre.id = "thumbpre";
@@ -1312,9 +1429,11 @@ test("TCTDragFunctionStart: thumbstatus pre-existing removal path", async () => 
   };
   (pre as any).rowmsgele = document.createElement("div");
   (pre as any).rowpreviewele = document.createElement("div");
-  try {
-    SC.TCTDragFunctionStart({}, draginfo, dobj);
-  } catch {}
+  // The pre-existing thumbstatus (`pre`) is replaced by a fresh one created
+  // inside TCTDragFunctionStart's cleanup branch.
+  SC.TCTDragFunctionStart({}, draginfo, dobj);
+  expect(draginfo.thumbstatus).toBeDefined();
+  expect(draginfo.thumbstatus).not.toBe(pre);
 });
 
 test("DragMouseUp: with parent relative offset", async () => {
@@ -1326,6 +1445,10 @@ test("DragMouseUp: with parent relative offset", async () => {
   el.style.left = "10px";
   el.style.zIndex = "5";
   editor.toplevel.appendChild(el);
+  // DragRegister/DragMouseDown/DragMouseUp use document-level
+  // add/removeEventListener for capture, which this test's fresh
+  // FakeDocument does not provide by default.
+  ensureDocumentEvents();
   SC.DragRegister(
     el,
     true,
@@ -1338,12 +1461,12 @@ test("DragMouseUp: with parent relative offset", async () => {
     },
     editor.toplevel,
   );
-  try {
-    SC.DragMouseDown(fakeEvent({ clientX: 10, clientY: 10, target: el }));
-  } catch {}
-  try {
-    SC.DragMouseUp(fakeEvent({ clientX: 25, clientY: 20, target: el }));
-  } catch {}
+  SC.DragMouseDown(fakeEvent({ clientX: 10, clientY: 10, target: el }));
+  // DragMouseDown raises the dragged element's z-index to bring it to front...
+  expect(el.style.zIndex).toBe("100");
+  SC.DragMouseUp(fakeEvent({ clientX: 25, clientY: 20, target: el }));
+  // ...and DragMouseUp restores the original z-index it saved beforehand.
+  expect(el.style.zIndex).toBe("5");
   SC.DragUnregister(el);
 });
 
@@ -1351,36 +1474,27 @@ test("CellHandlesMouseUp: editor null returns early", async () => {
   const SC = await loadSocialCalc({ browser: true });
   await newControl(SC, "chmunu-root");
   SC.EditorMouseInfo.editor = null;
-  try {
-    SC.CellHandlesMouseUp(fakeEvent({}));
-  } catch {}
+  // Guard clause: with no active editor, this must be a safe no-op.
+  expect(() => SC.CellHandlesMouseUp(fakeEvent({}))).not.toThrow();
 });
 
 test("ProcessEditorMouseUp: editor null returns early", async () => {
   const SC = await loadSocialCalc({ browser: true });
   await newControl(SC, "pmuzb-root");
   SC.EditorMouseInfo.editor = null;
-  try {
-    SC.ProcessEditorMouseUp(fakeEvent({}));
-  } catch {}
+  // Guard clause: with no active editor, this must be a safe no-op.
+  expect(() => SC.ProcessEditorMouseUp(fakeEvent({}))).not.toThrow();
 });
 
 test("ProcessEditorColsizeMouseMove/Up: no editor (early return)", async () => {
   const SC = await loadSocialCalc({ browser: true });
   await newControl(SC, "csznone-root");
   SC.EditorMouseInfo.editor = null;
-  try {
-    SC.ProcessEditorColsizeMouseMove(fakeEvent({}));
-  } catch {}
-  try {
-    SC.ProcessEditorColsizeMouseUp(fakeEvent({}));
-  } catch {}
-  try {
-    SC.ProcessEditorRowsizeMouseMove(fakeEvent({}));
-  } catch {}
-  try {
-    SC.ProcessEditorRowsizeMouseUp(fakeEvent({}));
-  } catch {}
+  // Guard clause: with no active editor, these must be safe no-ops.
+  expect(() => SC.ProcessEditorColsizeMouseMove(fakeEvent({}))).not.toThrow();
+  expect(() => SC.ProcessEditorColsizeMouseUp(fakeEvent({}))).not.toThrow();
+  expect(() => SC.ProcessEditorRowsizeMouseMove(fakeEvent({}))).not.toThrow();
+  expect(() => SC.ProcessEditorRowsizeMouseUp(fakeEvent({}))).not.toThrow();
 });
 
 test("InputBox.Select: IE selection path", async () => {
@@ -1410,9 +1524,15 @@ test("ScrollRelativeBoth: positive + hidden col/row mix", async () => {
   const { control } = await newControl(SC, "srbm-root");
   const editor = control.editor;
   await scheduleCommands(SC, editor.context.sheetobj, ["set C hide yes", "set 3 hide yes"]);
-  try {
-    editor.ScrollRelativeBoth(2, 2);
-  } catch {}
+  const lastRowPane = () => editor.context.rowpanes[editor.context.rowpanes.length - 1];
+  const lastColPane = () => editor.context.colpanes[editor.context.colpanes.length - 1];
+  expect(lastRowPane()).toEqual({ first: 1, last: 22 });
+  expect(lastColPane()).toEqual({ first: 1, last: 8 });
+  // Requested amount is 2, but the hidden col C / row 3 skip-forward loop
+  // pushes the actual advance to 3.
+  editor.ScrollRelativeBoth(2, 2);
+  expect(lastRowPane()).toEqual({ first: 4, last: 25 });
+  expect(lastColPane()).toEqual({ first: 4, last: 10 });
 });
 
 test("ShowInputEcho: cell not found → position not set", async () => {
@@ -1442,12 +1562,11 @@ test("EditorMouseRegister + CellHandles: IE attachEvent fallback", async () => {
     parentNode: null,
   };
   editor.fullgrid = table;
-  try {
-    SC.EditorMouseRegister(editor);
-  } catch {}
-  try {
-    SC.EditorMouseUnregister(editor);
-  } catch {}
+  // This modern SocialCalc build has no IE attachEvent fallback: both
+  // registration functions call element.add/removeEventListener
+  // unconditionally, so nulling addEventListener deterministically throws.
+  expect(() => SC.EditorMouseRegister(editor)).toThrow(/addEventListener is not a function/);
+  expect(() => SC.EditorMouseUnregister(editor)).toThrow(/removeEventListener is not a function/);
 });
 
 test("MouseWheelRegister: IE attachEvent branch", async () => {
@@ -1456,9 +1575,12 @@ test("MouseWheelRegister: IE attachEvent branch", async () => {
     addEventListener: null,
     attachEvent() {},
   };
-  try {
-    SC.MouseWheelRegister(ele, { WheelMove() {} });
-  } catch {}
+  // This modern SocialCalc build has no IE attachEvent fallback:
+  // MouseWheelRegister calls element.addEventListener unconditionally, so
+  // nulling it deterministically throws.
+  expect(() => SC.MouseWheelRegister(ele, { WheelMove() {} })).toThrow(
+    /addEventListener is not a function/,
+  );
 });
 
 test("EditorSheetStatusCallback: calcstart/cmdstart/cmdend with recalc", async () => {
@@ -1469,8 +1591,11 @@ test("EditorSheetStatusCallback: calcstart/cmdstart/cmdend with recalc", async (
   editor.context.sheetobj.attribs.needsrecalc = "yes";
   editor.context.sheetobj.attribs.recalc = "auto";
   editor.recalcFunction = () => {};
-  try {
-    SC.EditorSheetStatusCallback(null, "cmdend", null, editor);
-  } catch {}
+  let recalcCalls = 0;
+  editor.recalcFunction = () => {
+    recalcCalls++;
+  };
+  SC.EditorSheetStatusCallback(null, "cmdend", null, editor);
+  expect(recalcCalls).toBe(1);
   editor.context.sheetobj.attribs.needsrecalc = "no";
 });

@@ -708,23 +708,32 @@ test("SpreadsheetControl: localization + spreadsheet control object helpers", as
   SC.SpreadsheetControlStatuslineCallback(control.editor, "calcstart", null, params);
   SC.SpreadsheetControlStatuslineCallback(control.editor, "cmdstart", null, params);
 
-  // UpdateSortRangeProposal sans range (wraps element option access).
-  try {
-    SC.UpdateSortRangeProposal(control.editor);
-  } catch {}
+  // UpdateSortRangeProposal reflects the current range selection into the
+  // sortlist option text: placeholder text with no selection, "TL:BR" once
+  // a range exists.
+  // Our DOM shim's <select>.options is an explicit array (see ui.ts), not
+  // derived from the static toolbar HTML's <option> tags, so seed it the way
+  // LoadColumnChoosers does before exercising UpdateSortRangeProposal.
+  const sortlistEle = document.getElementById(control.idPrefix + "sortlist") as HTMLSelectElement;
+  sortlistEle.options[0] = new Option("[select range]", "");
+  SC.UpdateSortRangeProposal(control.editor);
+  expect(sortlistEle.options[0].text).toBe(SC.LocalizeString("[select range]"));
   control.editor.RangeAnchor("A1");
   control.editor.RangeExtend("C3");
-  try {
-    SC.UpdateSortRangeProposal(control.editor);
-  } catch {}
+  SC.UpdateSortRangeProposal(control.editor);
+  expect(sortlistEle.options[0].text).toBe("A1:C3");
   control.editor.RangeRemove();
 
-  // LoadColumnChoosers — requires certain DOM elements; skip errors gracefully.
-  try {
-    SC.LoadColumnChoosers(control);
-  } catch {
-    // Some column chooser options aren't mounted in our minimal DOM.
-  }
+  // LoadColumnChoosers populates the major/minor/last sort column dropdowns
+  // from the control's remembered sort range ("[None]" + one option per col).
+  control.sortrange = "A1:C3";
+  SC.LoadColumnChoosers(control);
+  const majorEle = document.getElementById(control.idPrefix + "majorsort") as HTMLSelectElement;
+  const minorEle = document.getElementById(control.idPrefix + "minorsort") as HTMLSelectElement;
+  const lastEle = document.getElementById(control.idPrefix + "lastsort") as HTMLSelectElement;
+  expect(Array.from(majorEle.options).map((o) => o.value)).toEqual(["", "A", "B", "C"]);
+  expect(Array.from(minorEle.options).map((o) => o.value)).toEqual(["", "A", "B", "C"]);
+  expect(Array.from(lastEle.options).map((o) => o.value)).toEqual(["", "A", "B", "C"]);
 
   // CmdGotFocus + DoOnResize.
   SC.CmdGotFocus(null);
@@ -782,32 +791,38 @@ test("TableEditor: scroll helpers and PageRelative/ScrollRelative", async () => 
   const { control } = await newControl(SC, "sc-scroll");
   // Seed enough rows to scroll.
   await scheduleCommands(SC, control.sheet, ["set A1 value n 1", "set A20 value n 2"]);
-  // Some scroll functions were replaced with no-ops by module-wrapper-bottom
-  // when `document` was undefined at load time; wrap to ignore.
-  try {
-    control.editor.ScrollRelative(true, 1);
-  } catch {}
-  try {
-    control.editor.ScrollRelative(false, 1);
-  } catch {}
-  try {
-    control.editor.ScrollRelativeBoth(1, 1);
-  } catch {}
-  try {
-    control.editor.PageRelative(true, 1);
-  } catch {}
-  try {
-    control.editor.PageRelative(false, 1);
-  } catch {}
-  try {
-    control.editor.LimitLastPanes();
-  } catch {}
-  try {
-    control.editor.FitToEditTable();
-  } catch {}
-  try {
-    control.editor.CalculateEditorPositions();
-  } catch {}
+  const lastRowPane = () =>
+    control.editor.context.rowpanes[control.editor.context.rowpanes.length - 1];
+  const lastColPane = () =>
+    control.editor.context.colpanes[control.editor.context.colpanes.length - 1];
+
+  // ScrollRelative(vertical, amount) advances the last pane's `first` row/col
+  // by `amount` (the amount===1 fast-path in ScrollRelativeBoth).
+  expect(lastRowPane().first).toBe(1);
+  control.editor.ScrollRelative(true, 1);
+  expect(lastRowPane().first).toBe(2);
+  expect(lastColPane().first).toBe(1);
+  control.editor.ScrollRelative(false, 1);
+  expect(lastColPane().first).toBe(2);
+
+  control.editor.ScrollRelativeBoth(1, 1);
+  expect(lastRowPane().first).toBe(3);
+  expect(lastColPane().first).toBe(3);
+
+  // PageRelative(vertical, +1) seeks to editor.lastvisiblerow/lastvisiblecol,
+  // which this minimal DOM shim never populates via real layout (no
+  // getBoundingClientRect-driven pagination) — `first` collapses to null.
+  // This asserts the shim's supported contract, not real-browser behavior.
+  control.editor.PageRelative(true, 1);
+  expect(lastRowPane().first).toBeNull();
+  control.editor.PageRelative(false, 1);
+  expect(lastColPane().first).toBeNull();
+
+  // LimitLastPanes/FitToEditTable/CalculateEditorPositions must tolerate the
+  // pane state above (including the null `first`) without throwing.
+  expect(() => control.editor.LimitLastPanes()).not.toThrow();
+  expect(() => control.editor.FitToEditTable()).not.toThrow();
+  expect(() => control.editor.CalculateEditorPositions()).not.toThrow();
 });
 
 test("TableEditor: EnsureECellVisible + DisplayCellContents", async () => {
@@ -903,19 +918,34 @@ test("SpreadsheetControl: Clipboard + Settings helpers", async () => {
   SC.SpreadsheetControlClipboardFormat("csv");
   SC.SpreadsheetControlClipboardFormat("tab");
   SC.SpreadsheetControlClipboardClear();
-  const exportCb = () => {};
+  let exportCalls = 0;
+  const exportCb = () => {
+    exportCalls++;
+  };
   control.ExportCallback = exportCb;
-  try {
-    SC.SpreadsheetControlClipboardExport();
-  } catch {
-    // SetTab inside may fail on missing tabs; we swallow.
-  }
+  // ClipboardExport invokes the configured ExportCallback and returns focus
+  // to the first tab.
+  SC.SpreadsheetControlClipboardExport();
+  expect(exportCalls).toBe(1);
 
-  // Settings switch (both targets).
-  try {
-    SC.SpreadsheetControlSettingsSwitch("sheet");
-  } catch {}
-  try {
-    SC.SpreadsheetControlSettingsSwitch("cell");
-  } catch {}
+  // Settings switch (both targets) toggles which settings table/toolbar pair
+  // is visible.
+  const sheettable = document.getElementById(control.idPrefix + "sheetsettingstable") as HTMLElement;
+  const celltable = document.getElementById(control.idPrefix + "cellsettingstable") as HTMLElement;
+  const sheettoolbar = document.getElementById(
+    control.idPrefix + "sheetsettingstoolbar",
+  ) as HTMLElement;
+  const celltoolbar = document.getElementById(
+    control.idPrefix + "cellsettingstoolbar",
+  ) as HTMLElement;
+  SC.SpreadsheetControlSettingsSwitch("sheet");
+  expect(sheettable.style.display).toBe("block");
+  expect(celltable.style.display).toBe("none");
+  expect(sheettoolbar.style.display).toBe("block");
+  expect(celltoolbar.style.display).toBe("none");
+  SC.SpreadsheetControlSettingsSwitch("cell");
+  expect(sheettable.style.display).toBe("none");
+  expect(celltable.style.display).toBe("block");
+  expect(sheettoolbar.style.display).toBe("none");
+  expect(celltoolbar.style.display).toBe("block");
 });

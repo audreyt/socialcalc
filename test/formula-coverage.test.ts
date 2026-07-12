@@ -15,7 +15,9 @@ function resetFormulaGlobals(SC: any) {
     if (SC.RecalcInfo.recalctimer) {
       try {
         clearTimeout(SC.RecalcInfo.recalctimer);
-      } catch {}
+      } catch {
+        // cleanup: recalctimer may already have fired/cleared; best-effort clear only.
+      }
       SC.RecalcInfo.recalctimer = null;
     }
     SC.RecalcInfo.firstRenderScheduled = false;
