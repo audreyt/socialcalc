@@ -113,7 +113,7 @@ describe("SOCIALCALC_COVERAGE=1 vp build: dist/SocialCalc.js sourcemap", () => {
   });
 
   test("attributes a socialcalc-3.ts function to its exact original line", () => {
-    expectRoundTrip("SC.CreateSheetSave = function", "../js/socialcalc-3.ts", 873);
+    expectRoundTrip("SC.CreateSheetSave = function", "../js/socialcalc-3.ts", 891);
   });
 
   test("attributes a formula1.ts function to its exact original line", () => {
