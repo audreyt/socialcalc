@@ -304,7 +304,7 @@ async function main() {
           "",
         ].join("\n"),
       );
-      const result = run("vp", ["node", "esm-default-check.mjs"], { cwd: consumerDir });
+      const result = run(process.execPath, ["esm-default-check.mjs"], { cwd: consumerDir });
       if (result.status !== 0) {
         throw new Error(
           `native ESM default import failed (exit ${result.status}):\n${result.stdout}\n${result.stderr}`,
