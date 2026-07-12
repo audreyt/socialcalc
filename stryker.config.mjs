@@ -123,8 +123,45 @@ const testsFilter =
   process.env.MUTATE_TESTS?.trim() ??
   (isCriticalScope ? criticalTests.join(" ") : target ? targetTests.join(" ") : undefined);
 
+// Small env-parsing helper shared by the two concurrency knobs below: a
+// missing/non-numeric/non-positive override silently falls back to the
+// measured default rather than producing `--maxWorkers=NaN` or a zero/
+// negative Stryker `concurrency` (either of which would hang or no-op).
+function parsePositiveInt(value, fallback) {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : fallback;
+}
 
-const testCommand = testsFilter ? `vp test run ${testsFilter}` : "vp test";
+// Vitest's own "forks" pool defaults to using nearly every logical core for
+// a single `vp test run` invocation. Stryker's `concurrency` below then runs
+// several such invocations at once (one per in-flight mutant), so an
+// uncapped pool means `concurrency` invocations each trying to claim
+// (cores - 1) workers — e.g. 4 concurrent runs x up to 17 forks each on an
+// 18-core box, ~4x oversubscription.
+//
+// Measured 2026-07-12 against socialcalc-3.ts's 34-file/444-test subset on
+// an 18-logical-core host: a solo run with an uncapped pool took 7.9s; the
+// identical command run 4-way concurrent with an uncapped pool never
+// completed a single mutant inside the 60s+timeoutFactor budget and looped
+// on TimeoutDecorator restarts indefinitely — a timeout storm, not a slow
+// pass (see stryker.log from the 2026-07-12 20:36 socialcalc-3.ts run).
+// Capping each invocation's own pool at --maxWorkers=2 fixed it: 4-way
+// concurrent completed in ~21-23s each (8 threads/18 cores), 8-way
+// concurrent completed in ~31-33s each (16 threads/18 cores, still
+// comfortably under budget) — confirming real headroom past 4-way once
+// each invocation's internal fan-out is capped.
+//
+// Both this and `concurrency` below are env-overridable
+// (TEST_RUNNER_MAX_WORKERS, STRYKER_CONCURRENCY) so a smaller/larger CI
+// runner — or a future remeasurement — can retune without editing this
+// file. Keep their product comfortably under the host's logical core count;
+// the 2x4=8 default was measured safe on 18 cores with real headroom to
+// spare, so it is not a knife-edge tuning.
+const TEST_RUNNER_MAX_WORKERS = parsePositiveInt(process.env.TEST_RUNNER_MAX_WORKERS, 2);
+
+const testCommand = testsFilter
+  ? `vp test run --maxWorkers=${TEST_RUNNER_MAX_WORKERS} ${testsFilter}`
+  : `vp test --maxWorkers=${TEST_RUNNER_MAX_WORKERS}`;
 
 // Scope label used to namespace reports/ and the incremental cache so
 // critical/per-file/legacy-full runs never clobber or cross-pollinate each
@@ -187,8 +224,16 @@ export default {
   // and skips the broken rewrite entirely.
   tsconfigFile: "tsconfig.stryker-disabled.json",
 
-  // Always use isolated sandboxes; never mutate the caller's working tree.
-  concurrency: 4,
+  // Isolated sandboxes only; never mutate the caller's working tree.
+  // Default 4 matches the concurrency this repo's existing measured
+  // baselines (CRITICAL_BREAK_THRESHOLD above, the timeout-storm diagnosis
+  // itself) were taken at, so running with no overrides reproduces exactly
+  // what was measured. 8-way concurrency was also measured safe on an
+  // 18-logical-core host once TEST_RUNNER_MAX_WORKERS caps each invocation
+  // (see that const's comment) — override via STRYKER_CONCURRENCY on a host
+  // with cores to spare. Keep TEST_RUNNER_MAX_WORKERS * concurrency
+  // comfortably under the host's logical core count.
+  concurrency: parsePositiveInt(process.env.STRYKER_CONCURRENCY, 4),
 
   reporters: ["clear-text", "progress", "html", "json"],
   htmlReporter: { fileName: `reports/mutation/${scopeLabel}/index.html` },
