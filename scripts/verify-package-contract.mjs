@@ -37,6 +37,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
+import { exerciseCommandFormulaSaveLoad } from "./lib/sheet-smoke.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
@@ -143,60 +144,6 @@ function loadInVm(bundlePath) {
   return sandbox.SocialCalc;
 }
 
-function waitForStatus(sheet, match, trigger, timeoutMs = 4000) {
-  return new Promise((resolve, reject) => {
-    const previous = sheet.statuscallback;
-    const matches = typeof match === "function" ? match : (status) => status === match;
-    const timer = setTimeout(() => {
-      sheet.statuscallback = previous;
-      reject(new Error(`timed out waiting for status ${String(match)}`));
-    }, timeoutMs);
-    sheet.statuscallback = (...args) => {
-      previous?.(...args);
-      const status = args[1];
-      if (matches(status)) {
-        clearTimeout(timer);
-        sheet.statuscallback = previous;
-        resolve();
-      }
-    };
-    try {
-      trigger();
-    } catch (error) {
-      clearTimeout(timer);
-      sheet.statuscallback = previous;
-      reject(error);
-    }
-  });
-}
-
-async function exerciseCommandFormulaSaveLoad(SC, label) {
-  const sheet = new SC.Sheet();
-  await waitForStatus(sheet, "cmdend", () =>
-    SC.ScheduleSheetCommands(sheet, "set A1 value n 2\nset A2 value n 3\nset A3 formula A1+A2", true),
-  );
-  if (SC.RecalcInfo) {
-    SC.RecalcInfo.currentState = 0;
-    SC.RecalcInfo.queue = [];
-  }
-  await waitForStatus(sheet, "calcfinished", () => SC.RecalcSheet(sheet));
-  if (sheet.cells.A3?.datavalue !== 5) {
-    throw new Error(`[${label}] expected A3 formula A1+A2 to evaluate to 5, got ${sheet.cells.A3?.datavalue}`);
-  }
-
-  const saved = SC.CreateSheetSave(sheet);
-  if (typeof saved !== "string" || saved.length === 0) {
-    throw new Error(`[${label}] CreateSheetSave produced no output`);
-  }
-
-  const reloaded = new SC.Sheet();
-  SC.ParseSheetSave(saved, reloaded);
-  if (reloaded.cells.A3?.datavalue !== 5) {
-    throw new Error(`[${label}] round-tripped save/load lost A3's evaluated value`);
-  }
-  return `A3=5 saved ${saved.length} chars, round-trip OK`;
-}
-
 async function main() {
   const pkg = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8"));
 
@@ -204,6 +151,14 @@ async function main() {
   record("package.json declares an explicit CommonJS module type", () => {
     if (pkg.type !== "commonjs") {
       throw new Error(`expected package.json "type" to be the literal string "commonjs", got ${JSON.stringify(pkg.type)}`);
+    }
+  });
+
+  record("package.json declares an explicit engines.node floor (resolves publint's missing-engines finding)", () => {
+    if (pkg.engines?.node !== ">=22") {
+      throw new Error(
+        `expected package.json "engines.node" to be the literal string ">=22" (the maintained, CI-tested support policy — see the CI node-compat matrix job and README's Node compatibility note), got ${JSON.stringify(pkg.engines?.node)}`,
+      );
     }
   });
 

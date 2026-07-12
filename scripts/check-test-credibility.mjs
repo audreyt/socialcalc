@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Guards test *credibility*, not test source text: scans every tracked
-// `test/**/*.test.ts` file for two anti-patterns that let a test pass while
-// asserting nothing about the code under test:
+// `test/**/*.test.ts` and `e2e/**/*.spec.ts` file for two anti-patterns
+// that let a test pass while asserting nothing about the code under test:
 //
 //   1. An exact tautology: `expect(true).toBe(true)`.
 //   2. A `catch` block with no executable statements in its body — i.e. it
@@ -190,13 +190,21 @@ function splitCodeAndComments(body) {
   return { code, commentText };
 }
 
-function listTrackedTestFiles() {
+export function listTrackedTestFiles() {
   // `:(glob)` pathspec magic makes `**` match across directory boundaries
   // (plain git pathspecs treat `**` as a literal double-star otherwise).
-  const out = execFileSync("git", ["ls-files", ":(glob)test/**/*.test.ts"], {
-    cwd: repoRoot,
-    encoding: "utf8",
-  });
+  // Two globs: Vitest unit/integration tests (`test/**/*.test.ts`) and the
+  // real-browser Playwright suite (`e2e/**/*.spec.ts`). Both naming
+  // conventions already exclude generated/vendor/oracle data by
+  // construction — `test/fixtures/oracle-3.0.8/*`, `test/helpers/*.ts`,
+  // `e2e/fixtures/editor.ts`, and `e2e/server.ts` end in neither `.test.ts`
+  // nor `.spec.ts`, so they never match and never need a separate
+  // exclusion list.
+  const out = execFileSync(
+    "git",
+    ["ls-files", ":(glob)test/**/*.test.ts", ":(glob)e2e/**/*.spec.ts"],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
   return out
     .split("\n")
     .map((line) => line.trim())
@@ -209,7 +217,7 @@ function lineOf(src, index) {
   return line;
 }
 
-function checkFile(relPath) {
+export function checkFile(relPath) {
   const src = readFileSync(resolve(repoRoot, relPath), "utf8");
   const violations = [];
   const cleanupCatches = [];
@@ -287,4 +295,7 @@ function main() {
   process.exit(0);
 }
 
-main();
+// Only run as a CLI entrypoint, never on import (this module is imported
+// directly by test/check-test-credibility.test.ts to exercise
+// listTrackedTestFiles()/checkFile() without triggering process.exit()).
+if (import.meta.url === `file://${process.argv[1]}`) main();

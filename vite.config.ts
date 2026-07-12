@@ -22,10 +22,12 @@ export default defineConfig({
   test: {
     coverage: {
       // lemma/*.ts is a separate LemmaScript formal-verification facade
-      // (tested independently, never baked into dist/SocialCalc.js) — the
-      // shipping-coverage gate below measures only js/*.ts, the sources
-      // that are actually concatenated into the shipped bundle.
-      exclude: ["test/**", "lemma/**"],
+      // (tested independently, never baked into dist/SocialCalc.js), and
+      // scripts/** is dev/CI tooling (package-contract gate, credibility
+      // guard, EtherCalc canary, ...) that is likewise never bundled —
+      // the shipping-coverage gate below measures only js/*.ts, the
+      // sources that are actually concatenated into the shipped bundle.
+      exclude: ["test/**", "lemma/**", "scripts/**"],
       reporter: ["text", "lcov"],
       // Honest js/*.ts-only baseline (lemma/*.ts excluded above, since it
       // never ships in dist/SocialCalc.js) measured on tracked tests with

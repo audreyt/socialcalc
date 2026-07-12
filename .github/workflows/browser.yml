@@ -35,6 +35,9 @@ jobs:
       - name: Typecheck e2e suite (strict)
         run: vp exec tsc --noEmit -p e2e/tsconfig.json
 
+      - name: Test credibility guard (test/**/*.test.ts + e2e/**/*.spec.ts)
+        run: vp run check:test-credibility
+
       - name: Install Playwright browsers
         run: vp exec playwright install --with-deps chromium firefox webkit
 

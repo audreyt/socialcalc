@@ -137,6 +137,9 @@ jobs:
       - name: Test
         run: vp test
 
+      - name: Test credibility guard (test/**/*.test.ts + e2e/**/*.spec.ts)
+        run: vp run check:test-credibility
+
       - name: Verify Dafny models
         run: vp run verify:dafny
 
