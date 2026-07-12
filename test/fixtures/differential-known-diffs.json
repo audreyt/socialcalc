@@ -1,0 +1,23 @@
+{
+  "$comment": "Explicit registry of confirmed candidate-vs-oracle@3.0.8 behavioral differences. Every entry is reproduced by test/differential/known-intended-differences.test.ts, which reads `probe`/`expected` and executes the exact call — this file documents WHY the difference is intended, the test proves it still exists exactly as described. Do not add an entry without extending the test's api dispatch to execute its probe; if a future oracle repin shows a divergence has disappeared, delete the entry and add a parity case to the matching test/differential/*.test.ts file instead.",
+  "entries": [
+    {
+      "id": "malformed-ampm-token-crash",
+      "category": "number-date-formatting",
+      "api": "FormatNumber.formatNumberWithFormat",
+      "summary": "A malformed AM/PM format token starting with 'A' but not completing to 'AM/PM' or 'A/P' (e.g. the literal format string \"h:mm AX\") throws `ReferenceError: ampstr is not defined` on the oracle. The candidate swallows the invalid token and returns the same text it would for any other unrecognized trailing token (e.g. \"h:mm A\").",
+      "rationale": "Changes.txt (v3.1.0 — Unreleased, 'Toolchain and testing') documents: 'Removed an undeclared no-op assignment in partial AM/PM format parsing that throws under strict Node execution while preserving the existing token swallowing behavior.' The oracle's parser assigns through the correctly-scoped `ampmstr` local everywhere except one partial-match branch, which reads a never-declared `ampstr` instead — a genuine typo bug, not a supported oracle feature.",
+      "probe": { "value": "0.75", "format": "h:mm AX" },
+      "expected": { "candidateReturns": "18:00 ", "oracleThrows": true }
+    },
+    {
+      "id": "malformed-ampm-token-crash-second-letter",
+      "category": "number-date-formatting",
+      "api": "FormatNumber.formatNumberWithFormat",
+      "summary": "Same bug class as malformed-ampm-token-crash, confirmed with a second invalid trailing letter to rule out a one-off input coincidence.",
+      "rationale": "See malformed-ampm-token-crash. Not every invalid AM/PM continuation triggers the oracle's undeclared-variable read (e.g. \"h:mm AZZZ\" is parity, covered as a regression guard in test/differential/number-date-formatting.test.ts) — only specific partial-match states reach the buggy branch, so this second letter confirms the class rather than being a redundant restatement.",
+      "probe": { "value": "0.75", "format": "h:mm AY" },
+      "expected": { "candidateReturns": "18:00 ", "oracleThrows": true }
+    }
+  ]
+}

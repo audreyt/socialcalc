@@ -1,0 +1,19 @@
+{
+  "$comment": "Immutable provenance record for the checked-in socialcalc oracle bundle. Regenerate only via scripts/fetch-oracle-fixture.mjs; never hand-edit SocialCalc.bundle.txt. Stored as .txt (not .js): it's vendored third-party code, not project source, and a .js extension pulls it into vp lint's/tsc's file globs.",
+  "package": "socialcalc",
+  "version": "3.0.8",
+  "source": "https://registry.npmjs.org/socialcalc/-/socialcalc-3.0.8.tgz",
+  "npmGitHead": "952d7037f7c39f4ddd56e6d719ca7008c668769b",
+  "fetchedAt": "2026-07-12",
+  "tarball": {
+    "shasum": "d36ed7d4fac3203d5996af56a4da39e553f363a5",
+    "integrity": "sha512-2XdnQttQpNQWCJARP7cHIzzi9xo0MEAcmb3gCxM4SjmdBmia6mJZsJ4SCR5lR6kI0cb7jpq6GtaTQJEyR3ZJqw=="
+  },
+  "files": {
+    "SocialCalc.bundle.txt": {
+      "originalName": "dist/SocialCalc.js",
+      "bytes": 763155,
+      "sha256": "7901839ba8dddd6651b3587aec5bf76a73f29c0a1606f34be090a586f11b807e"
+    }
+  }
+}
