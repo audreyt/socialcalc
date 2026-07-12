@@ -758,10 +758,13 @@ FormulaMut.EvaluatePolish = function (parseinfo, revpolish, sheet, allowrangeret
 
   // look for overflow
 
-  if (valuetype.charAt(0) == "n" && (isNaN(value) || !isFinite(value))) {
-    value = 0;
-    valuetype = "e#NUM!";
-    errortext = isNaN(value) ? scc.s_calcerrnumericnan : scc.s_calcerrnumericoverflow;
+  if (valuetype.charAt(0) == "n") {
+    const numericIsNaN = isNaN(value);
+    if (numericIsNaN || !isFinite(value)) {
+      value = 0;
+      valuetype = "e#NUM!";
+      errortext = numericIsNaN ? scc.s_calcerrnumericnan : scc.s_calcerrnumericoverflow;
+    }
   }
 
   return { value: value, type: valuetype, error: errortext };
