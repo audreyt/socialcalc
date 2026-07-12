@@ -74,11 +74,17 @@ assert.match(mutation, /pattern: mutation-report-\*/);
 assert.match(mutation, /path: artifacts/);
 assert.match(mutation, /run: bun run mutate:release-gate/);
 const gate = readFileSync("scripts/mutate-release-gate.mjs", "utf8");
-assert.match(gate, /validMeasuredBaseline/);
-assert.match(gate, /GITHUB_ACTIONS === "true"\) return null/);
+assert.match(gate, /export function validMeasuredBaseline/);
+assert.match(gate, /GITHUB_ACTIONS === "true"/);
+assert.match(gate, /if \(isCI\) return null/);
 assert.match(gate, /invalid mutation report shape/);
 assert.match(gate, /mutation report contains no mutants/);
 assert.match(gate, /no fresh report found/);
+assert.match(gate, /export function evaluateFileReport/);
+assert.match(gate, /export function normalizeReportFileKey/);
+assert.match(gate, /not owned by this leg/);
+assert.match(gate, /has unrecognized status/);
+assert.match(gate, /STRYKER_MUTANT_STATUSES/);
 
 // Third-party actions are immutable commit-SHA references in both workflows.
 for (const source of [mutation, release]) {
