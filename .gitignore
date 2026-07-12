@@ -1,6 +1,7 @@
 /node_modules/
 /package-lock.json
 /dist/SocialCalc.min.js
+/dist/SocialCalc.js.map
 /coverage/
 /reports/
 /.stryker-tmp/

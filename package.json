@@ -46,7 +46,7 @@
     "typecheck": "tsc --noEmit",
     "typecheck:strict": "tsc --noEmit -p tsconfig.strict.json",
     "test": "vp build && vp test",
-    "test:coverage": "vp build && vp test --coverage",
+    "test:coverage": "SOCIALCALC_COVERAGE=1 vp build && vp test --coverage",
     "test:package-contract": "node scripts/verify-package-contract.mjs",
     "mutate": "vp exec stryker run",
     "mutate:file": "vp node stryker-file.mjs",
@@ -63,6 +63,8 @@
     "verify:both": "vp run verify:dafny && vp run verify:lean"
   },
   "devDependencies": {
+    "@jridgewell/gen-mapping": "0.3.13",
+    "@jridgewell/trace-mapping": "0.3.31",
     "@stryker-mutator/core": "^9.6.1",
     "@types/node": "24",
     "@vitest/coverage-v8": "4.1.10",

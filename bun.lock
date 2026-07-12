@@ -5,6 +5,8 @@
     "": {
       "name": "socialcalc",
       "devDependencies": {
+        "@jridgewell/gen-mapping": "0.3.13",
+        "@jridgewell/trace-mapping": "0.3.31",
         "@stryker-mutator/core": "^9.6.1",
         "@types/node": "24",
         "@vitest/coverage-v8": "4.1.10",

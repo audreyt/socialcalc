@@ -12,14 +12,35 @@
 
 import type { MinifyResult, Plugin } from "vite-plus";
 import { minify, transformWithOxc } from "vite-plus";
-import { existsSync } from "node:fs";
+import { existsSync, unlinkSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  allMappings,
+  GenMapping,
+  maybeAddMapping,
+  setSourceContent,
+  toEncodedMap,
+} from "@jridgewell/gen-mapping";
+import { eachMapping, originalPositionFor, TraceMap } from "@jridgewell/trace-mapping";
+import type { SourceMapInput } from "@jridgewell/trace-mapping";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const jsDir = join(root, "js");
 const cssDir = join(root, "css");
+const distDir = join(root, "dist");
+const bundleMapPath = join(distDir, "SocialCalc.js.map");
+
+// Coverage-only: set by `test:coverage` (`SOCIALCALC_COVERAGE=1 vp build`)
+// so `vp test --coverage` can remap executed dist/SocialCalc.js ranges back
+// to js/*.ts via ast-v8-to-istanbul's sourceMappingURL sniffing. A normal
+// `vp build`/`prepack` (this flag unset) emits byte-clean SocialCalc.js —
+// no map, no trailing comment — and deletes any stale map left on disk by
+// an earlier coverage build, so npm consumers and plain local builds never
+// see it. dist/SocialCalc.js.map is also never listed in package.json
+// "files" and is gitignored, so it can't ship even if this flag leaks.
+const coverageMode = process.env.SOCIALCALC_COVERAGE === "1";
 
 export const socialCalcBuildInput = "virtual:socialcalc-build";
 const resolvedBuildInput = `\0${socialCalcBuildInput}`;
@@ -165,17 +186,52 @@ function resolveJsSource(name: string): string {
   return name;
 }
 
-async function readJsSource(name: string): Promise<string> {
+// One resolved mapping segment: where `generatedLine`/`generatedColumn` in
+// this file's OWN emitted code (before bundle-level concatenation) traces
+// back to `originalLine`/`originalColumn` in the real js/*.ts file on disk
+// (already shifted past the preamble comment that was stripped pre-transform).
+interface ComposedMapping {
+  generatedLine: number;
+  generatedColumn: number;
+  originalLine: number;
+  originalColumn: number;
+  name: string | null;
+}
+
+// Per-file sourcemap info threaded through concatenation so v8 coverage
+// (via ast-v8-to-istanbul's sourceMappingURL sniffing in
+// @vitest/coverage-v8) can remap executed dist/SocialCalc.js ranges back
+// to the js/*.ts line/column that produced them.
+//
+// `relativeSource` is resolved against dist/ (where the bundle + its
+// .map ship side by side), matching how ast-v8-to-istanbul resolves a
+// sourcemap's `sources` entries: `path.resolve(dirname(bundleFile), source)`.
+interface CoreSourceMap {
+  relativeSource: string;
+  originalText: string;
+  entries: readonly ComposedMapping[];
+}
+
+interface CoreSource {
+  code: string;
+  map?: CoreSourceMap;
+}
+
+async function readJsSource(name: string): Promise<CoreSource> {
   const resolved = resolveJsSource(name);
   const sourcePath = join(jsDir, resolved);
   const text = await readFile(sourcePath, "utf8");
   if (!resolved.endsWith(".ts")) {
-    return text;
+    // No `.ts` sibling exists for this entry: nothing to transform, and
+    // (today, this branch is unreachable — every coreFiles entry resolves
+    // to a `.ts` sibling) no sourcemap to attribute coverage back to.
+    return { code: text };
   }
 
   const { body, preamble } = splitLeadingCommentPreamble(text);
   const transformed = await transformWithOxc(body, sourcePath, {
     target: "esnext",
+    ...(coverageMode ? { sourcemap: true } : {}),
   });
   for (const warning of transformed.warnings) {
     console.warn(warning);
@@ -187,18 +243,115 @@ async function readJsSource(name: string): Promise<string> {
     },
     compress: false,
     mangle: false,
+    ...(coverageMode ? { sourcemap: true } : {}),
   });
-  return preamble + assertMinified(sourcePath, normalized);
-}
+  const code = preamble + assertMinified(sourcePath, normalized);
+  if (!coverageMode) {
+    return { code };
+  }
+  if (!normalized.map || !transformed.map) {
+    console.warn(`No source map produced for ${sourcePath}; coverage will not attribute to this file.`);
+    return { code };
+  }
 
-async function concatCore(files: readonly string[]): Promise<string> {
-  const parts = await Promise.all(files.map((name) => readJsSource(name)));
-  return parts.join("\n");
+  // Original line where `body` starts, so mapped positions land on the
+  // real line in js/*.ts rather than in the preamble-stripped `body`.
+  const preambleLines = (text.slice(0, text.length - body.length).match(/\n/g) ?? []).length;
+
+  // Two-hop composition: normalized.map traces final code -> transformed
+  // (pre-minify) code; transformed.map traces that -> `body`. Compose them
+  // by hand instead of rolldown's `MinifyOptions.inputMap` — that field's
+  // declared type doesn't structurally match `transformWithOxc`'s own
+  // `TransformResult["map"]` in this vite-plus release (a `toUrl`-bearing
+  // Rollup-style SourceMap vs. the plain binding SourceMap data shape).
+  const bodyTrace = new TraceMap(transformed.map as unknown as SourceMapInput);
+  const intermediateTrace = new TraceMap(normalized.map as unknown as SourceMapInput);
+  // `code` is `preamble + normalized.code`, but every mapping segment's
+  // `generatedLine` is relative to `normalized.code` ALONE — offset each
+  // entry by the reconstructed preamble's own line count so `generatedLine`
+  // lands on the right line of `code` (what assembleBundle actually appends).
+  const preambleTextLines = (preamble.match(/\n/g) ?? []).length;
+  const entries: ComposedMapping[] = [];
+  eachMapping(intermediateTrace, (segment) => {
+    if (segment.source == null) return;
+    const original = originalPositionFor(bodyTrace, {
+      line: segment.originalLine,
+      column: segment.originalColumn,
+    });
+    if (original.source == null) return;
+    entries.push({
+      generatedLine: segment.generatedLine + preambleTextLines,
+      generatedColumn: segment.generatedColumn,
+      originalLine: original.line + preambleLines,
+      originalColumn: original.column,
+      name: segment.name ?? original.name,
+    });
+  });
+  if (entries.length === 0) {
+    console.warn(`Composed source map for ${sourcePath} produced no mappings; coverage will not attribute to this file.`);
+    return { code };
+  }
+
+  return {
+    code,
+    map: {
+      relativeSource: relative(distDir, sourcePath).split("\\").join("/"),
+      originalText: text,
+      entries,
+    },
+  };
 }
 
 async function concatCss(dir: string, files: readonly string[]): Promise<string> {
   const parts = await Promise.all(files.map((name) => readFile(join(dir, name), "utf8")));
   return parts.join("\n");
+}
+
+// Concatenates the UMD wrappers + core sources into the final bundle text
+// (byte-identical layout regardless of coverageMode:
+// `${umdWrapperTop}\n${file0}\n${file1}\n...\n${fileN}\n${umdWrapperBottom}`)
+// while building one combined sourcemap — only when coverageMode is on —
+// that traces every emitted range back through each file's own composed
+// mapping to js/*.ts.
+async function assembleBundle(
+  files: readonly string[],
+): Promise<{ js: string; map?: string }> {
+  const sources = await Promise.all(files.map((name) => readJsSource(name)));
+  const combined = new GenMapping({ file: "SocialCalc.js" });
+
+  let js = umdWrapperTop;
+  // 0-based count of newlines emitted so far == 1-based line number of the
+  // last line currently in `js`, minus 1.
+  let lineCursor = (umdWrapperTop.match(/\n/g) ?? []).length;
+
+  const appendChunk = (chunk: string, mapping?: CoreSourceMap) => {
+    js += "\n";
+    lineCursor += 1;
+    if (mapping) {
+      setSourceContent(combined, mapping.relativeSource, mapping.originalText);
+      for (const entry of mapping.entries) {
+        const generated = { line: lineCursor + entry.generatedLine, column: entry.generatedColumn };
+        const original = { line: entry.originalLine, column: entry.originalColumn };
+        if (entry.name) {
+          maybeAddMapping(combined, { generated, source: mapping.relativeSource, original, name: entry.name });
+        } else {
+          maybeAddMapping(combined, { generated, source: mapping.relativeSource, original });
+        }
+      }
+    }
+    js += chunk;
+    lineCursor += (chunk.match(/\n/g) ?? []).length;
+  };
+
+  for (const source of sources) {
+    appendChunk(source.code, source.map);
+  }
+  appendChunk(umdWrapperBottom);
+
+  if (!coverageMode || allMappings(combined).length === 0) {
+    return { js };
+  }
+  return { js, map: JSON.stringify(toEncodedMap(combined)) };
 }
 
 export function socialCalcBuildPlugin(): Plugin {
@@ -229,21 +382,39 @@ export function socialCalcBuildPlugin(): Plugin {
         delete bundle[fileName];
       }
 
-      const core = await concatCore(coreFiles);
-      const js = `${umdWrapperTop}\n${core}\n${umdWrapperBottom}`;
-      this.emitFile({
-        type: "asset",
-        fileName: "SocialCalc.js",
-        source: js,
-      });
-
+      const assembled = await assembleBundle(coreFiles);
+      // The minified build is derived from the undecorated bundle text —
+      // it never carries a sourceMappingURL comment or a map, whether or
+      // not coverageMode is on.
       if (emitMinified) {
-        const result = await minify("SocialCalc.min.js", js);
+        const result = await minify("SocialCalc.min.js", assembled.js);
         this.emitFile({
           type: "asset",
           fileName: "SocialCalc.min.js",
           source: assertMinified("SocialCalc.min.js", result),
         });
+      }
+
+      const js = assembled.map
+        ? `${assembled.js}//# sourceMappingURL=SocialCalc.js.map\n`
+        : assembled.js;
+      this.emitFile({
+        type: "asset",
+        fileName: "SocialCalc.js",
+        source: js,
+      });
+      if (assembled.map) {
+        this.emitFile({
+          type: "asset",
+          fileName: "SocialCalc.js.map",
+          source: assembled.map,
+        });
+      } else if (existsSync(bundleMapPath)) {
+        // A normal (non-coverage) build: delete any map left on disk by an
+        // earlier `SOCIALCALC_COVERAGE=1` build so dist/ never carries a
+        // stale, unreferenced .map next to a SocialCalc.js that no longer
+        // points at it.
+        unlinkSync(bundleMapPath);
       }
 
       this.emitFile({
