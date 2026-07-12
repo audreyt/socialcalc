@@ -1,26 +1,26 @@
 {
-  "$description": "Machine-readable disposition of Stryker mutation-testing survivors in the critical-scope modules (js/formula-parse.ts, js/formula-operand.ts, js/formula-ref.ts, js/socialcalcconstants.ts) that were reviewed and determined to be behaviorally EQUIVALENT mutants (no possible test can ever distinguish the mutant from the original for any reachable input) rather than genuine test-coverage gaps. This file is documentation only — it is NOT read by stryker.config.mjs and does NOT suppress, exclude, or hide these mutants from Stryker's own run; they still appear and count as 'Survived' in reports/mutation/<scope>/mutation.json and in the measured mutation score used to set thresholds.break. Do not add an entry here to make a score look better — every entry needs a concrete, checkable argument for why NO possible test could ever kill that mutant. See undispositionedSurvivors below for the current, honestly-counted gap this file does NOT paper over.",
-  "$schema_note": "entries[].location uses Stryker's own 1-based line/column mutant location format. Stryker reassigns numeric mutant `id`s per run, so entries[].id is NOT stable across runs and must not be used to cross-reference a fresh mutation.json — match on (file, mutatorName, location, replacement) instead, which is stable for as long as the source line doesn't move.",
+  "$description": "Machine-readable disposition of Stryker survivors reviewed as behaviorally equivalent in the three critical formula modules (js/formula-parse.ts, js/formula-operand.ts, js/formula-ref.ts). This documentation never excludes or suppresses mutants: every survivor remains counted in Stryker reports. It records ONLY proof-quality equivalence arguments for mutants explicitly listed in `entries`. It does NOT claim a survivor is 'covered' or 'killed' by a new test unless an actual fresh (or targeted incremental) Stryker rerun shows that exact mutant's status flip to Killed — a test file merely targeting a survivor is not evidence and is never enough to disposition it here. socialcalcconstants.ts is intentionally outside this critical registry and remains in the full 11-module matrix with no mutator exclusions.",
+  "$schema_note": "entries[].location uses Stryker's own 1-based line/column mutant location format. Stryker reassigns numeric mutant `id`s per run, so entries[].id is NOT stable across runs and must not be used to cross-reference a fresh mutation.json — match on (file, mutatorName, location, replacement) instead, which is stable for as long as the source line doesn't move. scripts/verify-mutation-disposition.mjs implements this exact matching and fails loudly on any Survived mutant in a fresh report that has no entry here.",
   "reviewedAt": "2026-07-12",
   "reviewedAgainst": {
-    "mutationJson": "reports/mutation/critical/mutation.json (not checked in; regenerate via `MUTATE_SCOPE=critical bun run mutate`)",
+    "mutationJson": "reports/mutation/critical/mutation.json (fresh run 2026-07-12 18:06; not checked in, regenerate via an isolated sandbox MUTATE_SCOPE=critical run — never in this working checkpoint, see the repo-level ABSOLUTE RULE against running Stryker here)",
     "measuredCriticalScope": {
-      "note": "Fresh full rerun 2026-07-12, no mutator exclusions, 4-file critical scope, 31-file deterministic test subset (see stryker.config.mjs's measurement comment for the full per-file breakdown).",
-      "total": 2119,
-      "killed": 1405,
-      "timeout": 95,
-      "survived": 619,
-      "score": "70.79%"
+      "note": "Fresh no-exclusion run after narrowing critical scope to exactly formula-parse.ts, formula-operand.ts, and formula-ref.ts; deterministic 23-file test subset.",
+      "total": 1440,
+      "killed": 1280,
+      "timeout": 88,
+      "survived": 72,
+      "score": "95.00%"
     },
-    "entriesInThisFile": 28,
-    "entriesStillSurvivedInFreshRun": 26,
-    "entriesNowKilledInFreshRun": 2,
-    "note": "All 28 entries below are confined to js/formula-parse.ts, js/formula-operand.ts, and js/formula-ref.ts. 26 still show Survived in the fresh run (expected: equivalence means no test CAN kill them). 2 now show Killed — an incidental kill from a broader test addition elsewhere; their equivalence reasoning is unaffected, they're simply no longer counted as survivors either way. A prior draft of this file claimed 33 total survivors with '5 more addressed with tests after the rerun' (id=417/830/305/1364/1365/1368) whose kills were 'not yet observed in a fresh run' — that claim was never actually re-verified against a fresh run and is retracted here; do not cite it."
+    "entriesInThisFile": 44,
+    "entriesStillSurvivedInFreshRun": 43,
+    "entriesNowKilledInFreshRun": 1,
+    "note": "Fresh report has 72 survivors. 43 of them match a proof-quality equivalence entry in this registry (27 carried over plus 16 newly reviewed this session; a 44th entry, id=476, was survived when written but is now incidentally Killed in the fresh report — left in place as a still-valid equivalence proof, not removed). The remaining 29 fresh formula-module survivors are NOT dispositioned here: new boundary/error/type/reference tests in the three survivor test files target them, but no isolated-sandbox Stryker rerun has confirmed any of the 29 actually flips to Killed, so they are UNVERIFIED gaps, not 'covered' or 'resolved' — see undispositionedSurvivors below for the exact per-file breakdown pending a real rerun. This registry does not claim zero undispositioned survivors; scripts/verify-mutation-disposition.mjs recomputes and enforces this count directly from a fresh report."
   },
   "undispositionedSurvivors": {
-    "note": "Real, currently-measured coverage gaps that are NOT reviewed for equivalence and NOT excluded from scoring. js/socialcalcconstants.ts's 548 are all StringLiteral default-value/CSS-class literals in a large data table — genuinely under-tested, not yet reviewed one by one. The critical break threshold (stryker.config.mjs's CRITICAL_BREAK_THRESHOLD) is set to the honest measured floor that includes all of these, rather than hiding them behind an exclusion or an unverified claim.",
-    "js/formula-parse.ts": 8,
-    "js/formula-operand.ts": 20,
+    "note": "Exact counts of Survived mutants with no matching entries[] tuple. The three formula-module counts below are freshly recomputed from the 2026-07-12 18:06 critical report (reports/mutation/critical/mutation.json) via scripts/verify-mutation-disposition.mjs and are real, currently-open gaps pending an isolated-sandbox rerun after the new survivor tests are verified to actually kill them — NOT claimed as covered. socialcalcconstants.ts is a separate, larger figure carried over from the full 11-module matrix (out of critical-registry scope) and is not recomputed by that script.",
+    "js/formula-operand.ts": 8,
+    "js/formula-parse.ts": 4,
     "js/formula-ref.ts": 17,
     "js/socialcalcconstants.ts": 548
   },
@@ -499,6 +499,278 @@
       },
       "replacement": "false",
       "justification": "Identical reasoning to id=476: charclass.numstart (2) is assigned to exactly one character in CharClassTable: '.'. The alpha state's own second branch (`cclass == charclass.alpha || ch == \".\"`) already intercepts every '.' character before this terminator group is ever reached, so `cclass == charclass.numstart` can never be observed true at this program point. Forcing it to `false` (removing the clause from the OR group) changes nothing for any reachable input.",
+      "file": "js/formula-parse.ts"
+    },
+    {
+      "id": 130,
+      "mutatorName": "StringLiteral",
+      "location": {
+        "end": {
+          "column": 22,
+          "line": 185
+        },
+        "start": {
+          "column": 19,
+          "line": 185
+        }
+      },
+      "replacement": "\"\"",
+      "justification": "When a coordinate points to a missing cell, this literal is assigned to cellvtype and immediately normalized by `result.type = cellvtype || \"b\"`; replacing \"b\" with the empty string therefore still selects the same fallback \"b\" for every reachable missing-cell path.",
+      "file": "js/formula-operand.ts"
+    },
+    {
+      "id": 146,
+      "mutatorName": "StringLiteral",
+      "location": {
+        "end": {
+          "column": 57,
+          "line": 222
+        },
+        "start": {
+          "column": 55,
+          "line": 222
+        }
+      },
+      "replacement": "\"Stryker was here!\"",
+      "justification": "OperandAsType returns immediately with e#REF!/0 on an empty stack or overwrites both fields from the popped operand before any return; its initial type literal is never observed.",
+      "file": "js/formula-operand.ts"
+    },
+    {
+      "id": 147,
+      "mutatorName": "StringLiteral",
+      "location": {
+        "end": {
+          "column": 68,
+          "line": 222
+        },
+        "start": {
+          "column": 66,
+          "line": 222
+        }
+      },
+      "replacement": "\"Stryker was here!\"",
+      "justification": "OperandAsType returns immediately with e#REF!/0 on an empty stack or overwrites both fields from the popped operand before any return; its initial value literal is never observed.",
+      "file": "js/formula-operand.ts"
+    },
+    {
+      "id": 169,
+      "mutatorName": "StringLiteral",
+      "location": {
+        "end": {
+          "column": 57,
+          "line": 257
+        },
+        "start": {
+          "column": 55,
+          "line": 257
+        }
+      },
+      "replacement": "\"Stryker was here!\"",
+      "justification": "OperandsAsCoordOnSheet overwrites value1.value from the popped operand before reading it; the initial value literal cannot reach any return.",
+      "file": "js/formula-operand.ts"
+    },
+    {
+      "id": 170,
+      "mutatorName": "StringLiteral",
+      "location": {
+        "end": {
+          "column": 68,
+          "line": 257
+        },
+        "start": {
+          "column": 66,
+          "line": 257
+        }
+      },
+      "replacement": "\"Stryker was here!\"",
+      "justification": "OperandsAsCoordOnSheet overwrites value1.value from the popped operand before reading it; the initial value literal cannot reach any return.",
+      "file": "js/formula-operand.ts"
+    },
+    {
+      "id": 172,
+      "mutatorName": "StringLiteral",
+      "location": {
+        "end": {
+          "column": 57,
+          "line": 258
+        },
+        "start": {
+          "column": 55,
+          "line": 258
+        }
+      },
+      "replacement": "\"Stryker was here!\"",
+      "justification": "OperandsAsCoordOnSheet overwrites value1.type from the popped operand before reading it; the initial type literal cannot reach any return.",
+      "file": "js/formula-operand.ts"
+    },
+    {
+      "id": 173,
+      "mutatorName": "StringLiteral",
+      "location": {
+        "end": {
+          "column": 68,
+          "line": 258
+        },
+        "start": {
+          "column": 66,
+          "line": 258
+        }
+      },
+      "replacement": "\"Stryker was here!\"",
+      "justification": "OperandsAsCoordOnSheet overwrites value1.type from the popped operand before reading it; the initial type literal cannot reach any return.",
+      "file": "js/formula-operand.ts"
+    },
+    {
+      "id": 236,
+      "mutatorName": "StringLiteral",
+      "location": {
+        "end": {
+          "column": 57,
+          "line": 323
+        },
+        "start": {
+          "column": 55,
+          "line": 323
+        }
+      },
+      "replacement": "\"Stryker was here!\"",
+      "justification": "OperandsAsRangeOnSheet overwrites value2.value from the popped operand before reading it; the initial value literal cannot reach any return.",
+      "file": "js/formula-operand.ts"
+    },
+    {
+      "id": 237,
+      "mutatorName": "StringLiteral",
+      "location": {
+        "end": {
+          "column": 68,
+          "line": 323
+        },
+        "start": {
+          "column": 66,
+          "line": 323
+        }
+      },
+      "replacement": "\"Stryker was here!\"",
+      "justification": "OperandsAsRangeOnSheet overwrites value2.type from the popped operand before reading it; the initial type literal cannot reach any return.",
+      "file": "js/formula-operand.ts"
+    },
+    {
+      "id": 290,
+      "mutatorName": "StringLiteral",
+      "location": {
+        "end": {
+          "column": 57,
+          "line": 381
+        },
+        "start": {
+          "column": 55,
+          "line": 381
+        }
+      },
+      "replacement": "\"Stryker was here!\"",
+      "justification": "OperandAsSheetName overwrites result.value from the popped operand before any branch can observe the initializer; the initial value literal cannot reach any return.",
+      "file": "js/formula-operand.ts"
+    },
+    {
+      "id": 291,
+      "mutatorName": "StringLiteral",
+      "location": {
+        "end": {
+          "column": 68,
+          "line": 381
+        },
+        "start": {
+          "column": 66,
+          "line": 381
+        }
+      },
+      "replacement": "\"Stryker was here!\"",
+      "justification": "OperandAsSheetName overwrites result.type from the popped operand before any branch can observe the initializer; the initial type literal cannot reach any return.",
+      "file": "js/formula-operand.ts"
+    },
+    {
+      "id": 327,
+      "mutatorName": "StringLiteral",
+      "location": {
+        "end": {
+          "column": 24,
+          "line": 412
+        },
+        "start": {
+          "column": 22,
+          "line": 412
+        }
+      },
+      "replacement": "\"Stryker was here!\"",
+      "justification": "For a missing coordinate cell, this value is assigned and then immediately overwritten by the final non-text branch with the empty string before return; replacing the earlier assignment is unobservable.",
+      "file": "js/formula-operand.ts"
+    },
+    {
+      "id": 350,
+      "mutatorName": "StringLiteral",
+      "location": {
+        "end": {
+          "column": 15,
+          "line": 57
+        },
+        "start": {
+          "column": 13,
+          "line": 57
+        }
+      },
+      "replacement": "\"Stryker was here!\"",
+      "justification": "ParseFormulaIntoTokens assigns str from the first character before any read on every non-empty input; for empty input it is never read, so replacing its initializer cannot affect output.",
+      "file": "js/formula-parse.ts"
+    },
+    {
+      "id": 352,
+      "mutatorName": "StringLiteral",
+      "location": {
+        "end": {
+          "column": 20,
+          "line": 60
+        },
+        "start": {
+          "column": 18,
+          "line": 60
+        }
+      },
+      "replacement": "\"Stryker was here!\"",
+      "justification": "twochrop is assigned from last_token_text + str immediately before every read; its initializer is never observed.",
+      "file": "js/formula-parse.ts"
+    },
+    {
+      "id": 365,
+      "mutatorName": "StringLiteral",
+      "location": {
+        "end": {
+          "column": 14,
+          "line": 67
+        },
+        "start": {
+          "column": 12,
+          "line": 67
+        }
+      },
+      "replacement": "\"Stryker was here!\"",
+      "justification": "At EOF, ch is only used in branches selected by cclass; every EOF branch either ignores ch or takes a fixed error/token path without reading its value, so replacing the EOF initializer is unobservable.",
+      "file": "js/formula-parse.ts"
+    },
+    {
+      "id": 660,
+      "mutatorName": "StringLiteral",
+      "location": {
+        "end": {
+          "column": 34,
+          "line": 250
+        },
+        "start": {
+          "column": 29,
+          "line": 250
+        }
+      },
+      "replacement": "\"\"",
+      "justification": "The no-operand/empty-stack initializer is overwritten by the popped operand or by the fixed e#REF!/0 empty-stack return before any return can observe it.",
       "file": "js/formula-parse.ts"
     }
   ]

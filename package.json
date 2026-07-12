@@ -59,6 +59,8 @@
     "mutate:formula": "vp node stryker-file.mjs js/formula1.ts",
     "mutate:all": "vp node scripts/mutate-all.mjs",
     "mutate:release-gate": "vp node scripts/mutate-release-gate.mjs",
+    "test:mutation-workflow": "vp exec node scripts/verify-mutation-workflow.mjs",
+    "test:mutation-disposition": "vp exec node scripts/verify-mutation-disposition.mjs",
     "verify": "lsc check --backend=dafny",
     "verify:dafny": "lsc check --backend=dafny",
     "verify:dafny:gen": "lsc gen --backend=dafny",

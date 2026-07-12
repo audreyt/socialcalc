@@ -3,12 +3,15 @@ name: Mutation
 # Two mutation-testing gates (see stryker.config.mjs for the full design
 # rationale):
 #
-# - critical (MUTATE_SCOPE=critical): 4 release-critical modules
-#   (formula-parse.ts, formula-operand.ts, formula-ref.ts,
-#   socialcalcconstants.ts) against a deterministic ~31-file test subset, in
-#   one process. Small and fast enough to gate a PR; thresholds.break is a
-#   real number measured from an actual run (see stryker.config.mjs's
-#   CRITICAL_BREAK_THRESHOLD comment), not guessed.
+# - critical (MUTATE_SCOPE=critical): 3 release-critical modules (pure
+#   formula lexer/parser/operand-stack/reference algebra: formula-parse.ts,
+#   formula-operand.ts, formula-ref.ts) against a deterministic 23-file test
+#   subset, in one process. socialcalcconstants.ts is deliberately NOT in
+#   this set (see stryker.config.mjs's CRITICAL_FILES comment) and stays
+#   covered only by the full 11-module per-file matrix below. Small and fast
+#   enough to gate a PR; thresholds.break is a real number measured from an
+#   actual run (see stryker.config.mjs's CRITICAL_BREAK_THRESHOLD comment),
+#   not guessed.
 # - full (MUTATE_TARGET set per leg): all 11 shipping modules, gated
 #   individually as a GitHub Actions matrix — one job per module, each
 #   mutating only that module against the exact test subset
@@ -94,7 +97,19 @@ on:
         default: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # A literal "mutation-" prefix, NOT `${{ github.workflow }}`: like
+  # `github.event_name` (see the job `if:` conditions below), `github.workflow`
+  # is inherited from the CALLER when this file runs via `workflow_call` — it
+  # resolves to the calling workflow's own `name:` (e.g. "Release"), not this
+  # file's. Reusing it here would make this workflow's concurrency group
+  # collide with release.yml's own group whenever release.yml's group also
+  # embeds its workflow name (concurrency group names compare
+  # case-insensitively, so "Release-<ref>" collides with a
+  # "release-<ref>"-style group too) — the called mutation workflow would
+  # then queue behind its own caller, which is itself blocked on this run
+  # finishing via `needs:`, deadlocking the release. A literal, distinct
+  # prefix can never collide with whatever release.yml names its own group.
+  group: mutation-${{ github.ref }}
   # Never cancel a run that might be the evidence a release's publish job is
   # waiting on (or a nightly/PR run someone is about to read the report
   # from) — a cancelled run is neither "measured" nor "unmeasured", it's
@@ -107,15 +122,23 @@ permissions:
   contents: read
 
 jobs:
-  # Deterministic, focused, PR-blocking gate. Only the 4 release-critical
+  # Deterministic, focused, PR-blocking gate. Only the 3 release-critical
   # modules, only the tests that actually exercise them (stryker-file.mjs's
   # testsByFile) — same inputs every run, no full-suite noise.
   critical:
     name: mutation (critical scope, PR gate)
+    # `github.event_name` is reliable for a genuine top-level `pull_request`
+    # run, but NOT for detecting "called via workflow_call": a reusable
+    # workflow inherits the CALLER's event_name (e.g. release.yml's own
+    # trigger), so `github.event_name == 'workflow_call'` never matches and
+    # would silently skip this job on every release call — the exact bug
+    # fixed here. `inputs.scope` is populated identically by the unified
+    # `inputs` context for BOTH workflow_dispatch and workflow_call
+    # (defaulted from `on:` when the caller doesn't override it), so gating
+    # on its value directly works regardless of who's calling.
     if: >-
       github.event_name == 'pull_request' ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.scope == 'critical') ||
-      (github.event_name == 'workflow_call' && inputs.scope == 'critical')
+      inputs.scope == 'critical'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -153,10 +176,17 @@ jobs:
   # knows how to test gets its own gated leg below, none silently dropped.
   mutate-discover:
     name: mutation (full scope, discover modules)
+    # Same fix as `critical` above: gate on `inputs.scope` directly instead
+    # of an unreachable `github.event_name == 'workflow_call'` branch.
+    # `inputs.scope == 'full'` (not `!= 'critical'`) is deliberate: on a bare
+    # `pull_request`/`schedule` run there IS no `inputs` context at all, so
+    # `inputs.scope` is null — `null != 'critical'` is true (null coerces to
+    # "" for the string comparison), which would wrongly fire this job on
+    # every PR. `inputs.scope == 'full'` is false for that same null, so PR
+    # runs correctly fall through to only the `critical` job above.
     if: >-
       github.event_name == 'schedule' ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.scope != 'critical') ||
-      (github.event_name == 'workflow_call' && inputs.scope != 'critical')
+      inputs.scope == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -239,7 +269,16 @@ jobs:
   release-gate:
     name: mutation (release gate — all 11 modules measured?)
     needs: mutate-full
-    if: always() && github.event_name == 'workflow_call' && inputs.enforce_release == true
+    # `inputs.enforce_release` alone is enough to scope this to a real
+    # workflow_call with `enforce_release: true`: that input only exists
+    # under `on: workflow_call: inputs:` (workflow_dispatch has no such
+    # input), so it's null — and `null == true` is false — on every
+    # standalone PR/schedule/manual-dispatch run. The old
+    # `github.event_name == 'workflow_call'` conjunct never matched (see
+    # `critical`'s comment above) and made this condition permanently false,
+    # which would have silently skipped the release gate on every real
+    # release call — the release-blocking half of the same bug.
+    if: always() && inputs.enforce_release == true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

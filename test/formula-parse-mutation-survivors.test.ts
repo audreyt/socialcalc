@@ -461,3 +461,31 @@ describe("id=830: precedence while-loop must not pop non-op entries from parsest
     expect(SC.Formula.ConvertInfixToPolish(tokens)).toEqual([-1, -1, 1, -1, 3, 2, 0]);
   });
 });
+
+
+// --------------------------------------------------------------------------
+// Fresh no-exclusion survivors: regex anchoring and comparison-token spelling.
+// --------------------------------------------------------------------------
+
+describe("fresh parse survivors", () => {
+  test("fresh id341: a trailing in-coordinate marker is not accepted as a coord", async () => {
+    const SC = await loadSocialCalc();
+    const tokens = SC.Formula.ParseFormulaIntoTokens("A1$");
+    // Full-string anchoring (trailing `$`) means a full coordregex match
+    // fails, so this pushes a "name" token, never "coord" — the mutant
+    // (dropped `$` end anchor) accepts the "A1" prefix and pushes "coord".
+    expect(tokens).toEqual([{ text: "A1$", type: SC.Formula.TokenType.name, opcode: 0 }]);
+  });
+
+  test("fresh id718/id725/id728: comparison operators carry their canonical opcode, not just token text", async () => {
+    const SC = await loadSocialCalc();
+    // `str` (-> token.text, L278/281/284) and `ch` (-> token.opcode via
+    // pushtoken's 4th arg, L279/282/285) are set independently right next to
+    // each other; id718/725/728 mutate only the `ch` assignments, which
+    // text-only assertions on token.text never observe.
+    const opcodeOf = (formula: string) => SC.Formula.ParseFormulaIntoTokens(formula)[1]!.opcode;
+    expect(opcodeOf("A1>=B1")).toBe("G");
+    expect(opcodeOf("A1<=B1")).toBe("L");
+    expect(opcodeOf("A1<>B1")).toBe("N");
+  });
+});

@@ -271,3 +271,71 @@ test("id305: circular name reference returns e#NAME? error, not bare name", asyn
   expect(r.type).not.toBe("name");
   expect(r.error).toBeTruthy();
 });
+
+
+// ---------------------------------------------------------------------------
+// Fresh no-exclusion survivors: observable defaults, coercions, and errors.
+// ---------------------------------------------------------------------------
+
+test("fresh id3/id8: empty TopOfStackValueAndType preserves blank type/value and error text", async () => {
+  const { SC, sheet } = await fresh();
+  const r = SC.Formula.TopOfStackValueAndType(sheet, []);
+  expect(r).toMatchObject({ type: "", value: "" });
+  expect(r.error).toBe(`${SC.Constants.s_InternalError}no operand on stack`);
+});
+
+test("fresh id86/id91: empty OperandValueAndType preserves blank type/value and error text", async () => {
+  const { SC, sheet } = await fresh();
+  const r = SC.Formula.OperandValueAndType(sheet, []);
+  expect(r).toMatchObject({ type: "", value: "" });
+  expect(r.error).toBe(`${SC.Constants.s_InternalError}no operand on stack`);
+});
+
+test("fresh id65: numeric OperandAsText fallback stringifies when formatter is absent", async () => {
+  const { SC, sheet } = await fresh();
+  const original = SC.format_number_for_display;
+  try {
+    Reflect.set(SC, "format_number_for_display", undefined);
+    const r = SC.Formula.OperandAsText(sheet, [{ type: "n", value: 12.5 }]);
+    expect(r).toEqual({ type: "t", value: "12.5" });
+  } finally {
+    Reflect.set(SC, "format_number_for_display", original);
+  }
+});
+
+test("fresh id81: unknown OperandAsText type still stringifies the operand", async () => {
+  const { SC, sheet } = await fresh();
+  const r = SC.Formula.OperandAsText(sheet, [{ type: "x", value: 12.5 }]);
+  expect(r).toEqual({ type: "t", value: "12.5" });
+});
+
+test("missing coord resolves to blank type rather than an empty type", async () => {
+  const { SC, sheet } = await fresh();
+  const r = SC.Formula.OperandValueAndType(sheet, [{ type: "coord", value: "A1" }]);
+  expect(r).toMatchObject({ type: "b", value: 0 });
+});
+
+test("fresh id134: a cell with an empty valuetype still falls back to blank type 'b'", async () => {
+  const { SC, sheet } = await fresh();
+  // A directly-poked cell with valuetype "" is falsy but truthy `cell`, so
+  // L182's `cellvtype = cell.valuetype` yields "" (not the L185 "b" default,
+  // which only fires when `cell` itself is absent). That makes L187's
+  // `cellvtype || "b"` fallback the ONLY place "b" can still come from,
+  // isolating id134 (StringLiteral "b" -> "") from the already-equivalent
+  // id130 (StringLiteral "b" -> "" on L185, unreachable there since a
+  // present-but-blank-valuetype cell never executes L185 at all).
+  sheet.cells["A1"] = { datavalue: "leftover", valuetype: "" } as SCBundle.Cell;
+  const r = SC.Formula.OperandValueAndType(sheet, [{ type: "coord", value: "A1" }]);
+  expect(r.type).toBe("b");
+  expect(r.value).toBe(0);
+});
+
+test("fresh id200: unavailable sheet error includes the sheet name separator", async () => {
+  const { SC, sheet } = await fresh();
+  const r = SC.Formula.OperandsAsCoordOnSheet(sheet, [
+    { type: "t", value: "MISSING" },
+    { type: "coord", value: "A1" },
+  ]);
+  expect(r.type).toBe("e#REF!");
+  expect(r.error).toBe(`${SC.Constants.s_sheetunavailable} MISSING`);
+});

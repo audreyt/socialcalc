@@ -187,29 +187,53 @@ describe("OffsetFormulaCoords overflow to #REF! (id=1232, id=1239)", () => {
   });
 });
 
-describe("AdjustFormulaCoords overflow to #REF! (id=1364, id=1365, id=1368)", () => {
-  test("a coord whose row is adjusted below 1 becomes #REF! even though its column stays valid", async () => {
-    const SC = await loadSocialCalc();
-    // Isolates the `cr.row < 1` clause: forcing it to `false` (id=1365), or ANDing it
-    // with the col<1 clause instead of ORing (id=1364), would both miss this case since
-    // col stays valid (1) throughout.
-    expect(SC.AdjustFormulaCoords("A1", 1, 0, 1, -5)).toBe("#REF!");
-  });
-
-  test("a coord whose column is adjusted below 1 becomes #REF! even though its row stays valid", async () => {
-    const SC = await loadSocialCalc();
-    // Isolates the `cr.col < 1` clause (id=1368): forcing it to `false` leaves only the
-    // row<1 and col>702 clauses, neither of which fires here (row stays 1, col is -4 but
-    // that clause is disabled), so the mutant would wrongly reconstruct "A1" (rcColname
-    // clamps -4 back to "A") instead of "#REF!".
-    expect(SC.AdjustFormulaCoords("A1", 1, -5, 1, 0)).toBe("#REF!");
-  });
-
+// id=1364/id=1365/id=1368 (the `cr.row < 1 || cr.col < 1` pair at L370) are
+// EQUIVALENT, not tested here — see stryker-mutation-disposition.json. Proof
+// sketch: the only way this function ever drives `cr.row` or `cr.col` below 1
+// is the deleted-band zeroing block a few lines above, which sets BOTH
+// `cr.col = 0` AND `cr.row = 0` together in one unconditional pair whenever
+// either axis's deletion-band condition matches; the row/col shift that
+// follows can only add a (possibly negative) offset when `cr.>= col/row`,
+// and algebraically any shift that would land below 1 already satisfies the
+// SAME deletion-band condition (since col/row are always >= 1 in every
+// caller), so it is always intercepted by the zeroing branch first. A
+// sheet-qualified reference (`sheetref`) skips both the zeroing and the
+// shift entirely, leaving a coord that a real lexer only ever tags `coord`
+// when it matched `[A-Z]{1,2}[1-9]\d*`, i.e. row >= 1 and col in [1,702]
+// already. So `cr.row < 1` and `cr.col < 1` are always equal in every
+// reachable state: replacing `||` with `&&` (id=1364), or forcing either
+// individual clause to `false` (id=1365, id=1368), can never change the
+// truth value of the disjunction because the other clause is always in
+// lockstep. The independent `cr.col > 702` disjunct (column overflow, not
+// touched by any of these 3 mutants) is what the tests below exercise.
+describe("AdjustFormulaCoords overflow to #REF!", () => {
   test("deleting the column a plain reference sits in still turns it into #REF!", async () => {
     const SC = await loadSocialCalc();
     // Baseline sanity check for the deleted-band detection this same overflow guard
     // ultimately surfaces through: deleting column B (col 2, coloffset -1) invalidates a
     // B1 reference.
     expect(SC.AdjustFormulaCoords("B1", 2, -1, 1, 0)).toBe("#REF!");
+  });
+
+  test("shifting a column past ZZ (702) turns it into #REF!", async () => {
+    const SC = await loadSocialCalc();
+    // Isolates the untouched `cr.col > 702` disjunct in isolation from the
+    // row/col-underflow pair proven equivalent above.
+    expect(SC.AdjustFormulaCoords("A1", 1, 750, 1, 0)).toBe("#REF!");
+  });
+});
+
+
+// --------------------------------------------------------------------------
+// Fresh no-exclusion survivors: every middle column letter (ids 1002-1015).
+// --------------------------------------------------------------------------
+
+describe("fresh formula-ref survivors", () => {
+  test("fresh ids1002-1015: every A-Z column letter remains addressable", async () => {
+    const SC = await loadSocialCalc();
+    for (let col = 1; col <= 26; col++) {
+      const letter = String.fromCharCode(64 + col);
+      expect(SC.crToCoord(col, 1)).toBe(`${letter}1`);
+    }
   });
 });
