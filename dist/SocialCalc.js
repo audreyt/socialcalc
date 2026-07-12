@@ -16943,7 +16943,7 @@ PopupMut.RGBToHex = function(val) {
 	}
 	var rgbvals = val.match(/(-?\d+)\D+(-?\d+)\D+(-?\d+)/);
 	if (rgbvals) {
-		return sp.ToHex(PopupClamp255(Number(rgbvals[1]))) + sp.ToHex(PopupClamp255(Number(rgbvals[2]))) + sp.ToHex(PopupClamp255(Number(rgbvals[3])));
+		return sp.ToHex(Number(rgbvals[1])) + sp.ToHex(Number(rgbvals[2])) + sp.ToHex(Number(rgbvals[3]));
 	} else {
 		return "000000";
 	}

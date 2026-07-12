@@ -532,17 +532,7 @@ PopupMut.DestroyPopupDiv = function (
 // Color Utility Functions
 //
 
-/**
- * File-private 8-bit channel clamp shared by ToHex, makeRGB, splitRGB, and
- * RGBToHex's parse layer so all four share one integer-rounding policy:
- *   - non-finite or <0  -> 0
- *   - >255               -> 255
- *   - otherwise          -> Math.trunc(v) (explicit integer rounding)
- * Hoisted out of per-call allocation so splitRGB/etc. don't recreate an
- * inner closure on each invocation. Not exported on SocialCalc.Popup —
- * this is a script-local color normalization helper, not part of the
- * public type surface.
- */
+// Shared file-private normalization for RGB channels.
 function PopupClamp255(v: number): number {
   if (!Number.isFinite(v) || v < 0) return 0;
   if (v > 255) return 255;
@@ -559,16 +549,13 @@ PopupMut.RGBToHex = function (val: string) {
   if (val == "") {
     return "000000";
   }
-  // Capture optional leading sign so "(−5, 0, 0)" no longer parses the
-  // trailing digit "5" as "+5"; each channel is normalized through the
-  // shared PopupClamp255 helper at the parse boundary before ToHex does
-  // its own final clamp (cheap, explicit parity at every consumer).
+  // Preserve a leading minus; ToHex is the normalization boundary.
   var rgbvals = val.match(/(-?\d+)\D+(-?\d+)\D+(-?\d+)/);
   if (rgbvals) {
     return (
-      sp.ToHex(PopupClamp255(Number(rgbvals[1]))) +
-      sp.ToHex(PopupClamp255(Number(rgbvals[2]))) +
-      sp.ToHex(PopupClamp255(Number(rgbvals[3])))
+      sp.ToHex(Number(rgbvals[1])) +
+      sp.ToHex(Number(rgbvals[2])) +
+      sp.ToHex(Number(rgbvals[3]))
     );
   } else {
     return "000000";
