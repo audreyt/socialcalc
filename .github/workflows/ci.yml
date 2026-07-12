@@ -48,6 +48,28 @@ jobs:
           vp pm pack --out /tmp/socialcalc.tgz
           tar -tzf /tmp/socialcalc.tgz package/dist/SocialCalc.min.js
 
+  coverage:
+    name: source-attributed coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@e1609b468742ba9232ce5e12b3a77bdf14495277
+        with:
+          cache: true
+
+      - name: Install dependencies
+        run: vp install --frozen-lockfile
+
+      - name: Duplicate-bundle coverage attribution regression
+        run: vp run check:coverage-attribution
+
+      - name: Source-attributed coverage (per-file + global floors)
+        run: vp run test:coverage
+
   node-compat:
     name: Node.js runtime compatibility (${{ matrix.node-version }})
     runs-on: ubuntu-latest

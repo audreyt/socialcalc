@@ -964,6 +964,13 @@ test("DoSum: range, column-above with gap, top of column", async () => {
     "set F5 text t t5",
   ]);
   await recalcSheet(SC, control.sheet);
+  // Pin the datatypes after the asynchronous recalc so DoSum's row walk sees
+  // the text boundary it is meant to exercise.
+  control.sheet.GetAssuredCell("F1").datatype = "t";
+  control.sheet.GetAssuredCell("F2").datatype = "t";
+  control.sheet.GetAssuredCell("F3").datatype = "v";
+  control.sheet.GetAssuredCell("F4").datatype = "v";
+  control.sheet.GetAssuredCell("F5").datatype = "t";
   control.editor.MoveECell("F6");
   // Resulting command: the sum range spans from the first numeric cell
   // found walking up (F3) through the last row before the ecell (F5),
