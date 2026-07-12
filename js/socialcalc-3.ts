@@ -5694,27 +5694,25 @@ SC.encodeForSave = function (s: any) {
 //
 // Validates rawurl against an allowlist of URL schemes (and, for "data:"
 // URLs, an allowlist of MIME types) before it is used as an href/src
-// attribute value. Returns an encoded, safe URL, or null if rawurl must not
-// be rendered as an active link/image target.
+// attribute value. Returns an HTML-attribute-safe, encoded URL, or null if
+// rawurl must not be rendered as an active link/image target.
 //
 // Only consulted by rendering code when SocialCalc.Callbacks.untrustedContent
 // is true; see SocialCalc.Callbacks.securityPolicy for the default policy.
 //
-// Lookup tables are built on null-prototype objects so a scheme/mime value
-// like "__proto__" or "constructor" is just an ordinary rejected key, never
-// a prototype-chain mutation.
+// Scheme/MIME membership is checked with a plain indexed loop and strict
+// (case-normalized) string equality against the small, host-supplied
+// policy arrays - never a property/bracket lookup keyed by the candidate
+// string. Equality comparison has no notion of "own property" vs.
+// "inherited from Object.prototype", so a value like "__proto__" or
+// "constructor" is just an ordinary string that fails to equal any real
+// allowlist entry; there is no lookup object to pollute or shadow.
 //
 
 SC.SafeUrlForRender = function (
   rawurl: string,
   policy: SocialCalc.RenderSecurityPolicy = SocialCalc.Callbacks.securityPolicy,
 ): string | null {
-  const allowedSchemes: Record<string, true> = Object.create(null);
-  for (const scheme of policy.allowedUrlSchemes) allowedSchemes[scheme.toLowerCase()] = true;
-
-  const allowedDataMimeTypes: Record<string, true> = Object.create(null);
-  for (const mime of policy.allowedDataMimeTypes) allowedDataMimeTypes[mime.toLowerCase()] = true;
-
   // Mirror the browser URL parser: strip ASCII tab/newline/CR from anywhere,
   // then leading/trailing C0 controls and spaces, before looking for a
   // scheme. Closes bypasses like "java\tscript:alert(1)". Validation and
@@ -5735,9 +5733,32 @@ SC.SafeUrlForRender = function (
     return null; // malformed encoding (e.g., an unpaired surrogate) - fail closed
   }
 
+  // encodeURI deliberately leaves "&", "#", ";" (and other RFC 3986
+  // reserved/mark characters) untouched - it only percent-encodes what
+  // would otherwise be an invalid URI character, not what would be unsafe
+  // inside an HTML attribute. Every caller of this function places the
+  // result inside href="..."/src="...". If a literal "&" survives here, an
+  // HTML entity reference such as "&#58;" (":"), "&#x61;" ("a"), or
+  // "&quot;" ('"') looks like harmless non-scheme text to the checks
+  // below, passes validation, and is then decoded by the BROWSER'S HTML
+  // PARSER - independently of any URL parsing - into a live "javascript:"
+  // scheme or a quote that breaks out of the attribute into a new one
+  // (e.g. onmouseover=). HTML-escaping the already percent-encoded string
+  // closes this: it must happen on every accepted return path below,
+  // including the schemeless/relative and "data:" branches, and it must
+  // be the LAST step, after scheme/mime validation (which still inspects
+  // the un-escaped `stripped`/`afterScheme` values). A legitimate "&" in
+  // e.g. a query string ("?a=1&b=2") becomes "&amp;", which the browser
+  // decodes back to a literal "&" for the actual href/src - so real URL
+  // semantics are unchanged - but an attacker's literal "&#58;" becomes
+  // "&amp;#58;", which decodes to the inert text "&#58;" (entity decoding
+  // is one pass, not recursive), never reinterpreted as a colon. Computed
+  // once here and reused on every accepted return path below.
+  const htmlSafe = SocialCalc.special_chars(encoded);
+
   const schemeMatch = stripped.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/);
   if (!schemeMatch) {
-    return encoded; // no scheme: relative/path-only URL, cannot invoke a scheme handler
+    return htmlSafe; // no scheme: relative/path-only URL, cannot invoke a scheme handler
   }
 
   const scheme = schemeMatch[1].toLowerCase() + ":";
@@ -5746,10 +5767,19 @@ SC.SafeUrlForRender = function (
     const afterScheme = stripped.slice(schemeMatch[0].length);
     const mimeMatch = afterScheme.match(/^([^,;]*)/);
     const mime = mimeMatch ? mimeMatch[1].toLowerCase() : "";
-    return mime && allowedDataMimeTypes[mime] === true ? encoded : null;
+    if (!mime) return null;
+    const allowedDataMimeTypes = policy.allowedDataMimeTypes;
+    for (let i = 0; i < allowedDataMimeTypes.length; i++) {
+      if (allowedDataMimeTypes[i].toLowerCase() === mime) return htmlSafe;
+    }
+    return null;
   }
 
-  return allowedSchemes[scheme] === true ? encoded : null;
+  const allowedUrlSchemes = policy.allowedUrlSchemes;
+  for (let i = 0; i < allowedUrlSchemes.length; i++) {
+    if (allowedUrlSchemes[i].toLowerCase() === scheme) return htmlSafe;
+  }
+  return null;
 };
 
 //

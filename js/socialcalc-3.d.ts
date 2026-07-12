@@ -528,8 +528,9 @@ declare namespace SocialCalc {
   function special_chars(string: string): string;
 
   // Validates rawurl against securityPolicy.allowedUrlSchemes (and, for
-  // "data:" URLs, allowedDataMimeTypes). Returns an encoded safe URL, or
-  // null if rawurl must not be rendered as an active link/image target.
+  // "data:" URLs, allowedDataMimeTypes). Returns an HTML-attribute-safe,
+  // percent-encoded and HTML-escaped URL suitable for href="..."/src="...",
+  // or null if rawurl must not be rendered as an active link/image target.
   function SafeUrlForRender(rawurl: string, policy?: RenderSecurityPolicy): string | null;
   // Renders raw HTML safely under the untrusted-content policy: applies
   // policy.sanitizeHtml if configured, otherwise HTML-escapes the value.

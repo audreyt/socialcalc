@@ -341,6 +341,157 @@ describe("untrusted mode: URL and image scheme allowlist", () => {
 });
 
 // ---------------------------------------------------------------------------
+// SafeUrlForRender must return an HTML-ATTRIBUTE-SAFE string, not merely a
+// URI-safe one. encodeURI deliberately leaves "&", "#", ";" unescaped
+// (they are valid URI characters), but every consumer of SafeUrlForRender
+// places its result inside an href="..."/src="..." attribute. A literal
+// "&" there lets an HTML character/entity reference (decimal "&#58;", hex
+// "&#x61;", or named "&quot;") slip past the scheme-sniffing regex as
+// harmless-looking text, survive validation, and then get decoded by the
+// BROWSER'S HTML PARSER - independently of any URL-parsing logic - into a
+// live "javascript:" scheme or a quote that breaks out of the attribute.
+// The fix HTML-escapes the validated, percent-encoded string on every
+// accepted return path (relative/schemeless, allowlisted scheme, and
+// data:), so a legitimate "&" (e.g. in a query string) round-trips back to
+// a literal "&" once the browser decodes the attribute, while an
+// attacker's literal entity text is doubly inert.
+// ---------------------------------------------------------------------------
+describe("SafeUrlForRender: HTML entity-decoding bypass is closed", () => {
+  test("a decimal numeric character reference hiding ':' is HTML-escaped, not left as live scheme text", async () => {
+    const SC = await loadSocialCalc();
+    const out = SC.SafeUrlForRender("javascript&#58;alert(1)");
+    expect(out).not.toBeNull();
+    expect(out).not.toContain("javascript:");
+    expect(out).toBe("javascript&amp;#58;alert(1)");
+  });
+
+  test("a hex numeric character reference hiding a scheme letter is HTML-escaped", async () => {
+    const SC = await loadSocialCalc();
+    const out = SC.SafeUrlForRender("jav&#x61;script:alert(1)");
+    expect(out).not.toBeNull();
+    expect(out).not.toContain("javascript:");
+    expect(out).toBe("jav&amp;#x61;script:alert(1)");
+  });
+
+  test("a named entity ('&quot;') used to smuggle a quote for attribute breakout is HTML-escaped", async () => {
+    const SC = await loadSocialCalc();
+    const out = SC.SafeUrlForRender('x&quot;onmouseover=&quot;alert(1)');
+    expect(out).not.toBeNull();
+    expect(out).not.toContain('"');
+    expect(out).toBe("x&amp;quot;onmouseover=&amp;quot;alert(1)");
+  });
+
+  test("an allowlisted scheme carrying an entity-encoded payload after it is still HTML-escaped", async () => {
+    const SC = await loadSocialCalc();
+    // Scheme check passes (real "http:" scheme), but the path still
+    // carries a decimal-entity javascript-scheme payload as harmless text
+    // - it must never be able to decode into a second, nested live scheme.
+    const out = SC.SafeUrlForRender("http://example.com/redirect?to=javascript&#58;alert(1)");
+    expect(out).not.toBeNull();
+    expect(out).toBe("http://example.com/redirect?to=javascript&amp;#58;alert(1)");
+  });
+
+  test("query-string '&' semantics are preserved: '&amp;' round-trips back to a literal '&'", async () => {
+    const SC = await loadSocialCalc();
+    const out = SC.SafeUrlForRender("http://example.com/?a=1&b=2");
+    expect(out).toBe("http://example.com/?a=1&amp;b=2");
+    // Round-trip check: HTML-unescaping the attribute value recovers the
+    // exact original URL, proving no semantic change to the query string.
+    const htmlUnescape = (s: string) =>
+      s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
+    expect(htmlUnescape(out as string)).toBe("http://example.com/?a=1&b=2");
+  });
+
+  test("rejected schemes (e.g. javascript:) still return null regardless of entity-encoding", async () => {
+    const SC = await loadSocialCalc();
+    expect(SC.SafeUrlForRender("javascript:alert(1)")).toBeNull();
+  });
+
+  // -------------------------------------------------------------------
+  // Same payloads propagated through every URL-consuming sink, proving
+  // the fix is not just a unit-level property of SafeUrlForRender itself.
+  // -------------------------------------------------------------------
+
+  test("sink: text-url neutralizes a decimal-entity javascript: payload and preserves query '&'", async () => {
+    const SC = await loadSocialCalc();
+    SC.Callbacks.untrustedContent = true;
+    const malicious = SC.format_text_for_display(
+      "javascript&#58;alert(1)",
+      "t",
+      "text-url",
+      null,
+      "",
+    );
+    expect(malicious).not.toContain('href="javascript:');
+    expect(malicious).toContain("javascript&amp;#58;alert(1)");
+
+    const safeQuery = SC.format_text_for_display(
+      "http://example.com/?a=1&b=2",
+      "t",
+      "text-url",
+      null,
+      "",
+    );
+    expect(safeQuery).toBe(
+      '<a href="http://example.com/?a=1&amp;b=2">http://example.com/?a=1&amp;b=2</a>',
+    );
+  });
+
+  test("sink: text-image neutralizes a hex-entity javascript: payload in an image src", async () => {
+    const SC = await loadSocialCalc();
+    SC.Callbacks.untrustedContent = true;
+    const out = SC.format_text_for_display(
+      "jav&#x61;script:alert(1)",
+      "t",
+      "text-image",
+      null,
+      "",
+    );
+    expect(out).not.toContain('src="javascript:');
+  });
+
+  test("sink: text-custom @u neutralizes a named-entity quote-breakout payload", async () => {
+    const SC = await loadSocialCalc();
+    SC.Callbacks.untrustedContent = true;
+    const out = SC.format_text_for_display(
+      'x&quot;onmouseover=&quot;alert(1)',
+      "t",
+      'text-custom:<a href="@u">@s</a>',
+      null,
+      "",
+    );
+    // The template markup is escaped anyway (no sanitizer configured), so
+    // this is doubly inert - but @u itself must also carry no live quote.
+    expect(out).not.toContain('onmouseover="alert');
+  });
+
+  test("sink: expand_text_link neutralizes a decimal-entity javascript: payload", async () => {
+    const SC = await loadSocialCalc();
+    SC.Callbacks.untrustedContent = true;
+    const html = SC.expand_text_link(
+      "desc<javascript&#58;alert(1)>",
+      new SC.Sheet(),
+      null,
+      "text-link",
+    );
+    expect(html).not.toContain('href="javascript:');
+  });
+
+  test("sink: MakePageLink returning an entity-encoded payload is neutralized when untrusted", async () => {
+    const SC = await loadSocialCalc();
+    const prev = SC.Callbacks.MakePageLink;
+    SC.Callbacks.MakePageLink = (pagename: string) => `javascript&#58;${pagename}`;
+    SC.Callbacks.untrustedContent = true;
+    try {
+      const html = SC.expand_text_link("[alert(1)]", new SC.Sheet(), null, "text-link");
+      expect(html).not.toContain('href="javascript:');
+    } finally {
+      SC.Callbacks.MakePageLink = prev;
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Malformed encodings and prototype-key probing must fail closed, not throw
 // and not produce active output.
 // ---------------------------------------------------------------------------
