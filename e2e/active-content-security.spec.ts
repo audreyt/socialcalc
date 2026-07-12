@@ -1,13 +1,25 @@
-// Characterization test for SocialCalc's documented trust boundary
-// (README "Trust boundary and host security"): the `text-html` cell format
-// renders raw HTML without escaping, and link/image formats can likewise
-// inject markup. This file records that CURRENT behavior for regression
-// visibility. It intentionally does NOT assert that hostile content is
-// blocked or sanitized — README is explicit that SocialCalc "does not
-// provide a secure mode or a host-wide sanitizer" and sanitizing untrusted
-// cell content is the host application's responsibility. If this test ever
-// starts failing because markup got escaped, that is a behavior change to
-// evaluate, not a regression to "fix" back to the old assertions.
+// Two characterization/regression suites for SocialCalc's documented trust
+// boundary (README "Trust boundary and host security" and "Opt-in
+// untrusted-content mode"):
+//
+// 1. Below, "active-content characterization" — the `text-html` cell format
+//    renders raw HTML without escaping, and link/image formats can likewise
+//    inject markup, under the LEGACY DEFAULT (`SocialCalc.Callbacks
+//    .untrustedContent === false`). This records that CURRENT default
+//    behavior for regression visibility and intentionally does NOT assert
+//    hostile content is blocked or sanitized — README is explicit that the
+//    legacy default "treats all of this as trusted and is not safe for
+//    untrusted input" by design; sanitizing untrusted cell content under
+//    the default mode remains the host application's responsibility. If
+//    this test ever starts failing because markup got escaped under the
+//    default, that is a behavior change to evaluate, not a regression to
+//    "fix" back to the old assertions.
+//
+// 2. Further below, "opt-in untrusted-content policy" — with
+//    `untrustedContent` explicitly set to `true`, SocialCalc DOES provide a
+//    real, asserted security control (SafeUrlForRender/EscapeUntrustedHtml);
+//    that section proves hostile payloads never reach a live, browser-
+//    parsed active attribute. See that section's own header for detail.
 
 import {
   cellLocator,
@@ -21,7 +33,7 @@ import {
   waitFor,
 } from "./fixtures/editor";
 
-test.describe("active-content characterization (not a security guarantee)", () => {
+test.describe("active-content characterization (legacy default, untrustedContent=false — not a security guarantee)", () => {
   test("a text-html cell renders raw markup, including inline event-handler attributes, verbatim", async ({
     page,
   }) => {
