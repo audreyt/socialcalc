@@ -18275,6 +18275,7 @@ SpreadsheetControlSC.InitializeSpreadsheetControl = function(spreadsheet, node, 
 	if (typeof node == "string") node = document.getElementById(node);
 	if (node == null) {
 		alert("SocialCalc.SpreadsheetControl not given parent node.");
+		return;
 	}
 	spreadsheet.parentNode = node;
 	spreadsheet.spreadsheetDiv = document.createElement("div");
