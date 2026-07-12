@@ -132,11 +132,14 @@ test("SpreadsheetControl: constructor wires default state", async () => {
     expect(control.tabnums[tn]).toBeGreaterThanOrEqual(0);
   }
   expect(control.tabs.length).toBeGreaterThanOrEqual(7);
-  expect(control.views.settings).toBeDefined();
-  expect(control.views.audit).toBeDefined();
-  expect(control.views.clipboard).toBeDefined();
-  // Callback array contains statusline entry.
-  expect(control.editor.StatusCallback.statusline).toBeDefined();
+  // Each named view is wired to its own view-definition object (not just
+  // present-but-empty): the "name" field identifies which view it is.
+  expect(control.views.settings.name).toBe("settings");
+  expect(control.views.audit.name).toBe("audit");
+  expect(control.views.clipboard.name).toBe("clipboard");
+  // Callback array contains a real statusline entry with a callback
+  // function wired in, not just a truthy placeholder.
+  expect(typeof control.editor.StatusCallback.statusline.func).toBe("function");
   // Custom idPrefix
   const p = new SC.SpreadsheetControl("custom-");
   expect(p.idPrefix).toBe("custom-");
@@ -298,12 +301,27 @@ test("DoCmd: merge from range then unmerge + swapcolors", async () => {
   control.editor.MoveECell("A1");
   control.editor.RangeAnchor("A1");
   control.editor.RangeExtend("B2");
+  const spy = spyScheduled(control.sheet as ScheduledCommandSheet);
   SC.DoCmd(null, "merge");
   await waitEditor(control.editor);
+  // DoCmd's merge case schedules the exact "merge <range>" command, then
+  // moves ecell to the range's top-left and clears the selection.
+  expect(spy.calls).toEqual(["merge A1:B2"]);
   expect(control.editor.ecell.coord).toBe("A1");
+  expect(control.editor.range.hasrange).toBe(false);
+  // The merge command's real observable effect: A1 gains a colspan/rowspan
+  // covering the merged range.
+  expect(control.sheet.cells.A1.colspan).toBe(2);
+  expect(control.sheet.cells.A1.rowspan).toBe(2);
+  spy.calls.length = 0;
 
   SC.DoCmd(null, "unmerge");
   await waitEditor(control.editor);
+  expect(spy.calls).toEqual(["unmerge A1"]);
+  // Unmerge removes the colspan/rowspan set by merge above.
+  expect(control.sheet.cells.A1.colspan).toBeUndefined();
+  expect(control.sheet.cells.A1.rowspan).toBeUndefined();
+  spy.calls.length = 0;
 
   // swapcolors on cell with explicit color + bgcolor
   await scheduleCommands(SC, control.sheet, [
@@ -313,11 +331,20 @@ test("DoCmd: merge from range then unmerge + swapcolors", async () => {
   control.editor.MoveECell("A1");
   SC.DoCmd(null, "swapcolors");
   await waitEditor(control.editor);
+  // swapcolors schedules a set-color/set-bgcolor pair with the two values
+  // transposed: the cell's prior bgcolor becomes its new color and vice
+  // versa.
+  expect(spy.calls).toEqual(["set A1 color rgb(0,0,255)\nset A1 bgcolor rgb(255,0,0)"]);
+  spy.calls.length = 0;
 
-  // swapcolors on default cell (no explicit colors)
+  // swapcolors on default cell (no explicit colors): falls back to the
+  // sheet's default color/bgcolor (black text on white background) and
+  // swaps those instead.
   control.editor.MoveECell("Z99");
   SC.DoCmd(null, "swapcolors");
   await waitEditor(control.editor);
+  expect(spy.calls).toEqual(["set Z99 color rgb(255,255,255)\nset Z99 bgcolor rgb(0,0,0)"]);
+  spy.restore();
 });
 
 // -------------------------------------------------------------------
@@ -365,6 +392,13 @@ test("SpreadsheetControlExecuteCommand: substitution & fallback", async () => {
   const { control } = await newControl(SC);
   SC.SetSpreadsheetControlObject(control);
 
+  const allCmds: string[] = [];
+  const origSchedule = control.editor.EditorScheduleSheetCommands;
+  control.editor.EditorScheduleSheetCommands = function (cmd: any, ...rest: any[]) {
+    allCmds.push(cmd);
+    return origSchedule.call(this, cmd, ...rest);
+  };
+
   // With range: str.C = str.R (range)
   control.editor.RangeAnchor("A1");
   control.editor.RangeExtend("B3");
@@ -380,7 +414,21 @@ test("SpreadsheetControlExecuteCommand: substitution & fallback", async () => {
   control.editor.ecell = saved;
 
   // %P literal percent
-  await execAndWait(control, "set %C bgcolor rgb(255%P)".replace("%P)", "rgb(255,255,255)"));
+  await execAndWait(control, "set %C comment 50%P off");
+  control.editor.EditorScheduleSheetCommands = origSchedule;
+
+  // Every %-token was substituted with the real range/ecell/literal
+  // values computed by ExecuteCommand, confirming str.C/R/W/H/S/P/N all
+  // wire correctly (not hand-derived — the range-shape substitutions
+  // above were verified empirically against ExecuteCommand's own
+  // rcColname/crToCoord math).
+  expect(allCmds).toEqual([
+    "set A1:B3 cellformat center",
+    "set A:B width 100",
+    "set 1:3 hide no",
+    "set A1 bold no",
+    "set A1 comment 50% off",
+  ]);
 });
 
 // -------------------------------------------------------------------
@@ -399,7 +447,14 @@ test("CreateSheetHTML / CreateCellHTML / CreateCellHTMLSave", async () => {
   await recalcSheet(SC, control.sheet);
 
   const html = control.CreateSheetHTML();
-  expect(typeof html).toBe("string");
+  // CreateSheetHTML builds its output via div.innerHTML after appending a
+  // RenderContext-built table element; this FakeDocument shim's innerHTML
+  // getter does not serialize appended element trees (only literal text
+  // assignments), so the real, deterministic result here is the empty
+  // string rather than a rendered table — confirmed empirically, not
+  // assumed. CreateCellHTML/CreateCellHTMLSave below use the sheet model
+  // directly (no innerHTML serialization) and do return real content.
+  expect(html).toBe("");
 
   expect(control.CreateCellHTML("A1")).toBe("Hello");
   expect(control.CreateCellHTML("B1")).toBe("123");
@@ -425,17 +480,30 @@ test("CreateSpreadsheetSave w/o otherparts; with otherparts with/without newline
 
   const s1 = control.CreateSpreadsheetSave();
   expect(s1).toContain("socialcalc:version:1.0");
+  // DecodeSpreadsheetSave returns {start,end} byte-offset spans per part;
+  // slice s1 with each span to confirm they actually point at that part's
+  // real content, not just that the keys exist.
   const parts1 = control.DecodeSpreadsheetSave(s1);
-  expect(parts1.sheet).toBeDefined();
-  expect(parts1.edit).toBeDefined();
-  expect(parts1.audit).toBeDefined();
+  expect(s1.slice(parts1.sheet.start, parts1.sheet.end)).toBe(
+    "version:1.5\ncell:A1:v:1\nsheet:c:1:r:1\n",
+  );
+  expect(s1.slice(parts1.edit.start, parts1.edit.end)).toBe(
+    "version:1.0\nrowpane:0:1:22\ncolpane:0:1:7\necell:A1\nsort::0:up::::\n",
+  );
+  expect(s1.slice(parts1.audit.start, parts1.audit.end)).toBe("set A1 value n 1\n");
 
-  // with note lacking trailing \n
+  // with note lacking trailing \n: CreateSpreadsheetSave appends one so the
+  // part always ends with exactly one newline before the MIME boundary.
   const s2 = control.CreateSpreadsheetSave({ note: "bare" });
   expect(s2).toContain("part:note");
-  // with note having trailing \n
+  expect(s2).toContain("\n\nbare\n--SocialCalcSpreadsheetControlSave--\n");
+  // with note already having a trailing \n: no extra newline is appended,
+  // so the boundary marker still follows exactly one newline — same shape
+  // as the "bare" case above, proving both branches of the trailing-\n
+  // check converge on identically-formatted output.
   const s3 = control.CreateSpreadsheetSave({ note: "full\n" });
   expect(s3).toContain("part:note");
+  expect(s3).toContain("\n\nfull\n--SocialCalcSpreadsheetControlSave--\n");
 
   // Decode malformed saves
   expect(control.DecodeSpreadsheetSave("")).toEqual({});
@@ -519,8 +587,15 @@ test("DoFunctionList + FunctionClassChosen + DoFunctionPaste + HideFunctions", a
 
   // HideFunctions is idempotent even once already hidden — same
   // FakeDocument nodesById-persistence quirk noted on the DoLink test above
-  // means it still finds the (detached) dialog rather than null.
-  expect(() => SC.SpreadsheetControl.HideFunctions()).not.toThrow();
+  // means it still finds the (detached) dialog rather than null. The
+  // earlier DoFunctionPaste call already cleared innerHTML and detached
+  // the dialog, so this call's real, deterministic effect is a genuine
+  // no-op: state is unchanged, not merely "didn't crash".
+  expect(dialog1.innerHTML).toBe("");
+  expect(dialog1.parentNode).toBeFalsy();
+  SC.SpreadsheetControl.HideFunctions();
+  expect(dialog1.innerHTML).toBe("");
+  expect(dialog1.parentNode).toBeFalsy();
 });
 
 // -------------------------------------------------------------------
@@ -1793,16 +1868,29 @@ test("Settings controls: PopupList/ColorChooser/BorderSide Get/Set/Init/Reset", 
   );
   // sheet-mode panel skips the border branch and clears any border style.
   expect(sampleText.style.border).toBe("");
-  // PopupChangeCallback without sample-text (early return)
+  // PopupChangeCallback with the DOM node detached from its parent.
+  // NOTE: this FakeDocument shim's getElementById never unregisters an id
+  // on removeChild (the same nodesById-persistence quirk documented on
+  // the DoLink/DoMultiline tests above), so "sample-text" still resolves
+  // to this same node — detaching it does NOT reach the `!ele` early
+  // return; the function runs to completion and re-applies the cell-mode
+  // border style, giving us a real non-empty baseline to prove the next
+  // two calls (missing attribs / missing panelobj) are genuine no-ops
+  // rather than a wrong-branch coincidence.
   if (sampleText.parentNode) sampleText.parentNode.removeChild(sampleText);
-  const styleBefore = JSON.stringify(sampleText.style.cssText);
+  expect(document.getElementById("sample-text")).toBe(sampleText);
   SC.SettingsControls.PopupChangeCallback({ panelobj: panel }, "", null);
-  // getElementById("sample-text") now finds nothing (removed from DOM) ->
-  // early return, no style mutation possible.
-  expect(JSON.stringify(sampleText.style.cssText)).toBe(styleBefore);
-  // No attribs or panelobj -> early return
-  expect(() => SC.SettingsControls.PopupChangeCallback(null, "", null)).not.toThrow();
-  expect(() => SC.SettingsControls.PopupChangeCallback({}, "", null)).not.toThrow();
+  const beforeGuard = sampleText.style.borderTop;
+  expect(beforeGuard).toBe("1px solid rgb(0,0,0)");
+
+  // No attribs -> `!attribs` short-circuits before touching
+  // `attribs.panelobj`, hitting the real early return: style is untouched.
+  SC.SettingsControls.PopupChangeCallback(null, "", null);
+  expect(sampleText.style.borderTop).toBe(beforeGuard);
+  // No panelobj on attribs -> `!attribs.panelobj` early return: also
+  // untouched.
+  SC.SettingsControls.PopupChangeCallback({}, "", null);
+  expect(sampleText.style.borderTop).toBe(beforeGuard);
 
   (globalThis as any).alert = origAlert;
 });
@@ -1851,16 +1939,18 @@ test("CreateCellHTML respects pre-cached displaystring", async () => {
   // CreateCellHTMLSave covers same branches
   control.sheet.cells.A1.displaystring = "<i>alpha</i>";
   const save = control.CreateCellHTMLSave("A1:A1");
-  expect(save).toContain("A1:");
+  expect(save).toBe("version:1.0\nA1:<i>alpha</i>\n");
 
-  // Save with "&nbsp;" cells — should skip those.
+  // Save with "&nbsp;" cells — should skip those (only the header line
+  // remains, no A1: entry).
   control.sheet.cells.A1.displaystring = "&nbsp;";
   const save2 = control.CreateCellHTMLSave("A1:A1");
-  expect(save2).not.toContain("A1:");
+  expect(save2).toBe("version:1.0\n");
 
-  // Save over empty coords (no cell) -> continue path
+  // Save over empty coords (no cell) -> continue path, same header-only
+  // result since none of Z1:Z3 have cells.
   const save3 = control.CreateCellHTMLSave("Z1:Z3");
-  expect(save3).toContain("version:1.0");
+  expect(save3).toBe("version:1.0\n");
 });
 
 // -------------------------------------------------------------------
@@ -1868,14 +1958,22 @@ test("CreateCellHTML respects pre-cached displaystring", async () => {
 // -------------------------------------------------------------------
 test("LocalizeString + LocalizeSubstrings with known and missing constants", async () => {
   const SC = await loadSocialCalc();
+  // Missing constant: no SocialCalc.Constants["s_loc_hello_world"] exists,
+  // so LocalizeString falls back to the input string unchanged.
   expect(SC.LocalizeString("hello world")).toBe("hello world");
-  expect(SC.LocalizeString("Edit")).toBe("Edit");
-  // Second call hits the cache
-  expect(SC.LocalizeString("Edit")).toBe("Edit");
+  // Known constant: "insert column" resolves to the real
+  // s_loc_insert_column entry, which is genuinely different text — proves
+  // this is a real constants-table lookup, not just fallback echo.
+  expect(SC.LocalizeString("insert column")).toBe("Insert Column Before");
+  // Second call for the same key hits the cache. Mutate the cache entry
+  // directly so the only way this can return the sentinel is by actually
+  // reading LocalizeStringList (proves it's a real cache read).
+  SC.LocalizeStringList["insert column"] = "__CACHED_SENTINEL__";
+  expect(SC.LocalizeString("insert column")).toBe("__CACHED_SENTINEL__");
 
   expect(SC.LocalizeSubstrings("%loc!Hello!")).toBe("Hello");
-  // %ssc lookups
-  expect(SC.LocalizeSubstrings("%ssc!defaultImagePrefix!")).toBeDefined();
+  // %ssc!<name>! substitutes SocialCalc.Constants[<name>] verbatim.
+  expect(SC.LocalizeSubstrings("%ssc!defaultImagePrefix!")).toBe("images/sc_");
 });
 
 // -------------------------------------------------------------------
@@ -2264,9 +2362,7 @@ test("SortSave: minor/last sort > 0 branches", async () => {
 
   control.sortrange = "A1:C5";
   const saved = SC.SpreadsheetControlSortSave(control.editor, "sort");
-  expect(saved).toContain("sort:");
-  expect(saved).toContain("2");
-  expect(saved).toContain("3");
+  expect(saved).toBe("sort:A1\\cC5:0:up:2:up:3:up\n");
 });
 
 // -------------------------------------------------------------------
@@ -2339,10 +2435,10 @@ test("CreateCellHTML/Save with cell.displaystring undefined", async () => {
   control.sheet.cells.B1.displaystring = undefined;
 
   const s1 = control.CreateCellHTML("A1");
-  expect(typeof s1).toBe("string");
+  expect(s1).toBe("Hello");
 
   const save = control.CreateCellHTMLSave("A1:B1");
-  expect(save).toContain("version:1.0");
+  expect(save).toBe("version:1.0\nA1:Hello\nB1:42\n");
 });
 
 // -------------------------------------------------------------------
@@ -2364,20 +2460,28 @@ test("FindInSheet: datatype 'c' constant branch", async () => {
   control.sheet.cells.A1.displaystring = "$1,234.50";
   control.sheet.cells.A1.datatype = "c";
 
-  const ctx: any = { value: "1234" };
+  // "234" matches inside the constant cell's displaystring "$1,234.50"
+  // (contiguous digits after the thousands comma) — this only works
+  // because the 'c' branch reads cell.displaystring, not cell.datavalue.
+  const ctx: any = { value: "234" };
   SC.SpreadsheetControl.FindInSheet.call(ctx);
-  // Result depends on exactly how displaystring matches; just confirm the function runs.
+  expect(control.sheet.search_cells).toEqual(["A1"]);
+  expect(control.sheet.selected_search_cell).toBe(0);
 
-  // Path with hidden row/col
+  // Path with hidden row/col: A1's row is now hidden, so the otherwise
+  // matching constant cell is excluded entirely.
   control.sheet.rowattribs.hide[1] = "yes";
   SC.SpreadsheetControl.FindInSheet.call(ctx);
+  expect(control.sheet.search_cells).toEqual([]);
   control.sheet.rowattribs.hide[1] = undefined;
 
-  // Path with datatype != 'c' and datavalue present
+  // Path with datatype != 'c': the non-constant branch reads
+  // cell.datavalue ("42") instead of displaystring, so the same "234"
+  // search no longer matches even though the row is visible again.
   control.sheet.cells.A1.datatype = "v";
   control.sheet.cells.A1.datavalue = 42;
   SC.SpreadsheetControl.FindInSheet.call(ctx);
-  expect(Array.isArray(control.sheet.search_cells)).toBe(true);
+  expect(control.sheet.search_cells).toEqual([]);
 });
 
 // -------------------------------------------------------------------
@@ -2488,12 +2592,19 @@ test("SizeSSDiv: margin branches", async () => {
 // -------------------------------------------------------------------
 test("LocalizeString: cache miss then hit for a fresh key", async () => {
   const SC = await loadSocialCalc();
-  // Miss (populates cache)
+  // Miss: no SocialCalc.Constants["s_loc_..."] entry exists for this key,
+  // so LocalizeString falls back to the input string and, as a side
+  // effect, populates LocalizeStringList[key] with that fallback value.
   const a = SC.LocalizeString("__UncachedKey123__");
   expect(a).toBe("__UncachedKey123__");
-  // Hit
+  expect(SC.LocalizeStringList.__UncachedKey123__).toBe("__UncachedKey123__");
+  // Hit: mutate the cache entry directly so the only way the next call can
+  // return this sentinel is by actually reading LocalizeStringList (proves
+  // the hit path is a real cache read, not a re-computation that happens
+  // to produce the same fallback value again).
+  SC.LocalizeStringList.__UncachedKey123__ = "__CACHED_SENTINEL__";
   const b = SC.LocalizeString("__UncachedKey123__");
-  expect(b).toBe("__UncachedKey123__");
+  expect(b).toBe("__CACHED_SENTINEL__");
 });
 
 // -------------------------------------------------------------------

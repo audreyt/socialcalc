@@ -43,7 +43,10 @@ describe("typed public API smoke", () => {
       runtime.ParseSheetSave(save, sheet);
 
       const cell: SC.Cell = sheet.GetAssuredCell("B1");
-      expect(typeof cell).toBe("object");
+      // ParseSheetSave's "v:" cell format stores a real numeric value, not
+      // just an opaque object -- confirm both fields it sets.
+      expect(cell.datavalue).toBe(42);
+      expect(cell.valuetype).toBe("n");
 
       // Also exercise the free-function form of CellFromStringParts so its
       // overload stays in the public surface.
@@ -104,10 +107,13 @@ describe("typed public API smoke", () => {
       const ctx: SC.RenderContext = new runtime.RenderContext(sheet);
 
       expect(ctx.sheetobj).toBe(sheet);
-      expect(typeof ctx.showGrid).toBe("boolean");
-      expect(typeof ctx.cellIDprefix).toBe("string");
-      expect(Array.isArray(ctx.rowpanes)).toBe(true);
-      expect(Array.isArray(ctx.colpanes)).toBe(true);
+      // A fresh Sheet's RenderContext takes its real documented defaults
+      // (js/socialcalc-3.ts RenderContext ctor + socialcalcconstants.ts),
+      // not just "some boolean/string/array" shape.
+      expect(ctx.showGrid).toBe(false);
+      expect(ctx.cellIDprefix).toBe("cell_");
+      expect(ctx.rowpanes).toEqual([{ first: 1, last: 1 }]);
+      expect(ctx.colpanes).toEqual([{ first: 1, last: 1 }]);
     });
 
     it("Sheet command execution stores a typed numeric cell value", async () => {
@@ -128,11 +134,17 @@ describe("typed public API smoke", () => {
       runtime.ExecuteSheetCommand(sheet, new runtime.Parse("set A1 value n 7"), false);
 
       const attrs: SC.AttribSet = runtime.EncodeCellAttributes(sheet, "A1");
-      expect(typeof attrs).toBe("object");
+      // A cell with only a value set (no layout attribs) reports the same
+      // all-default shape documented/verified in sheet-coverage-a.test.ts's
+      // "EncodeCellAttributes on a default cell" case.
+      expect(attrs.alignhoriz.def).toBe(true);
+      expect(attrs.bgcolor.def).toBe(true);
+      expect(attrs.mod.val).toBe("n");
 
       const decodeErr: string | null = runtime.DecodeCellAttributes(sheet, "A1", attrs);
-      // DecodeCellAttributes returns null on success (or an error string).
-      expect(decodeErr === null || typeof decodeErr === "string").toBe(true);
+      // Decoding the exact same (unmodified) attrs back in is a no-op and
+      // must report success (null), not merely "some string or null".
+      expect(decodeErr).toBeNull();
     });
 
     it("Coordinate helpers round-trip column/row pairs", async () => {
@@ -184,8 +196,11 @@ describe("typed public API smoke", () => {
     it("FormatNumber Julian/Gregorian helpers return typed values", async () => {
       const runtime = await loadSocialCalc();
       const julian: number = runtime.FormatNumber.convert_date_gregorian_to_julian(2025, 1, 1);
-      expect(typeof julian).toBe("number");
-      expect(Number.isFinite(julian)).toBe(true);
+      // Julian Day Number for 2025-01-01, independently computed via the
+      // standard Fliegel & Van Flandern algorithm (not by re-invoking this
+      // function) -- matches the convention already used for this exact
+      // function in format-coverage.test.ts.
+      expect(julian).toBe(2460677);
 
       const ymd: SC.FormatNumberYMD = runtime.FormatNumber.convert_date_julian_to_gregorian(julian);
       expect(ymd.year).toBe(2025);
@@ -201,13 +216,16 @@ describe("typed public API smoke", () => {
       const runtime = await loadSocialCalc();
       // `textdatadefaulttype` is the strongly-typed field in the Constants
       // interface; it is the source of the conventional `textdatadefault`
-      // default referenced throughout the codebase.
+      // default referenced throughout the codebase. Assert its real,
+      // literal value (from socialcalcconstants.ts), not just its type.
       const defaultType: string = runtime.Constants.textdatadefaulttype;
-      expect(typeof defaultType).toBe("string");
+      expect(defaultType).toBe("t");
 
       // Also reach through the index signature so that aggregator users
       // who access other constants keep compiling.
-      expect(typeof runtime.Constants.defaultCellLayout).toBe("string");
+      expect(runtime.Constants.defaultCellLayout).toBe(
+        "padding:2px 2px 1px 2px;vertical-align:top;",
+      );
     });
 
     it("Constants exposes a localized s_loc_* string and ConstantsSetClasses runs", async () => {
@@ -217,11 +235,14 @@ describe("typed public API smoke", () => {
       // menu_edit variant. Using the declared field keeps the assertion
       // honest without mutating .d.ts files.
       const editLabel: string = runtime.Constants.s_loc_edit;
-      expect(typeof editLabel).toBe("string");
+      expect(editLabel).toBe("Edit");
 
-      // ConstantsSetClasses mutates Constants in-place; here we only care
-      // that it is callable with a prefix and does not throw.
-      expect(() => runtime.ConstantsSetClasses("myprefix")).not.toThrow();
+      // ConstantsSetClasses mutates Constants in-place: every string-typed
+      // ConstantsDefaultClasses entry gets prefixed onto the matching
+      // "<item>Class" field. Assert the real resulting value, not just
+      // that the call didn't throw (it was never going to).
+      runtime.ConstantsSetClasses("myprefix");
+      expect(runtime.Constants.defaultCommentClass).toBe("myprefixdefaultComment");
     });
   });
 

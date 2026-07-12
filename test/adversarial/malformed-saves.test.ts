@@ -20,8 +20,14 @@ describe("malformed save handling", () => {
     for (const SC of [candidate, oracle]) {
       const sheet = parseIntoFreshSheet(SC, "");
       expect(Object.keys(sheet.cells).length).toBe(0);
-      // Sheet must remain usable after the malformed parse.
-      expect(sheet.GetAssuredCell("A1").coord).toBe("A1");
+      // Sheet must remain usable after the malformed parse: a real write
+      // must land in `cells` and be readable back, not just return an
+      // object with the requested coord (GetAssuredCell always does that,
+      // even against a corrupted index).
+      const a1 = sheet.GetAssuredCell("A1");
+      a1.datavalue = 3;
+      a1.valuetype = "n";
+      expect(sheet.cells.A1.datavalue).toBe(3);
     }
   });
 
@@ -29,7 +35,15 @@ describe("malformed save handling", () => {
     const { candidate, oracle } = await loadPair();
     for (const SC of [candidate, oracle]) {
       const sheet = parseIntoFreshSheet(SC, "version:1.5\ncell:A1:v");
-      expect(sheet.GetAssuredCell("B1").coord).toBe("B1");
+      // The truncated record still creates A1 with an unparseable (NaN)
+      // decoded value rather than corrupting the cells map.
+      expect(sheet.cells.A1.datavalue).toBeNaN();
+      expect(sheet.cells.A1.valuetype).toBe("n");
+      // The sheet keeps functioning for legitimate writes afterward.
+      const b1 = sheet.GetAssuredCell("B1");
+      b1.datavalue = 5;
+      b1.valuetype = "n";
+      expect(sheet.cells.B1.datavalue).toBe(5);
     }
   });
 
@@ -37,7 +51,14 @@ describe("malformed save handling", () => {
     const { candidate, oracle } = await loadPair();
     for (const SC of [candidate, oracle]) {
       const sheet = parseIntoFreshSheet(SC, "version:1.5\ncell:A-1:v:5\n");
-      expect(sheet.GetAssuredCell("A1").coord).toBe("A1");
+      // The literal "A-1" key must not alias or corrupt the real A1 cell.
+      expect(sheet.cells["A-1"]?.datavalue).toBe(5);
+      expect(sheet.cells.A1).toBeUndefined();
+      // The sheet keeps functioning for legitimate writes afterward.
+      const a1 = sheet.GetAssuredCell("A1");
+      a1.datavalue = 9;
+      a1.valuetype = "n";
+      expect(sheet.cells.A1.datavalue).toBe(9);
     }
   });
 

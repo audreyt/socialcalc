@@ -245,8 +245,11 @@ test("DoPositionCalculations + SchedulePositionCalculations + DoRenderStep", asy
 
   SC.DoPositionCalculations(editor);
   SC.SchedulePositionCalculations(editor);
+  // Await the real doneposcalc signal fired by the scheduled 1ms timeout
+  // instead of a fixed delay.
+  const pRendered = waitEditor(editor);
   SC.DoRenderStep(editor);
-  await new Promise((r) => setTimeout(r, 50));
+  await pRendered;
 
   // ensureecell + deferredCommands + no cmd defer path.
   editor.ensureecell = true;
@@ -980,7 +983,8 @@ test("EditorGetStatuslineString: range with single cell (no sum path)", async ()
   editor.RangeAnchor("A1");
   editor.RangeExtend("A1"); // 1x1 range, no sum.
   const s = editor.GetStatuslineString("cmdend", null, {});
-  expect(typeof s).toBe("string");
+  // No sum suffix since left==right && top==bottom skips the sum branch.
+  expect(s).toBe("A1 &nbsp; ");
 });
 
 test("Safari userAgent → CreateTableEditor installs before-paste listeners", async () => {
@@ -1205,29 +1209,30 @@ test("SegmentDivHit: type-A nested table paths", async () => {
   const div: any = { offsetLeft: 0, offsetTop: 0, offsetWidth: 100, offsetHeight: 100 };
   // Nested: upper-left is a sub-table.
   const nested = [[10, 20, 30, 40], 1, 2, 3];
-  // Just ensure each quadrant hit doesn't throw (the return value depends on
-  // how nesting recursively divides the div; we primarily care that the
-  // recursion path is exercised).
-  for (const [x, y] of [
-    [10, 10],
-    [40, 10],
-    [40, 40],
-    [10, 40],
-    [75, 25],
-    [75, 75],
-    [25, 75],
-  ]) {
-    expect(typeof SC.SegmentDivHit(nested, div, x, y)).toBe("number");
+  // Each (x, y) recurses into the upper-left sub-table [10,20,30,40], then
+  // resolves to that sub-table's own quadrant leaf value.
+  const expectedHits: [number, number, number][] = [
+    [10, 10, 10],
+    [40, 10, 20],
+    [40, 40, 30],
+    [10, 40, 40],
+    // Outside the upper-left quadrant, the top-level leaves (1, 2, 3) apply.
+    [75, 25, 1],
+    [75, 75, 2],
+    [25, 75, 3],
+  ];
+  for (const [x, y, expected] of expectedHits) {
+    expect(SC.SegmentDivHit(nested, div, x, y)).toBe(expected);
   }
   const nested2 = [1, [10, 20, 30, 40], 2, 3];
-  expect(typeof SC.SegmentDivHit(nested2, div, 75, 25)).toBe("number");
-  expect(typeof SC.SegmentDivHit(nested2, div, 75, 10)).toBe("number");
+  expect(SC.SegmentDivHit(nested2, div, 75, 25)).toBe(30);
+  expect(SC.SegmentDivHit(nested2, div, 75, 10)).toBe(20);
 
   const nested3 = [1, 2, [10, 20, 30, 40], 3];
-  expect(typeof SC.SegmentDivHit(nested3, div, 75, 75)).toBe("number");
+  expect(SC.SegmentDivHit(nested3, div, 75, 75)).toBe(30);
 
   const nested4 = [1, 2, 3, [10, 20, 30, 40]];
-  expect(typeof SC.SegmentDivHit(nested4, div, 25, 75)).toBe("number");
+  expect(SC.SegmentDivHit(nested4, div, 25, 75)).toBe(30);
 });
 
 test("CellHandlesMouseDown: all whichhandle branches", async () => {

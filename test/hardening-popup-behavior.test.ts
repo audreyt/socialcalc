@@ -475,8 +475,13 @@ test("ColorChooser.GridMouseDown updates the arrow marker, message swatch, and f
   expect(redSwatch.ele.style.backgroundImage).toContain("chooserarrow.gif");
   // ...the message swatch mirrors the composed color and hex title...
   const newValue = SC.Popup.GetValue("grid-visual-pop");
-  expect(grid.msg.style.backgroundColor).toBe(newValue);
-  expect(grid.msg.title).toBe(SC.Popup.RGBToHex(newValue as string));
+  // Independently-derived expected value (not computed via RGBToHex/makeRGB,
+  // the functions under test elsewhere): row 4 of the red column (col=2) is
+  // red = 17*(15-4) = 187 = 0xBB; green/blue carry over unchanged from the
+  // original rgb(10,20,30) seed -> g=20=0x14, b=30=0x1E.
+  expect(newValue).toBe("rgb(187,20,30)");
+  expect(grid.msg.style.backgroundColor).toBe("rgb(187,20,30)");
+  expect(grid.msg.title).toBe("BB141E");
   // ...and since the new sum crosses 220, text color flips to black.
   expect(grid.msg.style.color).toBe("#000");
   SC.Popup.Close();

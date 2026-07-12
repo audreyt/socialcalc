@@ -312,21 +312,21 @@ test("EditorGetStatuslineString: params with emailing/response + circular-ref", 
   // Email flow: emailing → params.emailing ="sending".
   const params: any = {};
   let s = editor.GetStatuslineString("emailing", null, params);
-  expect(typeof s).toBe("string");
+  expect(s).toBe("A1 &nbsp; Sending Email ");
   // Calcstart sets params.calculating true; hitting fallthrough with null progress.
   s = editor.GetStatuslineString("calcstart", null, params);
-  expect(typeof s).toBe("string");
+  expect(s).toBe("A1 &nbsp; Calculation start...Sending Email ");
   s = editor.GetStatuslineString("calcfinished", 10, params);
-  expect(typeof s).toBe("string");
+  expect(s).toBe("A1 &nbsp; Sending Email ");
   // confirmemailsent
   s = editor.GetStatuslineString("confirmemailsent", " ok", params);
-  expect(typeof s).toBe("string");
+  expect(s).toBe("A1 &nbsp;  ok");
   // doneposcalc with sent response
   s = editor.GetStatuslineString("doneposcalc", null, params);
-  expect(typeof s).toBe("string");
+  expect(s).toBe("A1 &nbsp;  ok");
   // default fallthrough: arbitrary status
   s = editor.GetStatuslineString("customStatus", null, params);
-  expect(typeof s).toBe("string");
+  expect(s).toBe("A1 &nbsp; customStatus");
 
   // Range-sum path: set up a range and make sure it's computed.
   editor.MoveECell("A1");
@@ -343,13 +343,13 @@ test("EditorGetStatuslineString: params with emailing/response + circular-ref", 
   // Circular-reference path.
   editor.context.sheetobj.attribs.circularreferencecell = "A1|B1";
   s = editor.GetStatuslineString("renderdone", null, {});
-  expect(typeof s).toBe("string");
+  expect(s).toContain("Circular reference: A1 referenced by B1");
   editor.context.sheetobj.attribs.circularreferencecell = "";
 
   // Needs-recalc path.
   editor.context.sheetobj.attribs.needsrecalc = "yes";
   s = editor.GetStatuslineString("startup", null, {});
-  expect(typeof s).toBe("string");
+  expect(s).toContain("(Recalc needed)");
   editor.context.sheetobj.attribs.needsrecalc = "no";
 });
 
@@ -759,10 +759,11 @@ test("EditorSaveEdit: text/formula/constant/text-prefix/empty paths", async () =
   editor.EditorSaveEdit("42");
 
   editor.workingvalues.ecoord = "F1";
+  const pendingDrain = waitEditor(editor);
   editor.EditorSaveEdit("<span>hi</span>");
-
-  // Let pending commands drain.
-  await new Promise((r) => setTimeout(r, 300));
+  // Await the real doneposcalc signal instead of a fixed delay.
+  await pendingDrain;
+  expect(editor.context.sheetobj.cells["F1"]?.datavalue).toContain("hi");
 
   // ioEventTree branch for EditedTriggerCell. Invoke directly so we cover
   // its switch without going through the deferred email command pipeline.
@@ -1925,8 +1926,6 @@ test("Ctrl-A/C/V/X/Z/S flows via ctrlkeyFunction", async () => {
   const rc3 = editor.ctrlkeyFunction(editor, "[ctrl-q]");
   expect(rc3).toBe(true);
 
-  // Clean up any timeouts left by Ctrl-C/Ctrl-V.
-  await new Promise((r) => setTimeout(r, 300));
 });
 
 test("ScrollTable helpers (Up/Down): direct and boundary cases", async () => {
@@ -2152,9 +2151,19 @@ test("EditorScheduleSheetCommands: busy, deferred, recalc/undo/redo/setemail, de
     editor.EditorScheduleSheetCommands("undo");
     editor.EditorScheduleSheetCommands("redo");
 
-    // default (generic set).
+    // default (generic set). Force-clear busy/deferred state first (same
+    // isolation technique as the "Busy buffering" section above) so this
+    // exercises the default branch directly. Note: replaying a deferred
+    // "setemailparameters" entry never fires a status callback (see
+    // TableEditorSC.EditorScheduleSheetCommands), so without this reset any
+    // commands queued behind the setemailparameters/undo/redo calls above
+    // would never drain and editor.busy would stay stuck true permanently.
+    editor.busy = false;
+    editor.deferredCommands = [];
+    const pDefault = waitEditor(editor);
     editor.EditorScheduleSheetCommands("set B1 text t y", true);
-    await new Promise((r) => setTimeout(r, 50));
+    await pDefault;
+    expect(editor.context.sheetobj.cells["B1"]?.datavalue).toBe("y");
   } finally {
     (SC as any).TriggerIoAction.Email = origEmail;
   }

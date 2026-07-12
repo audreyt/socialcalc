@@ -42,15 +42,18 @@ describe("check-test-credibility.mjs: e2e/**/*.spec.ts coverage", () => {
     expect(files).not.toContain("test/helpers/oracle.ts");
   });
 
-  test("checkFile() runs the same anti-pattern scan against a real e2e spec file", () => {
-    const target = files.find((f) => f.startsWith("e2e/") && f.endsWith(".spec.ts"));
-    expect(target).toBeDefined();
+  test("checkFile() runs the same anti-pattern scan against real e2e spec files and finds them clean", () => {
+    const e2eSpecs = files.filter((f) => f.startsWith("e2e/") && f.endsWith(".spec.ts"));
+    expect(e2eSpecs.length).toBeGreaterThan(0);
     // This must not throw (proves checkFile()'s catch-block/tautology scan
-    // runs cleanly on real e2e source, not just test/ source) and must
-    // return the same { violations, cleanupCatches } shape used for
-    // test/**/*.test.ts files.
-    const result = checkFile(target as string);
-    expect(Array.isArray(result.violations)).toBe(true);
-    expect(Array.isArray(result.cleanupCatches)).toBe(true);
+    // runs cleanly on real e2e source, not just test/ source). The actual
+    // e2e specs currently contain no catch blocks and no tautologies, so
+    // the scan's real output — not just its shape — must come back empty
+    // for every one of them.
+    for (const target of e2eSpecs) {
+      const result = checkFile(target);
+      expect(result.violations).toEqual([]);
+      expect(result.cleanupCatches).toEqual([]);
+    }
   });
 });

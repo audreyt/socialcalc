@@ -266,10 +266,15 @@ test("InitializeSpreadsheetViewer: element node attaches spreadsheetDiv and sets
 test("InitializeSpreadsheetViewer: string node id resolves via getElementById", async () => {
   const SC = await fresh();
   const viewer = new SC.SpreadsheetViewer("vp-str-");
-  makeHost("vp-str-host");
+  const host = makeHost("vp-str-host");
   SC.InitializeSpreadsheetViewer(viewer, "vp-str-host", 200, 300, 10);
-  expect(viewer.parentNode).toBeDefined();
+  expect(viewer.parentNode).toBe(host);
+  expect(viewer.requestedHeight).toBe(200);
+  expect(viewer.requestedWidth).toBe(300);
+  expect(viewer.requestedSpaceBelow).toBe(10);
   expect(viewer.spreadsheetDiv).toBeDefined();
+  expect(viewer.spreadsheetDiv!.firstChild).toBeDefined();
+  expect(viewer.statuslineDiv!.id).toBe("vp-str-statusline");
 });
 
 test("InitializeSpreadsheetViewer: null node alerts and bails without attaching", async () => {
@@ -555,8 +560,9 @@ test("GetSpreadsheetViewerObject: returns current viewer, throws when none", asy
   expect(SC.GetSpreadsheetViewerObject()).toBe(viewer);
   SC.CurrentSpreadsheetViewerObject = null;
   expect(() => SC.GetSpreadsheetViewerObject()).toThrow("No current SpreadsheetViewer");
-  new SC.SpreadsheetViewer("vp-gsvo-restore-");
-  expect(SC.CurrentSpreadsheetViewerObject).toBeDefined();
+  const viewer2 = new SC.SpreadsheetViewer("vp-gsvo-restore-");
+  expect(SC.CurrentSpreadsheetViewerObject).toBe(viewer2);
+  expect(SC.GetSpreadsheetViewerObject()).toBe(viewer2);
 });
 
 // ---------------------------------------------------------------------------
@@ -979,9 +985,15 @@ test("GetFunctionNamesStr: returns option HTML for 'all' category with first sel
   const SC = await fresh();
   newControl(SC, "ctrl-fn-");
   SC.Formula.FillFunctionInfo();
+  const functionClasses = SC.Formula.FunctionClasses;
+  if (!functionClasses) throw new Error("function metadata unavailable");
+  const all = functionClasses["all"];
   const html = SC.SpreadsheetControl.GetFunctionNamesStr("all");
-  expect(html).toContain("<option");
-  expect(html).toContain(' selected>');
+  const optionCount = (html.match(/<option/g) || []).length;
+  expect(optionCount).toBe(all.items.length);
+  expect(html).toContain(
+    '<option value="' + all.items[0] + '" selected>' + all.items[0] + "</option>",
+  );
 });
 
 test("GetFunctionNamesStr: named category returns only that category's functions", async () => {
@@ -989,11 +1001,25 @@ test("GetFunctionNamesStr: named category returns only that category's functions
   newControl(SC, "ctrl-fn2-");
   SC.Formula.FillFunctionInfo();
   const fcl = SC.Constants.function_classlist;
-  const firstCategory = fcl[0];
-  const html = SC.SpreadsheetControl.GetFunctionNamesStr(firstCategory);
-  expect(html).toContain("<option");
-  // The first option in a named category should be selected
-  expect(html).toContain(' selected>');
+  const functionClasses = SC.Formula.FunctionClasses;
+  if (!functionClasses) throw new Error("function metadata unavailable");
+  // fcl[0] is "all"; use the first genuinely named (non-"all") category so
+  // this test actually exercises category scoping instead of duplicating
+  // the "all" case covered by the previous test.
+  const namedCategory = fcl[1];
+  const all = functionClasses["all"];
+  const cls = functionClasses[namedCategory];
+  const html = SC.SpreadsheetControl.GetFunctionNamesStr(namedCategory);
+  const optionCount = (html.match(/<option/g) || []).length;
+  expect(optionCount).toBe(cls.items.length);
+  expect(html).toContain(
+    '<option value="' + cls.items[0] + '" selected>' + cls.items[0] + "</option>",
+  );
+  // A function present in "all" but absent from this category proves the
+  // list is genuinely scoped, not just non-empty.
+  const excludedFn = all.items.find((fn: string) => !cls.items.includes(fn));
+  if (!excludedFn) throw new Error("category unexpectedly covers every function");
+  expect(html).not.toContain('value="' + excludedFn + '"');
 });
 
 test("GetFunctionInfoStr: returns bold function name with arg string and description", async () => {
@@ -1003,9 +1029,12 @@ test("GetFunctionInfoStr: returns bold function name with arg string and descrip
   const functionClasses = SC.Formula.FunctionClasses;
   if (!fcl || !functionClasses) throw new Error("function metadata unavailable");
   const firstFn = functionClasses[fcl[0]].items[0];
+  const argString = SC.Formula.FunctionArgString(firstFn);
+  const description = SC.Formula.FunctionList[firstFn][3];
   const html = SC.SpreadsheetControl.GetFunctionInfoStr(firstFn);
-  expect(html).toContain("<b>" + firstFn + "(");
+  expect(html).toContain("<b>" + firstFn + "(" + argString + ")</b>");
   expect(html).toContain("<br>");
+  expect(html).toContain(description);
 });
 
 // ---------------------------------------------------------------------------
@@ -1652,6 +1681,8 @@ test("CtrlSEditor: with part name shows that part's content in textarea", async 
   SC.CtrlSEditor("mypart");
   const ta = document.getElementById("socialcalc-editbox-textarea");
   expect(ta).not.toBeNull();
+  expect(ta!.firstChild).not.toBeNull();
+  expect(ta!.firstChild!.textContent).toContain("part content here");
   // Clean up
   const editbox = document.getElementById("socialcalc-editbox");
   if (editbox && editbox.parentNode) editbox.parentNode.removeChild(editbox);
@@ -1667,6 +1698,12 @@ test("CtrlSEditor: with empty string shows listing of all parts", async () => {
   SC.CtrlSEditor("");
   const ta = document.getElementById("socialcalc-editbox-textarea");
   expect(ta).not.toBeNull();
+  expect(ta!.firstChild).not.toBeNull();
+  const listing = ta!.firstChild!.textContent ?? "";
+  expect(listing).toContain("Part: part1");
+  expect(listing).toContain("content1");
+  expect(listing).toContain("Part: part2");
+  expect(listing).toContain("content2");
   // Clean up
   const editbox = document.getElementById("socialcalc-editbox");
   if (editbox && editbox.parentNode) editbox.parentNode.removeChild(editbox);
@@ -1922,7 +1959,7 @@ test("ClipboardFormat: converts clipboard to requested format", async () => {
   (clipText as unknown as { value: string }).value = "";
   document.body.appendChild(clipText);
   SC.SpreadsheetControlClipboardFormat("csv");
-  expect((clipText as unknown as { value: string }).value).not.toBe("");
+  expect((clipText as unknown as { value: string }).value).toBe("fmt\n");
 });
 
 test("ClipboardLoad: loads tab clipboard into the consumer clipboard state", async () => {
@@ -2006,10 +2043,24 @@ test("SettingsControlSave: sheet/cell changes update encoded attributes; cancel 
 
 test("SettingsControlSetCurrentPanel: sets CurrentPanel and calls PopupChangeCallback", async () => {
   const SC = await fresh();
-  newControl(SC, "ctrl-scp-");
+  const { control } = newControl(SC, "ctrl-scp-");
+  SC.SetSpreadsheetControlObject(control);
+  // PopupChangeCallback only has an observable effect when a "sample-text"
+  // preview element is present (see production code's early-return guard);
+  // seed one with the two child nodes the non-cell branch writes through.
+  const sampleText = document.createElement("div");
+  sampleText.id = "sample-text";
+  sampleText.appendChild(document.createElement("div"));
+  sampleText.appendChild(document.createElement("div"));
+  sampleText.style.border = "1px solid red";
+  document.body.appendChild(sampleText);
   const panelobj = { name: "test" };
   SC.SettingsControlSetCurrentPanel(panelobj);
   expect(SC.SettingsControls.CurrentPanel).toBe(panelobj);
+  // The stale border is cleared and default alignment applied only if
+  // PopupChangeCallback actually ran, proving the delegation contract.
+  expect(sampleText.style.border).toBe("");
+  expect(sampleText.style.textAlign).toBe("left");
 });
 
 test("SettingsControlInitializePanel: initializes popup controls for the panel", async () => {
@@ -2017,6 +2068,12 @@ test("SettingsControlInitializePanel: initializes popup controls for the panel",
   const { control } = newControl(SC, "ctrl-sip-");
   const panelobj = control.views.settings.values.cellspanel;
   SC.SettingsControlInitializePanel(panelobj);
-  expect(SC.Popup.Controls[panelobj.cfontlook.id]).toBeDefined();
-  expect(SC.Popup.Controls[panelobj.cformatnumber.id]).toBeDefined();
+  const fontlook = SC.Popup.Controls[panelobj.cfontlook.id];
+  expect(fontlook.type).toBe("List");
+  expect(fontlook.data.options.length).toBeGreaterThan(0);
+  expect(fontlook.data.attribs.panelobj).toBe(panelobj);
+  const formatnumber = SC.Popup.Controls[panelobj.cformatnumber.id];
+  expect(formatnumber.type).toBe("List");
+  expect(formatnumber.data.options.length).toBeGreaterThan(0);
+  expect(formatnumber.data.attribs.panelobj).toBe(panelobj);
 });

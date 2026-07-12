@@ -905,8 +905,12 @@ test("ButtonMouseOut: undo hover + MouseOut functionobj callback", async () => {
 
   // Hover then out — covers 13736-13741 + MouseOut callback 13743.
   SC.ButtonMouseOver(fakeEvent({ target: b }));
+  expect(SC.ButtonInfo.doingHover).toBe(true);
   SC.ButtonMouseOut(fakeEvent({ target: b }));
   expect(outCalled).toBe(true);
+  // The hover style is undone and the tracked hover element is cleared.
+  expect(SC.ButtonInfo.doingHover).toBe(false);
+  expect(SC.ButtonInfo.buttonElement).toBeNull();
 
   // Also: buttonDown=true path on MouseOut (13730-13732 already).
   SC.ButtonInfo.buttonDown = true;
@@ -952,6 +956,10 @@ test("ButtonMouseDown: Disabled false proceeds with repeatwait timer set", async
   );
   SC.ButtonMouseDown(fakeEvent({ target: b, clientX: 5, clientY: 5 }));
   expect(downCalled).toBe(true);
+  // buttonDown/buttonElement are set and the repeatwait timer got armed.
+  expect(SC.ButtonInfo.buttonDown).toBe(true);
+  expect(SC.ButtonInfo.buttonElement?.element).toBe(b);
+  expect(SC.ButtonInfo.timer).not.toBeNull();
 
   // Clean up timer if any.
   if (SC.ButtonInfo.timer) {
@@ -1618,6 +1626,9 @@ test("SetTab: view.needsresize + onresize fires (25468-25469)", async () => {
   editor.busy = false;
   SC.SetTab("settings");
   expect(onResizeCalled).toBe(true);
+  // needsresize is cleared before onresize fires, so a second SetTab to the
+  // same view would not re-trigger it.
+  expect(settingsView.needsresize).toBe(false);
   // Reset by switching to the first tab (sheet). Must reset busy=false
   // because ScheduleRender re-sets it to true after each SetTab to "sheet".
   editor.busy = false;
@@ -1629,7 +1640,14 @@ test("ParseFormulaIntoTokens: two-char non-comparator op (15681-15685)", async (
   // Force the parser into the two-char operator branch with an unexpected
   // pair. Pass a formula where the operator tokens include `><` etc.
   const tokens = SC.Formula.ParseFormulaIntoTokens("1><2");
-  expect(Array.isArray(tokens)).toBe(true);
+  expect(tokens).toHaveLength(4);
+  expect(tokens[1]).toMatchObject({ text: ">", type: 3 });
+  // `><` splits into `>` then a stray `<`, which the parser rejects as two
+  // operators in a row.
+  expect(tokens[2]).toMatchObject({
+    type: 5,
+    text: "Error in formula (two operators inappropriately in a row)",
+  });
   // Also some comparator edge cases that should work.
   SC.Formula.ParseFormulaIntoTokens("1<=2");
   SC.Formula.ParseFormulaIntoTokens("1>=2");
@@ -1680,18 +1698,20 @@ test("COUNTIF/SUMIF: numeric + blank criteria via direct parseinfo evaluation", 
     "set A3 value n 5",
     "set A4 text t hi",
   ]);
-  // COUNTIF(A1:A4, 5) — numeric criteria (line 18459).
+  // COUNTIF(A1:A4, 5) — numeric criteria (line 18459). parseinfo is passed
+  // directly (not wrapped) per SC.Formula.evaluate_parsed_formula's real
+  // signature (parseinfo, sheet, allowrangereturn).
   let parsed = SC.Formula.ParseFormulaIntoTokens("COUNTIF(A1:A4,5)");
-  let res = SC.Formula.evaluate_parsed_formula({ parsed, coord: "Z1" }, sheet, false);
-  expect(res).toBeDefined();
+  let res = SC.Formula.evaluate_parsed_formula(parsed, sheet, false);
+  expect(res).toMatchObject({ value: 3, type: "n" });
   // COUNTIF(A1:A4, ZZ99) — ZZ99 is blank (line 18465).
   parsed = SC.Formula.ParseFormulaIntoTokens("COUNTIF(A1:A4,ZZ99)");
-  res = SC.Formula.evaluate_parsed_formula({ parsed, coord: "Z1" }, sheet, false);
-  expect(res).toBeDefined();
+  res = SC.Formula.evaluate_parsed_formula(parsed, sheet, false);
+  expect(res).toMatchObject({ value: 0, type: "n" });
   // SUMIF(A1:A4, 5) — numeric criteria.
   parsed = SC.Formula.ParseFormulaIntoTokens("SUMIF(A1:A4,5)");
-  res = SC.Formula.evaluate_parsed_formula({ parsed, coord: "Z1" }, sheet, false);
-  expect(res).toBeDefined();
+  res = SC.Formula.evaluate_parsed_formula(parsed, sheet, false);
+  expect(res).toMatchObject({ value: 15, type: "n" });
 });
 
 test("SUMIFS: numeric + blank criteria in multi-condition", async () => {
@@ -1709,11 +1729,13 @@ test("SUMIFS: numeric + blank criteria in multi-condition", async () => {
     "set B3 value n 3",
   ]);
   let parsed = SC.Formula.ParseFormulaIntoTokens("SUMIFS(A1:A3,B1:B3,1)");
-  let res = SC.Formula.evaluate_parsed_formula({ parsed, coord: "Z1" }, sheet, false);
-  expect(res).toBeDefined();
+  let res = SC.Formula.evaluate_parsed_formula(parsed, sheet, false);
+  // Only A1 has B1=1, so the multi-condition sum is A1's own value.
+  expect(res).toMatchObject({ value: 1, type: "n" });
   parsed = SC.Formula.ParseFormulaIntoTokens("SUMIFS(A1:A3,B1:B3,ZZ99)");
-  res = SC.Formula.evaluate_parsed_formula({ parsed, coord: "Z1" }, sheet, false);
-  expect(res).toBeDefined();
+  res = SC.Formula.evaluate_parsed_formula(parsed, sheet, false);
+  // ZZ99 (blank) criteria matches nothing since B1:B3 are all non-blank.
+  expect(res).toMatchObject({ value: 0, type: "n" });
 });
 
 test("TestCriteria: empty criteria + blank value + = comparator", async () => {
@@ -1721,8 +1743,10 @@ test("TestCriteria: empty criteria + blank value + = comparator", async () => {
   // Call TestCriteria directly: value="", type="b", criteria="=".
   const result = SC.Formula.TestCriteria("", "b", "=");
   const result2 = SC.Formula.TestCriteria("", "b", "");
-  expect(typeof result === "boolean").toBe(true);
-  expect(typeof result2 === "boolean").toBe(true);
+  // "=" criteria against a blank value/basevalue is an equality match.
+  expect(result).toBe(true);
+  // An empty criteria string is not "=", so it takes the non-equality path.
+  expect(result2).toBe(false);
 });
 
 test("TCTDragFunctionStart: stale thumbstatus rowmsgele/rowpreviewele truthy → nulled", async () => {

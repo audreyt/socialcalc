@@ -1365,7 +1365,10 @@ test("SettingsControls.ColorChooser SetValue/GetValue/Initialize paths", async (
   } catch {
     // Defensive fake-DOM cleanup: reset may access popup DOM not modeled here.
   }
-  expect(result).toBeDefined();
+  // Every SetValue call above hit its defensive fake-DOM catch, so the
+  // popup's swatch was never actually painted; GetValue's fallback
+  // branch (Popup.GetValue returns falsy) is what fires deterministically.
+  expect(result).toEqual({ def: true, val: 0 });
 });
 
 // --------------------------------------------------------------------------

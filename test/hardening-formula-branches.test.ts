@@ -312,32 +312,32 @@ test("ConvertInfixToPolish: ^ is LEFT-associative in this engine, but unary minu
 test("ConvertInfixToPolish: comma without an open paren, close without open, and an unmatched open all produce distinct error strings", async () => {
   const SC = (await loadSocialCalc()) as FullRuntime;
   const polish = (f: string) => SC.Formula.ConvertInfixToPolish(SC.Formula.ParseFormulaIntoTokens(f));
-  const noOpen = polish("1,2");
-  const noClose = polish("SUM(1+2");
-  const strayClose = polish("1+2)");
-  expect(typeof noOpen).toBe("string");
-  expect(typeof noClose).toBe("string");
-  expect(typeof strayClose).toBe("string");
-  // Each failure mode must be textually distinguishable, not a single shared message.
-  expect(noOpen).not.toBe(noClose);
-  expect(noClose).not.toBe(strayClose);
-  expect(noOpen).not.toBe(strayClose);
+  // Each failure mode has its own named constant in SocialCalc.Constants —
+  // assert against those directly rather than merely checking the three
+  // strings differ from each other.
+  expect(polish("1,2")).toBe(SC.Constants.s_parseerrmissingopenparen);
+  expect(polish("SUM(1+2")).toBe(SC.Constants.s_parseerrmissingcloseparen);
+  expect(polish("1+2)")).toBe(SC.Constants.s_parseerrcloseparennoopen);
 });
 
 test("LookupResultType: unknown left type, malformed table row, and missing pair all surface distinct internal errors", async () => {
   const SC = (await loadSocialCalc()) as FullRuntime;
-  // type1 "x" is not in the table and its wildcard "x*" is also absent -> "missing" error.
+  // type1 "x" is not in the table and its wildcard "x*" is also absent ->
+  // the exact "missing from table" internal-error text, naming the wildcard key.
   const missing = SC.Formula.LookupResultType("x", "n", {});
-  expect(missing).toContain("missing");
-  expect(missing.charAt(0)).toBe("e");
+  expect(missing).toBe("e#VALUE! (internal error, missing LookupResultType x*)");
 
-  // type1 "n" IS in the table but its row string is malformed (no leading "|").
+  // type1 "n" IS in the table but its row string is malformed (no closing
+  // "|" after the matched "|t:" prefix) -> the exact "incorrect" text,
+  // echoing the malformed row verbatim for diagnosis.
   const malformedRow = SC.Formula.LookupResultType("n", "t", { n: "|t:1" });
-  expect(malformedRow).toContain("incorrect");
+  expect(malformedRow).toBe("e#VALUE! (internal error, incorrect LookupResultType |t:1)");
 
-  // type1 "n" resolves via wildcard "n*", but type2 "z" matches neither exact nor "z*" entries.
+  // type1 "n" resolves via wildcard "n*", but type2 "z" matches neither the
+  // exact "|z:" nor wildcard "|z*:" entries inside that row -> the generic
+  // (non-internal) #VALUE! fallback.
   const noPairMatch = SC.Formula.LookupResultType("n", "z", { "n*": "|t:n|" });
-  expect(noPairMatch.charAt(0)).toBe("e");
+  expect(noPairMatch).toBe("e#VALUE!");
 });
 
 test("ArrayValuesEqual: shallow strict equality, length mismatch, and no deep comparison of nested arrays", async () => {
@@ -388,7 +388,9 @@ test("OperandValueAndType: sheet-qualified coord resolves through the cache; una
 
   const unresolved = evalDirect(SC, main, "Missing!A1", "X2");
   expect(unresolved.type).toBe("e#REF!");
-  expect(String(unresolved.error)).toContain(String(SC.Constants.s_sheetunavailable));
+  // Lexer uppercases the sheet name; OperandsAsCoordOnSheet concatenates
+  // "<constant> <sheetname>" with a single space (formula-operand.ts:287).
+  expect(unresolved.error).toBe(`${SC.Constants.s_sheetunavailable} MISSING`);
 });
 
 test("OperandAsCoord/OperandAsRange: real formulas that route through IoFunctions' coord/range argument coercion", async () => {
@@ -446,7 +448,8 @@ test("LookupName: a circular self-referencing formula name resolves to a distinc
   sheet.names.X = { desc: "", definition: "=X" };
   const result = evalDirect(SC, sheet, "X", "A1");
   expect(result.type).toBe("e#NAME?");
-  expect(String(result.error)).toContain(String(SC.Constants.s_circularnameref));
+  // formula1.ts's circular-reference branch appends ' "<name>".' verbatim.
+  expect(result.error).toBe(`${SC.Constants.s_circularnameref} "X".`);
 });
 
 test("LookupName: a name defined as a range expands through StepThroughRangeDown", async () => {
@@ -568,9 +571,10 @@ test("sheet cache: FindInSheetCache is case-insensitive via NormalizeSheetName, 
 
   const miss = SC.Formula.FindInSheetCache("DoesNotExist");
   expect(miss).toBeNull();
-  expect(SC.Formula.SheetCache.waitingForLoading).toBe(
-    SC.Formula.NormalizeSheetName("DoesNotExist"),
-  );
+  // NormalizeSheetName has no registered Callbacks override in this test
+  // environment, so it's a plain lowercase — assert the literal directly
+  // rather than re-deriving it through the same helper FindInSheetCache calls.
+  expect(SC.Formula.SheetCache.waitingForLoading).toBe("doesnotexist");
 });
 
 test("OrderRangeParts normalizes reversed corners into upper-left/lower-right order", async () => {
@@ -645,7 +649,10 @@ test("IoFunctions: COPYVALUE with an undefined trigger cell fails with FunctionA
   const sheet = freshSheet(SC);
   const result = evalDirect(SC, sheet, "COPYVALUE(NOPE,A3,5)", "A1");
   expect(result.type).toBe("e#VALUE!");
-  expect(String(result.value)).toContain("COPYVALUE");
+  // NOPE is an undefined name (type "name"), not a coord, so it fails
+  // COPYVALUE's arg-1 coord-only type check and FunctionArgsError builds
+  // this exact message (formula1.ts's s_calcerrincorrectargstofunction).
+  expect(result.value).toBe(`${SC.Constants.s_calcerrincorrectargstofunction} COPYVALUE. `);
 });
 
 test("CopyValueToRange returns a 'set' command string encoding the source cell's value and type", async () => {
@@ -709,7 +716,10 @@ test("FillFunctionInfo is idempotent and FunctionArgString reports fixed, variab
   SC.Formula.FillFunctionInfo(); // second call must not throw or duplicate entries
   const secondPass = SC.Formula.FunctionArgString("SUM");
   expect(firstPass).toBe(secondPass);
-  expect(typeof SC.Formula.FunctionArgString("NOW")).toBe("string"); // zero-arg function
+  // NOW's FunctionList entry has nargs=0 and no arg_def, so the 0-arg
+  // branch sets adef to a single space and FunctionArgDefs never gets an
+  // entry for "" (NOW's falsy arg_def), leaving the space unresolved.
+  expect(SC.Formula.FunctionArgString("NOW")).toBe(" ");
 });
 
 // ===========================================================================

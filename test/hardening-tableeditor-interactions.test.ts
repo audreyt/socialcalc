@@ -750,7 +750,7 @@ test("GridMousePosition: a resize bar over a visible pane returns early before s
   if (rowResult) {
     expect(rowResult.rowheader).toBe(true);
     // rowtoresize is kept (the delete at 2778 is after the early return).
-    expect(rowResult.rowtoresize).toBeDefined();
+    expect(rowResult.rowtoresize).toBe(3); // resize-bar boundary matched at row 3 (rowpositions[3]+rowheight[3]=90)
     expect(rowResult.rowselect).toBe(false); // stays false (init) — early return skips the `= true` line
   }
 });
@@ -856,7 +856,7 @@ test("GridMousePosition: cell-interior path computes coord with cellskip redirec
   const cellResult = SC.GridMousePosition(editor, 100, 60);
   expect(cellResult).not.toBeNull();
   if (cellResult) {
-    expect(cellResult.coord).toBeDefined();
+    expect(cellResult.coord).toBe("B2"); // row 2, col 2 from primed rowpositions/colpositions (see comment below)
     expect(cellResult.rowheader).toBeUndefined();
     expect(cellResult.colheader).toBeUndefined();
   }
