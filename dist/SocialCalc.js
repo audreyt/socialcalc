@@ -26,6 +26,7 @@
 // that would shadow/collapse the namespace during `tsc`.
 var SocialCalc = {};
 
+// @ts-nocheck
 // In-place TypeScript conversion of socialcalcconstants.js (SocialCalc global script).
 // Ambient API types live in socialcalcconstants.d.ts (referenced by dist/SocialCalc.d.ts).
 // Vite+ strips types with Oxc before UMD concat — no runtime tax.
@@ -723,6 +724,7 @@ ConstantsRoot.ConstantsSetImagePrefix = function(imagePrefix) {
 	scc.defaultImagePrefix = imagePrefix;
 };
 
+// @ts-nocheck
 // In-place TypeScript conversion of socialcalc-3.js (SocialCalc global script).
 // Ambient API types live in socialcalc-3.d.ts (referenced by dist/SocialCalc.d.ts).
 // Vite+ strips types with Oxc before UMD concat — no runtime tax.
@@ -5489,6 +5491,7 @@ SC.SetConvertedCell = function(sheet, cr, rawvalue) {
 	}
 };
 
+// @ts-nocheck
 // In-place TypeScript conversion of socialcalctableeditor.js (SocialCalc global script).
 // Ambient API types live in socialcalctableeditor.d.ts (referenced by dist/SocialCalc.d.ts).
 // Vite+ strips types with Oxc before UMD concat — no runtime tax.
@@ -9796,6 +9799,7 @@ TableEditorSC.ProcessKey = function(ch, e) {
 	return ft.EditorProcessKey(ch, e);
 };
 
+// @ts-nocheck
 // In-place TypeScript conversion of the SocialCalc number-formatting module.
 // Ambient API types live in formatnumber2.d.ts (referenced by dist/SocialCalc.d.ts).
 // Vite+ strips types with Oxc before UMD concat — no runtime tax.
@@ -10668,6 +10672,7 @@ SocialCalc.intFunc = function(n) {
 	}
 };
 
+// @ts-nocheck
 // In-place TypeScript conversion of formula1.js (SocialCalc global script).
 // Ambient API types live in formula1.d.ts (referenced by dist/SocialCalc.d.ts).
 // Intermediate: typechecked core after removing @ts-nocheck.
@@ -15596,6 +15601,7 @@ FormulaMut.TestCriteria = function(value, type, criteria) {
 	return cond;
 };
 
+// @ts-nocheck
 // Pure formula parse / token / type helpers.
 // Shipping source extracted from formula1 for full typecheck + LemmaScript.
 // Concatenated after formula1 (Formula bag + token tables) and before formula-ref.
@@ -15949,6 +15955,7 @@ FormulaParseMut.CopyFunctionArgs = function(operand, foperand) {
 	return;
 };
 
+// @ts-nocheck
 // Pure formula operand-stack helpers.
 // Shipping source extracted from formula1 for full typecheck + LemmaScript.
 // Concatenated after formula-parse (token helpers) and before formula-ref.
@@ -16258,6 +16265,7 @@ FormulaOperandMut.OperandAsSheetName = function(sheet, operand) {
 	}
 };
 
+// @ts-nocheck
 // In-place TypeScript module: pure formula-reference rewrite + A1 coord algebra.
 // Shipping source (not a parallel oracle). Concatenated after formula1.js so
 // SocialCalc.Formula.ParseFormulaIntoTokens exists at call time.
@@ -16283,16 +16291,72 @@ FormulaOperandMut.OperandAsSheetName = function(sheet, operand) {
 // types-only; progressive assignment of these members uses a named mutable view
 // so we never redeclare `var SocialCalc` (which collapses the namespace in tsc).
 
+function stryNS_9fa48() {
+	var g = typeof globalThis === "object" && globalThis && globalThis.Math === Math && globalThis || new Function("return this")();
+	var ns = g.__stryker__ || (g.__stryker__ = {});
+	if (ns.activeMutant === undefined && g.process && g.process.env && g.process.env.__STRYKER_ACTIVE_MUTANT__) {
+		ns.activeMutant = g.process.env.__STRYKER_ACTIVE_MUTANT__;
+	}
+	function retrieveNS() {
+		return ns;
+	}
+	stryNS_9fa48 = retrieveNS;
+	return retrieveNS();
+}
+stryNS_9fa48();
+function stryCov_9fa48() {
+	var ns = stryNS_9fa48();
+	var cov = ns.mutantCoverage || (ns.mutantCoverage = {
+		static: {},
+		perTest: {}
+	});
+	function cover() {
+		var c = cov.static;
+		if (ns.currentTestId) {
+			c = cov.perTest[ns.currentTestId] = cov.perTest[ns.currentTestId] || {};
+		}
+		var a = arguments;
+		for (var i = 0; i < a.length; i++) {
+			c[a[i]] = (c[a[i]] || 0) + 1;
+		}
+	}
+	stryCov_9fa48 = cover;
+	cover.apply(null, arguments);
+}
+function stryMutAct_9fa48(id) {
+	var ns = stryNS_9fa48();
+	function isActive(id) {
+		if (ns.activeMutant === id) {
+			if (ns.hitCount !== void 0 && ++ns.hitCount > ns.hitLimit) {
+				throw new Error("Stryker: Hit count limit reached (" + ns.hitCount + ")");
+			}
+			return true;
+		}
+		return false;
+	}
+	stryMutAct_9fa48 = isActive;
+	return isActive(id);
+}
 const FormulaRefRoot = SocialCalc;
 FormulaRefRoot.rcColname = function(c) {
-	if (c > 702) c = 702;
-	if (c < 1) c = 1;
-	const collow = (c - 1) % 26 + 65;
-	const colhigh = Math.floor((c - 1) / 26);
-	if (colhigh) {
-		return String.fromCharCode(colhigh + 64) + String.fromCharCode(collow);
+	if (stryMutAct_9fa48("0")) {
+		{}
+	} else {
+		stryCov_9fa48("0");
+		if (stryMutAct_9fa48("4") ? c <= 702 : stryMutAct_9fa48("3") ? c >= 702 : stryMutAct_9fa48("2") ? false : stryMutAct_9fa48("1") ? true : (stryCov_9fa48("1", "2", "3", "4"), c > 702)) c = 702;
+		if (stryMutAct_9fa48("8") ? c >= 1 : stryMutAct_9fa48("7") ? c <= 1 : stryMutAct_9fa48("6") ? false : stryMutAct_9fa48("5") ? true : (stryCov_9fa48("5", "6", "7", "8"), c < 1)) c = 1;
+		const collow = stryMutAct_9fa48("9") ? (c - 1) % 26 - 65 : (stryCov_9fa48("9"), (stryMutAct_9fa48("10") ? (c - 1) * 26 : (stryCov_9fa48("10"), (stryMutAct_9fa48("11") ? c + 1 : (stryCov_9fa48("11"), c - 1)) % 26)) + 65);
+		const colhigh = Math.floor(stryMutAct_9fa48("12") ? (c - 1) * 26 : (stryCov_9fa48("12"), (stryMutAct_9fa48("13") ? c + 1 : (stryCov_9fa48("13"), c - 1)) / 26));
+		if (stryMutAct_9fa48("15") ? false : stryMutAct_9fa48("14") ? true : (stryCov_9fa48("14", "15"), colhigh)) {
+			if (stryMutAct_9fa48("16")) {
+				{}
+			} else {
+				stryCov_9fa48("16");
+				return stryMutAct_9fa48("17") ? String.fromCharCode(colhigh + 64) - String.fromCharCode(collow) : (stryCov_9fa48("17"), String.fromCharCode(stryMutAct_9fa48("18") ? colhigh - 64 : (stryCov_9fa48("18"), colhigh + 64)) + String.fromCharCode(collow));
+			}
+		}
+		return String.fromCharCode(collow);
 	}
-	return String.fromCharCode(collow);
 };
 FormulaRefRoot.letters = [
 	"A",
@@ -16581,6 +16645,7 @@ FormulaRefRoot.ReplaceFormulaCoords = function(formula, movedto) {
 	return updatedformula;
 };
 
+// @ts-nocheck
 // Opt this module into TypeScript strict checking via the r2scout config.
 // In-place TypeScript conversion of socialcalcpopup.js (SocialCalc global script).
 // Ambient API types live in socialcalcpopup.d.ts.
@@ -17571,6 +17636,7 @@ SocialCalc.Popup.Types.ColorChooser.CloseOK = function(_e) {
 	SocialCalc.Popup.Close();
 };
 
+// @ts-nocheck
 // In-place TypeScript conversion of socialcalcspreadsheetcontrol.js (SocialCalc global script).
 // Ambient API types live in socialcalcspreadsheetcontrol.d.ts (referenced by dist/SocialCalc.d.ts).
 // Vite+ strips types with Oxc before UMD concat — no runtime tax.
@@ -20100,6 +20166,7 @@ SpreadsheetControlSC.CtrlSEditorDone = function(idprefix, whichpart) {
 	editbox.parentNode.removeChild(editbox);
 };
 
+// @ts-nocheck
 // In-place TypeScript conversion of socialcalcviewer.js (SocialCalc global script).
 // Ambient API types live in socialcalcviewer.d.ts (referenced by dist/SocialCalc.d.ts).
 // Vite+ strips types with Oxc before UMD concat — no runtime tax.
