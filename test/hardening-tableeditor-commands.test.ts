@@ -391,7 +391,7 @@ test("FinishColRowSize: removes the size-display overlay and guards when no resi
 
   // Guard clause: mouseinfo.editor is null -> no-op, does not throw.
   SC.EditorMouseInfo.editor = null;
-  expect(() => SC.FinishColRowSize()).not.toThrow();
+  SC.FinishColRowSize();
 
   // Real cleanup: a real overlay element attached to editor.toplevel is
   // removed and the mouseinfo reference is cleared.
@@ -1019,7 +1019,7 @@ test("ButtonRepeat: is a no-op once buttonElement has been cleared", async () =>
   // Manually clear buttonElement to test ButtonRepeat's guard clause.
   SC.ButtonInfo.buttonElement = null;
 
-  expect(() => SC.ButtonRepeat()).not.toThrow();
+  SC.ButtonRepeat();
   expect(repeatCalls).toBe(0);
 });
 
@@ -1078,7 +1078,7 @@ test("DragUnregister: a no-op for an element that was never registered", async (
   const element = document.createElement("div");
   const countBefore = SC.DragInfo.registeredElements.length;
 
-  expect(() => SC.DragUnregister(element)).not.toThrow();
+  SC.DragUnregister(element);
 
   expect(SC.DragInfo.registeredElements.length).toBe(countBefore);
 });
