@@ -1,0 +1,56 @@
+name: Browser
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    name: playwright / real-browser suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # actions/checkout v4.3.0
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+
+      # voidzero-dev/setup-vp v1.1.0
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@e1609b468742ba9232ce5e12b3a77bdf14495277
+        with:
+          cache: true
+
+      - name: Install dependencies
+        run: vp install --frozen-lockfile
+
+      - name: Typecheck e2e suite (strict)
+        run: vp exec tsc --noEmit -p e2e/tsconfig.json
+
+      - name: Install Playwright browsers
+        run: vp exec playwright install --with-deps chromium firefox webkit
+
+      - name: Build (normal + minified UMD bundles)
+        run: vp build --minify
+
+      - name: Run browser suite
+        run: vp run test:browser
+
+      # actions/upload-artifact v4.6.2
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

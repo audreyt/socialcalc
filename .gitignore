@@ -5,6 +5,8 @@
 /coverage/
 /reports/
 /.stryker-tmp/
+/playwright-report/
+/test-results/
 /stryker.log
 /docs/
 /.lake/

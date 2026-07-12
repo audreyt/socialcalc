@@ -50,6 +50,7 @@
     "test:package-contract": "node scripts/verify-package-contract.mjs",
     "check:test-credibility": "node scripts/check-test-credibility.mjs",
     "test:ethercalc-canary": "node scripts/verify-ethercalc-canary.mjs",
+    "test:browser": "vp exec playwright test",
     "mutate": "vp exec stryker run",
     "mutate:file": "vp node stryker-file.mjs",
     "mutate:format": "vp node stryker-file.mjs js/formatnumber2.ts",
@@ -67,9 +68,11 @@
   "devDependencies": {
     "@jridgewell/gen-mapping": "0.3.13",
     "@jridgewell/trace-mapping": "0.3.31",
+    "@playwright/test": "^1.61.1",
     "@stryker-mutator/core": "^9.6.1",
     "@types/node": "24",
     "@vitest/coverage-v8": "4.1.10",
+    "jquery": "^4.0.0",
     "lemmascript": "0.5.13",
     "typescript": "^7.0.2",
     "vite-plus": "^0.2.4"

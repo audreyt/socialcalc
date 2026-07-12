@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["es2022", "dom"],
+
+    "strict": true,
+    "alwaysStrict": true,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": false,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "types": ["node", "@playwright/test"]
+  },
+  "include": ["../playwright.config.ts", "**/*.ts"],
+  "exclude": ["node_modules"]
+}
