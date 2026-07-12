@@ -826,13 +826,24 @@ More comments yet to come...
 // removed.
 
 const SC = SocialCalc;
+const defaultSecurityPolicy = {
+	sanitizeHtml: null,
+	allowedUrlSchemes: [
+		"http:",
+		"https:",
+		"mailto:"
+	],
+	allowedDataMimeTypes: []
+};
 SC.Callbacks = {
 	expand_wiki: null,
 	expand_markup: function(displayvalue, sheetobj, linkstyle) {
 		return SocialCalc.default_expand_markup(displayvalue, sheetobj, linkstyle);
 	},
 	MakePageLink: null,
-	NormalizeSheetName: null
+	NormalizeSheetName: null,
+	untrustedContent: false,
+	securityPolicy: defaultSecurityPolicy
 };
 SC.Cell = function(coord) {
 	this.coord = coord;
@@ -3532,11 +3543,14 @@ SC.RecalcLoadedSheet = function(sheetname, str, recalcneeded, live) {
 	var sheet;
 	var scri = SocialCalc.RecalcInfo;
 	var scf = SocialCalc.Formula;
-	sheet = SocialCalc.Formula.AddSheetToCache(sheetname || scf.SheetCache.waitingForLoading, str, live);
-	if (recalcneeded && sheet && sheet.attribs.recalc != "off") {
-		sheet.previousrecalcsheet = scri.sheet;
-		scri.sheet = sheet;
-		scri.currentState = scri.state.start_calc;
+	var effectiveSheetName = sheetname || scf.SheetCache.waitingForLoading;
+	if (effectiveSheetName) {
+		sheet = SocialCalc.Formula.AddSheetToCache(effectiveSheetName, str, live);
+		if (recalcneeded && sheet && sheet.attribs.recalc != "off") {
+			sheet.previousrecalcsheet = scri.sheet;
+			scri.sheet = sheet;
+			scri.currentState = scri.state.start_calc;
+		}
 	}
 	scf.SheetCache.waitingForLoading = null;
 	SocialCalc.RecalcSetTimeout();
@@ -4681,6 +4695,42 @@ SC.encodeForSave = function(s) {
 	if (s.indexOf("\n") != -1) s = s.replace(/\n/g, "\\n");
 	return s;
 };
+SC.SafeUrlForRender = function(rawurl, policy = SocialCalc.Callbacks.securityPolicy) {
+	const allowedSchemes = Object.create(null);
+	for (const scheme of policy.allowedUrlSchemes) allowedSchemes[scheme.toLowerCase()] = true;
+	const allowedDataMimeTypes = Object.create(null);
+	for (const mime of policy.allowedDataMimeTypes) allowedDataMimeTypes[mime.toLowerCase()] = true;
+	const noTabsOrNewlines = rawurl.replace(/[\t\n\r]/g, "");
+	let start = 0;
+	let end = noTabsOrNewlines.length;
+	while (start < end && noTabsOrNewlines.charCodeAt(start) <= 32) start++;
+	while (end > start && noTabsOrNewlines.charCodeAt(end - 1) <= 32) end--;
+	const stripped = noTabsOrNewlines.slice(start, end);
+	let encoded;
+	try {
+		encoded = encodeURI(stripped);
+	} catch {
+		return null;
+	}
+	const schemeMatch = stripped.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/);
+	if (!schemeMatch) {
+		return encoded;
+	}
+	const scheme = schemeMatch[1].toLowerCase() + ":";
+	if (scheme === "data:") {
+		const afterScheme = stripped.slice(schemeMatch[0].length);
+		const mimeMatch = afterScheme.match(/^([^,;]*)/);
+		const mime = mimeMatch ? mimeMatch[1].toLowerCase() : "";
+		return mime && allowedDataMimeTypes[mime] === true ? encoded : null;
+	}
+	return allowedSchemes[scheme] === true ? encoded : null;
+};
+SC.EscapeUntrustedHtml = function(html, policy = SocialCalc.Callbacks.securityPolicy) {
+	if (typeof policy.sanitizeHtml === "function") {
+		return policy.sanitizeHtml(html);
+	}
+	return SocialCalc.special_chars(html);
+};
 SC.special_chars = function(string) {
 	if (/[&<>"]/.test(string)) {
 		string = string.replace(/&/g, "&amp;");
@@ -4835,6 +4885,7 @@ SC.FormatCellForExport = function(sheet, cell, _cr) {
 SC.FormatValueForDisplay = function(sheetobj, value, cr, linkstyle) {
 	var valueformat, valuetype, valuesubtype;
 	var displayvalue, valueinputwidget;
+	var untrusted = Boolean(SocialCalc.Callbacks.untrustedContent);
 	var sheetattribs = sheetobj.attribs;
 	var cell = sheetobj.cells[cr];
 	if (!cell) {
@@ -4901,7 +4952,7 @@ SC.FormatValueForDisplay = function(sheetobj, value, cr, linkstyle) {
 	} else {
 		displayvalue = "&nbsp;";
 	}
-	if (valueinputwidget == "i" && html_display_value != null && html_formated_value != null) {
+	if (!untrusted && valueinputwidget == "i" && html_display_value != null && html_formated_value != null) {
 		var parameters = sheetobj.ioParameterList[cr];
 		var formula_details = SocialCalc.Formula.FunctionList[formula_name];
 		if (formula_details) {
@@ -4941,6 +4992,7 @@ SC.format_text_for_display = function(rawvalue, valuetype, valueformat, sheetobj
 	var valuesubtype, dvsc, dvue;
 	var textval;
 	var displayvalue;
+	var untrusted = Boolean(SocialCalc.Callbacks.untrustedContent);
 	valuesubtype = valuetype.substring(1);
 	displayvalue = rawvalue;
 	if (valueformat == "none" || valueformat == null) valueformat = "";
@@ -4951,32 +5003,67 @@ SC.format_text_for_display = function(rawvalue, valuetype, valueformat, sheetobj
 		if (valuesubtype == "l") valueformat = "text-link";
 		if (!valuesubtype) valueformat = "text-plain";
 	}
-	if (valueformat == "text-html") {} else if (SocialCalc.Callbacks.expand_wiki && valueformat.startsWith("text-wiki")) {
+	if (valueformat == "text-html") {
+		if (untrusted) {
+			displayvalue = SocialCalc.EscapeUntrustedHtml(displayvalue);
+		}
+	} else if (SocialCalc.Callbacks.expand_wiki && valueformat.startsWith("text-wiki")) {
 		displayvalue = SocialCalc.Callbacks.expand_wiki(displayvalue, sheetobj, linkstyle, valueformat);
+		if (untrusted) {
+			displayvalue = SocialCalc.EscapeUntrustedHtml(displayvalue);
+		}
 	} else if (valueformat == "text-wiki") {
 		displayvalue = SocialCalc.Callbacks.expand_markup && SocialCalc.Callbacks.expand_markup(displayvalue, sheetobj, linkstyle) || SocialCalc.special_chars("wiki-text:" + displayvalue);
+		if (untrusted) {
+			displayvalue = SocialCalc.EscapeUntrustedHtml(displayvalue);
+		}
 	} else if (valueformat == "text-url") {
 		dvsc = SocialCalc.special_chars(displayvalue);
-		dvue = encodeURI(displayvalue);
-		displayvalue = "<a href=\"" + dvue + "\">" + dvsc + "</a>";
+		if (untrusted) {
+			dvue = SocialCalc.SafeUrlForRender(displayvalue);
+			displayvalue = dvue == null ? dvsc : "<a href=\"" + dvue + "\">" + dvsc + "</a>";
+		} else {
+			dvue = encodeURI(displayvalue);
+			displayvalue = "<a href=\"" + dvue + "\">" + dvsc + "</a>";
+		}
 	} else if (valueformat == "text-link") {
 		displayvalue = SocialCalc.expand_text_link(displayvalue, sheetobj, linkstyle, valueformat);
 	} else if (valueformat == "text-image") {
-		dvue = encodeURI(displayvalue);
-		displayvalue = "<img src=\"" + dvue + "\">";
+		if (untrusted) {
+			dvue = SocialCalc.SafeUrlForRender(displayvalue);
+			displayvalue = dvue == null ? SocialCalc.special_chars(displayvalue) : "<img src=\"" + dvue + "\">";
+		} else {
+			dvue = encodeURI(displayvalue);
+			displayvalue = "<img src=\"" + dvue + "\">";
+		}
 	} else if (valueformat.substring(0, 12) == "text-custom:") {
 		dvsc = SocialCalc.special_chars(displayvalue);
 		dvsc = dvsc.replace(/  /g, "&nbsp; ");
 		dvsc = dvsc.replace(/\n/g, "<br>");
-		dvue = encodeURI(displayvalue);
+		var customTemplate = valueformat.substring(12);
 		textval = {};
-		textval.r = displayvalue;
-		textval.s = dvsc;
-		textval.u = dvue;
-		displayvalue = valueformat.substring(12);
-		displayvalue = displayvalue.replace(/@(r|s|u)/g, function(a, c) {
-			return textval[c];
-		});
+		if (untrusted && typeof SocialCalc.Callbacks.securityPolicy.sanitizeHtml === "function") {
+			textval.r = displayvalue;
+			textval.u = encodeURI(displayvalue);
+			textval.s = dvsc;
+			displayvalue = SocialCalc.EscapeUntrustedHtml(customTemplate.replace(/@(r|s|u)/g, function(a, c) {
+				return textval[c];
+			}));
+		} else if (untrusted) {
+			textval.r = SocialCalc.EscapeUntrustedHtml(displayvalue);
+			textval.u = SocialCalc.SafeUrlForRender(displayvalue) || "";
+			textval.s = dvsc;
+			displayvalue = customTemplate.split(/(@[rsu])/g).map(function(part) {
+				return part === "@r" || part === "@s" || part === "@u" ? textval[part.charAt(1)] : SocialCalc.special_chars(part);
+			}).join("");
+		} else {
+			textval.r = displayvalue;
+			textval.u = encodeURI(displayvalue);
+			textval.s = dvsc;
+			displayvalue = customTemplate.replace(/@(r|s|u)/g, function(a, c) {
+				return textval[c];
+			});
+		}
 	} else if (valueformat.substring(0, 6) == "custom") {
 		displayvalue = SocialCalc.special_chars(displayvalue);
 		displayvalue = displayvalue.replace(/  /g, "&nbsp; ");
@@ -5173,7 +5260,20 @@ SC.expand_text_link = function(displayvalue, sheetobj, linkstyle, valueformat) {
 	if (parts.pagename) {
 		if (SocialCalc.Callbacks.MakePageLink) {
 			url = SocialCalc.Callbacks.MakePageLink(parts.pagename, parts.workspacename, linkstyle, valueformat);
+			if (SocialCalc.Callbacks.untrustedContent) {
+				var safePageUrl = SocialCalc.SafeUrlForRender(url);
+				if (safePageUrl == null) {
+					return desc;
+				}
+				url = safePageUrl;
+			}
 		}
+	} else if (SocialCalc.Callbacks.untrustedContent) {
+		var safeUrl = SocialCalc.SafeUrlForRender(parts.url);
+		if (safeUrl == null) {
+			return desc;
+		}
+		url = safeUrl;
 	} else {
 		url = encodeURI(parts.url);
 	}
@@ -6259,7 +6359,7 @@ TableEditorSC.EditorGetStatuslineString = function(editor, status, arg, params) 
 			progress = scc.s_statusline_calculating + Math.floor(100 * arg.count / (arg.total || 1)) + "%";
 			break;
 		case "calcloading":
-			progress = scc.s_statusline_calculatingls + ": " + arg.sheetname;
+			progress = scc.s_statusline_calculatingls + ": " + (SocialCalc.Callbacks.untrustedContent ? SocialCalc.special_chars(arg.sheetname + "") : arg.sheetname);
 			break;
 		case "calcserverfunc":
 			progress = scc.s_statusline_calculating + Math.floor(100 * arg.count / (arg.total || 1)) + "%, " + scc.s_statusline_doingserverfunc + arg.funcname + scc.s_statusline_incell + arg.coord;
