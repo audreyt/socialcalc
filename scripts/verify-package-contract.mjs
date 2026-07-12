@@ -31,6 +31,7 @@
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { gzipSync } from "node:zlib";
 import { createRequire } from "node:module";
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, mkdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -78,12 +79,19 @@ const EXPECTED_TARBALL_MEMBERS = [
   "js/socialcalctableeditor.d.ts",
   "js/socialcalcviewer.d.ts",
 ];
-// Size ceilings are explicit package-contract values, not snapshots: they
-// leave room for ordinary source growth while catching accidental inclusion
-// of dependencies or other release artifacts. Baseline measured 2026-07-12:
-// 1,297,267 raw member bytes and a 273,712-byte npm tarball (gzip).
+// Component size ceilings are explicit package-contract values, not snapshots.
+// Baselines measured 2026-07-12: normal 720,971 raw / 132,153 gzip;
+// minified 411,929 raw / 101,593 gzip; CSS 2,688 raw / 958 gzip.
+// Combined baseline measured the same day: 1,297,564 raw member bytes and
+// 273,824 bytes for the already-gzip tarball.
+const MAX_NORMAL_RAW_BYTES = 780_000;
+const MAX_MINIFIED_RAW_BYTES = 450_000;
+const MAX_CSS_RAW_BYTES = 6_000;
+const MAX_NORMAL_GZIP_BYTES = 152_000;
+const MAX_MINIFIED_GZIP_BYTES = 117_000;
+const MAX_CSS_GZIP_BYTES = 1_100;
 const MAX_PACKAGE_RAW_BYTES = 1_600_000;
-const MAX_PACKAGE_GZIP_BYTES = 350_000;
+const MAX_PACKAGE_GZIP_BYTES = 300_000;
 
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -276,46 +284,70 @@ async function main() {
 
     const rootJsPath = path.join(packageDir, "dist", "SocialCalc.js");
     const minJsPath = path.join(packageDir, "dist", "SocialCalc.min.js");
-
+    const cssPath = path.join(packageDir, "dist", "socialcalc.css");
     function sha256(filePath) {
       return createHash("sha256").update(readFileSync(filePath)).digest("hex");
     }
 
     record("packed artifacts are nonempty and stay within explicit raw/gzip size budgets (sha256 reported, not pinned)", () => {
       const sizes = {
-        gzip: statSync(tarballPath).size,
+        tarball: statSync(tarballPath).size,
         rawPackage: EXPECTED_TARBALL_MEMBERS.reduce(
           (total, member) => total + statSync(path.join(packageDir, member)).size,
           0,
         ),
-        normal: statSync(rootJsPath).size,
-        minified: statSync(minJsPath).size,
+        normalRaw: statSync(rootJsPath).size,
+        minifiedRaw: statSync(minJsPath).size,
+        cssRaw: statSync(cssPath).size,
+        normalGzip: gzipSync(readFileSync(rootJsPath)).length,
+        minifiedGzip: gzipSync(readFileSync(minJsPath)).length,
+        cssGzip: gzipSync(readFileSync(cssPath)).length,
       };
       for (const [name, size] of Object.entries(sizes)) {
         if (!(size > 0)) throw new Error(`${name} artifact is empty (${size} bytes)`);
+      }
+      const ceilings = {
+        normalRaw: MAX_NORMAL_RAW_BYTES,
+        minifiedRaw: MAX_MINIFIED_RAW_BYTES,
+        cssRaw: MAX_CSS_RAW_BYTES,
+        normalGzip: MAX_NORMAL_GZIP_BYTES,
+        minifiedGzip: MAX_MINIFIED_GZIP_BYTES,
+      };
+      for (const [name, ceiling] of Object.entries(ceilings)) {
+        if (sizes[name] > ceiling) {
+          throw new Error(`${name} size ${sizes[name]}B exceeds the ${ceiling}B budget`);
+        }
+      }
+      if (sizes.cssGzip > MAX_CSS_GZIP_BYTES) {
+        throw new Error(`cssGzip size ${sizes.cssGzip}B exceeds the ${MAX_CSS_GZIP_BYTES}B budget`);
       }
       if (sizes.rawPackage > MAX_PACKAGE_RAW_BYTES) {
         throw new Error(
           `raw package size ${sizes.rawPackage}B exceeds the ${MAX_PACKAGE_RAW_BYTES}B budget`,
         );
       }
-      if (sizes.gzip > MAX_PACKAGE_GZIP_BYTES) {
+      if (sizes.tarball > MAX_PACKAGE_GZIP_BYTES) {
         throw new Error(
-          `gzip package size ${sizes.gzip}B exceeds the ${MAX_PACKAGE_GZIP_BYTES}B budget`,
+          `packed tarball size ${sizes.tarball}B exceeds the ${MAX_PACKAGE_GZIP_BYTES}B budget`,
         );
       }
-      if (!(sizes.minified < sizes.normal)) {
-        throw new Error(`expected minified bundle smaller than normal — normal=${sizes.normal} minified=${sizes.minified}`);
+      if (!(sizes.minifiedRaw < sizes.normalRaw)) {
+        throw new Error(`expected minified bundle smaller than normal — normal=${sizes.normalRaw} minified=${sizes.minifiedRaw}`);
       }
       const hashes = {
-        gzip: sha256(tarballPath),
+        tarball: sha256(tarballPath),
         normal: sha256(rootJsPath),
         minified: sha256(minJsPath),
+        css: sha256(cssPath),
       };
       return (
-        `raw package ${sizes.rawPackage}B | gzip ${sizes.gzip}B sha256:${hashes.gzip} | ` +
-        `normal ${sizes.normal}B sha256:${hashes.normal} | ` +
-        `minified ${sizes.minified}B sha256:${hashes.minified}`
+        `normal raw ${sizes.normalRaw}B gzip ${sizes.normalGzip}B | ` +
+        `minified raw ${sizes.minifiedRaw}B gzip ${sizes.minifiedGzip}B | ` +
+        `css raw ${sizes.cssRaw}B gzip ${sizes.cssGzip}B | ` +
+        `raw package ${sizes.rawPackage}B | ` +
+        `tarball raw ${sizes.tarball}B gzip ${sizes.tarball}B (already gzip; not recompressed) | ` +
+        `sha256 tarball:${hashes.tarball} normal:${hashes.normal} ` +
+        `minified:${hashes.minified} css:${hashes.css}`
       );
     });
 
