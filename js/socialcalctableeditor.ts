@@ -1036,7 +1036,28 @@ TableEditorSC.EditorScheduleSheetCommands = function (
       break;
 
     case "setemailparameters":
-      TableEditorSC.TriggerIoAction.Email(cmdTokens[1], cmdTokens[2]);
+      // TriggerIoAction.Email only issues its own "sendemail" sheet command
+      // (and therefore only fires its own cmdstart/cmdend pair) for each
+      // range row whose trigger cell matches and whose condition is true --
+      // a common, valid outcome for EMAILIF/EMAILONEDITIF is zero matches.
+      // Every other case here unconditionally drives sheetobj's
+      // cmdstart/cmdend contract (directly, or via SheetUndo/SheetRedo,
+      // which always call sheet.ScheduleSheetCommands even when there is
+      // nothing to undo/redo). Without that guarantee here, a zero-match (or
+      // throwing) call never signals completion, permanently stranding
+      // editor.busy=true plus anything already queued in
+      // editor.deferredCommands/deferredEmailCommands. Mirror SheetRedo's
+      // "nothing happened" idiom: schedule a no-op command so this dispatch
+      // always completes the cycle exactly once, whether or not a real
+      // email was sent or the call threw.
+      var emailsSent;
+      try {
+        emailsSent = TableEditorSC.TriggerIoAction.Email(cmdTokens[1], cmdTokens[2]);
+      } finally {
+        if (!emailsSent || !emailsSent.length) {
+          editor.context.sheetobj.ScheduleSheetCommands("", false);
+        }
+      }
       break;
 
     default:

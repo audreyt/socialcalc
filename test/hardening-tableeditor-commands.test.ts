@@ -118,6 +118,41 @@ function ensureDocumentEvents() {
   }
 }
 
+/** Await a real editor.StatusCallback event matching `predicate` (mirrors
+ * the waitForStatus/waitEditor convention used across the coverage suites).
+ * The setTimeout below is only a bounded fail-safe against a genuinely
+ * stalled command chain — the resolve path is driven by the production
+ * status-callback event, not by polling. */
+function waitForEditorStatus(
+  editor: Editor,
+  predicate: (status: string) => boolean,
+  timeoutMs = 3000,
+): Promise<void> {
+  // Promise.withResolvers is available at runtime (Bun) but not in es2022
+  // lib types; use a typed wrapper to bridge the gap (matches
+  // hardening-control-viewer.test.ts's waitEditor helper).
+  const PR = Promise as unknown as {
+    withResolvers: <T>() => { promise: Promise<T>; resolve: (v: T) => void; reject: (e: unknown) => void };
+  };
+  const { promise, resolve, reject } = PR.withResolvers<void>();
+  const key = `zz-wait_${Math.random().toString(36).slice(2)}`;
+  const timer = setTimeout(() => {
+    delete editor.StatusCallback[key];
+    reject(new Error("waitForEditorStatus: condition not met within timeout"));
+  }, timeoutMs);
+  editor.StatusCallback[key] = {
+    func: (_editor, status) => {
+      if (predicate(status)) {
+        clearTimeout(timer);
+        delete editor.StatusCallback[key];
+        resolve();
+      }
+    },
+    params: null,
+  };
+  return promise;
+}
+
 // A minimal event shape sufficient for the mouse handlers under test.
 interface FakeEvent {
   type: string;
@@ -791,6 +826,144 @@ test("EditedTriggerCell: an actionCellId absent from ioParameterList is skipped 
   SC.EditedTriggerCell({ Z9: true }, "A1", editor, sheet);
 
   expect(editor.deferredEmailCommands).toEqual([]);
+});
+
+// Parameter-list shape TriggerIoAction.Email reads off sheet.ioParameterList
+// for EMAILIF-family formulas: an array of range/coord/text operands with a
+// tacked-on function_name discriminant (matches the production convention
+// used by SC.Formula.IoFunctions elsewhere in this codebase).
+type EmailParamEntry = { type: "range" | "coord" | "text"; value: string };
+type EmailParamList = EmailParamEntry[] & { function_name: string };
+
+function emailIfParams(): EmailParamList {
+  return Object.assign(
+    [
+      { type: "range", value: "A1|A1|" }, // condition
+      { type: "range", value: "B1|B1|" }, // to
+      { type: "range", value: "C1|C1|" }, // subject
+      { type: "range", value: "D1|D1|" }, // body
+    ] satisfies EmailParamEntry[],
+    { function_name: "EMAILIF" },
+  );
+}
+
+// SC.RecalcInfo is a singleton shared across every loadSocialCalc() caller
+// in this worker; an earlier test's scheduleCommands can leave a recalc
+// in flight (currentState != idle), which would silently swallow this
+// file's own needsrecalc-triggered recalc and never reach "calcfinished" /
+// "doneposcalc". Reset it before relying on a full busy-settle wait.
+function resetRecalcInfo(SC: SC) {
+  const info = SC.RecalcInfo;
+  info.currentState = info.state.idle;
+  info.queue = [];
+  if (info.recalctimer) {
+    clearTimeout(info.recalctimer);
+    info.recalctimer = null;
+  }
+}
+
+test("EditorScheduleSheetCommands: setemailparameters completes the busy/deferred cycle when zero emails match", async () => {
+  const SC = await loadSocialCalc();
+  const { control } = await newControl(SC);
+  const editor = editorOf(control);
+  const sheet = sheetOf(editor);
+
+  (globalThis as unknown as { spreadsheet: unknown }).spreadsheet = control;
+  (globalThis as unknown as { ss: unknown }).ss = control;
+  try {
+    resetRecalcInfo(SC);
+    await scheduleCommands(SC, sheet, [
+      "set A1 value n 0", // condition cell: loosely-equal-false -> zero matches
+      "set B1 text t to@example.com",
+      "set C1 text t subj",
+      "set D1 text t body",
+    ]);
+
+    // scheduleCommands only awaits "cmdend"; the sheet's own needsrecalc/
+    // render/position-calc chain still has to settle before editor.busy
+    // drops back to false.
+    await waitForEditorStatus(editor, (status) => status === "doneposcalc" && editor.busy === false);
+
+    sheet.ioParameterList = { E1: emailIfParams() };
+
+    // Confirms the fixture genuinely exercises the fix's guard branch: real
+    // production zero-match outcome, not a stubbed no-op.
+    expect(SC.TriggerIoAction.Email("E1")).toEqual([]);
+
+    expect(editor.busy).toBe(false);
+    editor.EditorScheduleSheetCommands("setemailparameters E1", false);
+    // Fixed behavior: the dispatch itself synchronously fires cmdstart (via
+    // the fallback no-op ScheduleSheetCommands call), so busy flips true
+    // immediately -- reproducing the exact real-world scenario where an
+    // unrelated command issued right behind an email dispatch lands in
+    // editor.deferredCommands.
+    expect(editor.busy).toBe(true);
+    editor.EditorScheduleSheetCommands("set F1 text t queued", true, false);
+    expect(editor.deferredCommands).toEqual([{ cmdstr: "set F1 text t queued", saveundo: true }]);
+
+    await waitForEditorStatus(editor, (status) => status === "doneposcalc" && editor.busy === false);
+
+    // Before the fix this point was unreachable: setemailparameters never
+    // signaled completion, so busy stayed true forever and the queued F1
+    // command was permanently stranded.
+    expect(editor.busy).toBe(false);
+    expect(editor.deferredCommands).toEqual([]);
+    expect(sheet.cells.F1?.datavalue).toBe("queued");
+  } finally {
+    delete (globalThis as unknown as { spreadsheet?: unknown }).spreadsheet;
+    delete (globalThis as unknown as { ss?: unknown }).ss;
+  }
+});
+
+test("EditorScheduleSheetCommands: setemailparameters does not double-dispatch when a real email is sent", async () => {
+  const SC = await loadSocialCalc();
+  const { control } = await newControl(SC);
+  const editor = editorOf(control);
+  const sheet = sheetOf(editor);
+
+  (globalThis as unknown as { spreadsheet: unknown }).spreadsheet = control;
+  (globalThis as unknown as { ss: unknown }).ss = control;
+  try {
+    resetRecalcInfo(SC);
+    await scheduleCommands(SC, sheet, [
+      "set A1 value n 1", // condition cell: loosely-equal-true -> one match
+      "set B1 text t to@example.com",
+      "set C1 text t subj",
+      "set D1 text t body",
+    ]);
+
+    // scheduleCommands only awaits "cmdend"; the sheet's own needsrecalc/
+    // render/position-calc chain still has to settle before editor.busy
+    // drops back to false (required so the dispatch below executes
+    // synchronously instead of landing in editor.deferredCommands).
+    await waitForEditorStatus(editor, (status) => status === "doneposcalc" && editor.busy === false);
+
+    sheet.ioParameterList = { E1: emailIfParams() };
+
+    const scheduledCmds: string[] = [];
+    const originalScheduleSheetCommands = sheet.ScheduleSheetCommands.bind(sheet);
+    sheet.ScheduleSheetCommands = (cmd: string, saveundo?: boolean) => {
+      scheduledCmds.push(cmd);
+      originalScheduleSheetCommands(cmd, saveundo);
+    };
+    try {
+      editor.EditorScheduleSheetCommands("setemailparameters E1", false);
+    } finally {
+      sheet.ScheduleSheetCommands = originalScheduleSheetCommands;
+    }
+
+    // Exactly one real sheet command (the genuine "sendemail ..." dispatch
+    // TriggerIoAction.Email issues) -- the fix's fallback no-op must not
+    // fire a second, collateral cmdstart/cmdend pair when a real send
+    // already completes the cycle on its own.
+    expect(scheduledCmds).toEqual(["sendemail to@example.com subj body"]);
+
+    await waitForEditorStatus(editor, (status) => status === "doneposcalc" && editor.busy === false);
+    expect(editor.busy).toBe(false);
+  } finally {
+    delete (globalThis as unknown as { spreadsheet?: unknown }).spreadsheet;
+    delete (globalThis as unknown as { ss?: unknown }).ss;
+  }
 });
 
 // ===========================================================================

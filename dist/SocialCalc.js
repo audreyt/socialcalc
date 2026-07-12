@@ -6193,7 +6193,14 @@ TableEditorSC.EditorScheduleSheetCommands = function(editor, cmdstr, saveundo, i
 			editor.SheetRedo();
 			break;
 		case "setemailparameters":
-			TableEditorSC.TriggerIoAction.Email(cmdTokens[1], cmdTokens[2]);
+			var emailsSent;
+			try {
+				emailsSent = TableEditorSC.TriggerIoAction.Email(cmdTokens[1], cmdTokens[2]);
+			} finally {
+				if (!emailsSent || !emailsSent.length) {
+					editor.context.sheetobj.ScheduleSheetCommands("", false);
+				}
+			}
 			break;
 		default:
 			editor.context.sheetobj.ScheduleSheetCommands(cmdstr, saveundo);
@@ -20628,3 +20635,4 @@ SocialCalc.SpreadsheetViewerDecodeSpreadsheetSave = function(spreadsheet, str) {
     // Just return a value to define the module export.
     return SocialCalc;
 }));
+//# sourceMappingURL=SocialCalc.js.map
