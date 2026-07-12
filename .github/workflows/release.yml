@@ -1,23 +1,29 @@
 name: Release
 
-# Tag-push release pipeline, restructured as independent parallel gates so
-# no single expensive check (mutation testing, a 3-browser Playwright
-# matrix, an external EtherCalc canary) serializes behind the others in one
-# long-running job:
+# Tag-push release pipeline: independent parallel gates so no single
+# expensive check (mutation testing, a 3-browser Playwright matrix, an
+# external EtherCalc canary) serializes behind the others in one long-
+# running job:
 #
 #   core              typecheck, strict typecheck, lint, build, unit tests,
-#                     Dafny verification, Lean generation, blocking
-#                     high/critical dependency audit.
+#                     test credibility guard, Dafny verification, Lean
+#                     generation, blocking high/critical dependency audit.
 #   coverage          source-attributed coverage (`vp run test:coverage`),
 #                     enforces the per-file/global floors in vite.config.ts.
+#                     Uploads coverage/lcov-report + lcov.info even when a
+#                     threshold fails, so the enforced number stays
+#                     reviewable without a local re-run.
 #   mutation          full mutation run (`vp run mutate`); its HTML/JSON
 #                     reports are uploaded even when the job's score is red,
 #                     so a regression is inspectable without re-running.
 #   playwright        real-browser suite across Chromium/Firefox/WebKit
-#                     (skips cleanly, not red, if no browser suite is wired
-#                     into this branch yet — see each job's own gate step).
-#   ethercalc-canary  pinned, networked EtherCalc candidate-tarball canary
-#                     (skips cleanly if not wired into this branch yet).
+#                     (e2e typecheck + credibility guard run first).
+#   ethercalc-canary  pinned, networked EtherCalc candidate-tarball canary.
+#
+# None of the above have a graceful "skip if not wired in yet" fallback:
+# every script/config they invoke is expected to exist on this branch, and
+# a missing one fails loudly (a bare command-not-found/module-not-found
+# error) rather than silently passing.
 #
 # `package` needs ALL FIVE above. It re-verifies the package-contract gate,
 # packs the release tarball TWICE from a clean checkout and byte-compares
@@ -37,18 +43,32 @@ name: Release
 # `publish` job is wired for npm Trusted Publishing (OIDC, no stored
 # secret) but is inert until a human:
 #   1. Registers this exact repo + workflow filename (release.yml) as a
-#      Trusted Publisher for the `socialcalc` package on npmjs.com, and
+#      Trusted Publisher for the `socialcalc` package on npmjs.com,
 #   2. Creates a protected `npm-publish` GitHub Environment with required
 #      reviewers (Settings -> Environments) so the gated job cannot fire
-#      without an approval, even after a successful `workflow_dispatch`.
-# Until both are done, any dispatch of the publish job will simply fail at
-# the `npm publish` step (no token exists to leak, and no third-party has
-# been granted publish trust yet). Once it does publish, the same job
-# creates an immutable GitHub Release from the identical verified tarball
-# and integrity manifest, re-verifies the release asset's checksum after
-# upload, and runs a fresh-install smoke test against the real npm
-# registry (not the local tarball) to confirm the published package is
-# actually installable and correct before declaring success.
+#      without an approval, even after a successful `workflow_dispatch`, and
+#   3. Enables Settings -> General -> "Releases" -> "Enable release
+#      immutability" for this repository (future releases only — it does
+#      not retroactively lock releases published before it was turned on).
+#      The publish job below FAILS the run if the published release does
+#      not come back from the API with `"immutable": true`, specifically
+#      so a missed step 3 is caught loudly at publish time instead of
+#      silently shipping a mutable release.
+# Until all three are done, any dispatch of the publish job will fail:
+# without (1) at `npm publish` (no token exists to leak, and no third-party
+# has been granted publish trust yet); without (3) at the immutability
+# check after publish (the release itself still succeeds and is NOT rolled
+# back — see that step's own comment for why an npm-side rollback would be
+# actively harmful — but the job still ends red until (3) is fixed).
+#
+# Publish order is deliberately draft-first, matching GitHub's documented
+# immutable-release flow: create a DRAFT release and attach the exact,
+# already-integrity-verified tarball + manifest to it, verify the
+# uploaded draft asset's checksum, and ONLY THEN run `npm publish`. The
+# draft is published (made non-draft, at which point immutability locks
+# in) after npm publish succeeds. This ordering means a failure in asset
+# staging/verification never triggers the npm side effect at all — npm
+# publish is irreversible, draft-release asset staging is not.
 #
 # Every `release` (core/coverage/mutation/playwright/ethercalc-canary/
 # package) and `publish` job additionally requires a real tag ref
@@ -186,7 +206,38 @@ jobs:
         run: vp install --frozen-lockfile
 
       - name: Source-attributed coverage (per-file + global floors)
-        run: vp run test:coverage
+        run: |
+          set -euo pipefail
+          vp run test:coverage 2>&1 | tee coverage-output.log
+
+      # Runs even when the step above failed a threshold: the report files
+      # are written to disk by the coverage run itself before the
+      # threshold check sets a nonzero exit, so they exist either way —
+      # only their upload was previously conditional on success, which
+      # made a failing (i.e. exactly the interesting) run's report
+      # unreviewable without a local re-run.
+      - name: Extract the exact coverage text summary into the job summary
+        if: always()
+        run: |
+          set -euo pipefail
+          {
+            echo "### Coverage report — ${{ github.ref_name }} @ ${{ github.sha }}"
+            echo '```'
+            awk '/Coverage report from v8/,/^=+$/' coverage-output.log || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload source-attributed coverage report (even on a failed threshold)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage-report-${{ github.ref_name }}-${{ github.sha }}
+          path: |
+            coverage/lcov-report/
+            coverage/lcov.info
+            coverage-output.log
+          if-no-files-found: error
+          retention-days: 90
 
   mutation:
     name: full mutation testing
@@ -215,13 +266,17 @@ jobs:
       # which fails the step above and therefore this job, blocking
       # `package`/`publish` downstream — still leaves its HTML/JSON report
       # inspectable instead of silently disappearing with the failed run.
+      # if-no-files-found: error (not warn): the ONLY way the report is
+      # genuinely absent is Stryker itself crashing before writing
+      # anything, which is its own distinct failure worth surfacing loudly
+      # here, not swallowing as a soft warning.
       - name: Upload mutation reports (even on red)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: mutation-report-${{ github.ref_name }}
           path: reports/mutation/
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 90
 
   playwright:
@@ -244,16 +299,30 @@ jobs:
       - name: Install dependencies (frozen lockfile)
         run: vp install --frozen-lockfile
 
-      - name: Browser suite (if wired into this branch)
-        run: |
-          set -euo pipefail
-          if [ -f playwright.config.ts ] && node -e "process.exit(require('./package.json').scripts?.['test:browser'] ? 0 : 1)"; then
-            echo "Running browser suite: vp run test:browser"
-            vp exec playwright install --with-deps chromium firefox webkit
-            vp run test:browser
-          else
-            echo "No playwright.config.ts / \"test:browser\" script on this branch yet; skipping (nothing to enforce)."
-          fi
+      - name: Typecheck e2e suite (strict)
+        run: vp exec tsc --noEmit -p e2e/tsconfig.json
+
+      - name: Test credibility guard (test/**/*.test.ts + e2e/**/*.spec.ts)
+        run: vp run check:test-credibility
+
+      - name: Install Playwright browsers
+        run: vp exec playwright install --with-deps chromium firefox webkit
+
+      - name: Build (normal + minified UMD bundles)
+        run: vp build --minify
+
+      - name: Run browser suite
+        run: vp run test:browser
+
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-report-${{ github.ref_name }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
 
   ethercalc-canary:
     name: pinned EtherCalc candidate-tarball canary
@@ -275,15 +344,8 @@ jobs:
       - name: Install dependencies (frozen lockfile)
         run: vp install --frozen-lockfile
 
-      - name: EtherCalc canary (if wired into this branch)
-        run: |
-          set -euo pipefail
-          if node -e "process.exit(require('./package.json').scripts?.['test:ethercalc-canary'] ? 0 : 1)"; then
-            echo "Running EtherCalc canary: vp run test:ethercalc-canary"
-            vp run test:ethercalc-canary
-          else
-            echo "No \"test:ethercalc-canary\" script on this branch yet; skipping (nothing to enforce)."
-          fi
+      - name: EtherCalc canary
+        run: vp run test:ethercalc-canary
 
   package:
     name: package-contract gate + deterministic pack-twice release artifact
@@ -309,15 +371,8 @@ jobs:
       - name: Install dependencies (frozen lockfile)
         run: vp install --frozen-lockfile
 
-      - name: Package artifact gate (if defined)
-        run: |
-          set -euo pipefail
-          if node -e "process.exit(require('./package.json').scripts?.['test:package-contract'] ? 0 : 1)"; then
-            echo "Running package contract gate: vp run test:package-contract"
-            vp run test:package-contract
-          else
-            echo "No test:package-contract script defined yet; skipping (nothing to enforce)."
-          fi
+      - name: Package artifact gate
+        run: vp run test:package-contract
 
       - name: Pack twice and byte-compare (refuse a non-deterministic build)
         id: pack
@@ -423,13 +478,31 @@ jobs:
             exit 1
           fi
 
+      # Needed for scripts/verify-registry-smoke.mjs + scripts/lib/
+      # sheet-smoke.mjs (the registry-smoke step) — a plain checkout, no
+      # build/install: those two files have zero dependencies of their own.
+      - name: Checkout tag commit (exact SHA, no mutable ref)
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
       - name: Download the one exact release artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: ${{ needs.package.outputs.artifact-name }}
           path: dist-release
 
-      - name: Verify downloaded artifact integrity
+      # Every check here runs BEFORE any side effect (draft release
+      # creation or npm publish) below. sha256/integrity alone only prove
+      # the bytes weren't corrupted in transit between jobs; they do NOT
+      # prove this artifact was built for THIS tag/commit/version — a
+      # manifest could be internally self-consistent (its own sha256 field
+      # matches its own paired tarball) while still being the artifact
+      # from a completely different, unrelated tag if e.g. artifact
+      # retention/naming ever got confused. The tag/commit/file/version
+      # cross-checks close that gap.
+      - name: Verify downloaded artifact integrity and provenance
         id: verify
         shell: bash
         run: |
@@ -448,8 +521,26 @@ jobs:
           fi
           TARBALL="${tgz_files[0]}"
           MANIFEST="${manifest_files[0]}"
+
+          RECORDED_FILE="$(node -p "require('./$MANIFEST').file")"
+          RECORDED_TAG="$(node -p "require('./$MANIFEST').tag")"
+          RECORDED_COMMIT="$(node -p "require('./$MANIFEST').commit")"
           RECORDED_SHA256="$(node -p "require('./$MANIFEST').sha256")"
           RECORDED_INTEGRITY="$(node -p "require('./$MANIFEST').integrity")"
+
+          if [ "$RECORDED_FILE" != "$TARBALL" ]; then
+            echo "::error::manifest \"file\" ($RECORDED_FILE) does not match the actual downloaded tarball name ($TARBALL)"
+            exit 1
+          fi
+          if [ "$RECORDED_TAG" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::manifest \"tag\" ($RECORDED_TAG) does not match this run's tag ($GITHUB_REF_NAME) — artifact was built for a different release"
+            exit 1
+          fi
+          if [ "$RECORDED_COMMIT" != "$GITHUB_SHA" ]; then
+            echo "::error::manifest \"commit\" ($RECORDED_COMMIT) does not match this run's commit ($GITHUB_SHA) — artifact was built from a different commit"
+            exit 1
+          fi
+
           ACTUAL_SHA256="$(sha256sum "$TARBALL" | awk '{print $1}')"
           ACTUAL_INTEGRITY="sha512-$(openssl dgst -sha512 -binary "$TARBALL" | openssl base64 -A)"
           if [ "$ACTUAL_SHA256" != "$RECORDED_SHA256" ]; then
@@ -460,10 +551,24 @@ jobs:
             echo "::error::integrity mismatch for $TARBALL: recorded $RECORDED_INTEGRITY, actual $ACTUAL_INTEGRITY"
             exit 1
           fi
-          echo "Verified $TARBALL against recorded sha256 and integrity manifest."
-          echo "tarball-path=dist-release/$TARBALL" >> "$GITHUB_OUTPUT"
-          echo "tarball-name=$TARBALL" >> "$GITHUB_OUTPUT"
-          echo "sha256=$ACTUAL_SHA256" >> "$GITHUB_OUTPUT"
+
+          mkdir -p /tmp/publish-verify-extract
+          tar -xzf "$TARBALL" -C /tmp/publish-verify-extract
+          TARBALL_PKG_VERSION="$(node -p "require('/tmp/publish-verify-extract/package/package.json').version")"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$TARBALL_PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::tarball's package.json version ($TARBALL_PKG_VERSION) does not match the tag's version ($TAG_VERSION)"
+            exit 1
+          fi
+
+          echo "Verified $TARBALL: file/tag/commit match this run, sha256+integrity match the manifest, packed package.json version ($TARBALL_PKG_VERSION) matches the tag."
+          {
+            echo "tarball-path=dist-release/$TARBALL"
+            echo "tarball-name=$TARBALL"
+            echo "manifest-path=dist-release/$MANIFEST"
+            echo "manifest-name=$MANIFEST"
+            echo "sha256=$ACTUAL_SHA256"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Setup Node (npm >= 11.5.1 required for OIDC trusted publishing)
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -471,37 +576,75 @@ jobs:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Publish exact verified tarball with provenance (OIDC, no token secret)
-        run: npm publish "${{ steps.verify.outputs.tarball-path }}" --provenance
-
-      - name: Create immutable GitHub Release from the same verified tarball
+      # Draft-first, matching GitHub's documented immutable-release flow:
+      # create the release as a draft, attach the exact already-verified
+      # tarball + manifest, and verify the uploaded asset's checksum —
+      # ALL before `npm publish` runs below. `--verify-tag` additionally
+      # requires the tag to already exist and match this run's commit,
+      # refusing to create a release against a stale/wrong tag.
+      - name: Create DRAFT GitHub Release with the exact verified tarball + manifest
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           gh release create "${{ github.ref_name }}" \
+            --draft \
+            --verify-tag \
             "${{ steps.verify.outputs.tarball-path }}" \
-            dist-release/*.integrity.json \
+            "${{ steps.verify.outputs.manifest-path }}" \
             --title "${{ github.ref_name }}" \
-            --notes "Published to npm as socialcalc@${{ needs.package.outputs.version }}. Tarball sha256: ${{ steps.verify.outputs.sha256 }}."
+            --notes "Publishing socialcalc@${{ needs.package.outputs.version }} to npm. Tarball sha256: ${{ steps.verify.outputs.sha256 }}."
 
-      - name: Verify the GitHub Release asset's checksum matches the published tarball
+      - name: Verify the draft release asset's checksum before publishing to npm
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          mkdir -p release-asset-check
+          mkdir -p draft-asset-check
           gh release download "${{ github.ref_name }}" \
             --pattern "${{ steps.verify.outputs.tarball-name }}" \
-            --dir release-asset-check
-          DOWNLOADED_SHA256="$(sha256sum "release-asset-check/${{ steps.verify.outputs.tarball-name }}" | awk '{print $1}')"
+            --dir draft-asset-check
+          DOWNLOADED_SHA256="$(sha256sum "draft-asset-check/${{ steps.verify.outputs.tarball-name }}" | awk '{print $1}')"
           if [ "$DOWNLOADED_SHA256" != "${{ steps.verify.outputs.sha256 }}" ]; then
-            echo "::error::GitHub Release asset checksum mismatch: expected ${{ steps.verify.outputs.sha256 }}, downloaded asset is $DOWNLOADED_SHA256"
+            echo "::error::draft release asset checksum mismatch: expected ${{ steps.verify.outputs.sha256 }}, downloaded asset is $DOWNLOADED_SHA256"
             exit 1
           fi
-          echo "GitHub Release asset checksum verified: $DOWNLOADED_SHA256"
+          echo "Draft release asset checksum verified: $DOWNLOADED_SHA256"
 
-      - name: Registry smoke — fresh install of the just-published version
+      # The one irreversible step in this job. Everything above only
+      # staged/verified a draft GitHub Release (freely deletable); nothing
+      # below can be un-published from npm on a later failure, so nothing
+      # that could still fail runs before this except pure verification.
+      - name: Publish exact verified tarball with provenance (OIDC, no token secret)
+        run: npm publish "${{ steps.verify.outputs.tarball-path }}" --provenance
+
+      - name: Publish the draft GitHub Release (immutability locks in here, if the repo setting is enabled)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "${{ github.ref_name }}" --draft=false
+
+      # Confirms prerequisite 3 from this file's header comment (Settings
+      # -> General -> Releases -> "Enable release immutability") was
+      # actually done, rather than assuming it. Deliberately does NOT roll
+      # back the npm publish or delete the GitHub Release on failure here:
+      # npm publish is already irreversible, and deleting a just-published
+      # GitHub Release would destroy the only tamper-evident record of
+      # exactly what was published — a human fixing the repo setting and
+      # re-running this check (or accepting the gap for this one release)
+      # is safer than automation deleting release history.
+      - name: Verify the published release actually came back immutable
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          IMMUTABLE="$(gh api "repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}" --jq '.immutable')"
+          if [ "$IMMUTABLE" != "true" ]; then
+            echo "::error::published release ${{ github.ref_name }} came back with immutable=$IMMUTABLE, not true. The npm package IS published (this cannot be undone). Fix: enable Settings -> General -> Releases -> \"Enable release immutability\" for this repository (applies to future releases only), then re-tag or otherwise ensure this release's supply-chain evidence is trusted through another channel."
+            exit 1
+          fi
+          echo "Confirmed: release ${{ github.ref_name }} is immutable."
+
+      - name: Registry smoke — fresh install of the just-published version (real command/formula/save-load, all three delivery paths)
         run: |
           set -euo pipefail
           PKG_VERSION="${{ needs.package.outputs.version }}"
@@ -519,22 +662,4 @@ jobs:
             fi
             sleep 6
           done
-          mkdir -p registry-smoke && cd registry-smoke
-          npm init -y >/dev/null
-          npm install "socialcalc@$PKG_VERSION" >/dev/null
-          node -e "
-            const SC = require('socialcalc');
-            if (typeof SC.SpreadsheetControl !== 'function') throw new Error('CJS require: SpreadsheetControl missing');
-            console.log('CJS require OK:', Object.keys(SC).length, 'top-level keys');
-          "
-          cat > esm-check.mjs <<'EOF'
-          import SC from "socialcalc";
-          if (typeof SC.SpreadsheetControl !== "function") throw new Error("ESM default import: SpreadsheetControl missing");
-          console.log("native ESM default import OK:", Object.keys(SC).length, "top-level keys");
-          EOF
-          node esm-check.mjs
-          node -e "
-            const SCmin = require('socialcalc/dist/SocialCalc.min.js');
-            if (typeof SCmin.SpreadsheetControl !== 'function') throw new Error('deep minified require: SpreadsheetControl missing');
-            console.log('deep minified require OK:', Object.keys(SCmin).length, 'top-level keys');
-          "
+          node scripts/verify-registry-smoke.mjs "$PKG_VERSION"
