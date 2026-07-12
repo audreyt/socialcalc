@@ -1,98 +1,142 @@
 # Agent notes
 
-## TypeScript in-place rewrite (2026-07-09)
+## Source and quality-gate operations
 
-Sources under `js/` are global-script TypeScript (not ES modules). `build.ts`
-prefers sibling `.ts` over listed `.js`, strips types with `Bun.Transpiler`, and
-reattaches leading license comment preambles. UMD open/close wrappers are
-**inlined strings in `build.ts`** (not `js/*` files — they are not standalone-parseable).
+SocialCalc's shipping implementation is assembled from global-script TypeScript,
+not ES modules. `build.ts` owns the ordered source list, prefers a sibling `.ts`
+when a listed `.js` name has one, strips types with `Bun.Transpiler`, and writes
+the generated `dist/SocialCalc.js` and `dist/socialcalc.css`. Its UMD wrappers
+are inline strings in `build.ts`; they are not standalone files. Edit `js/` and
+`css/` sources, never generated `dist/` output.
 
-**Type-safety status (honest):**
+Normal source-only changes use this matrix:
 
-| File | Status |
-|---|---|
-| `formatnumber2.ts` | Fully typechecked (no `@ts-nocheck`) |
-| `formula-ref.ts` | Fully typechecked pure formula-ref + A1 coord algebra (after formula-operand in build) |
-| `formula-parse.ts` | Fully typechecked pure lexer/RPN/type helpers (after formula1 in build) |
-| `formula-operand.ts` | Fully typechecked pure operand-stack helpers (after formula-parse in build) |
-| `socialcalcconstants.ts` | Fully typechecked; LemmaScript `//@ verify` on pure class/image-prefix helpers |
-| `formula1.ts` | Fully typechecked (evaluator + Formula surface) |
-| `socialcalc-3.ts` | Fully typechecked (command/caller core) |
-| `socialcalcviewer.ts` | Fully typechecked |
-| `socialcalcpopup.ts` | Fully typechecked |
-| `socialcalcspreadsheetcontrol.ts` | Fully typechecked (toolbar/tab/save UI) |
-| `socialcalctableeditor.ts` | Fully typechecked (table editor / DOM) |
+| Change                                | Required checks                                                                                         |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Ordinary `js/` or build-source change | `bun run build`, `bun run typecheck`, `vp lint --type-check --type-aware`, then the focused Vite+ tests |
+| Formula-reference rewrite             | The matrix below, plus the focused command tests                                                        |
+| LemmaScript facade                    | The facade matrix below; optional full Lean build when sibling repos are available                      |
 
+`bun run typecheck` is the ordinary `tsc --noEmit` compiler check from
+`tsconfig.json`. `bun run typecheck:strict` is a separate narrower check:
+`tsconfig.strict.json` includes only `build.ts` and disallows JavaScript input.
 
-Do **not** claim a finished typed rewrite while `@ts-nocheck` remains. All core
-`js/*.ts` modules are now fully typechecked. Next work: tighten remaining `any`
-bridges and improve public `*.d.ts` coverage only when runtime surfaces a
-missing API.
+`vp lint --type-check --type-aware` is the Vite+ lint/type-aware gate. It has no
+package script: invoke `vp` directly. `vite.config.ts` sets
+`lint.options.denyWarnings: true`, so warnings fail the gate, and ignores
+`dist/**` because generated artifacts must be corrected in their `js/` source.
+Do not add `oxlint-disable`, `@ts-ignore`, or other suppressions to hide a
+source diagnostic.
 
-**LemmaScript:** Shipping pure cores keep `//@ verify` marks in place, but
-`lsc` cannot extract global-script `js/*.ts` (no exports). The verification
-surface is exported facades under `lemma/`:
+`vp test` is the test gate; test files import APIs from `vite-plus/test`.
+`test/helpers/socialcalc.ts` compiles the generated UMD bundle once with
+`vm.Script` and shares one SocialCalc instance within each isolated Vitest file
+worker. Install per-file state in that file's hooks. Do not restore
+cache-busting dynamic imports: Vite transforms each query as a separate copy of
+the 760 KB bundle and exhausts worker memory.
 
-- `lemma/a1.ts` — A1 clamp/coord + overflow `#REF!` rewrite policy (26 Dafny VCs)
-- `lemma/eval-ops.ts` — pure `/` and `&` error-propagation lattice (4 Dafny VCs)
-- `lemma/lookup-result.ts` — LookupResultType precedence chooser (resolveToken, preferExact, chooseLookupResult VCs; Bun locks full row-scan)
+## LemmaScript operations
 
-Both backends are scaffolded:
+Shipping `js/*.ts` files are global scripts and cannot be extracted directly by
+LemmaScript. The exported facades in `lemma/` mirror selected pure shipping
+behavior. Dafny and Lean proofs apply to those facades; Vite+ tests cross-check
+facade outputs against shipping oracles. This is a formal boundary around the
+named pure policies, not a proof of the complete global-script or DOM system.
+`LemmaScript-files.txt` is the manifest of the three facade inputs:
 
-```bash
-bun run verify:both          # Dafny check + Lean gen smoke
-bun run verify:dafny:gen     # → lemma/*.dfy.gen
-bun run verify:dafny:regen   # merge gen into proof-bearing .dfy files
-bun run verify:dafny         # lsc check --backend=dafny (LemmaScript-files.txt)
-bun run verify:lean:gen      # → lemma/*.types.lean + *.def.lean
-bun run verify:lean:build    # lake build (sibling ../velvet, ../loom, ../LemmaScript)
-```
+- `lemma/a1.ts`: A1 clamp/coordinate algebra, absolute-reference helpers, and
+  overflow `#REF!` policy — 26 Dafny VCs.
+- `lemma/eval-ops.ts`: `/` and `&` type/error-propagation lattice — 4 VCs.
+- `lemma/lookup-result.ts`: token resolution and exact-before-wildcard-before-
+  miss precedence — 3 VCs. The full pipe-table row scan remains runtime-tested.
 
-**Useful rewards now:** Dafny CI-locks pure A1/`#REF!` overflow algebra (26 VCs),
-`/`/`&` error lattice (4 VCs), and LookupResultType precedence chooser
- (resolveToken + preferExact + chooseLookupResult VCs). Bun
-`test/lemma-a1-facade.test.ts`, `test/lemma-eval-ops-facade.test.ts`, and
-`test/lemma-lookup-result-facade.test.ts` cross-check facades vs shipping oracles.
-Lean gen feeds Leanstral goal packs. Grow `lemma/*.ts` only; promote only to
-Bun fixtures. Do not formalize command/DOM. After TS facade edits:
-`verify:dafny:regen` then `verify:dafny` (`.dfy` is proof-bearing; plain `gen`
-alone can leave it stale).
+The verified count is **33 VCs (26 + 4 + 3)**. The proof-bearing `.dfy` files
+are checked by Dafny; direct reproduction is:
+`dafny verify lemma/a1.dfy lemma/eval-ops.dfy lemma/lookup-result.dfy`.
 
-## SocialCalc formula-reference work
+### Artifact ownership
 
-When changing formula-reference rewrite behavior, preserve compatibility first.
+| Files                                                       | Ownership                                   |
+| ----------------------------------------------------------- | ------------------------------------------- |
+| `lemma/*.ts`, `LemmaScript-files.txt`                       | Hand-maintained facade sources and manifest |
+| `lemma/*.dfy`                                               | Hand-maintained proof-bearing Dafny models  |
+| `lemma/*.proof.lean`, `lemma/a1.spec.lean`                  | Hand-maintained Lean proof/support files    |
+| `lemma/*.dfy.gen`, `lemma/*.types.lean`, `lemma/*.def.lean` | Generated from facades                      |
+
+After a facade edit, run its focused Vite+ oracle test, then
+`bun run verify:dafny:regen` (three-way merge) and `bun run verify:dafny`.
+Run `bun run verify:lean` for Lean generation/non-empty assertions; run
+`bun run verify:lean:build` only when `../velvet`, `../loom`, and
+`../LemmaScript` are present. `bun run verify:both` is Dafny check plus Lean
+generation/non-empty smoke, not `lake build`. Plain `verify:dafny:gen` creates
+`.dfy.gen` files but does not update checked proof-bearing `.dfy`; never
+routinely copy `.dfy.gen` over `.dfy`.
+
+Prerequisites and pins: package LemmaScript/lsc is `0.5.13`; CI installs Dafny
+`4.9.0`; Lean is `4.24.0`; Lake pins Z3 `4.15.4` and cvc5 `1.3.1` and
+downloads them as needed. Full Lake builds assume sibling checkouts at
+`../velvet` (with `../loom` pulled through its lemma layout) and
+`../LemmaScript`. CI intentionally splits Dafny verification from Lean
+generation and does not run the sibling-dependent Lake build.
+
+### Facade-to-shipping tests
+
+- `test/lemma-a1-facade.test.ts` compares A1 helpers with `rcColname`,
+  `crToCoord`, `OffsetFormulaCoords`, and `AdjustFormulaCoords`.
+- `test/lemma-eval-ops-facade.test.ts` compares `/` and `&` policies with
+  `evaluate_parsed_formula`.
+- `test/lemma-lookup-result-facade.test.ts` compares facade table selection with
+  `Formula.LookupResultType`; its complete row scans remain runtime coverage.
+
+## TypeScript status
+
+Core modules currently intended for typechecking include `formatnumber2.ts`,
+`formula-parse.ts`, `formula-operand.ts`, `formula-ref.ts`, `formula1.ts`,
+`socialcalcconstants.ts`, `socialcalc-3.ts`, `socialcalcspreadsheetcontrol.ts`,
+`socialcalctableeditor.ts`, `socialcalcviewer.ts`, and `socialcalcpopup.ts`.
+Keep this status honest: do not claim a finished typed rewrite when compiler or
+lint diagnostics remain. Tighten remaining `any` bridges and public `*.d.ts`
+coverage only when a runtime surface requires it.
+
+## Formula-reference compatibility
+
 The pure helpers in `js/formula-ref.ts` (emitted into `dist/SocialCalc.js`) are
-the implementation oracle for `OffsetFormulaCoords` / `AdjustFormulaCoords` /
-`ReplaceFormulaCoords` and A1 coord algebra unless a command-level spreadsheet
-scenario proves the current behavior is wrong. `js/socialcalc-3.ts` is command
-handling and call sites only.
+the implementation oracle for `OffsetFormulaCoords`, `AdjustFormulaCoords`,
+`ReplaceFormulaCoords`, and A1 coordinate algebra unless a command-level
+spreadsheet scenario proves the current behavior wrong. `js/socialcalc-3.ts`
+contains command handling and call sites.
 
-Key files:
-
-- `js/formula-ref.ts` — pure formula-reference rewrite helpers and A1 coord algebra (LemmaScript `//@ verify`).
-- `js/socialcalc-3.ts` — production command handling (calls formula-ref helpers).
-- `test/fixtures/formula-rewrite-cases.json` — data-driven direct + command rewrite cases (ported from the retired Leanstral/Rust spike).
-- `test/formula-rewrite-cases.test.ts` — runs every fixture case against the shipping bundle.
-- `test/formula-rewrite-regressions.test.ts` — production tests for direct rewrite helpers.
-- `test/command-boundary-regressions.test.ts` — command-level boundary regressions.
-- `test/filldown-persistence.test.ts` — fill/fillright/filldown persistence and increment regressions.
-- `test/sheet-coverage-b.test.ts` — sheet command undo/name coverage.
-
-Required verification after formula-reference changes:
+Required formula-reference matrix:
 
 ```bash
 bun run build.ts
-bun test test/formula-rewrite-cases.test.ts test/formula-rewrite-regressions.test.ts
+vp test run test/formula-rewrite-cases.test.ts test/formula-rewrite-regressions.test.ts
 bun run typecheck
+vp lint --type-check --type-aware
 ```
 
-Lessons from the 2026-07-05 Leanstral/oracle pass (still apply after the Rust drop):
+Use `ScheduleSheetCommands`/`loadSocialCalc()` command-level tests for copy,
+paste, fill, insert, delete, and undo behavior; direct helper tests alone are
+not enough. Relevant tests are:
 
-- Do not promote model output by prose alone. Convert it into a fixture or a Bun regression with exact calls, commands, and expected outputs.
-- Direct helper tests are not enough for command bugs. Use `ScheduleSheetCommands`/`loadSocialCalc()` command-level tests for copy, paste, fill, insert, delete, and undo behavior.
-- `$` markers lock copy/fill references, not structural insert/delete. Structural operations can still move the underlying coordinate.
-- Sheet-qualified ranges intentionally keep `sheetref` sticky through `:`. `OffsetFormulaCoords`, `AdjustFormulaCoords`, and `ReplaceFormulaCoords` are not interchangeable here.
-- SocialCalc's supported max column is `ZZ` (702). References shifted past `ZZ` should become `#REF!`; do not allow high-side `rcColname`/`crToCoord` clamping to silently turn overflow into `ZZ`.
-- For filldown/fillright, rectangular numeric series need per-column/per-row increments. Interactive editor `range2` state must be captured before clearing it.
-- For deletecol/deleterow, undo must restore changed named-reference definitions as well as cell formulas.
-- Treat lowercase/parser-normalization and no-op paste normalization as policy questions unless there is a concrete failing spreadsheet behavior.
+- `test/fixtures/formula-rewrite-cases.json`
+- `test/formula-rewrite-cases.test.ts`
+- `test/formula-rewrite-regressions.test.ts`
+- `test/command-boundary-regressions.test.ts`
+- `test/filldown-persistence.test.ts`
+- `test/sheet-coverage-b.test.ts`
+
+Compatibility rules:
+
+- `$` markers lock copy/fill references, not structural insert/delete.
+- Sheet-qualified ranges intentionally keep `sheetref` sticky through `:`.
+- SocialCalc's supported maximum column is `ZZ` (702); shifts past it become
+  `#REF!`, rather than silently clamping to `ZZ`.
+- Rectangular fill series need per-column/per-row increments, interactive
+  `range2` state must be captured before clearing, and delete undo must restore
+  changed named-reference definitions as well as formulas.
+- Treat lowercase/parser-normalization and no-op paste normalization as policy
+  questions until a concrete spreadsheet behavior fails.
+
+Promote model output only as exact fixtures or regression tests with calls,
+commands, and expected outputs; prose alone is not evidence.

@@ -100,8 +100,8 @@ See the comments in the main SocialCalc code module file of the SocialCalc packa
 
 */
 
-   // Module-top SocialCalc-presence guard removed — socialcalc-3.js
-   // always precedes this file in the concatenated bundle.
+// Module-top SocialCalc-presence guard removed — socialcalc-3.js
+// always precedes this file in the concatenated bundle.
 
 // *************************************
 //
@@ -112,532 +112,665 @@ See the comments in the main SocialCalc code module file of the SocialCalc packa
 // Constructor:
 
 /** @param {any} context */
-TableEditorSC.TableEditor = function(context: any) {
+TableEditorSC.TableEditor = function (context: any) {
+  var scc = TableEditorSC.Constants;
 
-   var scc = TableEditorSC.Constants;
+  // Properties:
 
-   // Properties:
+  this.context = context; // editing context
+  this.toplevel = null; // top level HTML element for this table editor
+  this.fullgrid = null; // rendered editing context
 
-   this.context = context; // editing context
-   this.toplevel = null; // top level HTML element for this table editor
-   this.fullgrid = null; // rendered editing context
+  this.noEdit = false; // if true, disable all edit UI and make read-only
 
-   this.noEdit = false; // if true, disable all edit UI and make read-only
+  this.width = null;
+  this.tablewidth = null;
+  this.height = null;
+  this.tableheight = null;
 
-   this.width = null;
-   this.tablewidth = null;
-   this.height = null;
-   this.tableheight = null;
+  this.inputBox = null;
+  this.inputEcho = null;
+  this.verticaltablecontrol = null;
+  this.horizontaltablecontrol = null;
 
-   this.inputBox = null;
-   this.inputEcho = null;
-   this.verticaltablecontrol = null;
-   this.horizontaltablecontrol = null;
+  this.logo = null;
 
-   this.logo = null;
+  this.cellhandles = null;
 
-   this.cellhandles = null;
+  // Dynamic properties:
 
-   // Dynamic properties:
+  this.timeout = null; // if non-null, timer id for position calculations
+  this.busy = false; // true when executing command, calculating, etc.
+  this.ensureecell = false; // if true, ensure ecell is visible after timeout
+  this.deferredCommands = []; // commands to execute after busy, in form: {cmdstr: "cmds", saveundo: t/f}
+  this.deferredEmailCommands = []; // Email commands to execute after busy, in form: {cmdstr: "cmds", saveundo: t/f}
 
-   this.timeout = null; // if non-null, timer id for position calculations
-   this.busy = false; // true when executing command, calculating, etc.
-   this.ensureecell = false; // if true, ensure ecell is visible after timeout
-   this.deferredCommands = []; // commands to execute after busy, in form: {cmdstr: "cmds", saveundo: t/f}
-   this.deferredEmailCommands = []; // Email commands to execute after busy, in form: {cmdstr: "cmds", saveundo: t/f}
+  this.gridposition = null; // screen coords of full grid
+  this.headposition = null; // screen coords of upper left of grid within header rows
+  this.firstscrollingrow = null; // row number of top row in last (the scrolling) pane
+  this.firstscrollingrowtop = null; // position of top row in last (the scrolling) pane
+  this.lastnonscrollingrow = null; // row number of last displayed row in last non-scrolling
+  // pane, or zero (for thumb position calculations)
+  this.lastvisiblerow = null; // used for paging down
+  this.firstscrollingcol = null; // column number of top col in last (the scrolling) pane
+  this.firstscrollingcolleft = null; // position of top col in last (the scrolling) pane
+  this.lastnonscrollingcol = null; // col number of last displayed column in last non-scrolling
+  // pane, or zero (for thumb position calculations)
+  this.lastvisiblecol = null; // used for paging right
 
-   this.gridposition = null; // screen coords of full grid
-   this.headposition = null; // screen coords of upper left of grid within header rows
-   this.firstscrollingrow = null; // row number of top row in last (the scrolling) pane
-   this.firstscrollingrowtop = null;  // position of top row in last (the scrolling) pane
-   this.lastnonscrollingrow = null; // row number of last displayed row in last non-scrolling
-                                    // pane, or zero (for thumb position calculations)
-   this.lastvisiblerow = null; // used for paging down
-   this.firstscrollingcol = null; // column number of top col in last (the scrolling) pane
-   this.firstscrollingcolleft = null;  // position of top col in last (the scrolling) pane
-   this.lastnonscrollingcol = null; // col number of last displayed column in last non-scrolling
-                                    // pane, or zero (for thumb position calculations)
-   this.lastvisiblecol = null; // used for paging right
+  this.rowpositions = []; // screen positions of the top of some rows
+  this.colpositions = []; // screen positions of the left side of some rows
+  this.rowheight = []; // size in pixels of each row when last checked, or null/undefined, for page up
+  this.colwidth = []; // size in pixels of each column when last checked, or null/undefined, for page left
 
-   this.rowpositions = []; // screen positions of the top of some rows
-   this.colpositions = []; // screen positions of the left side of some rows
-   this.rowheight = []; // size in pixels of each row when last checked, or null/undefined, for page up
-   this.colwidth = []; // size in pixels of each column when last checked, or null/undefined, for page left
+  this.ecell = null; // either null or {coord: c, row: r, col: c}
+  this.state = "start"; // the keyboard states: see EditorProcessKey
 
-   this.ecell = null; // either null or {coord: c, row: r, col: c}
-   this.state = "start"; // the keyboard states: see EditorProcessKey
+  this.workingvalues = {}; // values used during keyboard editing, etc.
 
-   this.workingvalues = {}; // values used during keyboard editing, etc.
+  // Constants:
 
-   // Constants:
+  this.imageprefix = scc.defaultImagePrefix; // URL prefix for images (e.g., "/images/sc")
+  this.idPrefix = scc.defaultTableEditorIDPrefix;
+  this.pageUpDnAmount = scc.defaultPageUpDnAmount; // number of rows to move cursor on PgUp/PgDn keys (numeric)
 
-   this.imageprefix = scc.defaultImagePrefix; // URL prefix for images (e.g., "/images/sc")
-   this.idPrefix = scc.defaultTableEditorIDPrefix;
-   this.pageUpDnAmount = scc.defaultPageUpDnAmount; // number of rows to move cursor on PgUp/PgDn keys (numeric)
+  // Callbacks
 
-   // Callbacks
+  // recalcFunction: if present, function(editor) {...}, called to do a recalc
+  // Default (sheet.RecalcSheet) does all the right stuff.
 
-   // recalcFunction: if present, function(editor) {...}, called to do a recalc
-   // Default (sheet.RecalcSheet) does all the right stuff.
+  /** @param {any} editor */
+  this.recalcFunction = function (editor: any) {
+    if (editor.context.sheetobj.RecalcSheet)
+      editor.context.sheetobj.RecalcSheet(TableEditorSC.EditorSheetStatusCallback, editor);
+    return null;
+  };
 
-   /** @param {any} editor */
-   this.recalcFunction = function(editor: any) {
-      if (editor.context.sheetobj.RecalcSheet) editor.context.sheetobj.RecalcSheet(TableEditorSC.EditorSheetStatusCallback, editor);
-      return null;
-      };
+  // ctrlkeyFunction: if present, function(editor, charname) {...}, called to handle ctrl-V, etc., at top level
+  // Returns true (pass through for continued processing) or false (stop processing this key).
 
-   // ctrlkeyFunction: if present, function(editor, charname) {...}, called to handle ctrl-V, etc., at top level
-   // Returns true (pass through for continued processing) or false (stop processing this key).
+  /**
+   * @param {any} editor
+   * @param {string} charname
+   */
+  this.ctrlkeyFunction = function (editor: any, charname: any) {
+    var ta, cell, position, cmd, sel, cliptext;
 
-   /**
-    * @param {any} editor
-    * @param {string} charname
-    */
-   this.ctrlkeyFunction = function(editor: any, charname: any) {
+    switch (charname) {
+      case "[ctrl-a]":
+        editor.MoveECell("A1");
+        editor.RangeAnchor("A1");
+        editor.RangeExtend(
+          TableEditorSC.crToCoord(
+            editor.context.sheetobj.attribs.lastcol,
+            editor.context.sheetobj.attribs.lastrow,
+          ),
+        );
+        return false;
+      case "[ctrl-c]":
+      case "[ctrl-x]":
+        ta = editor.pasteTextarea;
+        ta.value = "";
+        cell = TableEditorSC.GetEditorCellElement(editor, editor.ecell.row, editor.ecell.col);
+        if (cell) {
+          position = TableEditorSC.GetElementPosition(cell.element);
+          ta.style.left = position.left - 1 + "px";
+          ta.style.top = position.top - 1 + "px";
+        }
+        if (editor.range.hasrange) {
+          sel =
+            TableEditorSC.crToCoord(editor.range.left, editor.range.top) +
+            ":" +
+            TableEditorSC.crToCoord(editor.range.right, editor.range.bottom);
+        } else {
+          sel = editor.ecell.coord;
+        }
 
-      var ta, cell, position, cmd, sel, cliptext;
+        // get what to copy to clipboard
+        cliptext = TableEditorSC.ConvertSaveToOtherFormat(
+          TableEditorSC.CreateSheetSave(editor.context.sheetobj, sel),
+          "tab",
+        );
 
-      switch (charname) {
-         case "[ctrl-a]":
-            editor.MoveECell("A1");
-            editor.RangeAnchor("A1");
-            editor.RangeExtend(TableEditorSC.crToCoord(editor.context.sheetobj.attribs.lastcol,editor.context.sheetobj.attribs.lastrow));
-            return false;
-         case "[ctrl-c]":
-         case "[ctrl-x]":
-            ta = editor.pasteTextarea;
-            ta.value = "";
-            cell=TableEditorSC.GetEditorCellElement(editor, editor.ecell.row, editor.ecell.col);
-            if (cell) {
-               position = TableEditorSC.GetElementPosition(cell.element);
-               ta.style.left = (position.left-1)+"px";
-               ta.style.top = (position.top-1)+"px";
-               }
-            if (editor.range.hasrange) {
-               sel = TableEditorSC.crToCoord(editor.range.left, editor.range.top)+
-                  ":"+TableEditorSC.crToCoord(editor.range.right, editor.range.bottom);
-               }
-            else {
-               sel = editor.ecell.coord;
-               }
+        if (charname == "[ctrl-c]" || editor.noEdit || editor.ECellReadonly()) {
+          // if copy or cut but in no edit
+          cmd = "copy " + sel + " formulas";
+        } else {
+          // [ctrl-x]
+          cmd = "cut " + sel + " formulas";
+        }
+        editor.EditorScheduleSheetCommands(cmd, true, false); // queue up command to put on SocialCalc clipboard
 
-            // get what to copy to clipboard
-            cliptext = TableEditorSC.ConvertSaveToOtherFormat(TableEditorSC.CreateSheetSave(editor.context.sheetobj, sel), "tab");
+        ta.style.display = "block";
+        ta.value = cliptext; // must follow "block" setting for Webkit
+        ta.focus();
+        ta.select();
+        window.setTimeout(function () {
+          var ta = editor.pasteTextarea;
+          ta.blur();
+          ta.style.display = "none";
+          TableEditorSC.KeyboardFocus();
+        }, 200);
 
-            if (charname == "[ctrl-c]" || editor.noEdit || editor.ECellReadonly()) { // if copy or cut but in no edit
-               cmd = "copy "+sel+" formulas";
-               }
-            else { // [ctrl-x]
-               cmd = "cut "+sel+" formulas";
-               }
-            editor.EditorScheduleSheetCommands(cmd, true, false); // queue up command to put on SocialCalc clipboard
+        return true;
 
-            ta.style.display = "block";
-            ta.value = cliptext; // must follow "block" setting for Webkit
-            ta.focus();
-            ta.select();
-            window.setTimeout(function() {
-               var ta = editor.pasteTextarea;
-               ta.blur();
-               ta.style.display = "none";
-               TableEditorSC.KeyboardFocus();
-               }, 200);
-
-            return true;
-
-         case "[ctrl-v]":
-            if (editor.noEdit || editor.ECellReadonly()) return true; // not if no edit
-            ta = editor.pasteTextarea;
-            ta.value = "";
-            cell=TableEditorSC.GetEditorCellElement(editor, editor.ecell.row, editor.ecell.col);
-            if (cell) {
-               position = TableEditorSC.GetElementPosition(cell.element);
-               ta.style.left = (position.left-1)+"px";
-               ta.style.top = (position.top-1)+"px";
-               }
-            ta.style.display = "block";
-            ta.value = "";  // must follow "block" setting for Webkit
-            ta.focus();
-            window.setTimeout(function() {
-               var ta = editor.pasteTextarea;
-               var value = ta.value;
-               ta.blur();
-               ta.style.display = "none";
-               var cmd = "";
-               if(editor.pastescclipboard) {
-                 // Clipboard loaded from "clipboard tab" - see  SpreadsheetControlClipboardLoad
-                 // ignore windows clipboard contents
-                 editor.pastescclipboard = false;
-                 }
-               else {
-                 // Use windows clipboard contents if value does not match last copy
-                 var clipstr = TableEditorSC.ConvertSaveToOtherFormat(TableEditorSC.Clipboard.clipboard, "tab");
-                 value = value.replace(/\r\n/g, "\n");
-                 // pastes SocialCalc clipboard if did a Ctrl-C and contents still the same
-                 // Webkit adds an extra blank line, so need to allow for that
-                 if (value != clipstr && (value.length-clipstr.length!=1 || value.substring(0,value.length-1)!=clipstr)) {
-                    cmd = "loadclipboard "+
-                    TableEditorSC.encodeForSave(TableEditorSC.ConvertOtherFormatToSave(value, "tab")) + "\n";
-                    }
-                 }
-               var cr;
-               if (editor.range.hasrange) {
-                  var clipsheet = new TableEditorSC.Sheet();
-                  clipsheet.ParseSheetSave(TableEditorSC.Clipboard.clipboard);
-                  var matches = clipsheet.copiedfrom.match(/(.+):(.+)/);
-                  if (matches !== null && matches[1] === matches[2]) {
-                    // copy one cell to selected range
-                    cr = TableEditorSC.crToCoord(editor.range.left, editor.range.top) +
-                      ':' + TableEditorSC.crToCoord(editor.range.right, editor.range.bottom);
-                  } else {
-                    cr = TableEditorSC.crToCoord(editor.range.left, editor.range.top);
-                  }
-                  }
-               else {
-                  cr = editor.ecell.coord;
-                  }
-               cmd += "paste "+cr+" formulas";
-               editor.EditorScheduleSheetCommands(cmd, true, false);
-               TableEditorSC.KeyboardFocus();
-               }, 200);
-            return true;
-
-         case "[ctrl-z]":
-            editor.EditorScheduleSheetCommands("undo", true, false);
-            return false;
-
-         case "[ctrl-s]": // !!!! temporary hack
-            if (!TableEditorSC.Constants.AllowCtrlS) break;
-            window.setTimeout(
-               function() {
-                  var sheet = editor.context.sheetobj;
-                  var cell = sheet.GetAssuredCell(editor.ecell.coord);
-                  var ntvf = cell.nontextvalueformat ? sheet.valueformats[cell.nontextvalueformat-0] || "" : "";
-                  var newntvf = window.prompt("Advanced Feature:\n\nCustom Numeric Format or Command", ntvf);
-                  if (newntvf != null) { // not cancelled
-                     if (newntvf.match(/^cmd:/)) {
-                        cmd = newntvf.substring(4); // execute as command
-                        }
-                     else if (newntvf.match(/^edit:/)) {
-                        cmd = newntvf.substring(5); // execute as command
-                        if (TableEditorSC.CtrlSEditor) {
-                           TableEditorSC.CtrlSEditor(cmd);
-                           }
-                        return;
-                        }
-                     else {
-                        if (editor.range.hasrange) {
-                           sel = TableEditorSC.crToCoord(editor.range.left, editor.range.top)+
-                              ":"+TableEditorSC.crToCoord(editor.range.right, editor.range.bottom);
-                           }
-                        else {
-                          sel = editor.ecell.coord;
-                           }
-                        cmd = "set "+sel+" nontextvalueformat "+newntvf;
-                        }
-                     editor.EditorScheduleSheetCommands(cmd, true, false);
-                     }
-                  },
-               200);
-            return false;
-
-         default:
-            break;
+      case "[ctrl-v]":
+        if (editor.noEdit || editor.ECellReadonly()) return true; // not if no edit
+        ta = editor.pasteTextarea;
+        ta.value = "";
+        cell = TableEditorSC.GetEditorCellElement(editor, editor.ecell.row, editor.ecell.col);
+        if (cell) {
+          position = TableEditorSC.GetElementPosition(cell.element);
+          ta.style.left = position.left - 1 + "px";
+          ta.style.top = position.top - 1 + "px";
+        }
+        ta.style.display = "block";
+        ta.value = ""; // must follow "block" setting for Webkit
+        ta.focus();
+        window.setTimeout(function () {
+          var ta = editor.pasteTextarea;
+          var value = ta.value;
+          ta.blur();
+          ta.style.display = "none";
+          var cmd = "";
+          if (editor.pastescclipboard) {
+            // Clipboard loaded from "clipboard tab" - see  SpreadsheetControlClipboardLoad
+            // ignore windows clipboard contents
+            editor.pastescclipboard = false;
+          } else {
+            // Use windows clipboard contents if value does not match last copy
+            var clipstr = TableEditorSC.ConvertSaveToOtherFormat(
+              TableEditorSC.Clipboard.clipboard,
+              "tab",
+            );
+            value = value.replace(/\r\n/g, "\n");
+            // pastes SocialCalc clipboard if did a Ctrl-C and contents still the same
+            // Webkit adds an extra blank line, so need to allow for that
+            if (
+              value != clipstr &&
+              (value.length - clipstr.length != 1 ||
+                value.substring(0, value.length - 1) != clipstr)
+            ) {
+              cmd =
+                "loadclipboard " +
+                TableEditorSC.encodeForSave(TableEditorSC.ConvertOtherFormatToSave(value, "tab")) +
+                "\n";
             }
-      return true;
-      };
+          }
+          var cr;
+          if (editor.range.hasrange) {
+            var clipsheet = new TableEditorSC.Sheet();
+            clipsheet.ParseSheetSave(TableEditorSC.Clipboard.clipboard);
+            var matches = clipsheet.copiedfrom.match(/(.+):(.+)/);
+            if (matches !== null && matches[1] === matches[2]) {
+              // copy one cell to selected range
+              cr =
+                TableEditorSC.crToCoord(editor.range.left, editor.range.top) +
+                ":" +
+                TableEditorSC.crToCoord(editor.range.right, editor.range.bottom);
+            } else {
+              cr = TableEditorSC.crToCoord(editor.range.left, editor.range.top);
+            }
+          } else {
+            cr = editor.ecell.coord;
+          }
+          cmd += "paste " + cr + " formulas";
+          editor.EditorScheduleSheetCommands(cmd, true, false);
+          TableEditorSC.KeyboardFocus();
+        }, 200);
+        return true;
 
-   // Set sheet's status callback:
+      case "[ctrl-z]":
+        editor.EditorScheduleSheetCommands("undo", true, false);
+        return false;
 
-   context.sheetobj.statuscallback = TableEditorSC.EditorSheetStatusCallback;
-   context.sheetobj.statuscallbackparams = this; // this object: the table editor object
+      case "[ctrl-s]": // !!!! temporary hack
+        if (!TableEditorSC.Constants.AllowCtrlS) break;
+        window.setTimeout(function () {
+          var sheet = editor.context.sheetobj;
+          var cell = sheet.GetAssuredCell(editor.ecell.coord);
+          var ntvf = cell.nontextvalueformat
+            ? sheet.valueformats[cell.nontextvalueformat - 0] || ""
+            : "";
+          var newntvf = window.prompt(
+            "Advanced Feature:\n\nCustom Numeric Format or Command",
+            ntvf,
+          );
+          if (newntvf != null) {
+            // not cancelled
+            if (newntvf.match(/^cmd:/)) {
+              cmd = newntvf.substring(4); // execute as command
+            } else if (newntvf.match(/^edit:/)) {
+              cmd = newntvf.substring(5); // execute as command
+              if (TableEditorSC.CtrlSEditor) {
+                TableEditorSC.CtrlSEditor(cmd);
+              }
+              return;
+            } else {
+              if (editor.range.hasrange) {
+                sel =
+                  TableEditorSC.crToCoord(editor.range.left, editor.range.top) +
+                  ":" +
+                  TableEditorSC.crToCoord(editor.range.right, editor.range.bottom);
+              } else {
+                sel = editor.ecell.coord;
+              }
+              cmd = "set " + sel + " nontextvalueformat " + newntvf;
+            }
+            editor.EditorScheduleSheetCommands(cmd, true, false);
+          }
+        }, 200);
+        return false;
 
+      default:
+        break;
+    }
+    return true;
+  };
 
-   // StatusCallback: all values are called at appropriate times, add with unique name, delete when done
-   //
-   // Each value must be an object in the form of:
-   //
-   //    func: function(editor, status, arg, params) {...},
-   //    params: params value to call func with
-   //
-   // The values for status and arg are:
-   //
-   //    all the SocialCalc RecalcSheet statuscallbacks, including:
-   //
-   //       calccheckdone, calclist length
-   //       calcorder, {coord: coord, total: celllist length, count: count}
-   //       calcstep, {coord: coord, total: calclist length, count: count}
-   //       calcfinished, time in milliseconds
-   //
-   //    the command callbacks, like cmdstart and cmdend
-   //    cmdendnorender
-   //
-   //    calcstart, null
-   //    moveecell, new ecell coord
-   //    rangechange, "coord:coord" or "coord" or ""
-   //    specialkey, keyname ("[esc]")
-   //
+  // Set sheet's status callback:
 
-   this.StatusCallback = {};
+  context.sheetobj.statuscallback = TableEditorSC.EditorSheetStatusCallback;
+  context.sheetobj.statuscallbackparams = this; // this object: the table editor object
 
+  // StatusCallback: all values are called at appropriate times, add with unique name, delete when done
+  //
+  // Each value must be an object in the form of:
+  //
+  //    func: function(editor, status, arg, params) {...},
+  //    params: params value to call func with
+  //
+  // The values for status and arg are:
+  //
+  //    all the SocialCalc RecalcSheet statuscallbacks, including:
+  //
+  //       calccheckdone, calclist length
+  //       calcorder, {coord: coord, total: celllist length, count: count}
+  //       calcstep, {coord: coord, total: calclist length, count: count}
+  //       calcfinished, time in milliseconds
+  //
+  //    the command callbacks, like cmdstart and cmdend
+  //    cmdendnorender
+  //
+  //    calcstart, null
+  //    moveecell, new ecell coord
+  //    rangechange, "coord:coord" or "coord" or ""
+  //    specialkey, keyname ("[esc]")
+  //
 
-   this.MoveECellCallback = {}; // all values are called with editor as arg; add with unique name, delete when done
-   this.RangeChangeCallback = {}; // all values are called with editor as arg; add with unique name, delete when done
-   this.SettingsCallbacks = {}; // See TableEditorSC.SaveEditorSettings
+  this.StatusCallback = {};
 
-   // Set initial cursor
+  this.MoveECellCallback = {}; // all values are called with editor as arg; add with unique name, delete when done
+  this.RangeChangeCallback = {}; // all values are called with editor as arg; add with unique name, delete when done
+  this.SettingsCallbacks = {}; // See TableEditorSC.SaveEditorSettings
 
-   this.ecell = {coord: "A1", row: 1, col: 1};
-   context.highlights[this.ecell.coord] = "cursor";
+  // Set initial cursor
 
-   // Initialize range data
-   // Range has at least hasrange (true/false).
-   // It may also have: anchorcoord, anchorrow, anchorcol, top, bottom, left, and right.
+  this.ecell = { coord: "A1", row: 1, col: 1 };
+  context.highlights[this.ecell.coord] = "cursor";
 
-   this.range = {hasrange: false};
+  // Initialize range data
+  // Range has at least hasrange (true/false).
+  // It may also have: anchorcoord, anchorrow, anchorcol, top, bottom, left, and right.
 
-   // Initialize range2 data (used to show selections, such as for move)
-   // Range2 has at least hasrange (true/false).
-   // It may also have: top, bottom, left, and right.
+  this.range = { hasrange: false };
 
-   this.range2 = {hasrange: false};
+  // Initialize range2 data (used to show selections, such as for move)
+  // Range2 has at least hasrange (true/false).
+  // It may also have: top, bottom, left, and right.
 
-   }
+  this.range2 = { hasrange: false };
+};
 
 // Methods:
 
 /** @param {any} width @param {any} height */
-TableEditorSC.TableEditor.prototype.CreateTableEditor = function(width: any, height: any) {return TableEditorSC.CreateTableEditor(this, width, height);};
+TableEditorSC.TableEditor.prototype.CreateTableEditor = function (width: any, height: any) {
+  return TableEditorSC.CreateTableEditor(this, width, height);
+};
 /** @param {any} width @param {any} height */
-TableEditorSC.TableEditor.prototype.ResizeTableEditor = function(width: any, height: any) {return TableEditorSC.ResizeTableEditor(this, width, height);};
+TableEditorSC.TableEditor.prototype.ResizeTableEditor = function (width: any, height: any) {
+  return TableEditorSC.ResizeTableEditor(this, width, height);
+};
 
-TableEditorSC.TableEditor.prototype.SaveEditorSettings = function() {return TableEditorSC.SaveEditorSettings(this);};
+TableEditorSC.TableEditor.prototype.SaveEditorSettings = function () {
+  return TableEditorSC.SaveEditorSettings(this);
+};
 /** @param {any} str @param {any} [flags] */
-TableEditorSC.TableEditor.prototype.LoadEditorSettings = function(str: any, flags: any) {return TableEditorSC.LoadEditorSettings(this, str, flags);};
+TableEditorSC.TableEditor.prototype.LoadEditorSettings = function (str: any, flags: any) {
+  return TableEditorSC.LoadEditorSettings(this, str, flags);
+};
 
-TableEditorSC.TableEditor.prototype.EditorRenderSheet = function() {TableEditorSC.EditorRenderSheet(this);};
+TableEditorSC.TableEditor.prototype.EditorRenderSheet = function () {
+  TableEditorSC.EditorRenderSheet(this);
+};
 /** @param {any} cmdstr @param {any} saveundo @param {any} ignorebusy */
-TableEditorSC.TableEditor.prototype.EditorScheduleSheetCommands = function(cmdstr: any, saveundo: any, ignorebusy: any) {TableEditorSC.EditorScheduleSheetCommands(this, cmdstr, saveundo, ignorebusy);};
+TableEditorSC.TableEditor.prototype.EditorScheduleSheetCommands = function (
+  cmdstr: any,
+  saveundo: any,
+  ignorebusy: any,
+) {
+  TableEditorSC.EditorScheduleSheetCommands(this, cmdstr, saveundo, ignorebusy);
+};
 /** @param {any} cmdstr @param {any} saveundo */
-TableEditorSC.TableEditor.prototype.ScheduleSheetCommands = function(cmdstr: any, saveundo: any) {
-   this.context.sheetobj.ScheduleSheetCommands(cmdstr, saveundo);
-   };
-TableEditorSC.TableEditor.prototype.SheetUndo = function() {
-   this.context.sheetobj.SheetUndo();
-   };
-TableEditorSC.TableEditor.prototype.SheetRedo = function() {
-   this.context.sheetobj.SheetRedo();
-   };
+TableEditorSC.TableEditor.prototype.ScheduleSheetCommands = function (cmdstr: any, saveundo: any) {
+  this.context.sheetobj.ScheduleSheetCommands(cmdstr, saveundo);
+};
+TableEditorSC.TableEditor.prototype.SheetUndo = function () {
+  this.context.sheetobj.SheetUndo();
+};
+TableEditorSC.TableEditor.prototype.SheetRedo = function () {
+  this.context.sheetobj.SheetRedo();
+};
 /** @param {any} status @param {any} arg */
-TableEditorSC.TableEditor.prototype.EditorStepSet = function(status: any, arg: any) {TableEditorSC.EditorStepSet(this, status, arg);};
+TableEditorSC.TableEditor.prototype.EditorStepSet = function (status: any, arg: any) {
+  TableEditorSC.EditorStepSet(this, status, arg);
+};
 /** @param {any} status @param {any} arg @param {any} params */
-TableEditorSC.TableEditor.prototype.GetStatuslineString = function(status: any, arg: any, params: any) {return TableEditorSC.EditorGetStatuslineString(this, status, arg, params);};
+TableEditorSC.TableEditor.prototype.GetStatuslineString = function (
+  status: any,
+  arg: any,
+  params: any,
+) {
+  return TableEditorSC.EditorGetStatuslineString(this, status, arg, params);
+};
 
-TableEditorSC.TableEditor.prototype.EditorMouseRegister = function() {return TableEditorSC.EditorMouseRegister(this);};
-TableEditorSC.TableEditor.prototype.EditorMouseUnregister = function() {return TableEditorSC.EditorMouseUnregister(this);};
+TableEditorSC.TableEditor.prototype.EditorMouseRegister = function () {
+  return TableEditorSC.EditorMouseRegister(this);
+};
+TableEditorSC.TableEditor.prototype.EditorMouseUnregister = function () {
+  return TableEditorSC.EditorMouseUnregister(this);
+};
 /** @param {any} coord */
-TableEditorSC.TableEditor.prototype.EditorMouseRange = function(coord: any) {return TableEditorSC.EditorMouseRange(this, coord);};
+TableEditorSC.TableEditor.prototype.EditorMouseRange = function (coord: any) {
+  return TableEditorSC.EditorMouseRange(this, coord);
+};
 
 /** @param {any} ch @param {any} e */
-TableEditorSC.TableEditor.prototype.EditorProcessKey = function(ch: any, e: any) {return TableEditorSC.EditorProcessKey(this, ch, e);};
+TableEditorSC.TableEditor.prototype.EditorProcessKey = function (ch: any, e: any) {
+  return TableEditorSC.EditorProcessKey(this, ch, e);
+};
 /** @param {any} str @param {any} [prefix] */
-TableEditorSC.TableEditor.prototype.EditorAddToInput = function(str: any, prefix: any) {return TableEditorSC.EditorAddToInput(this, str, prefix);};
-TableEditorSC.TableEditor.prototype.DisplayCellContents = function() {return TableEditorSC.EditorDisplayCellContents(this);};
+TableEditorSC.TableEditor.prototype.EditorAddToInput = function (str: any, prefix: any) {
+  return TableEditorSC.EditorAddToInput(this, str, prefix);
+};
+TableEditorSC.TableEditor.prototype.DisplayCellContents = function () {
+  return TableEditorSC.EditorDisplayCellContents(this);
+};
 /** @param {any} [text] */
-TableEditorSC.TableEditor.prototype.EditorSaveEdit = function(text: any) {return TableEditorSC.EditorSaveEdit(this, text);};
+TableEditorSC.TableEditor.prototype.EditorSaveEdit = function (text: any) {
+  return TableEditorSC.EditorSaveEdit(this, text);
+};
 /** @param {any} cmdline @param {any} [type] */
-TableEditorSC.TableEditor.prototype.EditorApplySetCommandsToRange = function(cmdline: any, type: any) {return TableEditorSC.EditorApplySetCommandsToRange(this, cmdline, type);};
+TableEditorSC.TableEditor.prototype.EditorApplySetCommandsToRange = function (
+  cmdline: any,
+  type: any,
+) {
+  return TableEditorSC.EditorApplySetCommandsToRange(this, cmdline, type);
+};
 
 /** @param {any} ch */
-TableEditorSC.TableEditor.prototype.MoveECellWithKey = function(ch: any) {return TableEditorSC.MoveECellWithKey(this, ch);};
+TableEditorSC.TableEditor.prototype.MoveECellWithKey = function (ch: any) {
+  return TableEditorSC.MoveECellWithKey(this, ch);
+};
 /** @param {any} newcell */
-TableEditorSC.TableEditor.prototype.MoveECell = function(newcell: any) { if (TableEditorSC._app) return "A1"; return TableEditorSC.MoveECell(this, newcell);};
+TableEditorSC.TableEditor.prototype.MoveECell = function (newcell: any) {
+  if (TableEditorSC._app) return "A1";
+  return TableEditorSC.MoveECell(this, newcell);
+};
 /** @param {any} cell @param {any} row @param {any} col */
-TableEditorSC.TableEditor.prototype.ReplaceCell = function(cell: any, row: any, col: any) {TableEditorSC.ReplaceCell(this, cell, row, col);};
+TableEditorSC.TableEditor.prototype.ReplaceCell = function (cell: any, row: any, col: any) {
+  TableEditorSC.ReplaceCell(this, cell, row, col);
+};
 /** @param {any} cell @param {any} row @param {any} col */
-TableEditorSC.TableEditor.prototype.UpdateCellCSS = function(cell: any, row: any, col: any) {TableEditorSC.UpdateCellCSS(this, cell, row, col);};
+TableEditorSC.TableEditor.prototype.UpdateCellCSS = function (cell: any, row: any, col: any) {
+  TableEditorSC.UpdateCellCSS(this, cell, row, col);
+};
 /** @param {any} selected */
-TableEditorSC.TableEditor.prototype.SetECellHeaders = function(selected: any) {TableEditorSC.SetECellHeaders(this, selected);};
-TableEditorSC.TableEditor.prototype.EnsureECellVisible = function() {TableEditorSC.EnsureECellVisible(this);};
+TableEditorSC.TableEditor.prototype.SetECellHeaders = function (selected: any) {
+  TableEditorSC.SetECellHeaders(this, selected);
+};
+TableEditorSC.TableEditor.prototype.EnsureECellVisible = function () {
+  TableEditorSC.EnsureECellVisible(this);
+};
 /** @param {any} [coord] */
-TableEditorSC.TableEditor.prototype.ECellReadonly = function(coord: any) {return TableEditorSC.ECellReadonly(this, coord);};
+TableEditorSC.TableEditor.prototype.ECellReadonly = function (coord: any) {
+  return TableEditorSC.ECellReadonly(this, coord);
+};
 /** @param {any} [coord] */
-TableEditorSC.TableEditor.prototype.RangeAnchor = function(coord: any) {TableEditorSC.RangeAnchor(this, coord);};
+TableEditorSC.TableEditor.prototype.RangeAnchor = function (coord: any) {
+  TableEditorSC.RangeAnchor(this, coord);
+};
 /** @param {any} [coord] */
-TableEditorSC.TableEditor.prototype.RangeExtend = function(coord: any) {TableEditorSC.RangeExtend(this, coord);};
-TableEditorSC.TableEditor.prototype.RangeRemove = function() {TableEditorSC.RangeRemove(this);};
-TableEditorSC.TableEditor.prototype.Range2Remove = function() {TableEditorSC.Range2Remove(this);};
+TableEditorSC.TableEditor.prototype.RangeExtend = function (coord: any) {
+  TableEditorSC.RangeExtend(this, coord);
+};
+TableEditorSC.TableEditor.prototype.RangeRemove = function () {
+  TableEditorSC.RangeRemove(this);
+};
+TableEditorSC.TableEditor.prototype.Range2Remove = function () {
+  TableEditorSC.Range2Remove(this);
+};
 
-TableEditorSC.TableEditor.prototype.FitToEditTable = function() {TableEditorSC.FitToEditTable(this);};
-TableEditorSC.TableEditor.prototype.CalculateEditorPositions = function() {TableEditorSC.CalculateEditorPositions(this);};
+TableEditorSC.TableEditor.prototype.FitToEditTable = function () {
+  TableEditorSC.FitToEditTable(this);
+};
+TableEditorSC.TableEditor.prototype.CalculateEditorPositions = function () {
+  TableEditorSC.CalculateEditorPositions(this);
+};
 /** @param {any} [renderwidgets] */
-TableEditorSC.TableEditor.prototype.ScheduleRender = function(renderwidgets: any) {
+TableEditorSC.TableEditor.prototype.ScheduleRender = function (renderwidgets: any) {
   // App widgets need focus - so only render widgets when needed, rather than the default of rendering everything.
-  if(TableEditorSC._app && renderwidgets == true) this.context.sheetobj.widgetsClean = false;
+  if (TableEditorSC._app && renderwidgets == true) this.context.sheetobj.widgetsClean = false;
   TableEditorSC.ScheduleRender(this);
-  };
-TableEditorSC.TableEditor.prototype.DoRenderStep = function() {TableEditorSC.DoRenderStep(this);};
-TableEditorSC.TableEditor.prototype.SchedulePositionCalculations = function() {TableEditorSC.SchedulePositionCalculations(this);};
-TableEditorSC.TableEditor.prototype.DoPositionCalculations = function() {TableEditorSC.DoPositionCalculations(this);};
+};
+TableEditorSC.TableEditor.prototype.DoRenderStep = function () {
+  TableEditorSC.DoRenderStep(this);
+};
+TableEditorSC.TableEditor.prototype.SchedulePositionCalculations = function () {
+  TableEditorSC.SchedulePositionCalculations(this);
+};
+TableEditorSC.TableEditor.prototype.DoPositionCalculations = function () {
+  TableEditorSC.DoPositionCalculations(this);
+};
 /** @param {any} panenum @param {any} positions @param {any} sizes */
-TableEditorSC.TableEditor.prototype.CalculateRowPositions = function(panenum: any, positions: any, sizes: any) {return TableEditorSC.CalculateRowPositions(this,  panenum, positions, sizes);};
+TableEditorSC.TableEditor.prototype.CalculateRowPositions = function (
+  panenum: any,
+  positions: any,
+  sizes: any,
+) {
+  return TableEditorSC.CalculateRowPositions(this, panenum, positions, sizes);
+};
 /** @param {any} panenum @param {any} positions @param {any} sizes */
-TableEditorSC.TableEditor.prototype.CalculateColPositions = function(panenum: any, positions: any, sizes: any) {return TableEditorSC.CalculateColPositions(this,  panenum, positions, sizes);};
+TableEditorSC.TableEditor.prototype.CalculateColPositions = function (
+  panenum: any,
+  positions: any,
+  sizes: any,
+) {
+  return TableEditorSC.CalculateColPositions(this, panenum, positions, sizes);
+};
 
 /** @param {any} vertical @param {any} amount */
-TableEditorSC.TableEditor.prototype.ScrollRelative = function(vertical: any, amount: any) {TableEditorSC.ScrollRelative(this, vertical, amount);};
+TableEditorSC.TableEditor.prototype.ScrollRelative = function (vertical: any, amount: any) {
+  TableEditorSC.ScrollRelative(this, vertical, amount);
+};
 /** @param {any} vamount @param {any} hamount */
-TableEditorSC.TableEditor.prototype.ScrollRelativeBoth = function(vamount: any, hamount: any) {TableEditorSC.ScrollRelativeBoth(this, vamount, hamount);};
+TableEditorSC.TableEditor.prototype.ScrollRelativeBoth = function (vamount: any, hamount: any) {
+  TableEditorSC.ScrollRelativeBoth(this, vamount, hamount);
+};
 /** @param {any} vertical @param {any} direction */
-TableEditorSC.TableEditor.prototype.PageRelative = function(vertical: any, direction: any) {TableEditorSC.PageRelative(this, vertical, direction);};
-TableEditorSC.TableEditor.prototype.LimitLastPanes = function() {TableEditorSC.LimitLastPanes(this);};
-
-TableEditorSC.TableEditor.prototype.ScrollTableUpOneRow = function() {return TableEditorSC.ScrollTableUpOneRow(this);};
-TableEditorSC.TableEditor.prototype.ScrollTableDownOneRow = function() {return TableEditorSC.ScrollTableDownOneRow(this);};
-TableEditorSC.TableEditor.prototype.ScrollTableLeftOneCol = function() {return TableEditorSC.ScrollTableLeftOneCol(this);};
-TableEditorSC.TableEditor.prototype.ScrollTableRightOneCol = function() {return TableEditorSC.ScrollTableRightOneCol(this);};
-
-TableEditorSC.TableEditor.prototype.StopPropagation = function() {
-    return TableEditorSC.StopPropagation(this);
+TableEditorSC.TableEditor.prototype.PageRelative = function (vertical: any, direction: any) {
+  TableEditorSC.PageRelative(this, vertical, direction);
+};
+TableEditorSC.TableEditor.prototype.LimitLastPanes = function () {
+  TableEditorSC.LimitLastPanes(this);
 };
 
-TableEditorSC.TableEditor.prototype.SetMouseMoveUp = function() {
-    return TableEditorSC.SetMouseMoveUp(this);
+TableEditorSC.TableEditor.prototype.ScrollTableUpOneRow = function () {
+  return TableEditorSC.ScrollTableUpOneRow(this);
+};
+TableEditorSC.TableEditor.prototype.ScrollTableDownOneRow = function () {
+  return TableEditorSC.ScrollTableDownOneRow(this);
+};
+TableEditorSC.TableEditor.prototype.ScrollTableLeftOneCol = function () {
+  return TableEditorSC.ScrollTableLeftOneCol(this);
+};
+TableEditorSC.TableEditor.prototype.ScrollTableRightOneCol = function () {
+  return TableEditorSC.ScrollTableRightOneCol(this);
 };
 
-TableEditorSC.TableEditor.prototype.RemoveMouseMoveUp = function() {
-    return TableEditorSC.RemoveMouseMoveUp(this);
+TableEditorSC.TableEditor.prototype.StopPropagation = function () {
+  return TableEditorSC.StopPropagation(this);
+};
+
+TableEditorSC.TableEditor.prototype.SetMouseMoveUp = function () {
+  return TableEditorSC.SetMouseMoveUp(this);
+};
+
+TableEditorSC.TableEditor.prototype.RemoveMouseMoveUp = function () {
+  return TableEditorSC.RemoveMouseMoveUp(this);
 };
 
 // Functions:
 
 /** @param {any} editor @param {any} width @param {any} height */
-TableEditorSC.CreateTableEditor = function(editor: any, width: any, height: any) {
+TableEditorSC.CreateTableEditor = function (editor: any, width: any, height: any) {
+  var scc = TableEditorSC.Constants;
+  var AssignID = TableEditorSC.AssignID;
 
-   var scc = TableEditorSC.Constants;
-   var AssignID = TableEditorSC.AssignID;
+  editor.toplevel = document.createElement("div");
+  editor.toplevel.style.position = "relative";
+  AssignID(editor, editor.toplevel, "toplevel");
+  editor.width = width;
+  editor.height = height;
 
-   editor.toplevel = document.createElement("div");
-   editor.toplevel.style.position = "relative";
-   AssignID(editor, editor.toplevel, "toplevel");
-   editor.width = width;
-   editor.height = height;
+  editor.griddiv = document.createElement("div");
+  editor.tablewidth = Math.max(0, width - scc.defaultTableControlThickness);
+  editor.tableheight = Math.max(0, height - scc.defaultTableControlThickness);
+  editor.griddiv.style.width = editor.tablewidth + "px";
+  editor.griddiv.style.height = editor.tableheight + "px";
+  editor.griddiv.style.overflow = "hidden";
+  editor.griddiv.style.cursor = "default";
+  if (scc.cteGriddivClass) editor.griddiv.className = scc.cteGriddivClass;
+  AssignID(editor, editor.griddiv, "griddiv");
 
-   editor.griddiv = document.createElement("div");
-   editor.tablewidth = Math.max(0, width - scc.defaultTableControlThickness);
-   editor.tableheight = Math.max(0, height - scc.defaultTableControlThickness);
-   editor.griddiv.style.width = editor.tablewidth+"px";
-   editor.griddiv.style.height = editor.tableheight+"px";
-   editor.griddiv.style.overflow = "hidden";
-   editor.griddiv.style.cursor = "default";
-   if (scc.cteGriddivClass) editor.griddiv.className = scc.cteGriddivClass;
-   AssignID(editor, editor.griddiv, "griddiv");
+  editor.FitToEditTable();
 
-   editor.FitToEditTable();
+  editor.EditorRenderSheet();
 
-   editor.EditorRenderSheet();
+  editor.griddiv.appendChild(editor.fullgrid);
 
-   editor.griddiv.appendChild(editor.fullgrid);
+  editor.verticaltablecontrol = new TableEditorSC.TableControl(editor, true, editor.tableheight);
+  editor.verticaltablecontrol.CreateTableControl();
+  AssignID(editor, editor.verticaltablecontrol.main, "tablecontrolv");
 
-   editor.verticaltablecontrol = new TableEditorSC.TableControl(editor, true, editor.tableheight);
-   editor.verticaltablecontrol.CreateTableControl();
-   AssignID(editor, editor.verticaltablecontrol.main, "tablecontrolv");
+  editor.horizontaltablecontrol = new TableEditorSC.TableControl(editor, false, editor.tablewidth);
+  editor.horizontaltablecontrol.CreateTableControl();
+  AssignID(editor, editor.horizontaltablecontrol.main, "tablecontrolh");
 
-   editor.horizontaltablecontrol = new TableEditorSC.TableControl(editor, false, editor.tablewidth);
-   editor.horizontaltablecontrol.CreateTableControl();
-   AssignID(editor, editor.horizontaltablecontrol.main, "tablecontrolh");
+  var table, tbody, tr, td, ta;
 
-   var table, tbody, tr, td, img, anchor, ta;
+  table = document.createElement("table" as any);
+  editor.layouttable = table;
+  // Legacy attrs: assign via setAttribute to bypass TS's stricter string typing.
+  table.setAttribute("cellspacing", "0");
+  table.setAttribute("cellpadding", "0");
+  AssignID(editor, table, "layouttable");
 
-   table = (document.createElement("table" as any));
-   editor.layouttable = table;
-   // Legacy attrs: assign via setAttribute to bypass TS's stricter string typing.
-   table.setAttribute("cellspacing", "0");
-   table.setAttribute("cellpadding", "0");
-   AssignID(editor, table, "layouttable");
+  tbody = document.createElement("tbody");
+  table.appendChild(tbody);
 
-   tbody = document.createElement("tbody");
-   table.appendChild(tbody);
+  tr = document.createElement("tr");
+  tbody.appendChild(tr);
+  td = document.createElement("td");
+  td.appendChild(editor.griddiv);
+  tr.appendChild(td);
+  if (TableEditorSC._app != true) {
+    // no scroll bar in app
+    // Add v scroll bar
+    td = document.createElement("td");
+    td.appendChild(editor.verticaltablecontrol.main);
+    tr.appendChild(td);
+  }
+  tr = document.createElement("tr");
+  tbody.appendChild(tr);
+  if (TableEditorSC._app != true) {
+    // no scroll bar in app
+    // Add h scroll bar
+    td = document.createElement("td");
+    td.appendChild(editor.horizontaltablecontrol.main);
+    tr.appendChild(td);
+  }
 
-   tr = document.createElement("tr");
-   tbody.appendChild(tr);
-   td = document.createElement("td");
-   td.appendChild(editor.griddiv);
-   tr.appendChild(td);
-   if (TableEditorSC._app != true) { // no scroll bar in app
-     // Add v scroll bar
-     td = document.createElement("td");
-     td.appendChild(editor.verticaltablecontrol.main);
-     tr.appendChild(td);
-   }
-   tr = document.createElement("tr");
-   tbody.appendChild(tr);
-   if (TableEditorSC._app != true) { // no scroll bar in app
-     // Add h scroll bar
-     td = document.createElement("td");
-     td.appendChild(editor.horizontaltablecontrol.main);
-     tr.appendChild(td);
-   }
+  td = document.createElement("td"); // logo display: Required by CPAL License for this code!
+  if (TableEditorSC._app) {
+    // in app right align Required CPAL License logo
+    td.style.background = "url(" + editor.imageprefix + "logo.gif) no-repeat right center";
+  } else {
+    td.style.background = "url(" + editor.imageprefix + "logo.gif) no-repeat center center";
+  }
+  td.innerHTML =
+    "<div style='cursor:pointer;font-size:1px;'><img src='" +
+    editor.imageprefix +
+    "1x1.gif' border='0' width='18' height='18'></div>";
+  tr.appendChild(td);
+  editor.logo = td;
+  AssignID(editor, editor.logo, "logo");
+  var logoImg = td.firstChild && (td.firstChild.firstChild as any);
+  if (logoImg) logoImg.title = "SocialCalc";
 
-   td = document.createElement("td"); // logo display: Required by CPAL License for this code!
-   if (TableEditorSC._app) { // in app right align Required CPAL License logo
-     td.style.background="url("+editor.imageprefix+"logo.gif) no-repeat right center";
-   } else {
-     td.style.background="url("+editor.imageprefix+"logo.gif) no-repeat center center";
-   }
-   td.innerHTML = "<div style='cursor:pointer;font-size:1px;'><img src='"+editor.imageprefix+"1x1.gif' border='0' width='18' height='18'></div>";
-   tr.appendChild(td);
-   editor.logo = td;
-   AssignID(editor, editor.logo, "logo");
-   var logoImg = (td.firstChild && td.firstChild.firstChild as any);
-   if (logoImg) logoImg.title = "SocialCalc";
+  editor.toplevel.appendChild(editor.layouttable);
 
-   editor.toplevel.appendChild(editor.layouttable);
+  if (!editor.noEdit) {
+    editor.inputEcho = new TableEditorSC.InputEcho(editor);
+    AssignID(editor, editor.inputEcho.main, "inputecho");
+  }
 
-   if (!editor.noEdit) {
-      editor.inputEcho = new TableEditorSC.InputEcho(editor);
-      AssignID(editor, editor.inputEcho.main, "inputecho");
-      }
+  editor.cellhandles = new TableEditorSC.CellHandles(editor);
 
-   editor.cellhandles = new TableEditorSC.CellHandles(editor);
+  ta = document.createElement("textarea"); // used for ctrl-c/ctrl-v where an invisible text area is needed
+  TableEditorSC.setStyles(
+    ta,
+    "display:none;position:absolute;height:1px;width:1px;opacity:0;filter:alpha(opacity=0);",
+  );
+  ta.value = "";
+  editor.pasteTextarea = ta;
+  AssignID(editor, editor.pasteTextarea, "pastetextarea");
 
-   ta = document.createElement("textarea"); // used for ctrl-c/ctrl-v where an invisible text area is needed
-   TableEditorSC.setStyles(ta, "display:none;position:absolute;height:1px;width:1px;opacity:0;filter:alpha(opacity=0);");
-   ta.value = "";
-   editor.pasteTextarea = ta;
-   AssignID(editor, editor.pasteTextarea, "pastetextarea");
+  if (navigator.userAgent.match(/Safari\//) && !navigator.userAgent.match(/Chrome\//)) {
+    // special code for Safari 5 change
+    window.removeEventListener("beforepaste", TableEditorSC.SafariPasteFunction, false);
+    window.addEventListener("beforepaste", TableEditorSC.SafariPasteFunction, false);
+    window.removeEventListener("beforecopy", TableEditorSC.SafariPasteFunction, false);
+    window.addEventListener("beforecopy", TableEditorSC.SafariPasteFunction, false);
+    window.removeEventListener("beforecut", TableEditorSC.SafariPasteFunction, false);
+    window.addEventListener("beforecut", TableEditorSC.SafariPasteFunction, false);
+  }
 
-   if (navigator.userAgent.match(/Safari\//) &&!navigator.userAgent.match(/Chrome\//)) { // special code for Safari 5 change
-      window.removeEventListener('beforepaste', TableEditorSC.SafariPasteFunction, false);
-      window.addEventListener('beforepaste', TableEditorSC.SafariPasteFunction, false);
-      window.removeEventListener('beforecopy', TableEditorSC.SafariPasteFunction, false);
-      window.addEventListener('beforecopy', TableEditorSC.SafariPasteFunction, false);
-      window.removeEventListener('beforecut', TableEditorSC.SafariPasteFunction, false);
-      window.addEventListener('beforecut', TableEditorSC.SafariPasteFunction, false);
-      }
+  editor.toplevel.appendChild(editor.pasteTextarea);
 
-   editor.toplevel.appendChild(editor.pasteTextarea);
+  TableEditorSC.MouseWheelRegister(editor.toplevel, {
+    WheelMove: TableEditorSC.EditorProcessMouseWheel,
+    editor: editor,
+  });
 
-   TableEditorSC.MouseWheelRegister(editor.toplevel, {WheelMove: TableEditorSC.EditorProcessMouseWheel, editor: editor});
+  TableEditorSC.KeyboardSetFocus(editor);
 
-   TableEditorSC.KeyboardSetFocus(editor);
+  // do status reporting things
 
-   // do status reporting things
+  TableEditorSC.EditorSheetStatusCallback(null, "startup", null, editor);
 
-   TableEditorSC.EditorSheetStatusCallback(null, "startup", null, editor);
+  // done
 
-   // done
-
-   return editor.toplevel;
-
-   }
+  return editor.toplevel;
+};
 
 // Special code needed for change that occurred with Safari 5 that made paste not work for some reason
 
 /** @param {Event} e */
-TableEditorSC.SafariPasteFunction = function(e: any) {
-   e.preventDefault();
-   }
+TableEditorSC.SafariPasteFunction = function (e: any) {
+  e.preventDefault();
+};
 
 //
 // SocialCalc.ResizeTableEditor(editor, width, height)
@@ -646,35 +779,33 @@ TableEditorSC.SafariPasteFunction = function(e: any) {
 //
 
 /** @param {any} editor @param {any} width @param {any} height */
-TableEditorSC.ResizeTableEditor = function(editor: any, width: any, height: any) {
+TableEditorSC.ResizeTableEditor = function (editor: any, width: any, height: any) {
+  var scc = TableEditorSC.Constants;
 
-   var scc = TableEditorSC.Constants;
+  editor.width = width;
+  editor.height = height;
 
-   editor.width = width;
-   editor.height = height;
+  editor.toplevel.style.width = width + "px";
+  editor.toplevel.style.height = height + "px";
 
-   editor.toplevel.style.width = width+"px";
-   editor.toplevel.style.height = height+"px";
+  if (TableEditorSC._app) {
+    editor.tablewidth = Math.max(0, width); // no v scroll bar with app
+  } else {
+    editor.tablewidth = Math.max(0, width - scc.defaultTableControlThickness);
+  }
+  editor.tableheight = Math.max(0, height - scc.defaultTableControlThickness);
+  editor.griddiv.style.width = editor.tablewidth + "px";
+  editor.griddiv.style.height = editor.tableheight + "px";
 
-   if (TableEditorSC._app) {
-     editor.tablewidth = Math.max(0, width ); // no v scroll bar with app
-   } else {
-     editor.tablewidth = Math.max(0, width - scc.defaultTableControlThickness);
-   }
-   editor.tableheight = Math.max(0, height - scc.defaultTableControlThickness);
-   editor.griddiv.style.width=editor.tablewidth+"px";
-   editor.griddiv.style.height=editor.tableheight+"px";
+  editor.verticaltablecontrol.main.style.height = editor.tableheight + "px";
+  editor.horizontaltablecontrol.main.style.width = editor.tablewidth + "px";
 
-   editor.verticaltablecontrol.main.style.height = editor.tableheight + "px";
-   editor.horizontaltablecontrol.main.style.width = editor.tablewidth + "px";
+  editor.FitToEditTable();
 
-   editor.FitToEditTable();
+  editor.ScheduleRender();
 
-   editor.ScheduleRender();
-
-   return;
-
-   }
+  return;
+};
 
 //
 // str = SaveEditorSettings(editor)
@@ -699,37 +830,48 @@ TableEditorSC.ResizeTableEditor = function(editor: any, width: any, height: any)
 //
 
 /** @param {any} editor */
-TableEditorSC.SaveEditorSettings = function(editor: any) {
+TableEditorSC.SaveEditorSettings = function (editor: any) {
+  var i, setting;
+  var context = editor.context;
+  var range = editor.range;
+  var result = "";
 
-   var i, setting;
-   var context = editor.context;
-   var range = editor.range;
-   var result = "";
+  result += "version:1.0\n";
 
-   result += "version:1.0\n";
+  for (i = 0; i < context.rowpanes.length; i++) {
+    result +=
+      "rowpane:" + i + ":" + context.rowpanes[i].first + ":" + context.rowpanes[i].last + "\n";
+  }
+  for (i = 0; i < context.colpanes.length; i++) {
+    result +=
+      "colpane:" + i + ":" + context.colpanes[i].first + ":" + context.colpanes[i].last + "\n";
+  }
 
-   for (i=0; i<context.rowpanes.length; i++) {
-      result += "rowpane:"+i+":"+context.rowpanes[i].first+":"+context.rowpanes[i].last+"\n";
-      }
-   for (i=0; i<context.colpanes.length; i++) {
-      result += "colpane:"+i+":"+context.colpanes[i].first+":"+context.colpanes[i].last+"\n";
-      }
+  if (editor.ecell) {
+    result += "ecell:" + editor.ecell.coord + "\n";
+  }
 
-   if (editor.ecell) {
-      result += "ecell:"+editor.ecell.coord+"\n";
-      }
+  if (range.hasrange) {
+    result +=
+      "range:" +
+      range.anchorcoord +
+      ":" +
+      range.top +
+      ":" +
+      range.bottom +
+      ":" +
+      range.left +
+      ":" +
+      range.right +
+      "\n";
+  }
 
-   if (range.hasrange) {
-      result += "range:"+range.anchorcoord+":"+range.top+":"+range.bottom+":"+range.left+":"+range.right+"\n";
-      }
+  for (setting in editor.SettingsCallbacks) {
+    result += editor.SettingsCallbacks[setting].save(editor, setting);
+  }
 
-   for (setting in editor.SettingsCallbacks) {
-      result += editor.SettingsCallbacks[setting].save(editor, setting);
-      }
-
-   return result;
-
-   }
+  return result;
+};
 
 //
 // LoadEditorSettings(editor, str, flags)
@@ -739,76 +881,74 @@ TableEditorSC.SaveEditorSettings = function(editor: any) {
 //
 
 /** @param {any} editor @param {any} str @param {any} [flags] */
-TableEditorSC.LoadEditorSettings = function(editor: any, str: any, flags: any) {
+TableEditorSC.LoadEditorSettings = function (editor: any, str: any, flags: any) {
+  var lines = str.split(/\r\n|\n/);
+  var parts = [];
+  var line, i, cr, row, col, coord, setting;
+  var context = editor.context;
+  var highlights, range;
 
-   var lines=str.split(/\r\n|\n/);
-   var parts=[];
-   var line, i, cr, row, col, coord, setting;
-   var context = editor.context;
-   var highlights, range;
+  context.rowpanes = [{ first: 1, last: 1 }]; // reset to start
+  context.colpanes = [{ first: 1, last: 1 }];
+  editor.ecell = null;
+  editor.range = { hasrange: false };
+  editor.range2 = { hasrange: false };
+  range = editor.range;
+  context.highlights = {};
+  highlights = context.highlights;
 
-   context.rowpanes = [{first: 1, last: 1}]; // reset to start
-   context.colpanes = [{first: 1, last: 1}];
-   editor.ecell = null;
-   editor.range = {hasrange: false};
-   editor.range2 = {hasrange: false};
-   range = editor.range;
-   context.highlights = {};
-   highlights = context.highlights;
+  for (i = 0; i < lines.length; i++) {
+    line = lines[i];
+    parts = line.split(":");
+    setting = parts[0];
+    switch (setting) {
+      case "version":
+        break;
 
-   for (i=0; i<lines.length; i++) {
-      line=lines[i];
-      parts = line.split(":");
-      setting = parts[0];
-      switch (setting) {
-         case "version":
-            break;
+      case "rowpane":
+        context.rowpanes[parts[1] - 0] = { first: parts[2] - 0, last: parts[3] - 0 };
+        break;
 
-         case "rowpane":
-            context.rowpanes[parts[1]-0] = {first: parts[2]-0, last: parts[3]-0};
-            break;
+      case "colpane":
+        context.colpanes[parts[1] - 0] = { first: parts[2] - 0, last: parts[3] - 0 };
+        break;
 
-         case "colpane":
-            context.colpanes[parts[1]-0] = {first: parts[2]-0, last: parts[3]-0};
-            break;
+      case "ecell":
+        editor.ecell = TableEditorSC.coordToCr(parts[1]);
+        editor.ecell.coord = parts[1];
+        highlights[parts[1]] = "cursor";
+        break;
 
-         case "ecell":
-            editor.ecell = TableEditorSC.coordToCr(parts[1]);
-            editor.ecell.coord = parts[1];
-            highlights[parts[1]] = "cursor";
-            break;
+      case "range":
+        range.hasrange = true;
+        range.anchorcoord = parts[1];
+        cr = TableEditorSC.coordToCr(range.anchorcoord);
+        range.anchorrow = cr.row;
+        range.anchorcol = cr.col;
+        range.top = parts[2] - 0;
+        range.bottom = parts[3] - 0;
+        range.left = parts[4] - 0;
+        range.right = parts[5] - 0;
+        for (row = range.top; row <= range.bottom; row++) {
+          for (col = range.left; col <= range.right; col++) {
+            coord = TableEditorSC.crToCoord(col, row);
+            if (highlights[coord] != "cursor") {
+              highlights[coord] = "range";
+            }
+          }
+        }
+        break;
 
-         case "range":
-            range.hasrange = true;
-            range.anchorcoord = parts[1];
-            cr = TableEditorSC.coordToCr(range.anchorcoord);
-            range.anchorrow = cr.row;
-            range.anchorcol = cr.col;
-            range.top = parts[2]-0;
-            range.bottom = parts[3]-0;
-            range.left = parts[4]-0;
-            range.right = parts[5]-0;
-            for (row=range.top; row<=range.bottom; row++) {
-               for (col=range.left; col<=range.right; col++) {
-                  coord = TableEditorSC.crToCoord(col, row);
-                  if (highlights[coord]!="cursor") {
-                     highlights[coord] = "range";
-                     }
-                  }
-               }
-            break;
+      default:
+        if (editor.SettingsCallbacks[setting]) {
+          editor.SettingsCallbacks[setting].load(editor, setting, line, flags);
+        }
+        break;
+    }
+  }
 
-         default:
-            if (editor.SettingsCallbacks[setting]) {
-               editor.SettingsCallbacks[setting].load(editor, setting, line, flags);
-               }
-            break;
-         }
-      }
-
-   return;
-
-   }
+  return;
+};
 
 //
 // EditorRenderSheet(editor)
@@ -818,89 +958,92 @@ TableEditorSC.LoadEditorSettings = function(editor: any, str: any, flags: any) {
 //
 
 /** @param {any} editor */
-TableEditorSC.EditorRenderSheet = function(editor: any) {
+TableEditorSC.EditorRenderSheet = function (editor: any) {
+  editor.EditorMouseUnregister();
 
-   editor.EditorMouseUnregister();
-
-   var sheetobj = editor.context.sheetobj;
-   // App widgets need to keep focus -  only render widgets if needed
-   if(sheetobj.reRenderCellList != null && TableEditorSC._app && sheetobj.widgetsClean === true) {
-     // re-render each individual cells - but not widget with focus
-     for(var index in sheetobj.reRenderCellList) {
-       var coord = sheetobj.reRenderCellList[index];
-       var valuetype = sheetobj.cells[coord].valuetype;
-       if(valuetype.charAt(1) != "i" || valuetype !=  sheetobj.cells[coord].prevvaluetype) { // skip widgets - but paint when added/replaced
-         var cr = TableEditorSC.coordToCr(coord);
-         var cell = TableEditorSC.GetEditorCellElement(editor, cr.row, cr.col);
-         if(cell!=null) editor.ReplaceCell(cell, cr.row, cr.col);
-       }
-     }
-     sheetobj.reRenderCellList = [];
-   } else {
-      editor.fullgrid = editor.context.RenderSheet(editor.fullgrid);
-      if (sheetobj.reRenderCellList != null && TableEditorSC._app) {
-        sheetobj.widgetsClean = true; // widgets have been rendered
-        sheetobj.reRenderCellList = [];
+  var sheetobj = editor.context.sheetobj;
+  // App widgets need to keep focus -  only render widgets if needed
+  if (sheetobj.reRenderCellList != null && TableEditorSC._app && sheetobj.widgetsClean === true) {
+    // re-render each individual cells - but not widget with focus
+    for (var index in sheetobj.reRenderCellList) {
+      var coord = sheetobj.reRenderCellList[index];
+      var valuetype = sheetobj.cells[coord].valuetype;
+      if (valuetype.charAt(1) != "i" || valuetype != sheetobj.cells[coord].prevvaluetype) {
+        // skip widgets - but paint when added/replaced
+        var cr = TableEditorSC.coordToCr(coord);
+        var cell = TableEditorSC.GetEditorCellElement(editor, cr.row, cr.col);
+        if (cell != null) editor.ReplaceCell(cell, cr.row, cr.col);
       }
-   }
+    }
+    sheetobj.reRenderCellList = [];
+  } else {
+    editor.fullgrid = editor.context.RenderSheet(editor.fullgrid);
+    if (sheetobj.reRenderCellList != null && TableEditorSC._app) {
+      sheetobj.widgetsClean = true; // widgets have been rendered
+      sheetobj.reRenderCellList = [];
+    }
+  }
 
-   if (editor.ecell) editor.SetECellHeaders("selected");
+  if (editor.ecell) editor.SetECellHeaders("selected");
 
-   TableEditorSC.AssignID(editor, editor.fullgrid, "fullgrid"); // give it an id
-   // eddy EditorRenderSheet {
-   if(!TableEditorSC._app) editor.fullgrid.className = "te_download";
-   editor.EditorMouseRegister();
-   // } EditorRenderSheet
-
-   }
+  TableEditorSC.AssignID(editor, editor.fullgrid, "fullgrid"); // give it an id
+  // eddy EditorRenderSheet {
+  if (!TableEditorSC._app) editor.fullgrid.className = "te_download";
+  editor.EditorMouseRegister();
+  // } EditorRenderSheet
+};
 
 //
 // EditorScheduleSheetCommands(editor, cmdstr, saveundo, ignorebusy)
 //
 
 /** @param {any} editor @param {any} cmdstr @param {any} saveundo @param {any} ignorebusy */
-TableEditorSC.EditorScheduleSheetCommands = function(editor: any, cmdstr: any, saveundo: any, ignorebusy: any) {
+TableEditorSC.EditorScheduleSheetCommands = function (
+  editor: any,
+  cmdstr: any,
+  saveundo: any,
+  ignorebusy: any,
+) {
+  if (editor.state != "start" && !ignorebusy) {
+    // ignore commands if editing a cell
+    return;
+  }
 
-   if (editor.state!="start" && !ignorebusy) { // ignore commands if editing a cell
-      return;
-      }
+  if (editor.busy && !ignorebusy) {
+    // hold off on commands if doing one
+    editor.deferredCommands.push({ cmdstr: cmdstr, saveundo: saveundo });
+    return;
+  }
 
-   if (editor.busy && !ignorebusy) { // hold off on commands if doing one
-      editor.deferredCommands.push({cmdstr: cmdstr, saveundo: saveundo});
-      return;
-      }
+  // eddy ExecuteSheetCommand {
+  var cmdTokens = cmdstr.split(" ");
 
-   // eddy ExecuteSheetCommand {
-   var cmdTokens = cmdstr.split(" ");
+  switch (cmdTokens[0]) {
+    // } eddy ExecuteSheetCommand
+    case "recalc":
+    case "redisplay":
+      editor.context.sheetobj.ScheduleSheetCommands(cmdstr, false);
+      break;
 
-   switch (cmdTokens[0]) {
-	   // } eddy ExecuteSheetCommand
-      case "recalc":
-      case "redisplay":
-         editor.context.sheetobj.ScheduleSheetCommands(cmdstr, false);
-         break;
+    case "undo":
+      if (TableEditorSC._app) editor.context.sheetobj.widgetsClean = false; // force app widgets to render
+      editor.SheetUndo();
+      break;
 
-      case "undo":
-         if(TableEditorSC._app ) editor.context.sheetobj.widgetsClean = false;     // force app widgets to render
-         editor.SheetUndo();
-         break;
+    case "redo":
+      if (TableEditorSC._app) editor.context.sheetobj.widgetsClean = false; // force app widgets to render
+      editor.SheetRedo();
+      break;
 
-      case "redo":
-         if(TableEditorSC._app ) editor.context.sheetobj.widgetsClean = false;     // force app widgets to render
-         editor.SheetRedo();
-         break;
+    case "setemailparameters":
+      TableEditorSC.TriggerIoAction.Email(cmdTokens[1], cmdTokens[2]);
+      break;
 
-      case "setemailparameters":
-		  TableEditorSC.TriggerIoAction.Email(cmdTokens[1], cmdTokens[2]);
-    	  break;
-
-
-      default:
-         editor.context.sheetobj.ScheduleSheetCommands(cmdstr, saveundo);
-         break;
-      }
-   }
-
+    default:
+      editor.context.sheetobj.ScheduleSheetCommands(cmdstr, saveundo);
+      break;
+  }
+};
 
 //
 // EditorSheetStatusCallback(recalcdata, status, arg, editor)
@@ -909,167 +1052,169 @@ TableEditorSC.EditorScheduleSheetCommands = function(editor: any, cmdstr: any, s
 //
 
 /** @param {any} recalcdata @param {any} status @param {any} arg @param {any} editor */
-TableEditorSC.EditorSheetStatusCallback = function(recalcdata: any, status: any, arg: any, editor: any) {
+TableEditorSC.EditorSheetStatusCallback = function (
+  recalcdata: any,
+  status: any,
+  arg: any,
+  editor: any,
+) {
+  var f, cell, dcmd;
+  var sheetobj = editor.context.sheetobj;
 
-   var f, cell, dcmd;
-   var sheetobj = editor.context.sheetobj;
+  /** @param {any} s */
+  var signalstatus = function (s: any) {
+    for (f in editor.StatusCallback) {
+      if (editor.StatusCallback[f].func) {
+        editor.StatusCallback[f].func(editor, s, arg, editor.StatusCallback[f].params);
+      }
+    }
+  };
 
-   /** @param {any} s */
-   var signalstatus = function(s: any) {
-      for (f in editor.StatusCallback) {
-         if (editor.StatusCallback[f].func) {
-            editor.StatusCallback[f].func(editor, s, arg, editor.StatusCallback[f].params);
-            }
-         }
+  switch (status) {
+    case "startup":
+      break;
+
+    case "cmdstart":
+      editor.busy = true;
+      sheetobj.celldisplayneeded = "";
+      break;
+
+    case "cmdextension":
+      break;
+
+    case "cmdend":
+      signalstatus(status);
+
+      if (sheetobj.changedrendervalues) {
+        editor.context.PrecomputeSheetFontsAndLayouts();
+        editor.context.CalculateCellSkipData();
+        sheetobj.changedrendervalues = false;
       }
 
-   switch (status) {
-
-      case "startup":
-         break;
-
-      case "cmdstart":
-         editor.busy = true;
-         sheetobj.celldisplayneeded = "";
-         break;
-
-      case "cmdextension":
-         break;
-
-      case "cmdend":
-         signalstatus(status);
-
-         if (sheetobj.changedrendervalues) {
-            editor.context.PrecomputeSheetFontsAndLayouts();
-            editor.context.CalculateCellSkipData();
-            sheetobj.changedrendervalues = false;
-            }
-
-         if (sheetobj.celldisplayneeded && !sheetobj.renderneeded) {
-             if (sheetobj.cells[sheetobj.celldisplayneeded] && sheetobj.cells[sheetobj.celldisplayneeded].valuetype != "e#N/A") {
-                var cr = TableEditorSC.coordToCr(sheetobj.celldisplayneeded);
-                cell = TableEditorSC.GetEditorCellElement(editor, cr.row, cr.col);
-                editor.ReplaceCell(cell, cr.row, cr.col); // if no value set, wait for recalc and render .
-                }
-             }
-         if (editor.deferredCommands.length) {
-            dcmd = editor.deferredCommands.shift();
-            editor.EditorScheduleSheetCommands(dcmd.cmdstr, dcmd.saveundo, true);
-            return;
-            }
-         if (sheetobj.attribs.needsrecalc &&
-               (sheetobj.attribs.recalc!="off" || sheetobj.recalconce)
-               && editor.recalcFunction) {
-            editor.FitToEditTable();
-            sheetobj.renderneeded = false; // recalc will force a render
-            if (sheetobj.recalconce) delete sheetobj.recalconce; // only do once
-            editor.recalcFunction(editor);
-            }
-         else {
-            if (sheetobj.renderneeded) {
-               editor.FitToEditTable();
-               sheetobj.renderneeded = false;
-               editor.ScheduleRender(false);
-               }
-            else {
-               editor.SchedulePositionCalculations(); // just in case command changed positions
-//               editor.busy = false;
-//               signalstatus("cmdendnorender");
-               }
-            }
-
-         // Handle hidden column.
-         if (sheetobj.hiddencolrow == "col") {
-            if (editor.ecell !== null) {
-               var col = editor.ecell.col;
-               while (sheetobj.colattribs.hide[TableEditorSC.rcColname(col)] == "yes") {
-                  col++;
-                  }
-               var coord = TableEditorSC.crToCoord(col, editor.ecell.row);
-               editor.MoveECell(coord);
-               sheetobj.hiddencolrow = "";
-               }
-            }
-
-         // Handle hidden row.
-         if (sheetobj.hiddencolrow == "row") {
-            if (editor.ecell !== null) {
-               var row = editor.ecell.row;
-               while (sheetobj.rowattribs.hide[row] == "yes") {
-                  row++;
-                  }
-               var coord = TableEditorSC.crToCoord(editor.ecell.col, row);
-               editor.MoveECell(coord);
-               sheetobj.hiddencolrow = "";
-               }
-            }
-
-         return;
-
-      case "calcstart":
-         editor.busy = true;
-         break;
-
-      case "calccheckdone":
-      case "calcorder":
-      case "calcstep":
-      case "calcloading":
-      case "calcserverfunc":
-         break;
-
-      case "calcfinished":
-         signalstatus(status);
-         editor.ScheduleRender(false);
-         return;
-
-      case "schedrender":
-         editor.busy = true; // in case got here without cmd or recalc
-         break;
-
-      case "renderdone":
-         break;
-
-      case "schedposcalc":
-         editor.busy = true; // in case got here without cmd or recalc
-         break;
-
-      case "doneposcalc":
-          if (editor.deferredEmailCommands.length) {
-              signalstatus(status);
-              var emailcmd = editor.deferredEmailCommands.shift();
-              editor.EditorScheduleSheetCommands(emailcmd.cmdstr, emailcmd.saveundo, true);
-              return;
-              }
-
-
-         if (editor.deferredCommands.length) {
-            signalstatus(status);
-            dcmd = editor.deferredCommands.shift();
-            editor.EditorScheduleSheetCommands(dcmd.cmdstr, dcmd.saveundo, true);
-            }
-         else {
-            editor.busy = false;
-            signalstatus(status);
-            if (editor.state=="start") editor.DisplayCellContents(); // make sure up to date
-            }
-         return;
-      // eddy EditorSheetStatusCallback {
-      case "emailing":
-      case "confirmemailsent":
-        break;
-      // } EditorSheetStatusCallback eddy
-
-      default:
-    	 alert("Unknown status: "+status);
-         break;
-
+      if (sheetobj.celldisplayneeded && !sheetobj.renderneeded) {
+        if (
+          sheetobj.cells[sheetobj.celldisplayneeded] &&
+          sheetobj.cells[sheetobj.celldisplayneeded].valuetype != "e#N/A"
+        ) {
+          var cr = TableEditorSC.coordToCr(sheetobj.celldisplayneeded);
+          cell = TableEditorSC.GetEditorCellElement(editor, cr.row, cr.col);
+          editor.ReplaceCell(cell, cr.row, cr.col); // if no value set, wait for recalc and render .
+        }
+      }
+      if (editor.deferredCommands.length) {
+        dcmd = editor.deferredCommands.shift();
+        editor.EditorScheduleSheetCommands(dcmd.cmdstr, dcmd.saveundo, true);
+        return;
+      }
+      if (
+        sheetobj.attribs.needsrecalc &&
+        (sheetobj.attribs.recalc != "off" || sheetobj.recalconce) &&
+        editor.recalcFunction
+      ) {
+        editor.FitToEditTable();
+        sheetobj.renderneeded = false; // recalc will force a render
+        if (sheetobj.recalconce) delete sheetobj.recalconce; // only do once
+        editor.recalcFunction(editor);
+      } else {
+        if (sheetobj.renderneeded) {
+          editor.FitToEditTable();
+          sheetobj.renderneeded = false;
+          editor.ScheduleRender(false);
+        } else {
+          editor.SchedulePositionCalculations(); // just in case command changed positions
+          //               editor.busy = false;
+          //               signalstatus("cmdendnorender");
+        }
       }
 
-   signalstatus(status);
+      // Handle hidden column.
+      if (sheetobj.hiddencolrow == "col") {
+        if (editor.ecell !== null) {
+          var col = editor.ecell.col;
+          while (sheetobj.colattribs.hide[TableEditorSC.rcColname(col)] == "yes") {
+            col++;
+          }
+          var coord = TableEditorSC.crToCoord(col, editor.ecell.row);
+          editor.MoveECell(coord);
+          sheetobj.hiddencolrow = "";
+        }
+      }
 
-   return;
+      // Handle hidden row.
+      if (sheetobj.hiddencolrow == "row") {
+        if (editor.ecell !== null) {
+          var row = editor.ecell.row;
+          while (sheetobj.rowattribs.hide[row] == "yes") {
+            row++;
+          }
+          var coord = TableEditorSC.crToCoord(editor.ecell.col, row);
+          editor.MoveECell(coord);
+          sheetobj.hiddencolrow = "";
+        }
+      }
 
-   }
+      return;
+
+    case "calcstart":
+      editor.busy = true;
+      break;
+
+    case "calccheckdone":
+    case "calcorder":
+    case "calcstep":
+    case "calcloading":
+    case "calcserverfunc":
+      break;
+
+    case "calcfinished":
+      signalstatus(status);
+      editor.ScheduleRender(false);
+      return;
+
+    case "schedrender":
+      editor.busy = true; // in case got here without cmd or recalc
+      break;
+
+    case "renderdone":
+      break;
+
+    case "schedposcalc":
+      editor.busy = true; // in case got here without cmd or recalc
+      break;
+
+    case "doneposcalc":
+      if (editor.deferredEmailCommands.length) {
+        signalstatus(status);
+        var emailcmd = editor.deferredEmailCommands.shift();
+        editor.EditorScheduleSheetCommands(emailcmd.cmdstr, emailcmd.saveundo, true);
+        return;
+      }
+
+      if (editor.deferredCommands.length) {
+        signalstatus(status);
+        dcmd = editor.deferredCommands.shift();
+        editor.EditorScheduleSheetCommands(dcmd.cmdstr, dcmd.saveundo, true);
+      } else {
+        editor.busy = false;
+        signalstatus(status);
+        if (editor.state == "start") editor.DisplayCellContents(); // make sure up to date
+      }
+      return;
+    // eddy EditorSheetStatusCallback {
+    case "emailing":
+    case "confirmemailsent":
+      break;
+    // } EditorSheetStatusCallback eddy
+
+    default:
+      alert("Unknown status: " + status);
+      break;
+  }
+
+  signalstatus(status);
+
+  return;
+};
 
 //
 // str = SocialCalc.EditorGetStatuslineString(editor, status, arg, params)
@@ -1080,1350 +1225,1418 @@ TableEditorSC.EditorSheetStatusCallback = function(recalcdata: any, status: any,
 //
 
 /** @param {any} editor @param {any} status @param {any} arg @param {any} params */
-TableEditorSC.EditorGetStatuslineString = function(editor: any, status: any, arg: any, params: any) {
+TableEditorSC.EditorGetStatuslineString = function (
+  editor: any,
+  status: any,
+  arg: any,
+  params: any,
+) {
+  var scc = TableEditorSC.Constants;
 
-   var scc = TableEditorSC.Constants;
+  var sstr, progress, coord, circ, r, c, cell, sum;
 
-   var sstr, progress, coord, circ, r, c, cell, sum, ele;
+  progress = "";
 
-   progress = "";
-
-   switch (status) {
-      case "moveecell":
-      case "rangechange":
-      case "startup":
-         break;
-      case "cmdstart":
-         params.command = true;
-         document.body.style.cursor = "progress";
-         editor.griddiv.style.cursor = "progress";
-         progress = scc.s_statusline_executing;
-         break;
-      case "cmdextension":
-         progress = "Command Extension: "+arg;
-         break;
-      case "cmdend":
-         params.command = false;
-         break;
-      case "schedrender":
-         progress = scc.s_statusline_displaying;
-         break;
-      case "renderdone":
-         progress = " ";
-         break;
-      case "schedposcalc":
-         progress = scc.s_statusline_displaying;
-         break;
-      case "cmdendnorender":
-      case "doneposcalc":
-         document.body.style.cursor = "default";
-         editor.griddiv.style.cursor = "default";
-         // eddy EditorGetStatuslineString {
-         // all updates done, So let future event clear the "sent" message in the status bar
-         if(params.emailing == "sent") {
-        	 progress = params.emailreponse;
-        	 params.emailreponse = "";
-        	 params.emailing = "done";
-         }
-         // } eddy EditorGetStatuslineString
-         break;
-
-      case "calcorder":
-         progress = scc.s_statusline_ordering+Math.floor(100*arg.count/(arg.total||1))+"%";
-         break;
-      case "calcstep":
-         progress = scc.s_statusline_calculating+Math.floor(100*arg.count/(arg.total||1))+"%";
-         break;
-      case "calcloading":
-         progress = scc.s_statusline_calculatingls+": "+arg.sheetname;
-         break;
-      case "calcserverfunc":
-         progress = scc.s_statusline_calculating+Math.floor(100*arg.count/(arg.total||1))+"%, "+scc.s_statusline_doingserverfunc+arg.funcname+scc.s_statusline_incell+arg.coord;
-         break;
-      case "calcstart":
-         params.calculating = true;
-         document.body.style.cursor = "progress";
-         editor.griddiv.style.cursor = "progress"; // griddiv has an explicit cursor style
-         progress = scc.s_statusline_calcstart;
-         break;
-      case "calccheckdone":
-         break;
-      case "calcfinished":
-         params.calculating = false;
-         break;
+  switch (status) {
+    case "moveecell":
+    case "rangechange":
+    case "startup":
+      break;
+    case "cmdstart":
+      params.command = true;
+      document.body.style.cursor = "progress";
+      editor.griddiv.style.cursor = "progress";
+      progress = scc.s_statusline_executing;
+      break;
+    case "cmdextension":
+      progress = "Command Extension: " + arg;
+      break;
+    case "cmdend":
+      params.command = false;
+      break;
+    case "schedrender":
+      progress = scc.s_statusline_displaying;
+      break;
+    case "renderdone":
+      progress = " ";
+      break;
+    case "schedposcalc":
+      progress = scc.s_statusline_displaying;
+      break;
+    case "cmdendnorender":
+    case "doneposcalc":
+      document.body.style.cursor = "default";
+      editor.griddiv.style.cursor = "default";
       // eddy EditorGetStatuslineString {
-      case "emailing":
-    	 params.emailing = "sending";
-    	 params.emailreponse ="";
-         break;
-      case "confirmemailsent":
-     	 params.emailing = "sent";
-     	 if(typeof params.emailreponse === 'undefined') params.emailreponse ="";
-     	 params.emailreponse += arg;
-         break;
+      // all updates done, So let future event clear the "sent" message in the status bar
+      if (params.emailing == "sent") {
+        progress = params.emailreponse;
+        params.emailreponse = "";
+        params.emailing = "done";
+      }
       // } eddy EditorGetStatuslineString
+      break;
 
-      default:
-         progress = status;
-         break;
+    case "calcorder":
+      progress = scc.s_statusline_ordering + Math.floor((100 * arg.count) / (arg.total || 1)) + "%";
+      break;
+    case "calcstep":
+      progress =
+        scc.s_statusline_calculating + Math.floor((100 * arg.count) / (arg.total || 1)) + "%";
+      break;
+    case "calcloading":
+      progress = scc.s_statusline_calculatingls + ": " + arg.sheetname;
+      break;
+    case "calcserverfunc":
+      progress =
+        scc.s_statusline_calculating +
+        Math.floor((100 * arg.count) / (arg.total || 1)) +
+        "%, " +
+        scc.s_statusline_doingserverfunc +
+        arg.funcname +
+        scc.s_statusline_incell +
+        arg.coord;
+      break;
+    case "calcstart":
+      params.calculating = true;
+      document.body.style.cursor = "progress";
+      editor.griddiv.style.cursor = "progress"; // griddiv has an explicit cursor style
+      progress = scc.s_statusline_calcstart;
+      break;
+    case "calccheckdone":
+      break;
+    case "calcfinished":
+      params.calculating = false;
+      break;
+    // eddy EditorGetStatuslineString {
+    case "emailing":
+      params.emailing = "sending";
+      params.emailreponse = "";
+      break;
+    case "confirmemailsent":
+      params.emailing = "sent";
+      if (typeof params.emailreponse === "undefined") params.emailreponse = "";
+      params.emailreponse += arg;
+      break;
+    // } eddy EditorGetStatuslineString
+
+    default:
+      progress = status;
+      break;
+  }
+
+  // eddy EditorGetStatuslineString {
+  // if send email then update status bar with "sending" and then "sent"
+  if (params.emailing == "sending") {
+    progress += scc.s_statusline_sendemail;
+  }
+  if (params.emailing == "sent") {
+    progress += params.emailreponse;
+  }
+  // } eddy EditorGetStatuslineString
+
+  if (!progress && params.calculating) {
+    progress = scc.s_statusline_calculating;
+  }
+
+  // if there is a range, calculate sum (not during busy times)
+  if (
+    !params.calculating &&
+    !params.command &&
+    !progress &&
+    editor.range.hasrange &&
+    (editor.range.left != editor.range.right || editor.range.top != editor.range.bottom)
+  ) {
+    sum = 0;
+    for (r = editor.range.top; r <= editor.range.bottom; r++) {
+      for (c = editor.range.left; c <= editor.range.right; c++) {
+        cell = editor.context.sheetobj.cells[TableEditorSC.crToCoord(c, r)];
+        if (!cell) continue;
+        if (cell.valuetype && cell.valuetype.charAt(0) == "n") {
+          sum += cell.datavalue - 0;
+        }
       }
+    }
 
-   // eddy EditorGetStatuslineString {
-   // if send email then update status bar with "sending" and then "sent"
-   if(params.emailing == "sending") {
-  	 progress += scc.s_statusline_sendemail;
-   }
-   if(params.emailing == "sent") {
-  	 progress += params.emailreponse;
-   }
-   // } eddy EditorGetStatuslineString
+    sum = TableEditorSC.FormatNumber.formatNumberWithFormat(sum, "[,]General", "");
 
-   if (!progress && params.calculating) {
-      progress = scc.s_statusline_calculating;
-      }
+    coord =
+      TableEditorSC.crToCoord(editor.range.left, editor.range.top) +
+      ":" +
+      TableEditorSC.crToCoord(editor.range.right, editor.range.bottom);
+    progress =
+      coord +
+      " (" +
+      (editor.range.right - editor.range.left + 1) +
+      "x" +
+      (editor.range.bottom - editor.range.top + 1) +
+      ") " +
+      scc.s_statusline_sum +
+      "=" +
+      sum +
+      " " +
+      progress;
+  }
+  sstr = (editor.ecell || {}).coord + " &nbsp; " + progress;
 
-   // if there is a range, calculate sum (not during busy times)
-   if (!params.calculating && !params.command && !progress && editor.range.hasrange
-       && (editor.range.left!=editor.range.right || editor.range.top!=editor.range.bottom)) {
-      sum = 0;
-      for (r=editor.range.top; r <= editor.range.bottom; r++) {
-         for (c=editor.range.left; c <= editor.range.right; c++) {
-            cell = editor.context.sheetobj.cells[TableEditorSC.crToCoord(c, r)];
-            if (!cell) continue;
-            if (cell.valuetype && cell.valuetype.charAt(0)=="n") {
-               sum += cell.datavalue-0;
-               }
-            }
-         }
+  if (!params.calculating && editor.context.sheetobj.attribs.needsrecalc == "yes") {
+    sstr += " &nbsp; " + scc.s_statusline_recalcneeded;
+  }
 
-      sum = TableEditorSC.FormatNumber.formatNumberWithFormat(sum, "[,]General", "");
-
-      coord = TableEditorSC.crToCoord(editor.range.left, editor.range.top) + ":" +
-         TableEditorSC.crToCoord(editor.range.right, editor.range.bottom);
-      progress = coord + " (" + (editor.range.right-editor.range.left+1) + "x" + (editor.range.bottom-editor.range.top+1) +
-                 ") "+scc.s_statusline_sum+"=" + sum + " " + progress;
-      }
-   sstr = (editor.ecell || {}).coord+" &nbsp; "+progress;
-
-   if (!params.calculating && editor.context.sheetobj.attribs.needsrecalc=="yes") {
-      sstr += ' &nbsp; '+scc.s_statusline_recalcneeded;
-      }
-
-   circ = editor.context.sheetobj.attribs.circularreferencecell;
-   if (circ) {
-      circ = circ.replace(/\|/, " referenced by ");
-      sstr += ' &nbsp; '+scc.s_statusline_circref + circ + '</span>';
-      }
-   // eddy EditorGetStatuslineString {
-   sstr += "";
-   // } eddy EditorGetStatuslineString
-   return sstr;
-
-   }
-
+  circ = editor.context.sheetobj.attribs.circularreferencecell;
+  if (circ) {
+    circ = circ.replace(/\|/, " referenced by ");
+    sstr += " &nbsp; " + scc.s_statusline_circref + circ + "</span>";
+  }
+  // eddy EditorGetStatuslineString {
+  sstr += "";
+  // } eddy EditorGetStatuslineString
+  return sstr;
+};
 
 //
 // Mouse stuff
 //
 
 TableEditorSC.EditorMouseInfo = {
+  // The registeredElements array is used to identify editor grid in which the mouse is doing things.
 
-   // The registeredElements array is used to identify editor grid in which the mouse is doing things.
+  // One item for each active editor, each an object with:
+  //    .element, .editor
 
-   // One item for each active editor, each an object with:
-   //    .element, .editor
+  registeredElements: [],
 
-   registeredElements: [],
+  editor: null, // editor being processed (between mousedown and mouseup)
+  element: null, // element being processed
 
-   editor: null, // editor being processed (between mousedown and mouseup)
-   element: null, // element being processed
+  ignore: false, // if true, mousedowns are ignored
 
-   ignore: false, // if true, mousedowns are ignored
-
-   mousedowncoord: "", // coord where mouse went down for drag range
-   mouselastcoord: "", // coord where mouse last was during drag
-   mouseresizecol: "", // col being resized
-   mouseresizeclientx: null, // where resize started
-   mouseresizedisplay: null // element tracking new size
-   }
+  mousedowncoord: "", // coord where mouse went down for drag range
+  mouselastcoord: "", // coord where mouse last was during drag
+  mouseresizecol: "", // col being resized
+  mouseresizeclientx: null, // where resize started
+  mouseresizedisplay: null, // element tracking new size
+};
 
 //
 // EditorMouseRegister(editor)
 //
 
 /** @param {any} editor */
-TableEditorSC.EditorMouseRegister = function(editor: any) {
+TableEditorSC.EditorMouseRegister = function (editor: any) {
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  var element = editor.fullgrid;
+  var i;
 
-   var mouseinfo = TableEditorSC.EditorMouseInfo;
-   var element = editor.fullgrid;
-   var i;
-
-   for (i=0; i<mouseinfo.registeredElements.length; i++) {
-      if (mouseinfo.registeredElements[i].editor == editor) {
-         if (mouseinfo.registeredElements[i].element == element) {
-            return; // already set - don't do it again
-            }
-         break;
-         }
+  for (i = 0; i < mouseinfo.registeredElements.length; i++) {
+    if (mouseinfo.registeredElements[i].editor == editor) {
+      if (mouseinfo.registeredElements[i].element == element) {
+        return; // already set - don't do it again
       }
+      break;
+    }
+  }
 
-   if (i<mouseinfo.registeredElements.length) {
-      mouseinfo.registeredElements[i].element = element;
-      }
-   else {
-      mouseinfo.registeredElements.push({element: element, editor: editor});
-      }
+  if (i < mouseinfo.registeredElements.length) {
+    mouseinfo.registeredElements[i].element = element;
+  } else {
+    mouseinfo.registeredElements.push({ element: element, editor: editor });
+  }
 
-   element.addEventListener("mousedown", TableEditorSC.ProcessEditorMouseDown, false);
-   element.addEventListener("dblclick", TableEditorSC.ProcessEditorDblClick, false);
+  element.addEventListener("mousedown", TableEditorSC.ProcessEditorMouseDown, false);
+  element.addEventListener("dblclick", TableEditorSC.ProcessEditorDblClick, false);
 
-   mouseinfo.ignore = false; // just in case
+  mouseinfo.ignore = false; // just in case
 
-   return;
-
-   }
+  return;
+};
 
 //
 // EditorMouseUnregister(editor)
 //
 
 /** @param {any} editor */
-TableEditorSC.EditorMouseUnregister = function(editor: any) {
+TableEditorSC.EditorMouseUnregister = function (editor: any) {
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  var i, oldelement;
 
-   var mouseinfo = TableEditorSC.EditorMouseInfo;
-   var element = editor.fullgrid;
-   var i, oldelement;
+  for (i = 0; i < mouseinfo.registeredElements.length; i++) {
+    if (mouseinfo.registeredElements[i].editor == editor) {
+      break;
+    }
+  }
 
-   for (i=0; i<mouseinfo.registeredElements.length; i++) {
-      if (mouseinfo.registeredElements[i].editor == editor) {
-         break;
-         }
-      }
+  if (i < mouseinfo.registeredElements.length) {
+    oldelement = mouseinfo.registeredElements[i].element; // remove old handlers
+    oldelement.removeEventListener("mousedown", TableEditorSC.ProcessEditorMouseDown, false);
+    oldelement.removeEventListener("dblclick", TableEditorSC.ProcessEditorDblClick, false);
+    mouseinfo.registeredElements.splice(i, 1);
+  }
 
-   if (i<mouseinfo.registeredElements.length) {
-      oldelement = mouseinfo.registeredElements[i].element; // remove old handlers
-      oldelement.removeEventListener("mousedown", TableEditorSC.ProcessEditorMouseDown, false);
-      oldelement.removeEventListener("dblclick", TableEditorSC.ProcessEditorDblClick, false);
-      mouseinfo.registeredElements.splice(i, 1);
-      }
-
-   return;
-
-   }
+  return;
+};
 
 /** @param {any} event */
-TableEditorSC.StopPropagation = function(event: any) {
-    if (event.stopPropagation) event.stopPropagation(); // DOM Level 2
-    else event.cancelBubble = true; // IE 5+
-    if (event.preventDefault) event.preventDefault(); // DOM Level 2
-    else event.returnValue = false; // IE 5+
-}
+TableEditorSC.StopPropagation = function (event: any) {
+  if (event.stopPropagation)
+    event.stopPropagation(); // DOM Level 2
+  else event.cancelBubble = true; // IE 5+
+  if (event.preventDefault)
+    event.preventDefault(); // DOM Level 2
+  else event.returnValue = false; // IE 5+
+};
 
 /** @param {any} move @param {any} up @param {any} element @param {any} event */
-TableEditorSC.SetMouseMoveUp = function(move: any, up: any, element: any, event: any) {
-       // Event code from JavaScript, Flanagan, 5th Edition, pg. 422
-   document.addEventListener("mousemove", move, true); // capture everywhere
-   document.addEventListener("mouseup", up, true); // capture everywhere
-    TableEditorSC.StopPropagation(event);
-}
+TableEditorSC.SetMouseMoveUp = function (move: any, up: any, element: any, event: any) {
+  // Event code from JavaScript, Flanagan, 5th Edition, pg. 422
+  document.addEventListener("mousemove", move, true); // capture everywhere
+  document.addEventListener("mouseup", up, true); // capture everywhere
+  TableEditorSC.StopPropagation(event);
+};
 
 /** @param {any} move @param {any} up @param {any} element @param {any} event */
-TableEditorSC.RemoveMouseMoveUp = function(move: any, up: any, element: any, event: any) {
-    TableEditorSC.StopPropagation(event);
-    document.removeEventListener("mousemove", move, true);
-    document.removeEventListener("mouseup", up, true);
-}
+TableEditorSC.RemoveMouseMoveUp = function (move: any, up: any, element: any, event: any) {
+  TableEditorSC.StopPropagation(event);
+  document.removeEventListener("mousemove", move, true);
+  document.removeEventListener("mouseup", up, true);
+};
 
 /** @param {any} e */
-TableEditorSC.ProcessEditorMouseDown = function(e: any) {
+TableEditorSC.ProcessEditorMouseDown = function (e: any) {
+  var editor, result, coord, range;
 
-   var editor, result, coord, textarea, wval, range;
+  var event = e || window.event;
 
-   var event = e || window.event;
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  var ele = event.target || event.srcElement; // source object is often within what we want
+  var target = ele;
+  if (target.nodeType == 3) target = target.parentNode; // defeat Safari bug
 
-   var mouseinfo = TableEditorSC.EditorMouseInfo;
-   var ele = event.target || event.srcElement; // source object is often within what we want
-   var target = ele;
-   if (target.nodeType == 3) target = target.parentNode; // defeat Safari bug
+  var mobj;
 
-   var mobj;
+  if (mouseinfo.ignore) return; // ignore this
 
-   if (mouseinfo.ignore) return; // ignore this
+  for (mobj = null; !mobj && ele; ele = ele.parentNode) {
+    // go up tree looking for one of our elements
+    mobj = TableEditorSC.LookupElement(ele, mouseinfo.registeredElements);
+  }
+  if (!mobj) {
+    mouseinfo.editor = null;
+    return; // not one of our elements
+  }
 
-   for (mobj=null; !mobj && ele; ele=ele.parentNode) { // go up tree looking for one of our elements
-      mobj = TableEditorSC.LookupElement(ele, mouseinfo.registeredElements);
-      }
-   if (!mobj) {
-      mouseinfo.editor = null;
-      return; // not one of our elements
-      }
+  editor = mobj.editor;
+  mouseinfo.element = ele;
+  range = editor.range;
 
-   editor = mobj.editor;
-   mouseinfo.element = ele;
-   range = editor.range;
+  var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
+  var clientX = event.clientX - pos.left;
+  var clientY = event.clientY - pos.top;
+  result = TableEditorSC.GridMousePosition(editor, clientX, clientY);
 
-   var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
-   var clientX = event.clientX - pos.left;
-   var clientY = event.clientY - pos.top;
-   result = TableEditorSC.GridMousePosition(editor, clientX, clientY);
+  if (!result) return; // not on a cell or col header
+  mouseinfo.editor = editor; // remember for later
 
-   if (!result) return; // not on a cell or col header
-   mouseinfo.editor = editor; // remember for later
+  if (result.rowheader) {
+    if (result.rowselect) TableEditorSC.ProcessEditorRowselectMouseDown(e, ele, result);
+    else TableEditorSC.ProcessEditorRowsizeMouseDown(e, ele, result);
+    return;
+  }
 
-    if (result.rowheader) {
-       if (result.rowselect) TableEditorSC.ProcessEditorRowselectMouseDown(e, ele, result);
-       else TableEditorSC.ProcessEditorRowsizeMouseDown(e, ele, result);
-       return;
-    }
+  if (result.colheader) {
+    if (result.colselect) TableEditorSC.ProcessEditorColselectMouseDown(e, ele, result);
+    else TableEditorSC.ProcessEditorColsizeMouseDown(e, ele, result);
+    return;
+  }
 
-    if (result.colheader) {
-       if (result.colselect) TableEditorSC.ProcessEditorColselectMouseDown(e, ele, result);
-       else TableEditorSC.ProcessEditorColsizeMouseDown(e, ele, result);
-       return;
-    }
+  if (!result.coord) return; // not us
 
-   if (!result.coord) return; // not us
+  if (!range.hasrange) {
+    if (e.shiftKey) editor.RangeAnchor();
+  }
+  coord = editor.MoveECell(result.coord);
+  // eddy ProcessEditorMouseDown {
+  // "app" widgets need to keep focus - needed because "coord" always equals A1
+  if (TableEditorSC._app == true) {
+    TableEditorSC.CmdGotFocus(true);
+    return;
+  }
 
-   if (!range.hasrange) {
-      if (e.shiftKey)
-         editor.RangeAnchor();
-      }
-   coord = editor.MoveECell(result.coord);
-   // eddy ProcessEditorMouseDown {
-   // "app" widgets need to keep focus - needed because "coord" always equals A1
-   if(TableEditorSC._app == true) { TableEditorSC.CmdGotFocus(true); return; }
+  var clickedCell = editor.context.sheetobj.cells[coord];
+  if (clickedCell && clickedCell.valuetype.charAt(1) == "i") {
+    // IF cell contains ioWidget
+    var formula_name = clickedCell.valuetype.substring(2);
+    var widget_id = formula_name + "_" + coord;
+    // if widget was clicked (rather than cell containing widget)
+    if (target && widget_id == target.id)
+      TableEditorSC.CmdGotFocus((document as any).getElementById(widget_id));
+    return; // let ioWidget keep the focus
+  }
+  // }
 
-   var clickedCell = editor.context.sheetobj.cells[coord];
-   if(clickedCell && clickedCell.valuetype.charAt(1) == 'i') { // IF cell contains ioWidget
-      var formula_name = clickedCell.valuetype.substring(2);
-      var widget_id = formula_name+'_'+coord;
-      // if widget was clicked (rather than cell containing widget)
-      if (target && widget_id == target.id) TableEditorSC.CmdGotFocus((document as any).getElementById(widget_id));
-      return; // let ioWidget keep the focus
-   }
-   // }
+  if (range.hasrange) {
+    if (e.shiftKey) editor.RangeExtend();
+    else editor.RangeRemove();
+  }
 
-   if (range.hasrange) {
-      if (e.shiftKey)
-         editor.RangeExtend();
-      else
-         editor.RangeRemove();
-      }
+  mouseinfo.mousedowncoord = coord; // remember if starting drag range select
+  mouseinfo.mouselastcoord = coord;
 
-   mouseinfo.mousedowncoord = coord; // remember if starting drag range select
-   mouseinfo.mouselastcoord = coord;
+  editor.EditorMouseRange(coord);
 
-   editor.EditorMouseRange(coord);
-
-   TableEditorSC.KeyboardSetFocus(editor);
-   if (editor.state!="start" && editor.inputBox) editor.inputBox.element.focus();
-    TableEditorSC.SetMouseMoveUp(TableEditorSC.ProcessEditorMouseMove,
-			      TableEditorSC.ProcessEditorMouseUp,
-			      ele,
-			      event);
-   return;
-
-   }
+  TableEditorSC.KeyboardSetFocus(editor);
+  if (editor.state != "start" && editor.inputBox) editor.inputBox.element.focus();
+  TableEditorSC.SetMouseMoveUp(
+    TableEditorSC.ProcessEditorMouseMove,
+    TableEditorSC.ProcessEditorMouseUp,
+    ele,
+    event,
+  );
+  return;
+};
 
 /** @param {any} editor @param {any} coord */
-TableEditorSC.EditorMouseRange = function(editor: any, coord: any) {
+TableEditorSC.EditorMouseRange = function (editor: any, coord: any) {
+  var inputtext, wval;
+  var range = editor.range;
 
-   var inputtext, wval;
-   var range = editor.range;
-
-   switch (editor.state) { // editing a cell - shouldn't get here if no inputBox
-      case "input":
-         inputtext = editor.inputBox.GetText();
-         wval = editor.workingvalues;
-         if (("(+-*/,:!&<>=^".indexOf(inputtext.slice(-1))>=0 && inputtext.slice(0,1)=="=") ||
-             (inputtext == "=")) {
-            wval.partialexpr = inputtext;
-            }
-
-         if (wval.partialexpr) { // if in pointing operation
-            if (coord) {
-               if (range.hasrange) {
-                  editor.inputBox.SetText(wval.partialexpr + TableEditorSC.crToCoord(range.left, range.top) + ":" +
-                     TableEditorSC.crToCoord(range.right, range.bottom));
-                  }
-               else {
-                  editor.inputBox.SetText(wval.partialexpr + coord);
-                  }
-               }
-            }
-         else { // not in point -- done editing
-            editor.inputBox.Blur();
-            editor.inputBox.ShowInputBox(false);
-            editor.state = "start";
-            editor.cellhandles.ShowCellHandles(true);
-            editor.EditorSaveEdit();
-            editor.inputBox.DisplayCellContents(null);
-            }
-         break;
-
-      case "inputboxdirect":
-         editor.inputBox.Blur();
-         editor.inputBox.ShowInputBox(false);
-         editor.state = "start";
-         editor.cellhandles.ShowCellHandles(true);
-         editor.EditorSaveEdit();
-         editor.inputBox.DisplayCellContents(null);
-         break;
+  switch (
+    editor.state // editing a cell - shouldn't get here if no inputBox
+  ) {
+    case "input":
+      inputtext = editor.inputBox.GetText();
+      wval = editor.workingvalues;
+      if (
+        ("(+-*/,:!&<>=^".indexOf(inputtext.slice(-1)) >= 0 && inputtext.slice(0, 1) == "=") ||
+        inputtext == "="
+      ) {
+        wval.partialexpr = inputtext;
       }
-   }
+
+      if (wval.partialexpr) {
+        // if in pointing operation
+        if (coord) {
+          if (range.hasrange) {
+            editor.inputBox.SetText(
+              wval.partialexpr +
+                TableEditorSC.crToCoord(range.left, range.top) +
+                ":" +
+                TableEditorSC.crToCoord(range.right, range.bottom),
+            );
+          } else {
+            editor.inputBox.SetText(wval.partialexpr + coord);
+          }
+        }
+      } else {
+        // not in point -- done editing
+        editor.inputBox.Blur();
+        editor.inputBox.ShowInputBox(false);
+        editor.state = "start";
+        editor.cellhandles.ShowCellHandles(true);
+        editor.EditorSaveEdit();
+        editor.inputBox.DisplayCellContents(null);
+      }
+      break;
+
+    case "inputboxdirect":
+      editor.inputBox.Blur();
+      editor.inputBox.ShowInputBox(false);
+      editor.state = "start";
+      editor.cellhandles.ShowCellHandles(true);
+      editor.EditorSaveEdit();
+      editor.inputBox.DisplayCellContents(null);
+      break;
+  }
+};
 
 /** @param {any} e */
-TableEditorSC.ProcessEditorMouseMove = function(e: any) {
+TableEditorSC.ProcessEditorMouseMove = function (e: any) {
+  var editor, result;
 
-   var editor, element, result, coord, now, textarea, sheetobj, cellobj, wval;
+  var event = e || window.event;
 
-   var event = e || window.event;
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  editor = mouseinfo.editor;
+  if (!editor) return; // not us, ignore
+  if (mouseinfo.ignore) return; // ignore this
 
-   var mouseinfo = TableEditorSC.EditorMouseInfo;
-   editor = mouseinfo.editor;
-   if (!editor) return; // not us, ignore
-   if (mouseinfo.ignore) return; // ignore this
-   element = mouseinfo.element;
+  var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
+  var clientX = event.clientX - pos.left;
+  var clientY = event.clientY - pos.top;
+  result = TableEditorSC.GridMousePosition(editor, clientX, clientY); // get cell with move
 
-   var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
-   var clientX = event.clientX - pos.left;
-   var clientY = event.clientY - pos.top;
-   result = TableEditorSC.GridMousePosition(editor, clientX, clientY); // get cell with move
+  if (!result) return;
 
-   if (!result) return;
+  if (result && !result.coord) {
+    TableEditorSC.SetDragAutoRepeat(editor, result);
+    return;
+  }
 
-   if (result && !result.coord) {
-      TableEditorSC.SetDragAutoRepeat(editor, result);
-      return;
-      }
+  TableEditorSC.SetDragAutoRepeat(editor, null); // stop repeating if it was
 
-   TableEditorSC.SetDragAutoRepeat(editor, null); // stop repeating if it was
+  if (!result.coord) return;
 
-   if (!result.coord) return;
-
-   if (result.coord!=mouseinfo.mouselastcoord) {
-      if (!e.shiftKey && !editor.range.hasrange) {
-         editor.RangeAnchor(mouseinfo.mousedowncoord);
-         }
-      editor.MoveECell(result.coord);
-      editor.RangeExtend();
-      }
-   mouseinfo.mouselastcoord = result.coord;
-
-   editor.EditorMouseRange(result.coord);
-   TableEditorSC.StopPropagation(event);
-   return;
-   }
-
-
-/** @param {any} e */
-TableEditorSC.ProcessEditorMouseUp = function(e: any) {
-
-   var editor, element, result, coord, now, textarea, sheetobj, cellobj, wval;
-
-   var event = e || window.event;
-
-   var mouseinfo = TableEditorSC.EditorMouseInfo;
-   editor = mouseinfo.editor;
-   if (!editor) return; // not us, ignore
-   if (mouseinfo.ignore) return; // ignore this
-   element = mouseinfo.element;
-
-   var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
-   var clientX = event.clientX - pos.left;
-   var clientY = event.clientY - pos.top;
-   result = TableEditorSC.GridMousePosition(editor, clientX, clientY); // get cell with up
-
-   TableEditorSC.SetDragAutoRepeat(editor, null); // stop repeating if it was
-
-   if (!result) return;
-
-   if (!result.coord) result.coord = editor.ecell.coord;
-
-   if (editor.range.hasrange) {
-      editor.MoveECell(result.coord);
-      editor.RangeExtend();
-      }
-   else if (result.coord && result.coord!=mouseinfo.mousedowncoord) {
+  if (result.coord != mouseinfo.mouselastcoord) {
+    if (!e.shiftKey && !editor.range.hasrange) {
       editor.RangeAnchor(mouseinfo.mousedowncoord);
-      editor.MoveECell(result.coord);
-      editor.RangeExtend();
-      }
+    }
+    editor.MoveECell(result.coord);
+    editor.RangeExtend();
+  }
+  mouseinfo.mouselastcoord = result.coord;
 
-   editor.EditorMouseRange(result.coord);
-   mouseinfo.editor = null;
-   TableEditorSC.RemoveMouseMoveUp(TableEditorSC.ProcessEditorMouseMove,
-				  TableEditorSC.ProcessEditorMouseUp,
-				  element,
-				  event);
-   return false;
+  editor.EditorMouseRange(result.coord);
+  TableEditorSC.StopPropagation(event);
+  return;
+};
 
-   }
+/** @param {any} e */
+TableEditorSC.ProcessEditorMouseUp = function (e: any) {
+  var editor, element, result;
 
+  var event = e || window.event;
+
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  editor = mouseinfo.editor;
+  if (!editor) return; // not us, ignore
+  if (mouseinfo.ignore) return; // ignore this
+  element = mouseinfo.element;
+
+  var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
+  var clientX = event.clientX - pos.left;
+  var clientY = event.clientY - pos.top;
+  result = TableEditorSC.GridMousePosition(editor, clientX, clientY); // get cell with up
+
+  TableEditorSC.SetDragAutoRepeat(editor, null); // stop repeating if it was
+
+  if (!result) return;
+
+  if (!result.coord) result.coord = editor.ecell.coord;
+
+  if (editor.range.hasrange) {
+    editor.MoveECell(result.coord);
+    editor.RangeExtend();
+  } else if (result.coord && result.coord != mouseinfo.mousedowncoord) {
+    editor.RangeAnchor(mouseinfo.mousedowncoord);
+    editor.MoveECell(result.coord);
+    editor.RangeExtend();
+  }
+
+  editor.EditorMouseRange(result.coord);
+  mouseinfo.editor = null;
+  TableEditorSC.RemoveMouseMoveUp(
+    TableEditorSC.ProcessEditorMouseMove,
+    TableEditorSC.ProcessEditorMouseUp,
+    element,
+    event,
+  );
+  return false;
+};
 
 /** @param {any} e @param {any} ele @param {any} result */
-TableEditorSC.ProcessEditorColsizeMouseDown = function(e: any, ele: any, result: any) {
+TableEditorSC.ProcessEditorColsizeMouseDown = function (e: any, ele: any, result: any) {
+  var event = e || window.event;
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  var editor = mouseinfo.editor;
+  var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
+  var clientX = event.clientX - pos.left;
 
-   var event = e || window.event;
-   var mouseinfo = TableEditorSC.EditorMouseInfo;
-   var editor = mouseinfo.editor;
-   var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
-   var clientX = event.clientX - pos.left;
+  mouseinfo.mouseresizecolnum = result.coltoresize; // remember col being resized
+  mouseinfo.mouseresizecol = TableEditorSC.rcColname(result.coltoresize);
+  mouseinfo.mousedownclientx = clientX;
+  mouseinfo.mousecoltounhide = result.coltounhide;
 
-   mouseinfo.mouseresizecolnum = result.coltoresize; // remember col being resized
-   mouseinfo.mouseresizecol = TableEditorSC.rcColname(result.coltoresize);
-   mouseinfo.mousedownclientx = clientX;
-   mouseinfo.mousecoltounhide = result.coltounhide;
+  if (result.coltoresize) {
+    var sizedisplay = document.createElement("div");
+    mouseinfo.mouseresizedisplay = sizedisplay;
+    sizedisplay.style.width = "auto";
+    sizedisplay.style.position = "absolute";
+    sizedisplay.style.zIndex = "100";
+    sizedisplay.style.top = editor.headposition.top + "px";
+    sizedisplay.style.left = editor.colpositions[result.coltoresize] + "px";
+    sizedisplay.innerHTML =
+      '<table cellpadding="0" cellspacing="0"><tr><td style="height:100px;' +
+      "border:1px dashed black;background-color:white;width:" +
+      (editor.context.colwidth[mouseinfo.mouseresizecolnum] - 2) +
+      'px;">&nbsp;</td>' +
+      '<td><div style="font-size:small;color:white;background-color:gray;padding:4px;">' +
+      editor.context.colwidth[mouseinfo.mouseresizecolnum] +
+      "</div></td></tr></table>";
+    var szTarget =
+      sizedisplay.firstChild &&
+      sizedisplay.firstChild.lastChild &&
+      sizedisplay.firstChild.lastChild.firstChild &&
+      (sizedisplay.firstChild.lastChild.firstChild.childNodes[0] as any);
+    if (szTarget) TableEditorSC.setStyles(szTarget, "filter:alpha(opacity=85);opacity:.85;"); // so no warning msg with Firefox about filter
 
-   if (result.coltoresize) {
-      var sizedisplay = document.createElement("div");
-      mouseinfo.mouseresizedisplay = sizedisplay;
-      sizedisplay.style.width = "auto";
-      sizedisplay.style.position = "absolute";
-      sizedisplay.style.zIndex = "100";
-      sizedisplay.style.top = editor.headposition.top+"px";
-      sizedisplay.style.left = editor.colpositions[result.coltoresize]+"px";
-      sizedisplay.innerHTML = '<table cellpadding="0" cellspacing="0"><tr><td style="height:100px;'+
-        'border:1px dashed black;background-color:white;width:' +
-        (editor.context.colwidth[mouseinfo.mouseresizecolnum]-2) + 'px;">&nbsp;</td>'+
-        '<td><div style="font-size:small;color:white;background-color:gray;padding:4px;">'+
-        editor.context.colwidth[mouseinfo.mouseresizecolnum] + '</div></td></tr></table>';
-      var szTarget = (sizedisplay.firstChild && sizedisplay.firstChild.lastChild && sizedisplay.firstChild.lastChild.firstChild && sizedisplay.firstChild.lastChild.firstChild.childNodes[0] as any);
-      if (szTarget) TableEditorSC.setStyles(szTarget, "filter:alpha(opacity=85);opacity:.85;"); // so no warning msg with Firefox about filter
-
-      editor.toplevel.appendChild(sizedisplay);
-      }
-    TableEditorSC.SetMouseMoveUp( TableEditorSC.ProcessEditorColsizeMouseMove,
-			       TableEditorSC.ProcessEditorColsizeMouseUp,
-			       editor.toplevel,
-			       event);
-   return;
-   }
-
-
-/** @param {any} e */
-TableEditorSC.ProcessEditorColsizeMouseMove = function(e: any) {
-
-   var event = e || window.event;
-   var mouseinfo = TableEditorSC.EditorMouseInfo;
-   var editor = mouseinfo.editor;
-   if (!editor) return; // not us, ignore
-
-   if (mouseinfo.mouseresizecolnum) {
-      var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
-      var clientX = event.clientX - pos.left;
-
-      var newsize = (editor.context.colwidth[mouseinfo.mouseresizecolnum]-0) + (clientX - mouseinfo.mousedownclientx);
-      if (newsize < TableEditorSC.Constants.defaultMinimumColWidth) newsize = TableEditorSC.Constants.defaultMinimumColWidth;
-
-      var sizedisplay = mouseinfo.mouseresizedisplay;
-//      sizedisplay.firstChild.lastChild.firstChild.childNodes[1].firstChild.innerHTML = newsize+"";
-//      sizedisplay.firstChild.lastChild.firstChild.childNodes[0].firstChild.style.width = (newsize-2)+"px";
-      sizedisplay.innerHTML = '<table cellpadding="0" cellspacing="0"><tr><td style="height:100px;'+
-          'border:1px dashed black;background-color:white;width:' + (newsize-2) + 'px;">&nbsp;</td>'+
-          '<td><div style="font-size:small;color:white;background-color:gray;padding:4px;">'+
-          newsize + '</div></td></tr></table>';
-      TableEditorSC.setStyles(sizedisplay.firstChild.lastChild.firstChild.childNodes[0], "filter:alpha(opacity=85);opacity:.85;"); // so no warning msg with Firefox about filter
-      }
-   TableEditorSC.StopPropagation(event);
-   return;
-   }
-
+    editor.toplevel.appendChild(sizedisplay);
+  }
+  TableEditorSC.SetMouseMoveUp(
+    TableEditorSC.ProcessEditorColsizeMouseMove,
+    TableEditorSC.ProcessEditorColsizeMouseUp,
+    editor.toplevel,
+    event,
+  );
+  return;
+};
 
 /** @param {any} e */
-TableEditorSC.ProcessEditorColsizeMouseUp = function(e: any) {
+TableEditorSC.ProcessEditorColsizeMouseMove = function (e: any) {
+  var event = e || window.event;
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  var editor = mouseinfo.editor;
+  if (!editor) return; // not us, ignore
 
-   var event = e || window.event;
-   var mouseinfo = TableEditorSC.EditorMouseInfo;
-   var editor = mouseinfo.editor;
-   if (!editor) return; // not us, ignore
-   var element = mouseinfo.element;
-   var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
-   var clientX = event.clientX - pos.left;
-   TableEditorSC.RemoveMouseMoveUp(
-       TableEditorSC.ProcessEditorColsizeMouseMove,
-       TableEditorSC.ProcessEditorColsizeMouseUp,
-       editor.toplevel,
-       event);
+  if (mouseinfo.mouseresizecolnum) {
+    var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
+    var clientX = event.clientX - pos.left;
 
-   if (mouseinfo.mousecoltounhide) {
-      editor.EditorScheduleSheetCommands("set "+TableEditorSC.rcColname(mouseinfo.mousecoltounhide)+" hide", true, false);
-      /*
+    var newsize =
+      editor.context.colwidth[mouseinfo.mouseresizecolnum] -
+      0 +
+      (clientX - mouseinfo.mousedownclientx);
+    if (newsize < TableEditorSC.Constants.defaultMinimumColWidth)
+      newsize = TableEditorSC.Constants.defaultMinimumColWidth;
+
+    var sizedisplay = mouseinfo.mouseresizedisplay;
+    //      sizedisplay.firstChild.lastChild.firstChild.childNodes[1].firstChild.innerHTML = newsize+"";
+    //      sizedisplay.firstChild.lastChild.firstChild.childNodes[0].firstChild.style.width = (newsize-2)+"px";
+    sizedisplay.innerHTML =
+      '<table cellpadding="0" cellspacing="0"><tr><td style="height:100px;' +
+      "border:1px dashed black;background-color:white;width:" +
+      (newsize - 2) +
+      'px;">&nbsp;</td>' +
+      '<td><div style="font-size:small;color:white;background-color:gray;padding:4px;">' +
+      newsize +
+      "</div></td></tr></table>";
+    TableEditorSC.setStyles(
+      sizedisplay.firstChild.lastChild.firstChild.childNodes[0],
+      "filter:alpha(opacity=85);opacity:.85;",
+    ); // so no warning msg with Firefox about filter
+  }
+  TableEditorSC.StopPropagation(event);
+  return;
+};
+
+/** @param {any} e */
+TableEditorSC.ProcessEditorColsizeMouseUp = function (e: any) {
+  var event = e || window.event;
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  var editor = mouseinfo.editor;
+  if (!editor) return; // not us, ignore
+  var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
+  var clientX = event.clientX - pos.left;
+  TableEditorSC.RemoveMouseMoveUp(
+    TableEditorSC.ProcessEditorColsizeMouseMove,
+    TableEditorSC.ProcessEditorColsizeMouseUp,
+    editor.toplevel,
+    event,
+  );
+
+  if (mouseinfo.mousecoltounhide) {
+    editor.EditorScheduleSheetCommands(
+      "set " + TableEditorSC.rcColname(mouseinfo.mousecoltounhide) + " hide",
+      true,
+      false,
+    );
+    /*
       if (editor.ecell && editor.ecell.col == mouseinfo.mousecoltounhide+1) {
          editor.MoveECell(TableEditorSC.crToCoord(mouseinfo.mousecoltounhide, editor.ecell.row));
          }*/
-      }
-   else if (mouseinfo.mouseresizecolnum) {
-      var newsize = (editor.context.colwidth[mouseinfo.mouseresizecolnum]-0) + (clientX - mouseinfo.mousedownclientx);
-      if (newsize < TableEditorSC.Constants.defaultMinimumColWidth) newsize = TableEditorSC.Constants.defaultMinimumColWidth;
+  } else if (mouseinfo.mouseresizecolnum) {
+    var newsize =
+      editor.context.colwidth[mouseinfo.mouseresizecolnum] -
+      0 +
+      (clientX - mouseinfo.mousedownclientx);
+    if (newsize < TableEditorSC.Constants.defaultMinimumColWidth)
+      newsize = TableEditorSC.Constants.defaultMinimumColWidth;
 
-      editor.EditorScheduleSheetCommands("set "+mouseinfo.mouseresizecol+" width "+newsize, true, false);
+    editor.EditorScheduleSheetCommands(
+      "set " + mouseinfo.mouseresizecol + " width " + newsize,
+      true,
+      false,
+    );
 
-      if (editor.timeout) window.clearTimeout(editor.timeout);
-      editor.timeout = window.setTimeout(TableEditorSC.FinishColRowSize, 1); // wait - Firefox 2 has a bug otherwise with next mousedown
-      }
+    if (editor.timeout) window.clearTimeout(editor.timeout);
+    editor.timeout = window.setTimeout(TableEditorSC.FinishColRowSize as () => void, 1); // wait - Firefox 2 has a bug otherwise with next mousedown
+  }
 
-   return false;
+  return false;
+};
 
-   }
+TableEditorSC.FinishColRowSize = function () {
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  var editor = mouseinfo.editor;
+  if (!editor) return;
 
+  editor.toplevel.removeChild(mouseinfo.mouseresizedisplay);
+  mouseinfo.mouseresizedisplay = null;
 
-TableEditorSC.FinishColRowSize = function() {
+  //   editor.FitToEditTable();
+  //   editor.EditorRenderSheet();
+  //   editor.SchedulePositionCalculations();
 
-   var mouseinfo = TableEditorSC.EditorMouseInfo;
-   var editor = mouseinfo.editor;
-   if (!editor) return;
+  mouseinfo.editor = null;
 
-   editor.toplevel.removeChild(mouseinfo.mouseresizedisplay);
-   mouseinfo.mouseresizedisplay = null;
-
-//   editor.FitToEditTable();
-//   editor.EditorRenderSheet();
-//   editor.SchedulePositionCalculations();
-
-   mouseinfo.editor = null;
-
-   return;
-
-   }
-
-
-/** @param {any} e @param {any} ele @param {any} result */
-TableEditorSC.ProcessEditorRowselectMouseDown = function(e: any, ele: any, result: any) {
-    var event = e || window.event;
-    var mouseinfo = TableEditorSC.EditorMouseInfo;
-    var editor = mouseinfo.editor;
-    var sheet = TableEditorSC.GetSpreadsheetControlObject().sheet;
-    var coord1 = TableEditorSC.crToCoord(1, result.row)
-    var coord2 = TableEditorSC.crToCoord(sheet.LastCol(),
-				  result.row)
-    var coord3 = TableEditorSC.crToCoord(editor.firstscrollingcol,
-				  result.row)
-    editor.RangeAnchor(coord1);
-    editor.RangeExtend(coord2);
-    editor.MoveECell(coord3);
-    TableEditorSC.SetMouseMoveUp(TableEditorSC.ProcessEditorRowselectMouseMove,
-			      TableEditorSC.ProcessEditorRowselectMouseUp,
-			      editor.toplevel,
-			      event);
-}
-
-/** @param {any} e */
-TableEditorSC.ProcessEditorRowselectMouseMove = function(e: any) {
-    var event = e || window.event;
-    var mouseinfo = TableEditorSC.EditorMouseInfo;
-    var editor = mouseinfo.editor;
-    var sheet = TableEditorSC.GetSpreadsheetControlObject().sheet;
-
-    if (!editor) return; // not us, ignore
-
-    var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
-    var clientX = event.clientX - pos.left;
-    var clientY = event.clientY - pos.top;
-    var result = TableEditorSC.GridMousePosition(editor, clientX, clientY);
-    var coord2 = TableEditorSC.crToCoord(sheet.LastCol(),
-				  result.row)
-    var coord3 = TableEditorSC.crToCoord(editor.firstscrollingcol,
-				  result.row)
-    editor.RangeExtend(coord2);
-    editor.MoveECell(coord3);
-    return;
-}
-
-/** @param {any} e */
-TableEditorSC.ProcessEditorRowselectMouseUp = function(e: any) {
-    var event = e || window.event;
-    var mouseinfo = TableEditorSC.EditorMouseInfo;
-    var editor = mouseinfo.editor;
-    if (!editor) return; // not us, ignore
-    TableEditorSC.RemoveMouseMoveUp(TableEditorSC.ProcessEditorRowselectMouseMove,
-				 TableEditorSC.ProcessEditorRowselectMouseUp,
-				 editor.toplevel,
-				 e);
-    return;
-}
+  return;
+};
 
 /** @param {any} e @param {any} ele @param {any} result */
-TableEditorSC.ProcessEditorColselectMouseDown = function(e: any, ele: any, result: any) {
-    var event = e || window.event;
-    var mouseinfo = TableEditorSC.EditorMouseInfo;
-    var editor = mouseinfo.editor;
-    var sheet = TableEditorSC.GetSpreadsheetControlObject().sheet;
-
-    var coord1 = TableEditorSC.crToCoord(result.col, 1)
-    var coord2 = TableEditorSC.crToCoord(result.col,
-				  sheet.LastRow())
-    var coord3 = TableEditorSC.crToCoord(result.col,
-				  editor.firstscrollingrow)
-
-    editor.RangeAnchor(coord1);
-    editor.RangeExtend(coord2);
-    editor.MoveECell(coord3);
-    TableEditorSC.SetMouseMoveUp(TableEditorSC.ProcessEditorColselectMouseMove,
-			      TableEditorSC.ProcessEditorColselectMouseUp,
-			      editor.toplevel,
-			      event);
-
-}
+TableEditorSC.ProcessEditorRowselectMouseDown = function (e: any, ele: any, result: any) {
+  var event = e || window.event;
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  var editor = mouseinfo.editor;
+  var sheet = TableEditorSC.GetSpreadsheetControlObject().sheet;
+  var coord1 = TableEditorSC.crToCoord(1, result.row);
+  var coord2 = TableEditorSC.crToCoord(sheet.LastCol(), result.row);
+  var coord3 = TableEditorSC.crToCoord(editor.firstscrollingcol, result.row);
+  editor.RangeAnchor(coord1);
+  editor.RangeExtend(coord2);
+  editor.MoveECell(coord3);
+  TableEditorSC.SetMouseMoveUp(
+    TableEditorSC.ProcessEditorRowselectMouseMove,
+    TableEditorSC.ProcessEditorRowselectMouseUp,
+    editor.toplevel,
+    event,
+  );
+};
 
 /** @param {any} e */
-TableEditorSC.ProcessEditorColselectMouseMove = function(e: any) {
-    var event = e || window.event;
-    var mouseinfo = TableEditorSC.EditorMouseInfo;
-    var editor = mouseinfo.editor;
-    var sheet = TableEditorSC.GetSpreadsheetControlObject().sheet;
+TableEditorSC.ProcessEditorRowselectMouseMove = function (e: any) {
+  var event = e || window.event;
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  var editor = mouseinfo.editor;
+  var sheet = TableEditorSC.GetSpreadsheetControlObject().sheet;
 
-    if (!editor) return; // not us, ignore
+  if (!editor) return; // not us, ignore
 
-    var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
-    var clientX = event.clientX - pos.left;
-    var clientY = event.clientY - pos.top;
-    var result = TableEditorSC.GridMousePosition(editor, clientX, clientY);
-    var coord2 = TableEditorSC.crToCoord(result.col,
-				  sheet.LastRow())
-    var coord3 = TableEditorSC.crToCoord(result.col,
-				  editor.firstscrollingrow)
-    editor.RangeExtend(coord2);
-    editor.MoveECell(coord3);
-    return;
-}
+  var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
+  var clientX = event.clientX - pos.left;
+  var clientY = event.clientY - pos.top;
+  var result = TableEditorSC.GridMousePosition(editor, clientX, clientY);
+  var coord2 = TableEditorSC.crToCoord(sheet.LastCol(), result.row);
+  var coord3 = TableEditorSC.crToCoord(editor.firstscrollingcol, result.row);
+  editor.RangeExtend(coord2);
+  editor.MoveECell(coord3);
+  return;
+};
 
 /** @param {any} e */
-TableEditorSC.ProcessEditorColselectMouseUp = function(e: any) {
-    var event = e || window.event;
-    var mouseinfo = TableEditorSC.EditorMouseInfo;
-    var editor = mouseinfo.editor;
-    if (!editor) return; // not us, ignore
-    TableEditorSC.RemoveMouseMoveUp(TableEditorSC.ProcessEditorColselectMouseMove,
-				 TableEditorSC.ProcessEditorColselectMouseUp,
-				 editor.toplevel,
-				 e);
-    return;
-}
+TableEditorSC.ProcessEditorRowselectMouseUp = function (e: any) {
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  var editor = mouseinfo.editor;
+  if (!editor) return; // not us, ignore
+  TableEditorSC.RemoveMouseMoveUp(
+    TableEditorSC.ProcessEditorRowselectMouseMove,
+    TableEditorSC.ProcessEditorRowselectMouseUp,
+    editor.toplevel,
+    e,
+  );
+  return;
+};
 
 /** @param {any} e @param {any} ele @param {any} result */
-TableEditorSC.ProcessEditorRowsizeMouseDown = function(e: any, ele: any, result: any) {
+TableEditorSC.ProcessEditorColselectMouseDown = function (e: any, ele: any, result: any) {
+  var event = e || window.event;
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  var editor = mouseinfo.editor;
+  var sheet = TableEditorSC.GetSpreadsheetControlObject().sheet;
 
-   var event = e || window.event;
-   var mouseinfo = TableEditorSC.EditorMouseInfo;
-   var editor = mouseinfo.editor;
-   var pos = TableEditorSC.GetSpreadsheetControlObject().spreadsheetDiv.firstChild.offsetHeight;
-   var clientY = event.clientY - pos;
+  var coord1 = TableEditorSC.crToCoord(result.col, 1);
+  var coord2 = TableEditorSC.crToCoord(result.col, sheet.LastRow());
+  var coord3 = TableEditorSC.crToCoord(result.col, editor.firstscrollingrow);
 
-   mouseinfo.mouseresizerownum = result.rowtoresize; // remember col being resized
-   mouseinfo.mouseresizerow = result.rowtoresize;
-   mouseinfo.mousedownclienty = clientY;
-   mouseinfo.mouserowtounhide = result.rowtounhide;
+  editor.RangeAnchor(coord1);
+  editor.RangeExtend(coord2);
+  editor.MoveECell(coord3);
+  TableEditorSC.SetMouseMoveUp(
+    TableEditorSC.ProcessEditorColselectMouseMove,
+    TableEditorSC.ProcessEditorColselectMouseUp,
+    editor.toplevel,
+    event,
+  );
+};
+
+/** @param {any} e */
+TableEditorSC.ProcessEditorColselectMouseMove = function (e: any) {
+  var event = e || window.event;
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  var editor = mouseinfo.editor;
+  var sheet = TableEditorSC.GetSpreadsheetControlObject().sheet;
+
+  if (!editor) return; // not us, ignore
+
+  var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
+  var clientX = event.clientX - pos.left;
+  var clientY = event.clientY - pos.top;
+  var result = TableEditorSC.GridMousePosition(editor, clientX, clientY);
+  var coord2 = TableEditorSC.crToCoord(result.col, sheet.LastRow());
+  var coord3 = TableEditorSC.crToCoord(result.col, editor.firstscrollingrow);
+  editor.RangeExtend(coord2);
+  editor.MoveECell(coord3);
+  return;
+};
+
+/** @param {any} e */
+TableEditorSC.ProcessEditorColselectMouseUp = function (e: any) {
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  var editor = mouseinfo.editor;
+  if (!editor) return; // not us, ignore
+  TableEditorSC.RemoveMouseMoveUp(
+    TableEditorSC.ProcessEditorColselectMouseMove,
+    TableEditorSC.ProcessEditorColselectMouseUp,
+    editor.toplevel,
+    e,
+  );
+  return;
+};
+
+/** @param {any} e @param {any} ele @param {any} result */
+TableEditorSC.ProcessEditorRowsizeMouseDown = function (e: any, ele: any, result: any) {
+  var event = e || window.event;
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  var editor = mouseinfo.editor;
+  var pos = TableEditorSC.GetSpreadsheetControlObject().spreadsheetDiv.firstChild.offsetHeight;
+  var clientY = event.clientY - pos;
+
+  mouseinfo.mouseresizerownum = result.rowtoresize; // remember col being resized
+  mouseinfo.mouseresizerow = result.rowtoresize;
+  mouseinfo.mousedownclienty = clientY;
+  mouseinfo.mouserowtounhide = result.rowtounhide;
 
   if (result.rowtoresize) {
     var sizedisplay = document.createElement("div");
     mouseinfo.mouseresizedisplay = sizedisplay;
-    sizedisplay.style.width = editor.context.totalwidth+"px";
-    sizedisplay.style.height = editor.rowpositions[result.rowtoresize]+"px";
+    sizedisplay.style.width = editor.context.totalwidth + "px";
+    sizedisplay.style.height = editor.rowpositions[result.rowtoresize] + "px";
     sizedisplay.style.position = "absolute";
     sizedisplay.style.zIndex = "100";
-    sizedisplay.style.top = editor.rowpositions[result.rowtoresize]+"px";
-    sizedisplay.style.left = editor.headposition.left+"px";
-    sizedisplay.innerHTML = '<table cellpadding="0" cellspacing="0"><tr><td style="width:100px' +
-      'border:1px dashed black;background-color:white;height:' +
-      (editor.context.rowheight[mouseinfo.mouseresizerownum]-2) + 'px;">&nbsp;</td>'+
-      '<td><div style="font-size:small;color:white;background-color:gray;padding:4px;">'+
-      editor.context.rowheight[mouseinfo.mouseresizerownum] + '</div></td></tr></table>';
-    var szTarget2 = (sizedisplay.firstChild && sizedisplay.firstChild.lastChild && sizedisplay.firstChild.lastChild.firstChild && sizedisplay.firstChild.lastChild.firstChild.childNodes[0] as any);
+    sizedisplay.style.top = editor.rowpositions[result.rowtoresize] + "px";
+    sizedisplay.style.left = editor.headposition.left + "px";
+    sizedisplay.innerHTML =
+      '<table cellpadding="0" cellspacing="0"><tr><td style="width:100px' +
+      "border:1px dashed black;background-color:white;height:" +
+      (editor.context.rowheight[mouseinfo.mouseresizerownum] - 2) +
+      'px;">&nbsp;</td>' +
+      '<td><div style="font-size:small;color:white;background-color:gray;padding:4px;">' +
+      editor.context.rowheight[mouseinfo.mouseresizerownum] +
+      "</div></td></tr></table>";
+    var szTarget2 =
+      sizedisplay.firstChild &&
+      sizedisplay.firstChild.lastChild &&
+      sizedisplay.firstChild.lastChild.firstChild &&
+      (sizedisplay.firstChild.lastChild.firstChild.childNodes[0] as any);
     if (szTarget2) TableEditorSC.setStyles(szTarget2, "filter:alpha(opacity=85);opacity:.5;"); // so no warning msg with Firefox about filter
 
     editor.toplevel.appendChild(sizedisplay);
   }
-    TableEditorSC.SetMouseMoveUp(TableEditorSC.ProcessEditorRowsizeMouseMove,
-			      TableEditorSC.ProcessEditorRowsizeMouseUp,
-			      editor.toplevel,
-			      event);
-    return;
-   }
-
+  TableEditorSC.SetMouseMoveUp(
+    TableEditorSC.ProcessEditorRowsizeMouseMove,
+    TableEditorSC.ProcessEditorRowsizeMouseUp,
+    editor.toplevel,
+    event,
+  );
+  return;
+};
 
 /** @param {any} e */
-TableEditorSC.ProcessEditorRowsizeMouseMove = function(e: any) {
-
-   var event = e || window.event;
-   var mouseinfo = TableEditorSC.EditorMouseInfo;
-   var editor = mouseinfo.editor;
-   if (!editor) return; // not us, ignore
+TableEditorSC.ProcessEditorRowsizeMouseMove = function (e: any) {
+  var event = e || window.event;
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  var editor = mouseinfo.editor;
+  if (!editor) return; // not us, ignore
 
   if (mouseinfo.mouseresizerownum) {
     var pos = TableEditorSC.GetSpreadsheetControlObject().spreadsheetDiv.firstChild.offsetHeight;
     var clientY = event.clientY - pos;
 
-    var newsize = (editor.context.rowheight[mouseinfo.mouseresizerownum]-0) + (clientY - mouseinfo.mousedownclienty);
-    if (newsize < TableEditorSC.Constants.defaultAssumedRowHeight) newsize = TableEditorSC.Constants.defaultAssumedRowHeight;
+    var newsize =
+      editor.context.rowheight[mouseinfo.mouseresizerownum] -
+      0 +
+      (clientY - mouseinfo.mousedownclienty);
+    if (newsize < TableEditorSC.Constants.defaultAssumedRowHeight)
+      newsize = TableEditorSC.Constants.defaultAssumedRowHeight;
 
     var sizedisplay = mouseinfo.mouseresizedisplay;
-    sizedisplay.innerHTML = '<table cellpadding="0" cellspacing="0"><tr><td style="width:100px;'+
-      'border:1px dashed black;background-color:white;height:' + (newsize-2) + 'px;">&nbsp;</td>'+
-      '<td><div style="font-size:small;color:white;background-color:gray;padding:4px;">'+
-      newsize + '</div></td></tr></table>';
-    TableEditorSC.setStyles(sizedisplay.firstChild.lastChild.firstChild.childNodes[0], "filter:alpha(opacity=85);opacity:.5;"); // so no warning msg with Firefox about filter
+    sizedisplay.innerHTML =
+      '<table cellpadding="0" cellspacing="0"><tr><td style="width:100px;' +
+      "border:1px dashed black;background-color:white;height:" +
+      (newsize - 2) +
+      'px;">&nbsp;</td>' +
+      '<td><div style="font-size:small;color:white;background-color:gray;padding:4px;">' +
+      newsize +
+      "</div></td></tr></table>";
+    TableEditorSC.setStyles(
+      sizedisplay.firstChild.lastChild.firstChild.childNodes[0],
+      "filter:alpha(opacity=85);opacity:.5;",
+    ); // so no warning msg with Firefox about filter
   }
 
-   TableEditorSC.StopPropagation(event);
-   return;
-
-   }
-
+  TableEditorSC.StopPropagation(event);
+  return;
+};
 
 /** @param {any} e */
-TableEditorSC.ProcessEditorRowsizeMouseUp = function(e: any) {
+TableEditorSC.ProcessEditorRowsizeMouseUp = function (e: any) {
+  var event = e || window.event;
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  var editor = mouseinfo.editor;
+  if (!editor) return; // not us, ignore
+  var pos = TableEditorSC.GetSpreadsheetControlObject().spreadsheetDiv.firstChild.offsetHeight;
+  var clientY = event.clientY - pos;
+  TableEditorSC.RemoveMouseMoveUp(
+    TableEditorSC.ProcessEditorRowsizeMouseMove,
+    TableEditorSC.ProcessEditorRowsizeMouseUp,
+    editor.toplevel,
+    event,
+  );
+  if (mouseinfo.mouserowtounhide) {
+    editor.EditorScheduleSheetCommands("set " + mouseinfo.mouserowtounhide + " hide", true, false);
+  } else if (mouseinfo.mouseresizerownum) {
+    var newsize =
+      editor.context.rowheight[mouseinfo.mouseresizerownum] -
+      0 +
+      (clientY - mouseinfo.mousedownclienty);
+    if (newsize < TableEditorSC.Constants.defaultAssumedRowHeight)
+      newsize = TableEditorSC.Constants.defaultAssumedRowHeight;
+    editor.EditorScheduleSheetCommands(
+      "set " + mouseinfo.mouseresizerownum + " height " + newsize,
+      true,
+      false,
+    );
 
-   var event = e || window.event;
-   var mouseinfo = TableEditorSC.EditorMouseInfo;
-   var editor = mouseinfo.editor;
-   if (!editor) return; // not us, ignore
-   var element = mouseinfo.element;
-   var pos = TableEditorSC.GetSpreadsheetControlObject().spreadsheetDiv.firstChild.offsetHeight;
-   var clientY = event.clientY - pos;
-   TableEditorSC.RemoveMouseMoveUp(
-       TableEditorSC.ProcessEditorRowsizeMouseMove,
-       TableEditorSC.ProcessEditorRowsizeMouseUp,
-       editor.toplevel,
-       event);
-   if (mouseinfo.mouserowtounhide) {
-      editor.EditorScheduleSheetCommands("set "+mouseinfo.mouserowtounhide+" hide", true, false);
-      }
-   else if (mouseinfo.mouseresizerownum) {
-     var newsize = (editor.context.rowheight[mouseinfo.mouseresizerownum]-0) + (clientY - mouseinfo.mousedownclienty);
-     if (newsize < TableEditorSC.Constants.defaultAssumedRowHeight) newsize = TableEditorSC.Constants.defaultAssumedRowHeight;
-     editor.EditorScheduleSheetCommands("set "+mouseinfo.mouseresizerownum+" height "+newsize, true, false);
+    if (editor.timeout) window.clearTimeout(editor.timeout);
+    editor.timeout = window.setTimeout(TableEditorSC.FinishColRowSize as () => void, 1); // wait - Firefox 2 has a bug otherwise with next mousedown
+  }
 
-     if (editor.timeout) window.clearTimeout(editor.timeout);
-     editor.timeout = window.setTimeout(TableEditorSC.FinishColRowSize, 1); // wait - Firefox 2 has a bug otherwise with next mousedown
-   }
-
-   return false;
-
-   }
-
+  return false;
+};
 
 //
 // Handle auto-repeat of dragging the cursor into the borders of the sheet
 //
 
 TableEditorSC.AutoRepeatInfo = {
-
-   timer: null, // timer object for repeating
-   mouseinfo: null, // result from TableEditorSC.GridMousePosition
-   repeatinterval: 1000, // milliseconds to wait between repeats
-   editor: null, // editor object to use when it repeats
-   repeatcallback: null // used instead of default when repeating (e.g., for cellhandles)
-                        // called as: repeatcallback(newcoord, direction)
-
+  timer: null, // timer object for repeating
+  mouseinfo: null, // result from TableEditorSC.GridMousePosition
+  repeatinterval: 1000, // milliseconds to wait between repeats
+  editor: null, // editor object to use when it repeats
+  repeatcallback: null, // used instead of default when repeating (e.g., for cellhandles)
+  // called as: repeatcallback(newcoord, direction)
 };
 
 // Control auto-repeat. If mouseinfo==null, cancel.
 
 /** @param {any} editor @param {any} mouseinfo @param {any} callback */
-TableEditorSC.SetDragAutoRepeat = function(editor: any, mouseinfo: any, callback: any) {
+TableEditorSC.SetDragAutoRepeat = function (editor: any, mouseinfo: any, callback: any) {
+  var repeatinfo = TableEditorSC.AutoRepeatInfo;
+  var coord, direction;
 
-   var repeatinfo = TableEditorSC.AutoRepeatInfo;
-   var coord, direction;
+  repeatinfo.repeatcallback = callback; // null in regular case
 
-   repeatinfo.repeatcallback = callback; // null in regular case
+  if (!mouseinfo) {
+    // cancel
+    if (repeatinfo.timer) {
+      // If was repeating, stop
+      window.clearTimeout(repeatinfo.timer); // cancel timer
+      repeatinfo.timer = null;
+    }
+    repeatinfo.mouseinfo = null;
+    return; // done
+  }
 
-   if (!mouseinfo) { // cancel
-      if (repeatinfo.timer) { // If was repeating, stop
-         window.clearTimeout(repeatinfo.timer); // cancel timer
-         repeatinfo.timer = null;
-         }
-      repeatinfo.mouseinfo = null;
-      return; // done
+  repeatinfo.editor = editor;
+
+  if (repeatinfo.mouseinfo) {
+    // check for change while repeating
+    if (mouseinfo.rowheader || mouseinfo.rowfooter) {
+      if (mouseinfo.row != repeatinfo.mouseinfo.row) {
+        // changed row while dragging sidewards
+        coord = TableEditorSC.crToCoord(editor.ecell.col, mouseinfo.row); // change to it
+        if (repeatinfo.repeatcallback) {
+          direction =
+            mouseinfo.row < repeatinfo.mouseinfo.row
+              ? "left"
+              : mouseinfo.row > repeatinfo.mouseinfo.row
+                ? "right"
+                : "";
+          repeatinfo.repeatcallback(coord, direction);
+        } else {
+          editor.MoveECell(coord);
+          editor.MoveECell(coord);
+          editor.RangeExtend();
+          editor.EditorMouseRange(coord);
+        }
       }
-
-   repeatinfo.editor = editor;
-
-   if (repeatinfo.mouseinfo) { // check for change while repeating
-      if (mouseinfo.rowheader || mouseinfo.rowfooter) {
-         if (mouseinfo.row != repeatinfo.mouseinfo.row) { // changed row while dragging sidewards
-            coord = TableEditorSC.crToCoord(editor.ecell.col, mouseinfo.row); // change to it
-            if (repeatinfo.repeatcallback) {
-               direction = mouseinfo.row < repeatinfo.mouseinfo.row ? "left" : (mouseinfo.row > repeatinfo.mouseinfo.row ? "right" : "");
-               repeatinfo.repeatcallback(coord, direction);
-               }
-            else {
-               editor.MoveECell(coord);
-               editor.MoveECell(coord);
-               editor.RangeExtend();
-               editor.EditorMouseRange(coord);
-               }
-            }
-         }
-      else if (mouseinfo.colheader || mouseinfo.colfooter) {
-         if (mouseinfo.col != repeatinfo.mouseinfo.col) { // changed col while dragging vertically
-            coord = TableEditorSC.crToCoord(mouseinfo.col, editor.ecell.row); // change to it
-            if (repeatinfo.repeatcallback) {
-               direction = mouseinfo.row < repeatinfo.mouseinfo.row ? "left" : (mouseinfo.row > repeatinfo.mouseinfo.row ? "right" : "");
-               repeatinfo.repeatcallback(coord, direction);
-               }
-            else {
-               editor.MoveECell(coord);
-               editor.RangeExtend();
-               editor.EditorMouseRange(coord);
-               }
-            }
-         }
+    } else if (mouseinfo.colheader || mouseinfo.colfooter) {
+      if (mouseinfo.col != repeatinfo.mouseinfo.col) {
+        // changed col while dragging vertically
+        coord = TableEditorSC.crToCoord(mouseinfo.col, editor.ecell.row); // change to it
+        if (repeatinfo.repeatcallback) {
+          direction =
+            mouseinfo.row < repeatinfo.mouseinfo.row
+              ? "left"
+              : mouseinfo.row > repeatinfo.mouseinfo.row
+                ? "right"
+                : "";
+          repeatinfo.repeatcallback(coord, direction);
+        } else {
+          editor.MoveECell(coord);
+          editor.RangeExtend();
+          editor.EditorMouseRange(coord);
+        }
       }
+    }
+  }
 
-   repeatinfo.mouseinfo = mouseinfo;
+  repeatinfo.mouseinfo = mouseinfo;
 
-   if (mouseinfo.distance < 5) repeatinfo.repeatinterval = 333;
-   else if (mouseinfo.distance < 10) repeatinfo.repeatinterval = 250;
-   else if (mouseinfo.distance < 25) repeatinfo.repeatinterval = 100;
-   else if (mouseinfo.distance < 35) repeatinfo.repeatinterval = 75;
-   else { // too far - stop repeating
-      if (repeatinfo.timer) { // if repeating, cancel it
-         window.clearTimeout(repeatinfo.timer); // cancel timer
-         repeatinfo.timer = null;
-         }
-      return;
-      }
+  if (mouseinfo.distance < 5) repeatinfo.repeatinterval = 333;
+  else if (mouseinfo.distance < 10) repeatinfo.repeatinterval = 250;
+  else if (mouseinfo.distance < 25) repeatinfo.repeatinterval = 100;
+  else if (mouseinfo.distance < 35) repeatinfo.repeatinterval = 75;
+  else {
+    // too far - stop repeating
+    if (repeatinfo.timer) {
+      // if repeating, cancel it
+      window.clearTimeout(repeatinfo.timer); // cancel timer
+      repeatinfo.timer = null;
+    }
+    return;
+  }
 
-   if (!repeatinfo.timer) { // start if not already running
-      repeatinfo.timer = window.setTimeout(TableEditorSC.DragAutoRepeat, repeatinfo.repeatinterval);
-      }
+  if (!repeatinfo.timer) {
+    // start if not already running
+    repeatinfo.timer = window.setTimeout(TableEditorSC.DragAutoRepeat as () => void, repeatinfo.repeatinterval);
+  }
 
-   return;
-
-   }
+  return;
+};
 
 //
 // DragAutoRepeat()
 //
 
-TableEditorSC.DragAutoRepeat = function() {
+TableEditorSC.DragAutoRepeat = function () {
+  var repeatinfo = TableEditorSC.AutoRepeatInfo;
+  var mouseinfo = repeatinfo.mouseinfo;
 
-   var repeatinfo = TableEditorSC.AutoRepeatInfo;
-   var mouseinfo = repeatinfo.mouseinfo;
+  var direction, coord, cr;
 
-   var direction, coord, cr;
+  if (mouseinfo.rowheader) direction = "left";
+  else if (mouseinfo.rowfooter) direction = "right";
+  else if (mouseinfo.colheader) direction = "up";
+  else if (mouseinfo.colfooter) direction = "down";
 
-   if (mouseinfo.rowheader) direction = "left";
-   else if (mouseinfo.rowfooter) direction = "right";
-   else if (mouseinfo.colheader) direction = "up";
-   else if (mouseinfo.colfooter) direction = "down";
+  if (repeatinfo.repeatcallback) {
+    cr = TableEditorSC.coordToCr(repeatinfo.editor.ecell.coord);
+    if (direction == "left" && cr.col > 1) cr.col--;
+    else if (direction == "right") cr.col++;
+    else if (direction == "up" && cr.row > 1) cr.row--;
+    else if (direction == "down") cr.row++;
+    coord = TableEditorSC.crToCoord(cr.col, cr.row);
+    repeatinfo.repeatcallback(coord, direction);
+  } else {
+    coord = repeatinfo.editor.MoveECellWithKey("[a" + direction + "]shifted");
+    if (coord) repeatinfo.editor.EditorMouseRange(coord);
+  }
 
-   if (repeatinfo.repeatcallback) {
-      cr = TableEditorSC.coordToCr(repeatinfo.editor.ecell.coord);
-      if (direction == "left" && cr.col > 1) cr.col--;
-      else if (direction == "right") cr.col++;
-      else if (direction == "up" && cr.row > 1) cr.row--;
-      else if (direction == "down") cr.row++;
-      coord = TableEditorSC.crToCoord(cr.col, cr.row);
-      repeatinfo.repeatcallback(coord, direction);
-      }
-   else {
-      coord = repeatinfo.editor.MoveECellWithKey("[a"+direction+"]shifted");
-      if (coord) repeatinfo.editor.EditorMouseRange(coord);
-      }
-
-   repeatinfo.timer = window.setTimeout(TableEditorSC.DragAutoRepeat, repeatinfo.repeatinterval);
-
-   }
+  repeatinfo.timer = window.setTimeout(TableEditorSC.DragAutoRepeat as () => void, repeatinfo.repeatinterval);
+};
 
 //
 // Handling Clicking
 //
 
 /** @param {any} e */
-TableEditorSC.ProcessEditorDblClick = function(e: any) {
+TableEditorSC.ProcessEditorDblClick = function (e: any) {
+  var editor, result;
 
-   var editor, result, coord, textarea, wval, range, sheetobj;
+  var event = e || window.event;
 
-   var event = e || window.event;
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  var ele = event.target || event.srcElement; // source object is often within what we want
+  var mobj;
 
-   var mouseinfo = TableEditorSC.EditorMouseInfo;
-   var ele = event.target || event.srcElement; // source object is often within what we want
-   var mobj;
+  if (mouseinfo.ignore) return; // ignore this
 
-   if (mouseinfo.ignore) return; // ignore this
+  for (mobj = null; !mobj && ele; ele = ele.parentNode) {
+    // go up tree looking for one of our elements
+    mobj = TableEditorSC.LookupElement(ele, mouseinfo.registeredElements);
+  }
+  if (!mobj) {
+    mouseinfo.editor = null;
+    return; // not one of our elements
+  }
 
-   for (mobj=null; !mobj && ele; ele=ele.parentNode) { // go up tree looking for one of our elements
-      mobj = TableEditorSC.LookupElement(ele, mouseinfo.registeredElements);
-      }
-   if (!mobj) {
-      mouseinfo.editor = null;
-      return; // not one of our elements
-      }
+  editor = mobj.editor;
 
-   editor = mobj.editor;
+  var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
+  var clientX = event.clientX - pos.left;
+  var clientY = event.clientY - pos.top;
+  result = TableEditorSC.GridMousePosition(editor, clientX, clientY);
+  if (!result || !result.coord) return; // not within cell area - ignore
 
-   var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
-   var clientX = event.clientX - pos.left;
-   var clientY = event.clientY - pos.top;
-   result = TableEditorSC.GridMousePosition(editor, clientX, clientY);
-   if (!result || !result.coord) return; // not within cell area - ignore
+  mouseinfo.editor = editor; // remember for later
+  mouseinfo.element = ele;
 
-   mouseinfo.editor = editor; // remember for later
-   mouseinfo.element = ele;
-   range = editor.range;
+  switch (editor.state) {
+    case "start":
+      TableEditorSC.EditorOpenCellEdit(editor);
+      break;
 
-   sheetobj = editor.context.sheetobj;
+    case "input":
+      break;
 
-   switch (editor.state) {
-      case "start":
-         TableEditorSC.EditorOpenCellEdit(editor);
-         break;
-
-      case "input":
-         break;
-
-      default:
-         break;
-      }
-   TableEditorSC.StopPropagation(event);
-   return;
-
-   }
-
+    default:
+      break;
+  }
+  TableEditorSC.StopPropagation(event);
+  return;
+};
 
 /** @param {any} editor */
-TableEditorSC.EditorOpenCellEdit = function(editor: any) {
+TableEditorSC.EditorOpenCellEdit = function (editor: any) {
+  var wval;
 
-   var wval;
+  if (!editor.ecell) return true; // no ecell
+  if (!editor.inputBox) return true; // no input box, so no editing (happens on noEdit)
+  if (editor.inputBox.element.disabled) return true; // multi-line: ignore
+  editor.inputBox.ShowInputBox(true);
+  editor.inputBox.Focus();
+  editor.inputBox.SetText("");
+  editor.inputBox.DisplayCellContents();
+  editor.inputBox.Select("end");
+  wval = editor.workingvalues;
+  wval.partialexpr = "";
+  wval.ecoord = editor.ecell.coord;
+  wval.erow = editor.ecell.row;
+  wval.ecol = editor.ecell.col;
 
-   if (!editor.ecell) return true; // no ecell
-   if (!editor.inputBox) return true; // no input box, so no editing (happens on noEdit)
-   if (editor.inputBox.element.disabled) return true; // multi-line: ignore
-   editor.inputBox.ShowInputBox(true);
-   editor.inputBox.Focus();
-   editor.inputBox.SetText("");
-   editor.inputBox.DisplayCellContents();
-   editor.inputBox.Select("end");
-   wval = editor.workingvalues;
-   wval.partialexpr = "";
-   wval.ecoord = editor.ecell.coord;
-   wval.erow = editor.ecell.row;
-   wval.ecol = editor.ecell.col;
-
-   return;
-
-   }
-
+  return;
+};
 
 /** @param {any} editor @param {any} ch @param {any} e */
-TableEditorSC.EditorProcessKey = function(editor: any, ch: any, e: any) {
+TableEditorSC.EditorProcessKey = function (editor: any, ch: any, e: any) {
+  var result, coord, inputtext, f;
 
-   var result, cell, cellobj, valueinfo, fch, coord, inputtext, f;
+  var wval = editor.workingvalues;
+  var range = editor.range;
 
-   var sheetobj = editor.context.sheetobj;
-   var wval = editor.workingvalues;
-   var range = editor.range;
+  if (typeof ch != "string") ch = "";
 
-   if (typeof ch != "string") ch = "";
-
-   switch (editor.state) {
-      case "start":
-         if (e.shiftKey && ch.substr(0,2)=="[a") {
-            ch = ch + "shifted";
-            }
-         if (ch=="[enter]") ch = "[adown]";
-         if (ch=="[tab]") ch = e.shiftKey ? "[aleft]" : "[aright]";
-         if (ch.substr(0,2)=="[a" || ch.substr(0,3)=="[pg" || ch=="[home]") {
-            result = editor.MoveECellWithKey(ch);
-            return !result;
-            }
-         if (ch=="[del]" || ch=="[backspace]") {
-            if (!editor.noEdit && !editor.ECellReadonly()) {
-               editor.EditorApplySetCommandsToRange("empty", "");
-               }
-            break;
-            }
-         if (ch=="[esc]") {
-            if (range.hasrange) {
-               editor.RangeRemove();
-               editor.MoveECell(range.anchorcoord);
-               for (f in editor.StatusCallback) {
-                  editor.StatusCallback[f].func(editor, "specialkey", ch, editor.StatusCallback[f].params);
-                  }
-               }
-            return false;
-            }
-
-         if (ch=="[f2]") {
-            if (editor.noEdit || editor.ECellReadonly()) return true;
-            TableEditorSC.EditorOpenCellEdit(editor);
-            editor.state="inputboxdirect"; // arrow keys move left and right, rather than select cells
-            return false;
-            }
-
-         if ((ch.length>1 && ch.substr(0,1)=="[") || ch.length==0) { // some control key
-            if (editor.ctrlkeyFunction && ch.length>0) {
-               return editor.ctrlkeyFunction(editor, ch);
-               }
-            else {
-               return true;
-               }
-            }
-         if (!editor.ecell) return true; // no ecell
-         if (!editor.inputBox) return true; // no inputBox so no editing
-         if (editor.ECellReadonly()) return true;
-         editor.inputBox.element.disabled = false; // make sure editable
-         editor.state = "input";
-         editor.inputBox.ShowInputBox(true);
-         editor.inputBox.Focus();
-         editor.inputBox.SetText(ch);
-         editor.inputBox.Select("end");
-         wval.partialexpr = "";
-         wval.ecoord = editor.ecell.coord;
-         wval.erow = editor.ecell.row;
-         wval.ecol = editor.ecell.col;
-         editor.RangeRemove();
-         break;
-
-      case "input":
-         inputtext = editor.inputBox.GetText(); // should not get here if no inputBox
-         if (editor.inputBox.skipOne) return false; // ignore a key already handled
-         if (ch=="[esc]" || ch=="[enter]" || ch=="[tab]" || (ch && ch.substr(0,2)=="[a")) {
-            if (("(+-*/,:!&<>=^".indexOf(inputtext.slice(-1))>=0 && inputtext.slice(0,1)=="=") ||
-                (inputtext == "=")) {
-               wval.partialexpr = inputtext;
-               }
-            if (wval.partialexpr) { // if in pointing operation
-               if (e.shiftKey && ch.substr(0,2)=="[a") {
-                  ch = ch + "shifted";
-                  }
-               coord = editor.MoveECellWithKey(ch);
-               if (coord) {
-                  if (range.hasrange) {
-                     editor.inputBox.SetText(wval.partialexpr + TableEditorSC.crToCoord(range.left, range.top) + ":" +
-                        TableEditorSC.crToCoord(range.right, range.bottom));
-                     }
-                  else {
-                     editor.inputBox.SetText(wval.partialexpr + coord);
-                     }
-                  return false;
-                  }
-               }
-            editor.inputBox.Blur();
-            editor.inputBox.ShowInputBox(false);
-            editor.state = "start";
-            editor.cellhandles.ShowCellHandles(true);
-            if (ch != "[esc]") {
-               editor.EditorSaveEdit();
-               if (editor.ecell.coord != wval.ecoord) {
-                  editor.MoveECell(wval.ecoord);
-                  }
-               if (ch=="[enter]") ch = "[adown]";
-               if (ch=="[tab]") ch = e.shiftKey ? "[aleft]" : "[aright]";
-               if (ch.substr(0,2)=="[a") {
-                  editor.MoveECellWithKey(ch);
-                  }
-               }
-            else {
-               editor.inputBox.DisplayCellContents();
-               editor.RangeRemove();
-               editor.MoveECell(wval.ecoord);
-               }
-            break;
-            }
-         if (wval.partialexpr && ch=="[backspace]") {
-            editor.inputBox.SetText(wval.partialexpr);
-            wval.partialexpr = "";
-            editor.RangeRemove();
-            editor.MoveECell(wval.ecoord);
-            editor.inputBox.ShowInputBox(true); // make sure it's moved back if necessary
-            return false;
-            }
-         if (ch=="[f2]") { editor.state = "inputboxdirect"; return false; }
-         if (range.hasrange) editor.RangeRemove();
-         editor.MoveECell(wval.ecoord);
-         if (wval.partialexpr) {
-            editor.inputBox.ShowInputBox(true); // make sure it's moved back if necessary
-            wval.partialexpr = ""; // not pointing
-            }
-         return true;
-
-      case "inputboxdirect":
-         inputtext = editor.inputBox.GetText(); // should not get here if no inputBox
-         if (ch=="[esc]" || ch=="[enter]" || ch=="[tab]") {
-            editor.inputBox.Blur();
-            editor.inputBox.ShowInputBox(false);
-            editor.state = "start";
-            editor.cellhandles.ShowCellHandles(true);
-            if (ch == "[esc]") {
-               editor.inputBox.DisplayCellContents();
-               }
-            else {
-               editor.EditorSaveEdit();
-               if (editor.ecell.coord != wval.ecoord) {
-                  editor.MoveECell(wval.ecoord);
-                  }
-               if (ch=="[enter]") ch = "[adown]";
-               if (ch=="[tab]") ch = e.shiftKey ? "[aleft]" : "[aright]";
-               if (ch.substr(0,2)=="[a") {
-                  editor.MoveECellWithKey(ch);
-                  }
-               }
-            break;
-            }
-         // [f2] in inputboxdirect: arrow keys add range/coord to inputbox formula
-         if (ch=="[f2]") { editor.state = "input"; return false; }
-         return true;
-
-      case "skip-and-start":
-         editor.state = "start";
-         editor.cellhandles.ShowCellHandles(true);
-         return false;
-
-      default:
-         return true;
+  switch (editor.state) {
+    case "start":
+      if (e.shiftKey && ch.substr(0, 2) == "[a") {
+        ch = ch + "shifted";
+      }
+      if (ch == "[enter]") ch = "[adown]";
+      if (ch == "[tab]") ch = e.shiftKey ? "[aleft]" : "[aright]";
+      if (ch.substr(0, 2) == "[a" || ch.substr(0, 3) == "[pg" || ch == "[home]") {
+        result = editor.MoveECellWithKey(ch);
+        return !result;
+      }
+      if (ch == "[del]" || ch == "[backspace]") {
+        if (!editor.noEdit && !editor.ECellReadonly()) {
+          editor.EditorApplySetCommandsToRange("empty", "");
+        }
+        break;
+      }
+      if (ch == "[esc]") {
+        if (range.hasrange) {
+          editor.RangeRemove();
+          editor.MoveECell(range.anchorcoord);
+          for (f in editor.StatusCallback) {
+            editor.StatusCallback[f].func(
+              editor,
+              "specialkey",
+              ch,
+              editor.StatusCallback[f].params,
+            );
+          }
+        }
+        return false;
       }
 
-   return false;
+      if (ch == "[f2]") {
+        if (editor.noEdit || editor.ECellReadonly()) return true;
+        TableEditorSC.EditorOpenCellEdit(editor);
+        editor.state = "inputboxdirect"; // arrow keys move left and right, rather than select cells
+        return false;
+      }
 
-   }
+      if ((ch.length > 1 && ch.substr(0, 1) == "[") || ch.length == 0) {
+        // some control key
+        if (editor.ctrlkeyFunction && ch.length > 0) {
+          return editor.ctrlkeyFunction(editor, ch);
+        } else {
+          return true;
+        }
+      }
+      if (!editor.ecell) return true; // no ecell
+      if (!editor.inputBox) return true; // no inputBox so no editing
+      if (editor.ECellReadonly()) return true;
+      editor.inputBox.element.disabled = false; // make sure editable
+      editor.state = "input";
+      editor.inputBox.ShowInputBox(true);
+      editor.inputBox.Focus();
+      editor.inputBox.SetText(ch);
+      editor.inputBox.Select("end");
+      wval.partialexpr = "";
+      wval.ecoord = editor.ecell.coord;
+      wval.erow = editor.ecell.row;
+      wval.ecol = editor.ecell.col;
+      editor.RangeRemove();
+      break;
+
+    case "input":
+      inputtext = editor.inputBox.GetText(); // should not get here if no inputBox
+      if (editor.inputBox.skipOne) return false; // ignore a key already handled
+      if (ch == "[esc]" || ch == "[enter]" || ch == "[tab]" || (ch && ch.substr(0, 2) == "[a")) {
+        if (
+          ("(+-*/,:!&<>=^".indexOf(inputtext.slice(-1)) >= 0 && inputtext.slice(0, 1) == "=") ||
+          inputtext == "="
+        ) {
+          wval.partialexpr = inputtext;
+        }
+        if (wval.partialexpr) {
+          // if in pointing operation
+          if (e.shiftKey && ch.substr(0, 2) == "[a") {
+            ch = ch + "shifted";
+          }
+          coord = editor.MoveECellWithKey(ch);
+          if (coord) {
+            if (range.hasrange) {
+              editor.inputBox.SetText(
+                wval.partialexpr +
+                  TableEditorSC.crToCoord(range.left, range.top) +
+                  ":" +
+                  TableEditorSC.crToCoord(range.right, range.bottom),
+              );
+            } else {
+              editor.inputBox.SetText(wval.partialexpr + coord);
+            }
+            return false;
+          }
+        }
+        editor.inputBox.Blur();
+        editor.inputBox.ShowInputBox(false);
+        editor.state = "start";
+        editor.cellhandles.ShowCellHandles(true);
+        if (ch != "[esc]") {
+          editor.EditorSaveEdit();
+          if (editor.ecell.coord != wval.ecoord) {
+            editor.MoveECell(wval.ecoord);
+          }
+          if (ch == "[enter]") ch = "[adown]";
+          if (ch == "[tab]") ch = e.shiftKey ? "[aleft]" : "[aright]";
+          if (ch.substr(0, 2) == "[a") {
+            editor.MoveECellWithKey(ch);
+          }
+        } else {
+          editor.inputBox.DisplayCellContents();
+          editor.RangeRemove();
+          editor.MoveECell(wval.ecoord);
+        }
+        break;
+      }
+      if (wval.partialexpr && ch == "[backspace]") {
+        editor.inputBox.SetText(wval.partialexpr);
+        wval.partialexpr = "";
+        editor.RangeRemove();
+        editor.MoveECell(wval.ecoord);
+        editor.inputBox.ShowInputBox(true); // make sure it's moved back if necessary
+        return false;
+      }
+      if (ch == "[f2]") {
+        editor.state = "inputboxdirect";
+        return false;
+      }
+      if (range.hasrange) editor.RangeRemove();
+      editor.MoveECell(wval.ecoord);
+      if (wval.partialexpr) {
+        editor.inputBox.ShowInputBox(true); // make sure it's moved back if necessary
+        wval.partialexpr = ""; // not pointing
+      }
+      return true;
+
+    case "inputboxdirect":
+      inputtext = editor.inputBox.GetText(); // should not get here if no inputBox
+      if (ch == "[esc]" || ch == "[enter]" || ch == "[tab]") {
+        editor.inputBox.Blur();
+        editor.inputBox.ShowInputBox(false);
+        editor.state = "start";
+        editor.cellhandles.ShowCellHandles(true);
+        if (ch == "[esc]") {
+          editor.inputBox.DisplayCellContents();
+        } else {
+          editor.EditorSaveEdit();
+          if (editor.ecell.coord != wval.ecoord) {
+            editor.MoveECell(wval.ecoord);
+          }
+          if (ch == "[enter]") ch = "[adown]";
+          if (ch == "[tab]") ch = e.shiftKey ? "[aleft]" : "[aright]";
+          if (ch.substr(0, 2) == "[a") {
+            editor.MoveECellWithKey(ch);
+          }
+        }
+        break;
+      }
+      // [f2] in inputboxdirect: arrow keys add range/coord to inputbox formula
+      if (ch == "[f2]") {
+        editor.state = "input";
+        return false;
+      }
+      return true;
+
+    case "skip-and-start":
+      editor.state = "start";
+      editor.cellhandles.ShowCellHandles(true);
+      return false;
+
+    default:
+      return true;
+  }
+
+  return false;
+};
 
 /** @param {any} editor @param {any} str @param {any} prefix */
-TableEditorSC.EditorAddToInput = function(editor: any, str: any, prefix: any) {
+TableEditorSC.EditorAddToInput = function (editor: any, str: any, prefix: any) {
+  var wval = editor.workingvalues;
 
-   var wval = editor.workingvalues;
+  if (editor.noEdit || editor.ECellReadonly()) return;
 
-   if (editor.noEdit || editor.ECellReadonly()) return;
+  switch (editor.state) {
+    case "start":
+      editor.state = "input";
+      editor.inputBox.ShowInputBox(true);
+      editor.inputBox.element.disabled = false; // make sure editable and overwrite old
+      editor.inputBox.Focus();
+      editor.inputBox.SetText((prefix || "") + str);
+      editor.inputBox.Select("end");
+      wval.partialexpr = "";
+      wval.ecoord = editor.ecell.coord;
+      wval.erow = editor.ecell.row;
+      wval.ecol = editor.ecell.col;
+      editor.RangeRemove();
+      break;
 
-   switch (editor.state) {
-      case "start":
-         editor.state = "input";
-         editor.inputBox.ShowInputBox(true);
-         editor.inputBox.element.disabled = false; // make sure editable and overwrite old
-         editor.inputBox.Focus();
-         editor.inputBox.SetText((prefix||"")+str);
-         editor.inputBox.Select("end");
-         wval.partialexpr = "";
-         wval.ecoord = editor.ecell.coord;
-         wval.erow = editor.ecell.row;
-         wval.ecol = editor.ecell.col;
-         editor.RangeRemove();
-         break;
-
-      case "input":
-      case "inputboxdirect":
-         editor.inputBox.element.focus();
-         if (wval.partialexpr) {
-            editor.inputBox.SetText(wval.partialexpr);
-            wval.partialexpr = "";
-            editor.RangeRemove();
-            editor.MoveECell(wval.ecoord);
-            }
-         editor.inputBox.SetText(editor.inputBox.GetText()+str);
-         break;
-
-      default:
-         break;
+    case "input":
+    case "inputboxdirect":
+      editor.inputBox.element.focus();
+      if (wval.partialexpr) {
+        editor.inputBox.SetText(wval.partialexpr);
+        wval.partialexpr = "";
+        editor.RangeRemove();
+        editor.MoveECell(wval.ecoord);
       }
+      editor.inputBox.SetText(editor.inputBox.GetText() + str);
+      break;
 
-   }
-
+    default:
+      break;
+  }
+};
 
 /** @param {any} editor */
-TableEditorSC.EditorDisplayCellContents = function(editor: any) {
-
-   if (editor.inputBox) editor.inputBox.DisplayCellContents();
-
-   }
+TableEditorSC.EditorDisplayCellContents = function (editor: any) {
+  if (editor.inputBox) editor.inputBox.DisplayCellContents();
+};
 
 /** @param {any} editor @param {any} text */
-TableEditorSC.EditorSaveEdit = function(editor: any, text: any) {
+TableEditorSC.EditorSaveEdit = function (editor: any, text: any) {
+  var valueinfo, fch, type, value, oldvalue, cmdline;
 
-   var result, cell, valueinfo, fch, type, value, oldvalue, cmdline;
+  var sheetobj = editor.context.sheetobj;
+  var wval = editor.workingvalues;
 
-   var sheetobj = editor.context.sheetobj;
-   var wval = editor.workingvalues;
+  type = "text t";
+  value = typeof text == "string" ? text : editor.inputBox.GetText(); // either explicit or from input box
 
-   type = "text t";
-   value = typeof text == "string" ? text : editor.inputBox.GetText(); // either explicit or from input box
+  oldvalue = TableEditorSC.GetCellContents(sheetobj, wval.ecoord) + "";
+  if (value == oldvalue) {
+    // no change
+    return;
+  }
+  fch = value.charAt(0);
+  if (fch == "=" && value.indexOf("\n") == -1) {
+    type = "formula";
+    value = value.substring(1);
+  } else if (fch == "'") {
+    type = "text t";
+    value = value.substring(1);
+    valueinfo = TableEditorSC.DetermineValueType(value); // determine type again
+    if (valueinfo.type.charAt(0) == "t") {
+      type = "text " + valueinfo.type;
+    }
+  } else if (value.length == 0) {
+    type = "empty";
+  } else {
+    valueinfo = TableEditorSC.DetermineValueType(value);
+    if (valueinfo.type == "n" && value == valueinfo.value + "") {
+      // see if don't need "constant"
+      type = "value n";
+    } else if (valueinfo.type.charAt(0) == "t") {
+      type = "text " + valueinfo.type;
+    }
+    // `valueinfo.type === ""` branch removed — DetermineValueType only
+    // returns that when input length is 0, which the earlier
+    // `else if (value.length==0)` already catches.
+    else {
+      type = "constant " + valueinfo.type + " " + valueinfo.value;
+    }
+  }
 
-   oldvalue = TableEditorSC.GetCellContents(sheetobj, wval.ecoord)+"";
-   if (value == oldvalue) { // no change
-      return;
-      }
-   fch = value.charAt(0);
-   if (fch=="=" && value.indexOf("\n")==-1) {
-      type = "formula";
-      value = value.substring(1);
-      }
-   else if (fch=="'") {
-      type = "text t";
-      value = value.substring(1);
-      valueinfo = TableEditorSC.DetermineValueType(value); // determine type again
-      if (valueinfo.type.charAt(0)=="t") {
-         type = "text "+valueinfo.type;
-         }
-      }
-   else if (value.length==0) {
-      type = "empty";
-      }
-   else {
-      valueinfo = TableEditorSC.DetermineValueType(value);
-      if (valueinfo.type=="n" && value==(valueinfo.value+"")) { // see if don't need "constant"
-         type = "value n";
-         }
-      else if (valueinfo.type.charAt(0)=="t") {
-         type = "text "+valueinfo.type;
-         }
-      // `valueinfo.type === ""` branch removed — DetermineValueType only
-      // returns that when input length is 0, which the earlier
-      // `else if (value.length==0)` already catches.
-      else {
-         type = "constant "+valueinfo.type+" "+valueinfo.value;
-         }
-      }
+  if (type.charAt(0) == "t") {
+    // text
+    value = TableEditorSC.encodeForSave(value); // newlines, :, and \ are escaped
+  }
 
-   if (type.charAt(0)=="t") { // text
-      value = TableEditorSC.encodeForSave(value); // newlines, :, and \ are escaped
-      }
+  cmdline = "set " + wval.ecoord + " " + type + " " + value;
+  editor.EditorScheduleSheetCommands(cmdline, true, false);
+  // eddy EditorSaveEdit {
+  if (typeof sheetobj.ioEventTree === "undefined") return;
+  if (typeof sheetobj.ioParameterList === "undefined") return;
+  if (typeof sheetobj.ioEventTree[wval.ecoord] !== "undefined") {
+    TableEditorSC.EditedTriggerCell(
+      sheetobj.ioEventTree[wval.ecoord],
+      wval.ecoord,
+      editor,
+      sheetobj,
+    );
+  }
 
-   cmdline = "set "+wval.ecoord+" "+type+" "+value;
-   editor.EditorScheduleSheetCommands(cmdline, true, false);
-   // eddy EditorSaveEdit {
-   if(typeof sheetobj.ioEventTree === 'undefined') return;
-   if(typeof sheetobj.ioParameterList === 'undefined') return;
-   if(typeof sheetobj.ioEventTree[wval.ecoord] !== 'undefined') {
-	   TableEditorSC.EditedTriggerCell(sheetobj.ioEventTree[wval.ecoord], wval.ecoord, editor, sheetobj);
-   }
+  // }
 
-   // }
-
-   return;
-
-   }
-
+  return;
+};
 
 // Eddy EditedTriggerCell {
 
-
 /** @param {any} actionFormulaCells @param {any} editedCellRef @param {any} editor @param {any} sheet */
-TableEditorSC.EditedTriggerCell = function(actionFormulaCells: any, editedCellRef: any, editor: any, sheet: any) {
+TableEditorSC.EditedTriggerCell = function (
+  actionFormulaCells: any,
+  editedCellRef: any,
+  editor: any,
+  sheet: any,
+) {
+  for (var actionCellId in actionFormulaCells) {
+    var parameters = sheet.ioParameterList[actionCellId];
+    if (typeof parameters === "undefined") continue;
 
-	 for(var actionCellId in actionFormulaCells) {
-
-			var parameters = sheet.ioParameterList[actionCellId];
-            if(typeof parameters === 'undefined') continue;
-
-			switch(parameters.function_name) {
-				  case "EMAILONEDIT" :
-				  case "EMAILONEDITIF" :
-					  var cmdline = "setemailparameters "+actionCellId+ " " + editedCellRef;
-					// hold off on commands until recalc done
-				      editor.deferredEmailCommands.push({cmdstr: cmdline, saveundo: false});
-//					  editor.EditorScheduleSheetCommands(cmdline, false, false);
-					  break;
-			}
-	 }
-
-}
+    switch (parameters.function_name) {
+      case "EMAILONEDIT":
+      case "EMAILONEDITIF":
+        var cmdline = "setemailparameters " + actionCellId + " " + editedCellRef;
+        // hold off on commands until recalc done
+        editor.deferredEmailCommands.push({ cmdstr: cmdline, saveundo: false });
+        //					  editor.EditorScheduleSheetCommands(cmdline, false, false);
+        break;
+    }
+  }
+};
 // } Eddy EditedTriggerCell
-
-
-
-
-
 
 //
 // SocialCalc.EditorApplySetCommandsToRange(editor, cmd)
@@ -2432,41 +2645,43 @@ TableEditorSC.EditedTriggerCell = function(actionFormulaCells: any, editedCellRe
 //
 
 /** @param {any} editor @param {any} cmd */
-TableEditorSC.EditorApplySetCommandsToRange = function(editor: any, cmd: any) {
+TableEditorSC.EditorApplySetCommandsToRange = function (editor: any, cmd: any) {
+  var line, coord;
 
-   var cell, row, col, line, errortext, coord;
+  var ecell = editor.ecell;
+  var range = editor.range;
 
-   var sheetobj = editor.context.sheetobj;
-   var ecell = editor.ecell;
-   var range = editor.range;
+  if (range.hasrange) {
+    coord =
+      TableEditorSC.crToCoord(range.left, range.top) +
+      ":" +
+      TableEditorSC.crToCoord(range.right, range.bottom);
+    line = "set " + coord + " " + cmd;
+    editor.EditorScheduleSheetCommands(line, true, false);
+  } else {
+    line = "set " + ecell.coord + " " + cmd;
+    editor.EditorScheduleSheetCommands(line, true, false);
+  }
 
-   if (range.hasrange) {
-      coord = TableEditorSC.crToCoord(range.left, range.top)+":"+TableEditorSC.crToCoord(range.right, range.bottom);
-      line = "set "+coord+" "+cmd;
-      errortext = editor.EditorScheduleSheetCommands(line, true, false);
-      }
-   else {
-      line = "set "+ecell.coord+" "+cmd;
-      errortext = editor.EditorScheduleSheetCommands(line, true, false);
-      }
-
-   editor.DisplayCellContents();
-
-   }
+  editor.DisplayCellContents();
+};
 
 /** @param {any} event @param {any} delta @param {any} mousewheelinfo @param {any} wobj */
-TableEditorSC.EditorProcessMouseWheel = function(event: any, delta: any, mousewheelinfo: any, wobj: any) {
+TableEditorSC.EditorProcessMouseWheel = function (
+  event: any,
+  delta: any,
+  mousewheelinfo: any,
+  wobj: any,
+) {
+  if (wobj.functionobj.editor.busy) return; // ignore if busy
 
-   if (wobj.functionobj.editor.busy) return; // ignore if busy
-
-   if (delta > 0) {
-      wobj.functionobj.editor.ScrollRelative(true, Math.floor(-delta * 1.5));
-      }
-   if (delta < 0) {
-      wobj.functionobj.editor.ScrollRelative(true, Math.ceil(-delta * 1.5));
-      }
-
-   }
+  if (delta > 0) {
+    wobj.functionobj.editor.ScrollRelative(true, Math.floor(-delta * 1.5));
+  }
+  if (delta < 0) {
+    wobj.functionobj.editor.ScrollRelative(true, Math.ceil(-delta * 1.5));
+  }
+};
 
 //
 // GridMousePosition(editor, clientX, clientY)
@@ -2479,147 +2694,169 @@ TableEditorSC.EditorProcessMouseWheel = function(event: any, delta: any, mousewh
 //
 
 /** @param {any} editor @param {any} clientX @param {any} clientY */
-TableEditorSC.GridMousePosition = function(editor: any, clientX: any, clientY: any) {
+TableEditorSC.GridMousePosition = function (editor: any, clientX: any, clientY: any) {
+  var row, rowpane, col, colpane, rowtoresize, coltoresize, unhide, pos;
+  var result: any = {};
 
-   var row, rowpane, col, colpane, rowtoresize, coltoresize, unhide, pos;
-   var result: any = {};
+  for (row = 1; row < editor.rowpositions.length; row++) {
+    if (!editor.rowheight[row]) continue; // not rendered yet -- may be above or below us
+    if (editor.rowpositions[row] + editor.rowheight[row] > clientY) {
+      break;
+    }
+  }
+  for (col = 1; col < editor.colpositions.length; col++) {
+    if (!editor.colwidth[col]) continue;
+    if (editor.colpositions[col] + editor.colwidth[col] > clientX) {
+      break;
+    }
+  }
 
-   for (row=1; row<editor.rowpositions.length; row++) {
-      if (!editor.rowheight[row]) continue; // not rendered yet -- may be above or below us
-      if (editor.rowpositions[row]+editor.rowheight[row]>clientY) {
-         break;
-         }
-      }
-   for (col=1; col<editor.colpositions.length; col++) {
-      if (!editor.colwidth[col]) continue;
-      if (editor.colpositions[col]+editor.colwidth[col]>clientX) {
-         break;
-         }
-      }
+  result.row = row;
+  result.col = col;
 
-   result.row = row;
-   result.col = col;
+  if (editor.headposition && TableEditorSC._app != true) {
+    if (clientX < editor.headposition.left && clientX >= editor.gridposition.left) {
+      result.rowheader = true;
+      result.distance = editor.headposition.left - clientX;
+      result.rowtoresize = false;
+      result.rowselect = false;
 
-   if (editor.headposition && TableEditorSC._app != true)  {
-      if (clientX < editor.headposition.left && clientX >= editor.gridposition.left) {
-         result.rowheader = true;
-         result.distance = editor.headposition.left - clientX;
-         result.rowtoresize = false;
-         result.rowselect = false;
-
-         // resize bar
-         for (rowtoresize=1; rowtoresize<editor.rowpositions.length; rowtoresize++) {
-            if (!editor.rowheight[rowtoresize]) continue;
-            if (((editor.rowpositions[rowtoresize] + editor.rowheight[rowtoresize]) - 3) <= clientY
-               && ((editor.rowpositions[rowtoresize] + editor.rowheight[rowtoresize]) + 3) >= clientY) {
-               result.rowtoresize = rowtoresize;
-               break;
-            }
-         }
-
-         // Handle unhide row.
-         if (unhide = editor.context.rowunhidetop[row]) {
-           pos = TableEditorSC.GetElementPosition(unhide);
-           if (clientX >= pos.left && clientX < pos.left+unhide.offsetWidth
-               && clientY >= (editor.rowpositions[row] + editor.rowheight[row] - unhide.offsetHeight)
-               && clientY < (editor.rowpositions[row] + editor.rowheight[row])) {
-             result.rowtounhide = row+1;
-           }
-         }
-         if (unhide = editor.context.rowunhidebottom[row]) {
-           pos = TableEditorSC.GetElementPosition(unhide);
-           if (clientX >= pos.left && clientX < pos.left+unhide.offsetWidth
-               && clientY >= (editor.rowpositions[row])
-               && clientY < (editor.rowpositions[row] + unhide.offsetHeight)) {
-             result.rowtounhide = row-1;
-           }
-         }
-         if(result.rowtounhide == null) {  //if unhide then ignore row select & resize
-           for (rowpane=0; rowpane<editor.context.rowpanes.length; rowpane++) {
-             if (result.rowtoresize >= editor.context.rowpanes[rowpane].first &&
-               result.rowtoresize <= editor.context.rowpanes[rowpane].last) { // visible column
-               return result;
-             }
-           }
-           result.rowselect = true;
-         }
-         delete result.rowtoresize;
-         return result;
-         }
-      else if (clientY < editor.headposition.top && clientY > editor.gridposition.top) { // > because of sizing row
-         result.colheader = true;
-         result.distance = editor.headposition.top - clientY;
-         result.coltoresize = false;
-	 result.colselect = false;
-
-         // resize bar
-         for (coltoresize=1; coltoresize<editor.colpositions.length; coltoresize++) {
-            if (!editor.colwidth[coltoresize]) continue;
-            if (((editor.colpositions[coltoresize] + editor.colwidth[coltoresize]) - 3) <= clientX
-               && ((editor.colpositions[coltoresize] + editor.colwidth[coltoresize]) + 3) >= clientX) {
-               result.coltoresize = coltoresize;
-               break;
-            }
-         }
-
-         // Handle unhide column.
-         if (unhide = editor.context.colunhideleft[col]) {
-            pos = TableEditorSC.GetElementPosition(unhide);
-            if (clientX >= pos.left && clientX < pos.left+unhide.offsetWidth && clientY >= pos.top  && clientY < pos.top+unhide.offsetHeight) {
-               result.coltounhide = col+1;
-               }
-            }
-         if (unhide = editor.context.colunhideright[col]) {
-            pos = TableEditorSC.GetElementPosition(unhide);
-            if (clientX >= pos.left && clientX < pos.left+unhide.offsetWidth && clientY >= pos.top  && clientY < pos.top+unhide.offsetHeight) {
-               result.coltounhide = col-1;
-               }
-            }
-
-         if(result.coltounhide == null) {  //if unhide then ignore col select & resize
-           for (colpane=0; colpane<editor.context.colpanes.length; colpane++) {
-              if (result.coltoresize >= editor.context.colpanes[colpane].first &&
-                  result.coltoresize <= editor.context.colpanes[colpane].last) { // visible column
-                 return result;
-                 }
-              }
-           result.colselect = true;
-           }
-         delete result.coltoresize;
-         return result;
-         }
-      else if (clientX >= editor.verticaltablecontrol.controlborder) {
-         result.rowfooter = true;
-         result.distance = clientX - editor.verticaltablecontrol.controlborder;
-         return result;
-         }
-      else if (clientY >= editor.horizontaltablecontrol.controlborder) {
-         result.colfooter = true;
-         result.distance = clientY - editor.horizontaltablecontrol.controlborder;
-         return result;
-         }
-      else if (clientX < editor.gridposition.left) {
-         result.rowheader = true;
-         result.distance = editor.headposition.left - clientX;
-         return result;
-         }
-      else if (clientY <= editor.gridposition.top) {
-         result.colheader = true;
-         result.distance = editor.headposition.top - clientY;
-         return result;
-         }
-      else {
-         result.coord = TableEditorSC.crToCoord(result.col, result.row);
-         if (editor.context.cellskip[result.coord]) { // handle skipped cells
-            result.coord = editor.context.cellskip[result.coord];
-            }
-         return result;
-         }
+      // resize bar
+      for (rowtoresize = 1; rowtoresize < editor.rowpositions.length; rowtoresize++) {
+        if (!editor.rowheight[rowtoresize]) continue;
+        if (
+          editor.rowpositions[rowtoresize] + editor.rowheight[rowtoresize] - 3 <= clientY &&
+          editor.rowpositions[rowtoresize] + editor.rowheight[rowtoresize] + 3 >= clientY
+        ) {
+          result.rowtoresize = rowtoresize;
+          break;
+        }
       }
 
-   return null;
+      // Handle unhide row.
+      if ((unhide = editor.context.rowunhidetop[row])) {
+        pos = TableEditorSC.GetElementPosition(unhide);
+        if (
+          clientX >= pos.left &&
+          clientX < pos.left + unhide.offsetWidth &&
+          clientY >= editor.rowpositions[row] + editor.rowheight[row] - unhide.offsetHeight &&
+          clientY < editor.rowpositions[row] + editor.rowheight[row]
+        ) {
+          result.rowtounhide = row + 1;
+        }
+      }
+      if ((unhide = editor.context.rowunhidebottom[row])) {
+        pos = TableEditorSC.GetElementPosition(unhide);
+        if (
+          clientX >= pos.left &&
+          clientX < pos.left + unhide.offsetWidth &&
+          clientY >= editor.rowpositions[row] &&
+          clientY < editor.rowpositions[row] + unhide.offsetHeight
+        ) {
+          result.rowtounhide = row - 1;
+        }
+      }
+      if (result.rowtounhide == null) {
+        //if unhide then ignore row select & resize
+        for (rowpane = 0; rowpane < editor.context.rowpanes.length; rowpane++) {
+          if (
+            result.rowtoresize >= editor.context.rowpanes[rowpane].first &&
+            result.rowtoresize <= editor.context.rowpanes[rowpane].last
+          ) {
+            // visible column
+            return result;
+          }
+        }
+        result.rowselect = true;
+      }
+      delete result.rowtoresize;
+      return result;
+    } else if (clientY < editor.headposition.top && clientY > editor.gridposition.top) {
+      // > because of sizing row
+      result.colheader = true;
+      result.distance = editor.headposition.top - clientY;
+      result.coltoresize = false;
+      result.colselect = false;
 
-   }
+      // resize bar
+      for (coltoresize = 1; coltoresize < editor.colpositions.length; coltoresize++) {
+        if (!editor.colwidth[coltoresize]) continue;
+        if (
+          editor.colpositions[coltoresize] + editor.colwidth[coltoresize] - 3 <= clientX &&
+          editor.colpositions[coltoresize] + editor.colwidth[coltoresize] + 3 >= clientX
+        ) {
+          result.coltoresize = coltoresize;
+          break;
+        }
+      }
+
+      // Handle unhide column.
+      if ((unhide = editor.context.colunhideleft[col])) {
+        pos = TableEditorSC.GetElementPosition(unhide);
+        if (
+          clientX >= pos.left &&
+          clientX < pos.left + unhide.offsetWidth &&
+          clientY >= pos.top &&
+          clientY < pos.top + unhide.offsetHeight
+        ) {
+          result.coltounhide = col + 1;
+        }
+      }
+      if ((unhide = editor.context.colunhideright[col])) {
+        pos = TableEditorSC.GetElementPosition(unhide);
+        if (
+          clientX >= pos.left &&
+          clientX < pos.left + unhide.offsetWidth &&
+          clientY >= pos.top &&
+          clientY < pos.top + unhide.offsetHeight
+        ) {
+          result.coltounhide = col - 1;
+        }
+      }
+
+      if (result.coltounhide == null) {
+        //if unhide then ignore col select & resize
+        for (colpane = 0; colpane < editor.context.colpanes.length; colpane++) {
+          if (
+            result.coltoresize >= editor.context.colpanes[colpane].first &&
+            result.coltoresize <= editor.context.colpanes[colpane].last
+          ) {
+            // visible column
+            return result;
+          }
+        }
+        result.colselect = true;
+      }
+      delete result.coltoresize;
+      return result;
+    } else if (clientX >= editor.verticaltablecontrol.controlborder) {
+      result.rowfooter = true;
+      result.distance = clientX - editor.verticaltablecontrol.controlborder;
+      return result;
+    } else if (clientY >= editor.horizontaltablecontrol.controlborder) {
+      result.colfooter = true;
+      result.distance = clientY - editor.horizontaltablecontrol.controlborder;
+      return result;
+    } else if (clientX < editor.gridposition.left) {
+      result.rowheader = true;
+      result.distance = editor.headposition.left - clientX;
+      return result;
+    } else if (clientY <= editor.gridposition.top) {
+      result.colheader = true;
+      result.distance = editor.headposition.top - clientY;
+      return result;
+    } else {
+      result.coord = TableEditorSC.crToCoord(result.col, result.row);
+      if (editor.context.cellskip[result.coord]) {
+        // handle skipped cells
+        result.coord = editor.context.cellskip[result.coord];
+      }
+      return result;
+    }
+  }
+
+  return null;
+};
 
 //
 // GetEditorCellElement(editor, row, col)
@@ -2630,46 +2867,63 @@ TableEditorSC.GridMousePosition = function(editor: any, clientX: any, clientY: a
 //
 
 /** @param {any} editor @param {any} row @param {any} col */
-TableEditorSC.GetEditorCellElement = function(editor: any, row: any, col: any) {
-
+TableEditorSC.GetEditorCellElement = function (editor: any, row: any, col: any) {
   var headerColOffset = 0;
   var headerRowOffset = 0;
-   //Adjust for row/col headers
-   if (editor.context.showRCHeaders == false) {
-     var headerColOffset = -1;
-     var headerRowOffset = -1;
-   }
-   var rowpane, colpane, c, coord;
-   var rowindex = 0;
-   var colindex = 0;
+  //Adjust for row/col headers
+  if (editor.context.showRCHeaders == false) {
+    var headerColOffset = -1;
+    var headerRowOffset = -1;
+  }
+  var rowpane, colpane, c, coord;
+  var rowindex = 0;
+  var colindex = 0;
 
-   for (rowpane=0; rowpane<editor.context.rowpanes.length; rowpane++) {
-      if (row >= editor.context.rowpanes[rowpane].first && row <= editor.context.rowpanes[rowpane].last) {
-         for (colpane=0; colpane<editor.context.colpanes.length; colpane++) {
-            if (col >= editor.context.colpanes[colpane].first && col <= editor.context.colpanes[colpane].last) {
-               rowindex += row - editor.context.rowpanes[rowpane].first + 2;
-               for (c=editor.context.colpanes[colpane].first; c<=col; c++) {
-                  coord=editor.context.cellskip[TableEditorSC.crToCoord(c,row)];
-                  if (!coord || !editor.context.CoordInPane(coord, rowpane, colpane)) // don't count col-spanned cells
-                     colindex++;
-                  }
-               return {
-                  element: editor.griddiv.firstChild.lastChild.childNodes[rowindex +headerRowOffset].childNodes[colindex + headerColOffset],
-                  rowpane: rowpane, colpane: colpane};
-               }
-            for (c=editor.context.colpanes[colpane].first; c<=editor.context.colpanes[colpane].last; c++) {
-               coord=editor.context.cellskip[TableEditorSC.crToCoord(c,row)];
-               if (!coord || !editor.context.CoordInPane(coord, rowpane, colpane)) // don't count col-spanned cells
-                  colindex++;
-               }
-            colindex += 1;
-            }
-         }
-      rowindex += editor.context.rowpanes[rowpane].last - editor.context.rowpanes[rowpane].first + 1 + 1;
+  for (rowpane = 0; rowpane < editor.context.rowpanes.length; rowpane++) {
+    if (
+      row >= editor.context.rowpanes[rowpane].first &&
+      row <= editor.context.rowpanes[rowpane].last
+    ) {
+      for (colpane = 0; colpane < editor.context.colpanes.length; colpane++) {
+        if (
+          col >= editor.context.colpanes[colpane].first &&
+          col <= editor.context.colpanes[colpane].last
+        ) {
+          rowindex += row - editor.context.rowpanes[rowpane].first + 2;
+          for (c = editor.context.colpanes[colpane].first; c <= col; c++) {
+            coord = editor.context.cellskip[TableEditorSC.crToCoord(c, row)];
+            if (!coord || !editor.context.CoordInPane(coord, rowpane, colpane))
+              // don't count col-spanned cells
+              colindex++;
+          }
+          return {
+            element:
+              editor.griddiv.firstChild.lastChild.childNodes[rowindex + headerRowOffset].childNodes[
+                colindex + headerColOffset
+              ],
+            rowpane: rowpane,
+            colpane: colpane,
+          };
+        }
+        for (
+          c = editor.context.colpanes[colpane].first;
+          c <= editor.context.colpanes[colpane].last;
+          c++
+        ) {
+          coord = editor.context.cellskip[TableEditorSC.crToCoord(c, row)];
+          if (!coord || !editor.context.CoordInPane(coord, rowpane, colpane))
+            // don't count col-spanned cells
+            colindex++;
+        }
+        colindex += 1;
       }
+    }
+    rowindex +=
+      editor.context.rowpanes[rowpane].last - editor.context.rowpanes[rowpane].first + 1 + 1;
+  }
 
-   return null;
-}
+  return null;
+};
 
 //
 // cellcoord = MoveECellWithKey(editor, ch)
@@ -2679,104 +2933,99 @@ TableEditorSC.GetEditorCellElement = function(editor: any, row: any, col: any) {
 //
 
 /** @param {any} editor @param {any} ch */
-TableEditorSC.MoveECellWithKey = function(editor: any, ch: any) {
+TableEditorSC.MoveECellWithKey = function (editor: any, ch: any) {
+  var coord, row, col, cell;
+  var shifted = false;
+  var delta = 1;
 
-   var coord, row, col, cell;
-   var shifted = false;
-   var delta = 1;
+  if (!editor.ecell) {
+    return null;
+  }
 
-   if (!editor.ecell) {
+  if (ch.slice(-7) == "shifted") {
+    ch = ch.slice(0, -7);
+    shifted = true;
+  }
+
+  row = editor.ecell.row;
+  col = editor.ecell.col;
+  cell = editor.context.sheetobj.cells[editor.ecell.coord];
+
+  switch (ch) {
+    case "[adown]":
+      row += (cell && cell.rowspan) || 1;
+      break;
+    case "[aup]":
+      row--;
+      delta = -1;
+      break;
+    case "[pgdn]":
+      if (editor.lastvisiblerow && editor.firstscrollingrow) {
+        row += editor.lastvisiblerow - editor.firstscrollingrow + ((cell && cell.rowspan) || 1);
+      } else {
+        row += editor.pageUpDnAmount - 1 + ((cell && cell.rowspan) || 1);
+      }
+      break;
+    case "[pgup]":
+      if (editor.lastvisiblerow && editor.firstscrollingrow) {
+        row -= editor.lastvisiblerow - editor.firstscrollingrow + 1;
+      } else {
+        row -= editor.pageUpDnAmount;
+      }
+      delta = -1;
+      break;
+    case "[aright]":
+      col += (cell && cell.colspan) || 1;
+      break;
+    case "[aleft]":
+      col--;
+      delta = -1;
+      break;
+    case "[home]":
+      row = 1;
+      col = 1;
+      break;
+    default:
       return null;
-      }
+  }
 
-   if (ch.slice(-7)=="shifted") {
-      ch = ch.slice(0,-7);
-      shifted = true;
-      }
+  // Adjust against usermax col and row.
+  if (editor.context.sheetobj.attribs.usermaxcol)
+    col = Math.min(editor.context.sheetobj.attribs.usermaxcol, col);
+  if (editor.context.sheetobj.attribs.usermaxrow)
+    row = Math.min(editor.context.sheetobj.attribs.usermaxrow, row);
 
-   row = editor.ecell.row;
-   col = editor.ecell.col;
-   cell = editor.context.sheetobj.cells[editor.ecell.coord];
+  // Handle hidden column.
+  while (editor.context.sheetobj.colattribs.hide[TableEditorSC.rcColname(col)] == "yes") {
+    col += delta;
+    if (col < 1) {
+      delta = -delta;
+      col = 1;
+    }
+  }
 
-   switch (ch) {
-      case "[adown]":
-         row += (cell && cell.rowspan) || 1;
-         break;
-      case "[aup]":
-         row--;
-         delta = -1;
-         break;
-      case "[pgdn]":
-         if (editor.lastvisiblerow && editor.firstscrollingrow) {
-            row += editor.lastvisiblerow - editor.firstscrollingrow + ((cell && cell.rowspan) || 1);
-            }
-         else {
-            row += editor.pageUpDnAmount - 1 + ((cell && cell.rowspan) || 1);
-            }
-         break;
-      case "[pgup]":
-         if (editor.lastvisiblerow && editor.firstscrollingrow) {
-            row -= editor.lastvisiblerow - editor.firstscrollingrow + 1;
-            }
-         else {
-            row -= editor.pageUpDnAmount;
-            }
-         delta = -1;
-         break;
-      case "[aright]":
-         col += (cell && cell.colspan) || 1;
-         break;
-      case "[aleft]":
-         col--;
-         delta = -1;
-         break;
-      case "[home]":
-         row = 1;
-         col = 1;
-         break;
-      default:
-         return null;
-      }
+  // Handle hidden row.
+  while (editor.context.sheetobj.rowattribs.hide[row] == "yes") {
+    row += delta;
+    if (row < 1) {
+      delta = -delta;
+      row = 1;
+    }
+  }
 
-   // Adjust against usermax col and row.
-   if (editor.context.sheetobj.attribs.usermaxcol) col = Math.min(editor.context.sheetobj.attribs.usermaxcol, col);
-   if (editor.context.sheetobj.attribs.usermaxrow) row = Math.min(editor.context.sheetobj.attribs.usermaxrow, row);
+  if (!editor.range.hasrange) {
+    if (shifted) editor.RangeAnchor();
+  }
 
-   // Handle hidden column.
-   while (editor.context.sheetobj.colattribs.hide[TableEditorSC.rcColname(col)] == "yes") {
-      col += delta;
-      if (col < 1) {
-         delta = -delta;
-         col = 1;
-         }
-      }
+  coord = editor.MoveECell(TableEditorSC.crToCoord(col, row));
 
-   // Handle hidden row.
-   while (editor.context.sheetobj.rowattribs.hide[row] == "yes") {
-      row += delta;
-      if (row < 1) {
-         delta = -delta;
-         row = 1;
-         }
-      }
+  if (editor.range.hasrange) {
+    if (shifted) editor.RangeExtend();
+    else editor.RangeRemove();
+  }
 
-   if (!editor.range.hasrange) {
-      if (shifted)
-         editor.RangeAnchor();
-      }
-
-   coord = editor.MoveECell(TableEditorSC.crToCoord(col, row));
-
-   if (editor.range.hasrange) {
-      if (shifted)
-         editor.RangeExtend();
-      else
-         editor.RangeRemove();
-      }
-
-   return coord;
-
-   }
+  return coord;
+};
 
 //
 // cellcoord = MoveECell(editor, newecell)
@@ -2786,192 +3035,204 @@ TableEditorSC.MoveECellWithKey = function(editor: any, ch: any) {
 //
 
 /** @param {any} editor @param {any} newcell */
-TableEditorSC.MoveECell = function(editor: any, newcell: any) {
+TableEditorSC.MoveECell = function (editor: any, newcell: any) {
+  var cell, f;
 
-   var cell, f;
+  var highlights = editor.context.highlights;
 
-   var highlights = editor.context.highlights;
+  // adjust against user max col/row
+  var ecell = TableEditorSC.coordToCr(newcell);
+  if (
+    editor.context.sheetobj.attribs.usermaxcol &&
+    ecell.col > editor.context.sheetobj.attribs.usermaxcol
+  )
+    ecell.col = editor.context.sheetobj.attribs.usermaxcol;
+  if (
+    editor.context.sheetobj.attribs.usermaxrow &&
+    ecell.row > editor.context.sheetobj.attribs.usermaxrow
+  )
+    ecell.row = editor.context.sheetobj.attribs.usermaxrow;
+  newcell = TableEditorSC.crToCoord(ecell.col, ecell.row);
 
-   // adjust against user max col/row
-   var ecell = TableEditorSC.coordToCr(newcell);
-   if (editor.context.sheetobj.attribs.usermaxcol && ecell.col > editor.context.sheetobj.attribs.usermaxcol)
-      ecell.col = editor.context.sheetobj.attribs.usermaxcol;
-   if (editor.context.sheetobj.attribs.usermaxrow && ecell.row > editor.context.sheetobj.attribs.usermaxrow)
-      ecell.row = editor.context.sheetobj.attribs.usermaxrow;
-   newcell = TableEditorSC.crToCoord(ecell.col, ecell.row);
+  if (editor.ecell) {
+    if (editor.ecell.coord == newcell) return newcell; // already there - don't do anything and don't tell anybody
+    cell = TableEditorSC.GetEditorCellElement(editor, editor.ecell.row, editor.ecell.col);
+    delete highlights[editor.ecell.coord];
+    if (
+      editor.range2.hasrange &&
+      editor.ecell.row >= editor.range2.top &&
+      editor.ecell.row <= editor.range2.bottom &&
+      editor.ecell.col >= editor.range2.left &&
+      editor.ecell.col <= editor.range2.right
+    ) {
+      highlights[editor.ecell.coord] = "range2";
+    }
+    editor.UpdateCellCSS(cell, editor.ecell.row, editor.ecell.col);
+    editor.SetECellHeaders(""); // set to regular col/rowname styles
+    if (editor.cellhandles) editor.cellhandles.ShowCellHandles(false); // only if row/col visible
+  }
+  newcell = editor.context.cellskip[newcell] || newcell;
+  editor.ecell = TableEditorSC.coordToCr(newcell);
+  editor.ecell.coord = newcell;
+  cell = TableEditorSC.GetEditorCellElement(editor, editor.ecell.row, editor.ecell.col);
+  // eddy MoveECell {
+  // }
+  highlights[newcell] = "cursor";
 
-   if (editor.ecell) {
-      if (editor.ecell.coord==newcell) return newcell; // already there - don't do anything and don't tell anybody
-      cell=TableEditorSC.GetEditorCellElement(editor, editor.ecell.row, editor.ecell.col);
-      delete highlights[editor.ecell.coord];
-      if (editor.range2.hasrange &&
-        editor.ecell.row>=editor.range2.top && editor.ecell.row<=editor.range2.bottom &&
-        editor.ecell.col>=editor.range2.left && editor.ecell.col<=editor.range2.right) {
-         highlights[editor.ecell.coord] = "range2";
-         }
-      editor.UpdateCellCSS(cell, editor.ecell.row, editor.ecell.col);
-      editor.SetECellHeaders(""); // set to regular col/rowname styles
-      if(editor.cellhandles) editor.cellhandles.ShowCellHandles(false); // only if row/col visible
-      }
-   newcell = editor.context.cellskip[newcell] || newcell;
-   editor.ecell = TableEditorSC.coordToCr(newcell);
-   editor.ecell.coord = newcell;
-   cell=TableEditorSC.GetEditorCellElement(editor, editor.ecell.row, editor.ecell.col);
-   // eddy MoveECell {
-   // }
-   highlights[newcell] = "cursor";
+  for (f in editor.MoveECellCallback) {
+    // let others know
+    editor.MoveECellCallback[f](editor);
+  }
 
-   for (f in editor.MoveECellCallback) { // let others know
-      editor.MoveECellCallback[f](editor);
-      }
+  editor.UpdateCellCSS(cell, editor.ecell.row, editor.ecell.col);
+  editor.SetECellHeaders("selected");
 
-   editor.UpdateCellCSS(cell, editor.ecell.row, editor.ecell.col);
-   editor.SetECellHeaders("selected");
+  for (f in editor.StatusCallback) {
+    // let status line, etc., know
+    editor.StatusCallback[f].func(editor, "moveecell", newcell, editor.StatusCallback[f].params);
+  }
 
-   for (f in editor.StatusCallback) { // let status line, etc., know
-      editor.StatusCallback[f].func(editor, "moveecell", newcell, editor.StatusCallback[f].params);
-      }
+  if (editor.busy) {
+    editor.ensureecell = true; // wait for when not busy
+  } else {
+    editor.ensureecell = false;
+    editor.EnsureECellVisible();
+  }
 
-   if (editor.busy) {
-      editor.ensureecell = true; // wait for when not busy
-      }
-   else {
-      editor.ensureecell = false;
-      editor.EnsureECellVisible();
-      }
-
-   return newcell;
-
-   }
+  return newcell;
+};
 
 /** @param {any} editor */
-TableEditorSC.EnsureECellVisible = function(editor: any) {
+TableEditorSC.EnsureECellVisible = function (editor: any) {
+  var vamount = 0;
+  var hamount = 0;
 
-   var vamount = 0;
-   var hamount = 0;
+  if (editor.ecell.row > editor.lastnonscrollingrow) {
+    if (editor.ecell.row < editor.firstscrollingrow) {
+      vamount =
+        editor.ecell.row -
+        editor.firstscrollingrow -
+        Math.floor((editor.lastvisiblerow - editor.firstscrollingrow) / 2);
+    } else if (editor.ecell.row + 1 > editor.lastvisiblerow) {
+      vamount =
+        editor.ecell.row -
+        editor.lastvisiblerow +
+        Math.floor((editor.lastvisiblerow - editor.firstscrollingrow) / 2);
+    }
+  }
+  if (editor.ecell.col > editor.lastnonscrollingcol) {
+    if (editor.ecell.col < editor.firstscrollingcol) {
+      hamount =
+        editor.ecell.col -
+        editor.firstscrollingcol -
+        Math.floor((editor.lastvisiblecol - editor.firstscrollingcol) / 2);
+    } else if (editor.ecell.col + 1 > editor.lastvisiblecol) {
+      hamount =
+        editor.ecell.col -
+        editor.lastvisiblecol +
+        Math.floor((editor.lastvisiblecol - editor.firstscrollingcol) / 2);
+    }
+  }
 
-   if (editor.ecell.row > editor.lastnonscrollingrow) {
-      if (editor.ecell.row < editor.firstscrollingrow) {
-         vamount = editor.ecell.row - editor.firstscrollingrow - Math.floor((editor.lastvisiblerow - editor.firstscrollingrow)/2);
-         }
-      else if (editor.ecell.row + 1 > editor.lastvisiblerow) {
-         vamount = editor.ecell.row - editor.lastvisiblerow + Math.floor((editor.lastvisiblerow - editor.firstscrollingrow)/2);
-         }
-      }
-   if (editor.ecell.col > editor.lastnonscrollingcol) {
-      if (editor.ecell.col < editor.firstscrollingcol) {
-         hamount = editor.ecell.col - editor.firstscrollingcol - Math.floor((editor.lastvisiblecol - editor.firstscrollingcol)/2);
-         }
-      else if (editor.ecell.col + 1 > editor.lastvisiblecol) {
-        hamount = editor.ecell.col- editor.lastvisiblecol + Math.floor((editor.lastvisiblecol - editor.firstscrollingcol)/2);
-         }
-      }
-
-   if (vamount!=0 || hamount!=0) {
-      editor.ScrollRelativeBoth(vamount, hamount);
-      }
-   else {
-      editor.cellhandles.ShowCellHandles(true);
-      }
-
-   }
-
-/** @param {any} editor @param {any} cell @param {any} row @param {any} col */
-TableEditorSC.ReplaceCell = function(editor: any, cell: any, row: any, col: any) {
-
-   var newelement, a;
-   if (!cell) return;
-   newelement = editor.context.RenderCell(row, col, cell.rowpane, cell.colpane, true, null);
-   if (newelement && cell.element) { // skip hidden cells
-      // Don't use a real element and replaceChild, which seems to have focus issues with IE, Firefox, and speed issues
-      cell.element.innerHTML = newelement.innerHTML;
-      cell.element.style.cssText = "";
-      cell.element.className = newelement.className;
-      for (a in newelement.style) {
-         if (newelement.style[a]!="cssText")
-            cell.element.style[a] = newelement.style[a];
-         }
-      }
-   }
-
+  if (vamount != 0 || hamount != 0) {
+    editor.ScrollRelativeBoth(vamount, hamount);
+  } else {
+    editor.cellhandles.ShowCellHandles(true);
+  }
+};
 
 /** @param {any} editor @param {any} cell @param {any} row @param {any} col */
-TableEditorSC.UpdateCellCSS = function(editor: any, cell: any, row: any, col: any) {
+TableEditorSC.ReplaceCell = function (editor: any, cell: any, row: any, col: any) {
+  var newelement, a;
+  if (!cell) return;
+  newelement = editor.context.RenderCell(row, col, cell.rowpane, cell.colpane, true, null);
+  if (newelement && cell.element) {
+    // skip hidden cells
+    // Don't use a real element and replaceChild, which seems to have focus issues with IE, Firefox, and speed issues
+    cell.element.innerHTML = newelement.innerHTML;
+    cell.element.style.cssText = "";
+    cell.element.className = newelement.className;
+    for (a in newelement.style) {
+      if (newelement.style[a] != "cssText") cell.element.style[a] = newelement.style[a];
+    }
+  }
+};
 
-   var newelement, a;
-   if (!cell) return;
-   newelement = editor.context.RenderCell(row, col, cell.rowpane, cell.colpane, true, null);
-   if (newelement) {
-      cell.element.style.cssText = "";
-      cell.element.className = newelement.className;
-      for (a in newelement.style) {
-         if (newelement.style[a]!="cssText")
-            cell.element.style[a] = newelement.style[a];
-         }
-      }
-   }
-
+/** @param {any} editor @param {any} cell @param {any} row @param {any} col */
+TableEditorSC.UpdateCellCSS = function (editor: any, cell: any, row: any, col: any) {
+  var newelement, a;
+  if (!cell) return;
+  newelement = editor.context.RenderCell(row, col, cell.rowpane, cell.colpane, true, null);
+  if (newelement) {
+    cell.element.style.cssText = "";
+    cell.element.className = newelement.className;
+    for (a in newelement.style) {
+      if (newelement.style[a] != "cssText") cell.element.style[a] = newelement.style[a];
+    }
+  }
+};
 
 /** @param {any} editor @param {any} selected */
-TableEditorSC.SetECellHeaders = function(editor: any, selected: any) {
+TableEditorSC.SetECellHeaders = function (editor: any, selected: any) {
+  // eddy SetECellHeaders {
+  if (editor.context.showRCHeaders === false) return;
+  // } SetECellHeaders
+  var ecell = editor.ecell;
+  var context = editor.context;
 
-   // eddy SetECellHeaders {
-   if(editor.context.showRCHeaders === false) return;
-   // } SetECellHeaders
-   var ecell = editor.ecell;
-   var context = editor.context;
+  var rowpane, colpane, first, last;
+  var rowindex = 0;
+  var colindex = 0;
+  var headercell;
 
-   var rowpane, colpane, first, last;
-   var rowindex = 0;
-   var colindex = 0;
-   var headercell;
+  if (!ecell) return;
 
-   if (!ecell) return;
+  // Handle ecell on a hidden column/row.
+  while (context.sheetobj.colattribs.hide[TableEditorSC.rcColname(ecell.col)] == "yes") {
+    ecell.col++;
+  }
+  while (context.sheetobj.rowattribs.hide[ecell.row] == "yes") {
+    ecell.row++;
+  }
 
-   // Handle ecell on a hidden column/row.
-   while (context.sheetobj.colattribs.hide[TableEditorSC.rcColname(ecell.col)] == "yes") {
-      ecell.col++;
+  ecell.coord = TableEditorSC.crToCoord(ecell.col, ecell.row);
+
+  for (rowpane = 0; rowpane < context.rowpanes.length; rowpane++) {
+    first = context.rowpanes[rowpane].first;
+    last = context.rowpanes[rowpane].last;
+    if (ecell.row >= first && ecell.row <= last) {
+      var i = 2 + rowindex + ecell.row - first;
+      if (editor.fullgrid !== null && i >= 0) {
+        headercell = editor.fullgrid.childNodes[1].childNodes[i].childNodes[0];
+        if (headercell) {
+          if (context.classnames) headercell.className = context.classnames[selected + "rowname"];
+          if (context.explicitStyles)
+            headercell.style.cssText = context.explicitStyles[selected + "rowname"];
+          headercell.style.verticalAlign = "top"; // to get around Safari making top of centered row number be
+          // considered top of row (and can't get <row> position in Safari)
+        }
       }
-   while (context.sheetobj.rowattribs.hide[ecell.row] == "yes") {
-      ecell.row++;
-      }
+    }
+    rowindex += last - first + 1 + 1;
+  }
 
-   ecell.coord = TableEditorSC.crToCoord(ecell.col, ecell.row);
-
-   for (rowpane=0; rowpane<context.rowpanes.length; rowpane++) {
-      first = context.rowpanes[rowpane].first;
-      last = context.rowpanes[rowpane].last;
-      if (ecell.row >= first && ecell.row <= last) {
-         var i = 2+rowindex+ecell.row-first
-         if (editor.fullgrid !== null && i >= 0) {
-            headercell = editor.fullgrid.childNodes[1].childNodes[i].childNodes[0];
-            if (headercell) {
-               if (context.classnames) headercell.className=context.classnames[selected+"rowname"];
-               if (context.explicitStyles) headercell.style.cssText=context.explicitStyles[selected+"rowname"];
-               headercell.style.verticalAlign="top"; // to get around Safari making top of centered row number be
-                                                     // considered top of row (and can't get <row> position in Safari)
-               }
-            }
-         }
-      rowindex += last - first + 1 + 1;
+  for (colpane = 0; colpane < context.colpanes.length; colpane++) {
+    first = context.colpanes[colpane].first;
+    last = context.colpanes[colpane].last;
+    if (ecell.col >= first && ecell.col <= last) {
+      var i = 1 + colindex + ecell.col - first;
+      if (editor.fullgrid !== null && i >= 0) {
+        headercell = editor.fullgrid.childNodes[1].childNodes[1].childNodes[i];
+        if (headercell) {
+          if (context.classnames) headercell.className = context.classnames[selected + "colname"];
+          if (context.explicitStyles)
+            headercell.style.cssText = context.explicitStyles[selected + "colname"];
+        }
       }
-
-   for (colpane=0; colpane<context.colpanes.length; colpane++) {
-      first = context.colpanes[colpane].first;
-      last = context.colpanes[colpane].last;
-      if (ecell.col >= first && ecell.col <= last) {
-         var i = 1+colindex+ecell.col-first
-         if (editor.fullgrid !== null && i >= 0) {
-            headercell = editor.fullgrid.childNodes[1].childNodes[1].childNodes[i];
-            if (headercell) {
-               if (context.classnames) headercell.className=context.classnames[selected+"colname"];
-               if (context.explicitStyles) headercell.style.cssText=context.explicitStyles[selected+"colname"];
-               }
-            }
-         }
-      colindex += last - first + 1 + 1;
-      }
-   }
+    }
+    colindex += last - first + 1 + 1;
+  }
+};
 
 //
 // ECellReadonly(editor, ecoord)
@@ -2980,18 +3241,16 @@ TableEditorSC.SetECellHeaders = function(editor: any, selected: any) {
 //
 
 /** @param {any} editor @param {any} ecoord */
-TableEditorSC.ECellReadonly = function(editor: any, ecoord: any) {
+TableEditorSC.ECellReadonly = function (editor: any, ecoord: any) {
+  if (!ecoord && editor.ecell) {
+    ecoord = editor.ecell.coord;
+  }
 
-   if (!ecoord && editor.ecell) {
-      ecoord = editor.ecell.coord;
-      }
+  if (!ecoord) return false;
 
-   if (!ecoord) return false;
-
-   var cell = editor.context.sheetobj.cells[ecoord];
-   return cell && cell.readonly;
-
-   }
+  var cell = editor.context.sheetobj.cells[ecoord];
+  return cell && cell.readonly;
+};
 
 //
 // RangeAnchor(editor, ecoord)
@@ -3000,15 +3259,13 @@ TableEditorSC.ECellReadonly = function(editor: any, ecoord: any) {
 //
 
 /** @param {any} editor @param {any} ecoord */
-TableEditorSC.RangeAnchor = function(editor: any, ecoord: any) {
+TableEditorSC.RangeAnchor = function (editor: any, ecoord: any) {
+  if (editor.range.hasrange) {
+    editor.RangeRemove();
+  }
 
-   if (editor.range.hasrange) {
-      editor.RangeRemove();
-      }
-
-   editor.RangeExtend(ecoord);
-
-   }
+  editor.RangeExtend(ecoord);
+};
 
 //
 // RangeExtend(editor, ecoord)
@@ -3017,138 +3274,134 @@ TableEditorSC.RangeAnchor = function(editor: any, ecoord: any) {
 //
 
 /** @param {any} editor @param {any} ecoord */
-TableEditorSC.RangeExtend = function(editor: any, ecoord: any) {
+TableEditorSC.RangeExtend = function (editor: any, ecoord: any) {
+  var cell, cr, coord, row, col, f;
 
-   var a, cell, cr, coord, row, col, f;
+  var highlights = editor.context.highlights;
+  var range = editor.range;
+  var range2 = editor.range2;
 
-   var highlights = editor.context.highlights;
-   var range = editor.range;
-   var range2 = editor.range2;
+  var ecell;
+  if (ecoord) {
+    ecell = TableEditorSC.coordToCr(ecoord);
+    ecell.coord = ecoord;
+  } else ecell = editor.ecell;
 
-   var ecell;
-   if (ecoord) {
-      ecell = TableEditorSC.coordToCr(ecoord);
-      ecell.coord = ecoord;
-      }
-   else ecell = editor.ecell;
+  if (!ecell) return; // just in case
 
-   if (!ecell) return; // just in case
+  if (!range.hasrange) {
+    // called without RangeAnchor...
+    range.anchorcoord = ecell.coord;
+    range.anchorrow = ecell.row;
+    range.top = ecell.row;
+    range.bottom = ecell.row;
+    range.anchorcol = ecell.col;
+    range.left = ecell.col;
+    range.right = ecell.col;
+    range.hasrange = true;
+  }
 
-   if (!range.hasrange) { // called without RangeAnchor...
-      range.anchorcoord = ecell.coord;
-      range.anchorrow = ecell.row;
-      range.top = ecell.row;
-      range.bottom = ecell.row;
-      range.anchorcol = ecell.col;
-      range.left = ecell.col;
-      range.right = ecell.col;
-      range.hasrange = true;
-      }
+  if (range.anchorrow < ecell.row) {
+    range.top = range.anchorrow;
+    range.bottom = ecell.row;
+  } else {
+    range.top = ecell.row;
+    range.bottom = range.anchorrow;
+  }
+  if (range.anchorcol < ecell.col) {
+    range.left = range.anchorcol;
+    range.right = ecell.col;
+  } else {
+    range.left = ecell.col;
+    range.right = range.anchorcol;
+  }
 
-   if (range.anchorrow < ecell.row) {
-      range.top = range.anchorrow;
-      range.bottom = ecell.row;
-      }
-   else {
-      range.top = ecell.row;
-      range.bottom = range.anchorrow;
-      }
-   if (range.anchorcol < ecell.col) {
-      range.left = range.anchorcol;
-      range.right = ecell.col;
-      }
-   else {
-      range.left = ecell.col;
-      range.right = range.anchorcol;
-      }
+  for (coord in highlights) {
+    switch (highlights[coord]) {
+      case "range":
+        highlights[coord] = "unrange";
+        break;
+      case "range2":
+        highlights[coord] = "unrange2";
+        break;
+    }
+  }
 
-   for (coord in highlights) {
+  for (row = range.top; row <= range.bottom; row++) {
+    for (col = range.left; col <= range.right; col++) {
+      coord = TableEditorSC.crToCoord(col, row);
       switch (highlights[coord]) {
-         case "range":
-            highlights[coord] = "unrange";
-            break;
-         case "range2":
-            highlights[coord] = "unrange2";
-            break;
-         }
+        case "unrange":
+          highlights[coord] = "range";
+          break;
+        case "cursor":
+          break;
+        case "unrange2":
+        default:
+          highlights[coord] = "newrange";
+          break;
       }
+    }
+  }
 
-   for (row=range.top; row<=range.bottom; row++) {
-      for (col=range.left; col<=range.right; col++) {
-         coord = TableEditorSC.crToCoord(col, row);
-         switch (highlights[coord]) {
-            case "unrange":
-               highlights[coord] = "range";
-               break;
-            case "cursor":
-               break;
-            case "unrange2":
-            default:
-               highlights[coord] = "newrange";
-               break;
-            }
-         }
-      }
-
-   for (row=range2.top; range2.hasrange && row<=range2.bottom; row++) {
-      for (col=range2.left; col<=range2.right; col++) {
-         coord = TableEditorSC.crToCoord(col, row);
-         switch (highlights[coord]) {
-            case "unrange2":
-               highlights[coord] = "range2";
-               break;
-            case "range":
-            case "newrange":
-            case "cursor":
-               break;
-            default:
-               highlights[coord] = "newrange2";
-               break;
-            }
-         }
-      }
-
-   for (coord in highlights) {
-
+  for (row = range2.top; range2.hasrange && row <= range2.bottom; row++) {
+    for (col = range2.left; col <= range2.right; col++) {
+      coord = TableEditorSC.crToCoord(col, row);
       switch (highlights[coord]) {
-         case "unrange":
-            delete highlights[coord];
-            break;
-         case "newrange":
-            highlights[coord] = "range";
-            break;
-         case "newrange2":
-            highlights[coord] = "range2";
-            break;
-         case "range":
-         case "range2":
-         case "cursor":
-            continue;
-         }
-
-      cr = TableEditorSC.coordToCr(coord);
-      cell = TableEditorSC.GetEditorCellElement(editor, cr.row, cr.col);
-      editor.UpdateCellCSS(cell, cr.row, cr.col);
-
+        case "unrange2":
+          highlights[coord] = "range2";
+          break;
+        case "range":
+        case "newrange":
+        case "cursor":
+          break;
+        default:
+          highlights[coord] = "newrange2";
+          break;
       }
+    }
+  }
 
-   for (f in editor.RangeChangeCallback) { // let others know
-      editor.RangeChangeCallback[f](editor);
-      }
+  for (coord in highlights) {
+    switch (highlights[coord]) {
+      case "unrange":
+        delete highlights[coord];
+        break;
+      case "newrange":
+        highlights[coord] = "range";
+        break;
+      case "newrange2":
+        highlights[coord] = "range2";
+        break;
+      case "range":
+      case "range2":
+      case "cursor":
+        continue;
+    }
 
-   // create range/coord string and do status callback
+    cr = TableEditorSC.coordToCr(coord);
+    cell = TableEditorSC.GetEditorCellElement(editor, cr.row, cr.col);
+    editor.UpdateCellCSS(cell, cr.row, cr.col);
+  }
 
-   coord = TableEditorSC.crToCoord(editor.range.left, editor.range.top);
-   if (editor.range.left!=editor.range.right || editor.range.top!=editor.range.bottom) { // more than one cell
-      coord += ":" + TableEditorSC.crToCoord(editor.range.right, editor.range.bottom);
-      }
-   for (f in editor.StatusCallback) {
-      editor.StatusCallback[f].func(editor, "rangechange", coord, editor.StatusCallback[f].params);
-      }
+  for (f in editor.RangeChangeCallback) {
+    // let others know
+    editor.RangeChangeCallback[f](editor);
+  }
 
-   return;
+  // create range/coord string and do status callback
 
-   }
+  coord = TableEditorSC.crToCoord(editor.range.left, editor.range.top);
+  if (editor.range.left != editor.range.right || editor.range.top != editor.range.bottom) {
+    // more than one cell
+    coord += ":" + TableEditorSC.crToCoord(editor.range.right, editor.range.bottom);
+  }
+  for (f in editor.StatusCallback) {
+    editor.StatusCallback[f].func(editor, "rangechange", coord, editor.StatusCallback[f].params);
+  }
+
+  return;
+};
 
 //
 // RangeRemove(editor)
@@ -3157,62 +3410,61 @@ TableEditorSC.RangeExtend = function(editor: any, ecoord: any) {
 //
 
 /** @param {any} editor */
-TableEditorSC.RangeRemove = function(editor: any) {
+TableEditorSC.RangeRemove = function (editor: any) {
+  var cell, cr, coord, row, col, f;
 
-   var cell, cr, coord, row, col, f;
+  var highlights = editor.context.highlights;
+  var range = editor.range;
+  var range2 = editor.range2;
 
-   var highlights = editor.context.highlights;
-   var range = editor.range;
-   var range2 = editor.range2;
+  if (!range.hasrange && !range2.hasrange) return;
 
-   if (!range.hasrange && !range2.hasrange) return;
-
-   for (row=range2.top; range2.hasrange && row<=range2.bottom; row++) {
-      for (col=range2.left; col<=range2.right; col++) {
-         coord = TableEditorSC.crToCoord(col, row);
-         switch (highlights[coord]) {
-            case "range":
-               highlights[coord] = "newrange2";
-               break;
-            case "range2":
-            case "cursor":
-               break;
-            default:
-               highlights[coord] = "newrange2";
-               break;
-            }
-         }
-      }
-
-   for (coord in highlights) {
+  for (row = range2.top; range2.hasrange && row <= range2.bottom; row++) {
+    for (col = range2.left; col <= range2.right; col++) {
+      coord = TableEditorSC.crToCoord(col, row);
       switch (highlights[coord]) {
-         case "range":
-            delete highlights[coord];
-            break;
-         case "newrange2":
-            highlights[coord] = "range2";
-            break;
-         case "cursor":
-            continue;
-         }
-      cr = TableEditorSC.coordToCr(coord);
-      cell=TableEditorSC.GetEditorCellElement(editor, cr.row, cr.col);
-      editor.UpdateCellCSS(cell, cr.row, cr.col);
+        case "range":
+          highlights[coord] = "newrange2";
+          break;
+        case "range2":
+        case "cursor":
+          break;
+        default:
+          highlights[coord] = "newrange2";
+          break;
       }
+    }
+  }
 
-   range.hasrange = false;
+  for (coord in highlights) {
+    switch (highlights[coord]) {
+      case "range":
+        delete highlights[coord];
+        break;
+      case "newrange2":
+        highlights[coord] = "range2";
+        break;
+      case "cursor":
+        continue;
+    }
+    cr = TableEditorSC.coordToCr(coord);
+    cell = TableEditorSC.GetEditorCellElement(editor, cr.row, cr.col);
+    editor.UpdateCellCSS(cell, cr.row, cr.col);
+  }
 
-   for (f in editor.RangeChangeCallback) { // let others know
-      editor.RangeChangeCallback[f](editor);
-      }
+  range.hasrange = false;
 
-   for (f in editor.StatusCallback) {
-      editor.StatusCallback[f].func(editor, "rangechange", "", editor.StatusCallback[f].params);
-      }
+  for (f in editor.RangeChangeCallback) {
+    // let others know
+    editor.RangeChangeCallback[f](editor);
+  }
 
-   return;
+  for (f in editor.StatusCallback) {
+    editor.StatusCallback[f].func(editor, "rangechange", "", editor.StatusCallback[f].params);
+  }
 
-   }
+  return;
+};
 
 //
 // Range2Remove(editor)
@@ -3221,34 +3473,32 @@ TableEditorSC.RangeRemove = function(editor: any) {
 //
 
 /** @param {any} editor */
-TableEditorSC.Range2Remove = function(editor: any) {
+TableEditorSC.Range2Remove = function (editor: any) {
+  var cell, cr, coord;
 
-   var cell, cr, coord, row, col, f;
+  var highlights = editor.context.highlights;
+  var range2 = editor.range2;
 
-   var highlights = editor.context.highlights;
-   var range2 = editor.range2;
+  if (!range2.hasrange) return;
 
-   if (!range2.hasrange) return;
+  for (coord in highlights) {
+    switch (highlights[coord]) {
+      case "range2":
+        delete highlights[coord];
+        break;
+      case "range":
+      case "cursor":
+        continue;
+    }
+    cr = TableEditorSC.coordToCr(coord);
+    cell = TableEditorSC.GetEditorCellElement(editor, cr.row, cr.col);
+    editor.UpdateCellCSS(cell, cr.row, cr.col);
+  }
 
-   for (coord in highlights) {
-      switch (highlights[coord]) {
-         case "range2":
-            delete highlights[coord];
-            break;
-         case "range":
-         case "cursor":
-            continue;
-         }
-      cr = TableEditorSC.coordToCr(coord);
-      cell=TableEditorSC.GetEditorCellElement(editor, cr.row, cr.col);
-      editor.UpdateCellCSS(cell, cr.row, cr.col);
-      }
+  range2.hasrange = false;
 
-   range2.hasrange = false;
-
-   return;
-
-   }
+  return;
+};
 
 //
 // FitToEditTable(editor)
@@ -3259,64 +3509,80 @@ TableEditorSC.Range2Remove = function(editor: any) {
 //
 
 /** @param {any} editor */
-TableEditorSC.FitToEditTable = function(editor: any) {
+TableEditorSC.FitToEditTable = function (editor: any) {
+  var colnum, colname, colwidth, totalwidth, totalrows, rownum, rowpane, needed, colpane;
 
-   var colnum, colname, colwidth, totalwidth, totalrows, rownum, rowpane, needed, colpane;
+  var context = editor.context;
+  var sheetobj = context.sheetobj;
 
-   var context=editor.context;
-   var sheetobj=context.sheetobj;
-   var sheetcolattribs=sheetobj.colattribs;
+  // Calculate column width data
 
-   // Calculate column width data
-
-   totalwidth=context.showRCHeaders ? context.rownamewidth-0 : 0;
-   for (colpane=0; colpane<context.colpanes.length-1; colpane++) { // Get width of all but last pane
-      for (colnum=context.colpanes[colpane].first; colnum<=context.colpanes[colpane].last; colnum++) {
-         colname=TableEditorSC.rcColname(colnum);
-         if (sheetobj.colattribs.hide[colname] != "yes") {
-            colwidth = sheetobj.colattribs.width[colname] || sheetobj.attribs.defaultcolwidth || TableEditorSC.Constants.defaultColWidth;
-            if (colwidth=="blank" || colwidth=="auto") colwidth="";
-            totalwidth+=(colwidth && ((colwidth-0)>0)) ? (colwidth-0) : 10;
-            }
-         }
-      }
-
-   for (colnum=context.colpanes[colpane].first; colnum<=10000; colnum++) { //!!! max for safety, but makes that col max!!!
-      colname=TableEditorSC.rcColname(colnum);
+  totalwidth = context.showRCHeaders ? context.rownamewidth - 0 : 0;
+  for (colpane = 0; colpane < context.colpanes.length - 1; colpane++) {
+    // Get width of all but last pane
+    for (
+      colnum = context.colpanes[colpane].first;
+      colnum <= context.colpanes[colpane].last;
+      colnum++
+    ) {
+      colname = TableEditorSC.rcColname(colnum);
       if (sheetobj.colattribs.hide[colname] != "yes") {
-         colwidth = sheetobj.colattribs.width[colname] || sheetobj.attribs.defaultcolwidth || TableEditorSC.Constants.defaultColWidth;
-         if (colwidth=="blank" || colwidth=="auto") colwidth="";
-         totalwidth+=(colwidth && ((colwidth-0)>0)) ? (colwidth-0) : 10;
-         }
-      if (totalwidth > editor.tablewidth) break;
+        colwidth =
+          sheetobj.colattribs.width[colname] ||
+          sheetobj.attribs.defaultcolwidth ||
+          TableEditorSC.Constants.defaultColWidth;
+        if (colwidth == "blank" || colwidth == "auto") colwidth = "";
+        totalwidth += colwidth && colwidth - 0 > 0 ? colwidth - 0 : 10;
       }
+    }
+  }
 
-   context.colpanes[colpane].last = context.sheetobj.attribs.usermaxcol || colnum;
+  for (colnum = context.colpanes[colpane].first; colnum <= 10000; colnum++) {
+    //!!! max for safety, but makes that col max!!!
+    colname = TableEditorSC.rcColname(colnum);
+    if (sheetobj.colattribs.hide[colname] != "yes") {
+      colwidth =
+        sheetobj.colattribs.width[colname] ||
+        sheetobj.attribs.defaultcolwidth ||
+        TableEditorSC.Constants.defaultColWidth;
+      if (colwidth == "blank" || colwidth == "auto") colwidth = "";
+      totalwidth += colwidth && colwidth - 0 > 0 ? colwidth - 0 : 10;
+    }
+    if (totalwidth > editor.tablewidth) break;
+  }
 
-   // Calculate row height data
+  context.colpanes[colpane].last = context.sheetobj.attribs.usermaxcol || colnum;
 
-   // find first visible row - Bug fix when many rows hidden - as PANEL formula hides many rows
-   var firstRow = context.rowpanes[0].first;
-   var lastRow = context.sheetobj.attribs.lastrow;
-   while(sheetobj.rowattribs.hide[firstRow] == "yes" && firstRow <lastRow) firstRow++;
-   context.rowpanes[0].first = firstRow;
+  // Calculate row height data
 
-   // count visible rows in pane(s)
-   totalrows=context.showRCHeaders ? 1 : 0;
-   for (rowpane=0; rowpane<context.rowpanes.length-1; rowpane++) { // count all panes but last one
-      totalrows += context.rowpanes[rowpane].last - context.rowpanes[rowpane].first + 1;
-      for (rownum=context.rowpanes[rowpane].first; rownum<=context.rowpanes[rowpane].last; rownum++) {
-         if (sheetobj.rowattribs.hide[rownum] == "yes") {
-            totalrows--;
-            }
-         }
+  // find first visible row - Bug fix when many rows hidden - as PANEL formula hides many rows
+  var firstRow = context.rowpanes[0].first;
+  var lastRow = context.sheetobj.attribs.lastrow;
+  while (sheetobj.rowattribs.hide[firstRow] == "yes" && firstRow < lastRow) firstRow++;
+  context.rowpanes[0].first = firstRow;
+
+  // count visible rows in pane(s)
+  totalrows = context.showRCHeaders ? 1 : 0;
+  for (rowpane = 0; rowpane < context.rowpanes.length - 1; rowpane++) {
+    // count all panes but last one
+    totalrows += context.rowpanes[rowpane].last - context.rowpanes[rowpane].first + 1;
+    for (
+      rownum = context.rowpanes[rowpane].first;
+      rownum <= context.rowpanes[rowpane].last;
+      rownum++
+    ) {
+      if (sheetobj.rowattribs.hide[rownum] == "yes") {
+        totalrows--;
       }
+    }
+  }
 
-   needed = editor.tableheight - totalrows * context.pixelsPerRow; // estimate amount needed
+  needed = editor.tableheight - totalrows * context.pixelsPerRow; // estimate amount needed
 
-   context.rowpanes[rowpane].last = context.sheetobj.attribs.usermaxrow || context.rowpanes[rowpane].first + Math.floor(needed / context.pixelsPerRow) + 1;
-
-   }
+  context.rowpanes[rowpane].last =
+    context.sheetobj.attribs.usermaxrow ||
+    context.rowpanes[rowpane].first + Math.floor(needed / context.pixelsPerRow) + 1;
+};
 
 //
 // CalculateEditorPositions(editor)
@@ -3329,55 +3595,63 @@ TableEditorSC.FitToEditTable = function(editor: any) {
 //
 
 /** @param {any} editor */
-TableEditorSC.CalculateEditorPositions = function(editor: any) {
+TableEditorSC.CalculateEditorPositions = function (editor: any) {
+  var rowpane, colpane, i;
 
-   var rowpane, colpane, i;
+  editor.gridposition = TableEditorSC.GetElementPosition(editor.griddiv);
 
-   editor.gridposition = TableEditorSC.GetElementPosition(editor.griddiv);
+  var element = editor.griddiv.firstChild.lastChild.childNodes[1].childNodes[0]; // 2nd tr 1st td
+  editor.headposition = TableEditorSC.GetElementPosition(element);
+  editor.headposition.left += element.offsetWidth;
+  editor.headposition.top += element.offsetHeight;
 
-   var element = editor.griddiv.firstChild.lastChild.childNodes[1].childNodes[0]; // 2nd tr 1st td
-   editor.headposition = TableEditorSC.GetElementPosition(element);
-   editor.headposition.left += element.offsetWidth;
-   editor.headposition.top += element.offsetHeight;
+  editor.rowpositions = [];
+  for (rowpane = 0; rowpane < editor.context.rowpanes.length; rowpane++) {
+    editor.CalculateRowPositions(rowpane, editor.rowpositions, editor.rowheight);
+  }
+  for (i = 0; i < editor.rowpositions.length; i++) {
+    if (editor.rowpositions[i] > editor.gridposition.top + editor.tableheight) break;
+  }
+  editor.lastvisiblerow = i - 1;
 
-   editor.rowpositions = [];
-   for (rowpane=0; rowpane<editor.context.rowpanes.length; rowpane++) {
-      editor.CalculateRowPositions(rowpane, editor.rowpositions, editor.rowheight);
-      }
-   for (i=0; i<editor.rowpositions.length; i++) {
-      if (editor.rowpositions[i]>editor.gridposition.top+editor.tableheight) break;
-      }
-   editor.lastvisiblerow = i-1;
+  editor.colpositions = [];
+  for (colpane = 0; colpane < editor.context.colpanes.length; colpane++) {
+    editor.CalculateColPositions(colpane, editor.colpositions, editor.colwidth);
+  }
+  for (i = 0; i < editor.colpositions.length; i++) {
+    if (editor.colpositions[i] > editor.gridposition.left + editor.tablewidth) break;
+  }
+  editor.lastvisiblecol = i - 1;
 
-   editor.colpositions = [];
-   for (colpane=0; colpane<editor.context.colpanes.length; colpane++) {
-      editor.CalculateColPositions(colpane, editor.colpositions, editor.colwidth);
-      }
-   for (i=0; i<editor.colpositions.length; i++) {
-      if (editor.colpositions[i]>editor.gridposition.left+editor.tablewidth) break;
-      }
-   editor.lastvisiblecol = i-1;
+  editor.firstscrollingrow = editor.context.rowpanes[editor.context.rowpanes.length - 1].first;
+  while (editor.context.sheetobj.rowattribs.hide[editor.firstscrollingrow] == "yes") {
+    editor.firstscrollingrow++;
+  }
+  editor.firstscrollingrowtop =
+    editor.rowpositions[editor.firstscrollingrow] || editor.headposition.top;
+  editor.lastnonscrollingrow =
+    editor.context.rowpanes.length - 1 > 0
+      ? editor.context.rowpanes[editor.context.rowpanes.length - 2].last
+      : 0;
+  editor.firstscrollingcol = editor.context.colpanes[editor.context.colpanes.length - 1].first;
+  while (
+    editor.context.sheetobj.colattribs.hide[TableEditorSC.rcColname(editor.firstscrollingcol)] ==
+    "yes"
+  ) {
+    editor.firstscrollingcol++;
+  }
+  editor.firstscrollingcolleft =
+    editor.colpositions[editor.firstscrollingcol] || editor.headposition.left;
+  editor.lastnonscrollingcol =
+    editor.context.colpanes.length - 1 > 0
+      ? editor.context.colpanes[editor.context.colpanes.length - 2].last
+      : 0;
 
-   editor.firstscrollingrow = editor.context.rowpanes[editor.context.rowpanes.length-1].first;
-   while (editor.context.sheetobj.rowattribs.hide[editor.firstscrollingrow] == "yes") {
-      editor.firstscrollingrow++;
-      }
-   editor.firstscrollingrowtop = editor.rowpositions[editor.firstscrollingrow] || editor.headposition.top;
-   editor.lastnonscrollingrow = editor.context.rowpanes.length-1 > 0 ?
-         editor.context.rowpanes[editor.context.rowpanes.length-2].last : 0;
-   editor.firstscrollingcol = editor.context.colpanes[editor.context.colpanes.length-1].first;
-   while (editor.context.sheetobj.colattribs.hide[TableEditorSC.rcColname(editor.firstscrollingcol)] == "yes") {
-      editor.firstscrollingcol++;
-      }
-   editor.firstscrollingcolleft = editor.colpositions[editor.firstscrollingcol] || editor.headposition.left;
-   editor.lastnonscrollingcol = editor.context.colpanes.length-1 > 0 ?
-         editor.context.colpanes[editor.context.colpanes.length-2].last : 0;
+  // Now do the table controls
 
-   // Now do the table controls
-
-   editor.verticaltablecontrol.ComputeTableControlPositions();
-   editor.horizontaltablecontrol.ComputeTableControlPositions();
-   }
+  editor.verticaltablecontrol.ComputeTableControlPositions();
+  editor.horizontaltablecontrol.ComputeTableControlPositions();
+};
 
 //
 // ScheduleRender(editor)
@@ -3387,45 +3661,46 @@ TableEditorSC.CalculateEditorPositions = function(editor: any) {
 //
 
 /** @param {any} editor */
-TableEditorSC.ScheduleRender = function(editor: any) {
-   if(editor.ignoreRender == true) return; // formDataViewer is only used for "ExecuteSheetCommand" fumctions - so skip render
-   if (editor.timeout) window.clearTimeout(editor.timeout); // in case called more than once, just use latest
+TableEditorSC.ScheduleRender = function (editor: any) {
+  if (editor.ignoreRender == true) return; // formDataViewer is only used for "ExecuteSheetCommand" fumctions - so skip render
+  if (editor.timeout) window.clearTimeout(editor.timeout); // in case called more than once, just use latest
 
-   TableEditorSC.EditorSheetStatusCallback(null, "schedrender", null, editor);
-   editor.timeout = window.setTimeout(function() { TableEditorSC.DoRenderStep(editor); }, 1);
-
-   }
+  TableEditorSC.EditorSheetStatusCallback(null, "schedrender", null, editor);
+  editor.timeout = window.setTimeout(function () {
+    TableEditorSC.DoRenderStep(editor);
+  }, 1);
+};
 
 // DoRenderStep(editor)
 //
 
 /** @param {any} editor */
-TableEditorSC.DoRenderStep = function(editor: any) {
+TableEditorSC.DoRenderStep = function (editor: any) {
+  editor.timeout = null;
 
-   editor.timeout = null;
+  editor.EditorRenderSheet();
 
-   editor.EditorRenderSheet();
+  TableEditorSC.EditorSheetStatusCallback(null, "renderdone", null, editor);
 
-   TableEditorSC.EditorSheetStatusCallback(null, "renderdone", null, editor);
+  TableEditorSC.EditorSheetStatusCallback(null, "schedposcalc", null, editor);
 
-   TableEditorSC.EditorSheetStatusCallback(null, "schedposcalc", null, editor);
-
-   editor.timeout = window.setTimeout(function() { TableEditorSC.DoPositionCalculations(editor); }, 1);
-
-   }
+  editor.timeout = window.setTimeout(function () {
+    TableEditorSC.DoPositionCalculations(editor);
+  }, 1);
+};
 
 //
 // SocialCalc.SchedulePositionCalculations(editor)
 //
 
 /** @param {any} editor */
-TableEditorSC.SchedulePositionCalculations = function(editor: any) {
+TableEditorSC.SchedulePositionCalculations = function (editor: any) {
+  TableEditorSC.EditorSheetStatusCallback(null, "schedposcalc", null, editor);
 
-   TableEditorSC.EditorSheetStatusCallback(null, "schedposcalc", null, editor);
-
-   editor.timeout = window.setTimeout(function() { TableEditorSC.DoPositionCalculations(editor); }, 1);
-
-   }
+  editor.timeout = window.setTimeout(function () {
+    TableEditorSC.DoPositionCalculations(editor);
+  }, 1);
+};
 
 // DoPositionCalculations(editor)
 //
@@ -3435,241 +3710,253 @@ TableEditorSC.SchedulePositionCalculations = function(editor: any) {
 //
 
 /** @param {any} editor */
-TableEditorSC.DoPositionCalculations = function(editor: any) {
+TableEditorSC.DoPositionCalculations = function (editor: any) {
+  editor.timeout = null;
 
-   editor.timeout = null;
+  editor.CalculateEditorPositions();
+  editor.verticaltablecontrol.PositionTableControlElements();
+  editor.horizontaltablecontrol.PositionTableControlElements();
 
-   editor.CalculateEditorPositions();
-   editor.verticaltablecontrol.PositionTableControlElements();
-   editor.horizontaltablecontrol.PositionTableControlElements();
+  TableEditorSC.EditorSheetStatusCallback(null, "doneposcalc", null, editor);
 
-   TableEditorSC.EditorSheetStatusCallback(null, "doneposcalc", null, editor);
+  if (editor.ensureecell && editor.ecell && !editor.deferredCommands.length) {
+    // don't do if deferred cmd to execute
+    editor.ensureecell = false;
+    editor.EnsureECellVisible(); // this could cause another redisplay
+  }
 
-   if (editor.ensureecell && editor.ecell && !editor.deferredCommands.length) { // don't do if deferred cmd to execute
-      editor.ensureecell = false;
-      editor.EnsureECellVisible(); // this could cause another redisplay
-      }
+  editor.cellhandles.ShowCellHandles(true);
 
-   editor.cellhandles.ShowCellHandles(true);
-
-
-//!!! Need to now check to see if this positioned controls out of the editing area
-//!!! (such as when there is a large wrapped cell and it pushes the pane boundary too far down).
-
-   }
+  //!!! Need to now check to see if this positioned controls out of the editing area
+  //!!! (such as when there is a large wrapped cell and it pushes the pane boundary too far down).
+};
 
 /** @param {any} editor @param {any} panenum @param {any} positions @param {any} sizes */
-TableEditorSC.CalculateRowPositions = function(editor: any, panenum: any, positions: any, sizes: any) {
+TableEditorSC.CalculateRowPositions = function (
+  editor: any,
+  panenum: any,
+  positions: any,
+  sizes: any,
+) {
+  var toprow, rowpane, rownum, offset, trowobj;
 
-   var toprow, rowpane, rownum, offset, trowobj, cellposition;
+  var context = editor.context;
 
-   var context=editor.context;
-   var sheetobj=context.sheetobj;
+  var tbodyobj;
 
-   var tbodyobj;
+  // eddy CalculateRowPositions {
+  //   if (!context.showRCHeaders) throw("Needs showRCHeaders=true");
+  if (!context.showRCHeaders) return;
+  // } CalculateRowPositions
 
-   // eddy CalculateRowPositions {
-//   if (!context.showRCHeaders) throw("Needs showRCHeaders=true");
-   if (!context.showRCHeaders) return;
-   // } CalculateRowPositions
+  tbodyobj = editor.fullgrid.lastChild;
 
-   tbodyobj=editor.fullgrid.lastChild;
+  // Calculate start of this pane as row in this table:
 
-   // Calculate start of this pane as row in this table:
+  toprow = 2;
+  for (rowpane = 0; rowpane < panenum; rowpane++) {
+    toprow += context.rowpanes[rowpane].last - context.rowpanes[rowpane].first + 2; // skip pane and spacing row
+  }
 
-   toprow = 2;
-   for (rowpane=0; rowpane<panenum; rowpane++) {
-      toprow += context.rowpanes[rowpane].last - context.rowpanes[rowpane].first + 2; // skip pane and spacing row
-      }
+  offset = 0;
+  for (
+    rownum = context.rowpanes[rowpane].first;
+    rownum <= context.rowpanes[rowpane].last;
+    rownum++
+  ) {
+    trowobj = tbodyobj.childNodes[toprow + offset];
+    offset++;
+    if (!trowobj) {
+      continue;
+    }
 
-   offset = 0;
-   for (rownum=context.rowpanes[rowpane].first; rownum<=context.rowpanes[rowpane].last; rownum++) {
-      trowobj = tbodyobj.childNodes[toprow+offset];
-      offset++;
-      if (!trowobj) { continue; }
+    if (!positions[rownum]) {
+      positions[rownum] = trowobj.firstChild.offsetTop;
+      sizes[rownum] = trowobj.firstChild.offsetHeight;
+    }
+  }
 
-      if (!positions[rownum]) {
-         positions[rownum] = trowobj.firstChild.offsetTop;
-         sizes[rownum] = trowobj.firstChild.offsetHeight;
-         }
-      }
-
-   return;
-
-   }
+  return;
+};
 
 /** @param {any} editor @param {any} panenum @param {any} positions @param {any} sizes */
-TableEditorSC.CalculateColPositions = function(editor: any, panenum: any, positions: any, sizes: any) {
+TableEditorSC.CalculateColPositions = function (
+  editor: any,
+  panenum: any,
+  positions: any,
+  sizes: any,
+) {
+  var leftcol, colpane, colnum, offset, trowobj, cellposition;
 
-   var leftcol, colpane, colnum, offset, trowobj, cellposition;
+  var context = editor.context;
 
-   var context=editor.context;
-   var sheetobj=context.sheetobj;
+  var tbodyobj;
 
-   var tbodyobj;
+  // eddy CalculateColPositions {
+  // if (!context.showRCHeaders) throw("Needs showRCHeaders=true");
+  if (!context.showRCHeaders) return;
+  // } CalculateColPositions
 
-   // eddy CalculateColPositions {
-   // if (!context.showRCHeaders) throw("Needs showRCHeaders=true");
-   if (!context.showRCHeaders) return;
-   // } CalculateColPositions
+  tbodyobj = editor.fullgrid.lastChild;
 
-   tbodyobj=editor.fullgrid.lastChild;
+  // Calculate start of this pane as column in this table:
 
-   // Calculate start of this pane as column in this table:
+  leftcol = 1;
+  for (colpane = 0; colpane < panenum; colpane++) {
+    leftcol += context.colpanes[colpane].last - context.colpanes[colpane].first + 2; // skip pane and spacing col
+  }
 
-   leftcol = 1;
-   for (colpane=0; colpane<panenum; colpane++) {
-      leftcol += context.colpanes[colpane].last - context.colpanes[colpane].first + 2; // skip pane and spacing col
+  trowobj = tbodyobj.childNodes[1]; // get heading row, which has all columns
+  offset = 0;
+  for (
+    colnum = context.colpanes[colpane].first;
+    colnum <= context.colpanes[colpane].last;
+    colnum++
+  ) {
+    cellposition = TableEditorSC.GetElementPosition(trowobj.childNodes[leftcol + offset]);
+    if (!positions[colnum]) {
+      positions[colnum] = cellposition.left; // first one takes precedence
+      if (trowobj.childNodes[leftcol + offset]) {
+        sizes[colnum] = trowobj.childNodes[leftcol + offset].offsetWidth;
       }
+    }
+    offset++;
+  }
 
-   trowobj = tbodyobj.childNodes[1]; // get heading row, which has all columns
-   offset = 0;
-   for (colnum=context.colpanes[colpane].first; colnum<=context.colpanes[colpane].last; colnum++) {
-      cellposition = TableEditorSC.GetElementPosition(trowobj.childNodes[leftcol+offset]);
-      if (!positions[colnum]) {
-         positions[colnum] = cellposition.left; // first one takes precedence
-         if (trowobj.childNodes[leftcol+offset]) {
-            sizes[colnum] = trowobj.childNodes[leftcol+offset].offsetWidth;
-            }
-         }
-      offset++;
-      }
-
-   return;
-
-   }
-
+  return;
+};
 
 // ScrollRelative(editor, vertical, amount)
 //
 // If vertical true, scrolls up(-)/down(+), else left(-)/right(+)
 
 /** @param {any} editor @param {any} vertical @param {any} amount */
-TableEditorSC.ScrollRelative = function(editor: any, vertical: any, amount: any) {
-
-   if (vertical) {
-      editor.ScrollRelativeBoth(amount, 0);
-      }
-   else {
-      editor.ScrollRelativeBoth(0, amount);
-      }
-   return;
-
-   }
+TableEditorSC.ScrollRelative = function (editor: any, vertical: any, amount: any) {
+  if (vertical) {
+    editor.ScrollRelativeBoth(amount, 0);
+  } else {
+    editor.ScrollRelativeBoth(0, amount);
+  }
+  return;
+};
 
 // ScrollRelativeBoth(editor, vamount, hamount)
 //
 // Does both with one render
 
 /** @param {any} editor @param {any} vamount @param {any} hamount */
-TableEditorSC.ScrollRelativeBoth = function(editor: any, vamount: any, hamount: any) {
+TableEditorSC.ScrollRelativeBoth = function (editor: any, vamount: any, hamount: any) {
+  var context = editor.context;
+  var dv = vamount > 0 ? 1 : -1,
+    dh = hamount > 0 ? 1 : -1;
 
-   var context=editor.context;
-   var dv = vamount > 0 ? 1 : -1, dh = hamount > 0 ? 1 : -1;
+  var vplen = context.rowpanes.length;
+  var vlimit = vplen > 1 ? context.rowpanes[vplen - 2].last + 1 : 1; // don't scroll past here
+  if (context.rowpanes[vplen - 1].first + vamount < vlimit) {
+    // limit amount
+    vamount = -context.rowpanes[vplen - 1].first + vlimit;
+  }
 
-   var vplen=context.rowpanes.length;
-   var vlimit = vplen>1 ? context.rowpanes[vplen-2].last+1 : 1; // don't scroll past here
-   if (context.rowpanes[vplen-1].first+vamount < vlimit) { // limit amount
-      vamount = (-context.rowpanes[vplen-1].first) + vlimit;
-      }
+  var hplen = context.colpanes.length;
+  var hlimit = hplen > 1 ? context.colpanes[hplen - 2].last + 1 : 1; // don't scroll past here
+  if (context.colpanes[hplen - 1].first + hamount < hlimit) {
+    // limit amount
+    hamount = -context.colpanes[hplen - 1].first + hlimit;
+  }
 
-   var hplen=context.colpanes.length;
-   var hlimit = hplen>1 ? context.colpanes[hplen-2].last+1 : 1; // don't scroll past here
-   if (context.colpanes[hplen-1].first+hamount < hlimit) { // limit amount
-      hamount = (-context.colpanes[hplen-1].first) + hlimit;
-      }
+  // Handle hidden column by finding a next one that's not hidden.
+  while (
+    context.sheetobj.colattribs.hide[
+      TableEditorSC.rcColname(context.colpanes[hplen - 1].first + hamount)
+    ] == "yes"
+  ) {
+    hamount += dh;
+    if (hamount < 1) {
+      hamount = 0;
+      break;
+    }
+  }
 
-   // Handle hidden column by finding a next one that's not hidden.
-   while (context.sheetobj.colattribs.hide[TableEditorSC.rcColname(context.colpanes[hplen-1].first+hamount)] == "yes") {
-      hamount += dh;
-      if (hamount < 1) {
-         hamount = 0;
-         break;
-         }
-      }
+  // Handle hidden row by finding a next one that's not hidden.
+  while (context.sheetobj.rowattribs.hide[context.rowpanes[vplen - 1].first + vamount] == "yes") {
+    vamount += dv;
+    if (vamount < 1) {
+      vamount = 0;
+      break;
+    }
+  }
 
-   // Handle hidden row by finding a next one that's not hidden.
-   while (context.sheetobj.rowattribs.hide[context.rowpanes[vplen-1].first+vamount] == "yes") {
-      vamount += dv;
-      if (vamount < 1) {
-         vamount = 0;
-         break;
-         }
-      }
+  if ((vamount == 1 || vamount == -1) && hamount == 0) {
+    // special case quick scrolls
+    if (vamount == 1) {
+      editor.ScrollTableUpOneRow();
+    } else {
+      editor.ScrollTableDownOneRow();
+    }
+    if (editor.ecell) editor.SetECellHeaders("selected");
+    editor.SchedulePositionCalculations();
+    return;
+  }
 
-   if ((vamount==1 || vamount==-1) && hamount==0) { // special case quick scrolls
-      if (vamount==1) {
-         editor.ScrollTableUpOneRow();
-         }
-      else {
-         editor.ScrollTableDownOneRow();
-         }
-      if (editor.ecell) editor.SetECellHeaders("selected");
-      editor.SchedulePositionCalculations();
-      return;
-      }
+  // Do a gross move and render
 
-   // Do a gross move and render
-
-   if (vamount!=0 || hamount!=0) {
-      context.rowpanes[vplen-1].first += vamount;
-      context.rowpanes[vplen-1].last += vamount;
-      context.colpanes[hplen-1].first += hamount;
-      context.colpanes[hplen-1].last += hamount;
-      editor.LimitLastPanes();
-      editor.FitToEditTable();
-      editor.ScheduleRender();
-      }
-
-   }
-
+  if (vamount != 0 || hamount != 0) {
+    context.rowpanes[vplen - 1].first += vamount;
+    context.rowpanes[vplen - 1].last += vamount;
+    context.colpanes[hplen - 1].first += hamount;
+    context.colpanes[hplen - 1].last += hamount;
+    editor.LimitLastPanes();
+    editor.FitToEditTable();
+    editor.ScheduleRender();
+  }
+};
 
 // PageRelative(editor, vertical, direction)
 //
 // If vertical true, pages up(direction is -)/down(+), else left(-)/right(+)
 
 /** @param {any} editor @param {any} vertical @param {any} direction */
-TableEditorSC.PageRelative = function(editor: any, vertical: any, direction: any) {
+TableEditorSC.PageRelative = function (editor: any, vertical: any, direction: any) {
+  var context = editor.context;
+  var panes = vertical ? "rowpanes" : "colpanes";
+  var lastpane = context[panes][context[panes].length - 1];
+  var lastvisible = vertical ? "lastvisiblerow" : "lastvisiblecol";
+  var sizearray = vertical ? editor.rowheight : editor.colwidth;
+  var defaultsize = vertical
+    ? TableEditorSC.Constants.defaultAssumedRowHeight
+    : TableEditorSC.Constants.defaultColWidth;
+  var size, newfirst, totalsize, current;
 
-   var context=editor.context;
-   var panes=vertical ? "rowpanes" : "colpanes";
-   var lastpane=context[panes][context[panes].length-1];
-   var lastvisible=vertical ? "lastvisiblerow" : "lastvisiblecol";
-   var sizearray=vertical ? editor.rowheight : editor.colwidth;
-   var defaultsize=vertical ? TableEditorSC.Constants.defaultAssumedRowHeight : TableEditorSC.Constants.defaultColWidth;
-   var size, newfirst, totalsize, current;
+  if (direction > 0) {
+    // down/right
+    newfirst = editor[lastvisible];
+    if (newfirst == lastpane.first) newfirst += 1; // move at least one
+  } else {
+    if (vertical) {
+      // calculate amount to scroll
+      totalsize = editor.tableheight - (editor.firstscrollingrowtop - editor.gridposition.top);
+    } else {
+      totalsize = editor.tablewidth - (editor.firstscrollingcolleft - editor.gridposition.left);
+    }
+    totalsize -= sizearray[editor[lastvisible]] > 0 ? sizearray[editor[lastvisible]] : defaultsize;
 
-   if (direction > 0) { // down/right
-      newfirst = editor[lastvisible];
-      if (newfirst == lastpane.first) newfirst += 1; // move at least one
-      }
-   else {
-      if (vertical) { // calculate amount to scroll
-         totalsize = editor.tableheight - (editor.firstscrollingrowtop - editor.gridposition.top);
-         }
-      else {
-         totalsize = editor.tablewidth - (editor.firstscrollingcolleft - editor.gridposition.left);
-         }
-      totalsize -= sizearray[editor[lastvisible]] > 0 ? sizearray[editor[lastvisible]] : defaultsize;
+    for (newfirst = lastpane.first - 1; newfirst > 0; newfirst--) {
+      size = sizearray[newfirst] > 0 ? sizearray[newfirst] : defaultsize;
+      if (totalsize < size) break;
+      totalsize -= size;
+    }
 
-      for (newfirst=lastpane.first-1; newfirst>0; newfirst--) {
-         size = sizearray[newfirst] > 0 ? sizearray[newfirst] : defaultsize;
-         if (totalsize < size) break;
-         totalsize -= size;
-         }
+    current = lastpane.first;
+    if (newfirst >= current) newfirst = current - 1; // move at least 1
+    if (newfirst < 1) newfirst = 1;
+  }
 
-      current = lastpane.first;
-      if (newfirst >= current) newfirst = current-1; // move at least 1
-      if (newfirst < 1) newfirst = 1;
-      }
-
-   lastpane.first = newfirst;
-   lastpane.last = newfirst+1;
-   editor.LimitLastPanes();
-   editor.FitToEditTable();
-   editor.ScheduleRender();
-
-   }
+  lastpane.first = newfirst;
+  lastpane.last = newfirst + 1;
+  editor.LimitLastPanes();
+  editor.FitToEditTable();
+  editor.ScheduleRender();
+};
 
 // LimitLastPanes(editor)
 //
@@ -3677,194 +3964,243 @@ TableEditorSC.PageRelative = function(editor: any, vertical: any, direction: any
 //
 
 /** @param {any} editor */
-TableEditorSC.LimitLastPanes = function(editor: any) {
+TableEditorSC.LimitLastPanes = function (editor: any) {
+  var context = editor.context;
+  var plen;
 
-   var context=editor.context;
-   var plen;
+  plen = context.rowpanes.length;
+  if (plen > 1 && context.rowpanes[plen - 1].first <= context.rowpanes[plen - 2].last)
+    context.rowpanes[plen - 1].first = context.rowpanes[plen - 2].last + 1;
+  if (
+    context.sheetobj.attribs.usermaxrow &&
+    context.rowpanes[plen - 1].first > context.sheetobj.attribs.usermaxrow
+  )
+    context.rowpanes[plen - 1].first = context.sheetobj.attribs.usermaxrow;
 
-   plen = context.rowpanes.length;
-   if (plen>1 && context.rowpanes[plen-1].first <= context.rowpanes[plen-2].last)
-       context.rowpanes[plen-1].first = context.rowpanes[plen-2].last+1;
-   if (context.sheetobj.attribs.usermaxrow && context.rowpanes[plen-1].first > context.sheetobj.attribs.usermaxrow)
-       context.rowpanes[plen-1].first = context.sheetobj.attribs.usermaxrow;
-
-   plen = context.colpanes.length;
-   if (plen>1 && context.colpanes[plen-1].first <= context.colpanes[plen-2].last)
-       context.colpanes[plen-1].first = context.colpanes[plen-2].last+1;
-   if (context.sheetobj.attribs.usermaxcol && context.colpanes[plen-1].first > context.sheetobj.attribs.usermaxcol)
-       context.colpanes[plen-1].first = context.sheetobj.attribs.usermaxcol;
-
-   }
-
-/** @param {any} editor */
-TableEditorSC.ScrollTableUpOneRow = function(editor: any) {
-
-   var toprow, rowpane, rownum, colnum, colpane, cell, oldrownum, maxrowspan, newbottomrow, newrow, oldchild, bottomrownum, coord;
-   var rowneedsrefresh: any = {};
-
-   var context=editor.context;
-   var sheetobj=context.sheetobj;
-   var tableobj=editor.fullgrid;
-
-   var tbodyobj;
-
-   tbodyobj=tableobj.lastChild;
-
-   toprow = context.showRCHeaders ? 2 : 1;
-   for (rowpane=0; rowpane<context.rowpanes.length-1; rowpane++) {
-      toprow += context.rowpanes[rowpane].last - context.rowpanes[rowpane].first + 2; // skip pane and spacing row
-      }
-
-   // abort if scrolling beyond user max row
-   if (context.sheetobj.attribs.usermaxrow && (context.sheetobj.attribs.usermaxrow - context.rowpanes[rowpane].first < 1)) {
-      return tableobj;
-      }
-
-   tbodyobj.removeChild(tbodyobj.childNodes[toprow]);
-
-   context.rowpanes[rowpane].first++;
-   context.rowpanes[rowpane].last++;
-   editor.FitToEditTable();
-   context.CalculateColWidthData(); // Just in case, since normally done in RenderSheet
-
-   if (!context.sheetobj.attribs.usermaxrow || context.rowpanes[rowpane].last != context.sheetobj.attribs.usermaxrow) {
-      newbottomrow = context.RenderRow(context.rowpanes[rowpane].last, rowpane);
-      tbodyobj.appendChild(newbottomrow);
-      }
-
-   // if scrolled off a row with starting rowspans, replace rows for the largest rowspan
-
-   maxrowspan = 1;
-   oldrownum=context.rowpanes[rowpane].first - 1;
-
-   for (colpane=0; colpane<context.colpanes.length; colpane++) {
-      for (colnum=context.colpanes[colpane].first; colnum<=context.colpanes[colpane].last; colnum++) {
-         coord=TableEditorSC.crToCoord(colnum, oldrownum);
-         if (context.cellskip[coord]) continue;
-         cell=sheetobj.cells[coord];
-         if (cell && cell.rowspan>maxrowspan) maxrowspan=cell.rowspan;
-         }
-      }
-
-   if (maxrowspan>1) {
-      for (rownum=1; rownum<maxrowspan; rownum++) {
-         if (rownum+oldrownum >= context.rowpanes[rowpane].last) break;
-         newrow=context.RenderRow(rownum+oldrownum, rowpane);
-         oldchild=tbodyobj.childNodes[toprow+rownum-1];
-         tbodyobj.replaceChild(newrow,oldchild);
-         }
-      }
-
-   // if added a row that includes rowspans from above, update the size of those to include new row
-
-   bottomrownum=context.rowpanes[rowpane].last;
-
-   for (colpane=0; colpane<context.colpanes.length; colpane++) {
-      for (colnum=context.colpanes[colpane].first; colnum<=context.colpanes[colpane].last; colnum++) {
-         coord=context.cellskip[TableEditorSC.crToCoord(colnum, bottomrownum)];
-         if (!coord) continue; // only look at spanned cells
-         rownum=context.coordToCR[coord].row-0;
-         if (rownum==context.rowpanes[rowpane].last ||
-             rownum<context.rowpanes[rowpane].first) continue; // this row (colspan) or starts above pane
-         cell=sheetobj.cells[coord];
-         if (cell && cell.rowspan>1) rowneedsrefresh[rownum]=true; // remember row num to update
-         }
-      }
-
-   for (rownum in rowneedsrefresh) {
-      newrow=context.RenderRow(rownum, rowpane);
-      oldchild=tbodyobj.childNodes[(toprow+(Number(rownum)-context.rowpanes[rowpane].first))];
-      tbodyobj.replaceChild(newrow,oldchild);
-      }
-
-   return tableobj;
-   }
+  plen = context.colpanes.length;
+  if (plen > 1 && context.colpanes[plen - 1].first <= context.colpanes[plen - 2].last)
+    context.colpanes[plen - 1].first = context.colpanes[plen - 2].last + 1;
+  if (
+    context.sheetobj.attribs.usermaxcol &&
+    context.colpanes[plen - 1].first > context.sheetobj.attribs.usermaxcol
+  )
+    context.colpanes[plen - 1].first = context.sheetobj.attribs.usermaxcol;
+};
 
 /** @param {any} editor */
-TableEditorSC.ScrollTableDownOneRow = function(editor: any) {
+TableEditorSC.ScrollTableUpOneRow = function (editor: any) {
+  var toprow,
+    rowpane,
+    rownum,
+    colnum,
+    colpane,
+    cell,
+    oldrownum,
+    maxrowspan,
+    newbottomrow,
+    newrow,
+    oldchild,
+    bottomrownum,
+    coord;
+  var rowneedsrefresh: any = {};
 
-   var toprow, rowpane, rownum, colnum, colpane, cell, newrownum, maxrowspan, newbottomrow, newrow, oldchild, bottomrownum, coord;
-   var rowneedsrefresh: any = {};
+  var context = editor.context;
+  var sheetobj = context.sheetobj;
+  var tableobj = editor.fullgrid;
 
-   var context=editor.context;
-   var sheetobj=context.sheetobj;
-   var tableobj=editor.fullgrid;
+  var tbodyobj;
 
-   var tbodyobj;
+  tbodyobj = tableobj.lastChild;
 
-   tbodyobj=tableobj.lastChild;
+  toprow = context.showRCHeaders ? 2 : 1;
+  for (rowpane = 0; rowpane < context.rowpanes.length - 1; rowpane++) {
+    toprow += context.rowpanes[rowpane].last - context.rowpanes[rowpane].first + 2; // skip pane and spacing row
+  }
 
-   toprow = context.showRCHeaders ? 2 : 1;
-   for (rowpane=0; rowpane<context.rowpanes.length-1; rowpane++) {
-      toprow += context.rowpanes[rowpane].last - context.rowpanes[rowpane].first + 2; // skip pane and spacing row
+  // abort if scrolling beyond user max row
+  if (
+    context.sheetobj.attribs.usermaxrow &&
+    context.sheetobj.attribs.usermaxrow - context.rowpanes[rowpane].first < 1
+  ) {
+    return tableobj;
+  }
+
+  tbodyobj.removeChild(tbodyobj.childNodes[toprow]);
+
+  context.rowpanes[rowpane].first++;
+  context.rowpanes[rowpane].last++;
+  editor.FitToEditTable();
+  context.CalculateColWidthData(); // Just in case, since normally done in RenderSheet
+
+  if (
+    !context.sheetobj.attribs.usermaxrow ||
+    context.rowpanes[rowpane].last != context.sheetobj.attribs.usermaxrow
+  ) {
+    newbottomrow = context.RenderRow(context.rowpanes[rowpane].last, rowpane);
+    tbodyobj.appendChild(newbottomrow);
+  }
+
+  // if scrolled off a row with starting rowspans, replace rows for the largest rowspan
+
+  maxrowspan = 1;
+  oldrownum = context.rowpanes[rowpane].first - 1;
+
+  for (colpane = 0; colpane < context.colpanes.length; colpane++) {
+    for (
+      colnum = context.colpanes[colpane].first;
+      colnum <= context.colpanes[colpane].last;
+      colnum++
+    ) {
+      coord = TableEditorSC.crToCoord(colnum, oldrownum);
+      if (context.cellskip[coord]) continue;
+      cell = sheetobj.cells[coord];
+      if (cell && cell.rowspan > maxrowspan) maxrowspan = cell.rowspan;
+    }
+  }
+
+  if (maxrowspan > 1) {
+    for (rownum = 1; rownum < maxrowspan; rownum++) {
+      if (rownum + oldrownum >= context.rowpanes[rowpane].last) break;
+      newrow = context.RenderRow(rownum + oldrownum, rowpane);
+      oldchild = tbodyobj.childNodes[toprow + rownum - 1];
+      tbodyobj.replaceChild(newrow, oldchild);
+    }
+  }
+
+  // if added a row that includes rowspans from above, update the size of those to include new row
+
+  bottomrownum = context.rowpanes[rowpane].last;
+
+  for (colpane = 0; colpane < context.colpanes.length; colpane++) {
+    for (
+      colnum = context.colpanes[colpane].first;
+      colnum <= context.colpanes[colpane].last;
+      colnum++
+    ) {
+      coord = context.cellskip[TableEditorSC.crToCoord(colnum, bottomrownum)];
+      if (!coord) continue; // only look at spanned cells
+      rownum = context.coordToCR[coord].row - 0;
+      if (rownum == context.rowpanes[rowpane].last || rownum < context.rowpanes[rowpane].first)
+        continue; // this row (colspan) or starts above pane
+      cell = sheetobj.cells[coord];
+      if (cell && cell.rowspan > 1) rowneedsrefresh[rownum] = true; // remember row num to update
+    }
+  }
+
+  for (rownum in rowneedsrefresh) {
+    newrow = context.RenderRow(rownum, rowpane);
+    oldchild = tbodyobj.childNodes[toprow + (Number(rownum) - context.rowpanes[rowpane].first)];
+    tbodyobj.replaceChild(newrow, oldchild);
+  }
+
+  return tableobj;
+};
+
+/** @param {any} editor */
+TableEditorSC.ScrollTableDownOneRow = function (editor: any) {
+  var toprow,
+    rowpane,
+    rownum,
+    colnum,
+    colpane,
+    cell,
+    newrownum,
+    maxrowspan,
+    newrow,
+    oldchild,
+    bottomrownum,
+    coord;
+  var rowneedsrefresh: any = {};
+
+  var context = editor.context;
+  var sheetobj = context.sheetobj;
+  var tableobj = editor.fullgrid;
+
+  var tbodyobj;
+
+  tbodyobj = tableobj.lastChild;
+
+  toprow = context.showRCHeaders ? 2 : 1;
+  for (rowpane = 0; rowpane < context.rowpanes.length - 1; rowpane++) {
+    toprow += context.rowpanes[rowpane].last - context.rowpanes[rowpane].first + 2; // skip pane and spacing row
+  }
+
+  if (!context.sheetobj.attribs.usermaxrow) {
+    tbodyobj.removeChild(
+      tbodyobj.childNodes[
+        toprow + (context.rowpanes[rowpane].last - context.rowpanes[rowpane].first)
+      ],
+    );
+  }
+
+  context.rowpanes[rowpane].first--;
+  context.rowpanes[rowpane].last--;
+  editor.FitToEditTable();
+  context.CalculateColWidthData(); // Just in case, since normally done in RenderSheet
+
+  newrow = context.RenderRow(context.rowpanes[rowpane].first, rowpane);
+  tbodyobj.insertBefore(newrow, tbodyobj.childNodes[toprow]);
+
+  // if inserted a row with starting rowspans, replace rows for the largest rowspan
+
+  maxrowspan = 1;
+  newrownum = context.rowpanes[rowpane].first;
+
+  for (colpane = 0; colpane < context.colpanes.length; colpane++) {
+    for (
+      colnum = context.colpanes[colpane].first;
+      colnum <= context.colpanes[colpane].last;
+      colnum++
+    ) {
+      coord = TableEditorSC.crToCoord(colnum, newrownum);
+      if (context.cellskip[coord]) continue;
+      cell = sheetobj.cells[coord];
+      if (cell && cell.rowspan > maxrowspan) maxrowspan = cell.rowspan;
+    }
+  }
+
+  if (maxrowspan > 1) {
+    for (rownum = 1; rownum < maxrowspan; rownum++) {
+      if (rownum + newrownum > context.rowpanes[rowpane].last) break;
+      newrow = context.RenderRow(rownum + newrownum, rowpane);
+      oldchild = tbodyobj.childNodes[toprow + rownum];
+      tbodyobj.replaceChild(newrow, oldchild);
+    }
+  }
+
+  // if last row now includes rowspans or rowspans from above, update the size of those to remove deleted row
+
+  bottomrownum = context.rowpanes[rowpane].last;
+
+  for (colpane = 0; colpane < context.colpanes.length; colpane++) {
+    for (
+      colnum = context.colpanes[colpane].first;
+      colnum <= context.colpanes[colpane].last;
+      colnum++
+    ) {
+      coord = TableEditorSC.crToCoord(colnum, bottomrownum);
+      cell = sheetobj.cells[coord];
+      if (cell && cell.rowspan > 1) {
+        rowneedsrefresh[bottomrownum] = true; // need to update this row
+        continue;
       }
+      coord = context.cellskip[TableEditorSC.crToCoord(colnum, bottomrownum)];
+      if (!coord) continue; // only look at spanned cells
+      rownum = context.coordToCR[coord].row - 0;
+      if (rownum == bottomrownum || rownum < context.rowpanes[rowpane].first) continue; // this row (colspan) or starts above pane
+      cell = sheetobj.cells[coord];
+      if (cell && cell.rowspan > 1) rowneedsrefresh[rownum] = true; // remember row num to update
+    }
+  }
 
-   if (!context.sheetobj.attribs.usermaxrow) {
-      tbodyobj.removeChild(tbodyobj.childNodes[toprow+(context.rowpanes[rowpane].last-context.rowpanes[rowpane].first)]);
-      }
+  for (rownum in rowneedsrefresh) {
+    newrow = context.RenderRow(rownum, rowpane);
+    oldchild = tbodyobj.childNodes[toprow + (Number(rownum) - context.rowpanes[rowpane].first)];
+    tbodyobj.replaceChild(newrow, oldchild);
+  }
 
-   context.rowpanes[rowpane].first--;
-   context.rowpanes[rowpane].last--;
-   editor.FitToEditTable();
-   context.CalculateColWidthData(); // Just in case, since normally done in RenderSheet
-
-   newrow = context.RenderRow(context.rowpanes[rowpane].first, rowpane);
-   tbodyobj.insertBefore(newrow, tbodyobj.childNodes[toprow]);
-
-   // if inserted a row with starting rowspans, replace rows for the largest rowspan
-
-   maxrowspan = 1;
-   newrownum=context.rowpanes[rowpane].first;
-
-   for (colpane=0; colpane<context.colpanes.length; colpane++) {
-      for (colnum=context.colpanes[colpane].first; colnum<=context.colpanes[colpane].last; colnum++) {
-         coord=TableEditorSC.crToCoord(colnum, newrownum);
-         if (context.cellskip[coord]) continue;
-         cell=sheetobj.cells[coord];
-         if (cell && cell.rowspan>maxrowspan) maxrowspan=cell.rowspan;
-         }
-      }
-
-   if (maxrowspan>1) {
-      for (rownum=1; rownum<maxrowspan; rownum++) {
-         if (rownum+newrownum > context.rowpanes[rowpane].last) break;
-         newrow=context.RenderRow(rownum+newrownum, rowpane);
-         oldchild=tbodyobj.childNodes[toprow+rownum];
-         tbodyobj.replaceChild(newrow,oldchild);
-         }
-      }
-
-   // if last row now includes rowspans or rowspans from above, update the size of those to remove deleted row
-
-   bottomrownum=context.rowpanes[rowpane].last;
-
-   for (colpane=0; colpane<context.colpanes.length; colpane++) {
-      for (colnum=context.colpanes[colpane].first; colnum<=context.colpanes[colpane].last; colnum++) {
-         coord=TableEditorSC.crToCoord(colnum, bottomrownum);
-         cell=sheetobj.cells[coord];
-         if (cell && cell.rowspan>1) {
-            rowneedsrefresh[bottomrownum]=true; // need to update this row
-            continue;
-            }
-         coord=context.cellskip[TableEditorSC.crToCoord(colnum, bottomrownum)];
-         if (!coord) continue; // only look at spanned cells
-         rownum=context.coordToCR[coord].row-0;
-         if (rownum==bottomrownum ||
-             rownum<context.rowpanes[rowpane].first) continue; // this row (colspan) or starts above pane
-         cell=sheetobj.cells[coord];
-         if (cell && cell.rowspan>1) rowneedsrefresh[rownum]=true; // remember row num to update
-         }
-      }
-
-   for (rownum in rowneedsrefresh) {
-      newrow=context.RenderRow(rownum, rowpane);
-      oldchild=tbodyobj.childNodes[(toprow+(Number(rownum)-context.rowpanes[rowpane].first))];
-      tbodyobj.replaceChild(newrow,oldchild);
-      }
-
-   return tableobj;
-   }
-
+  return tableobj;
+};
 
 // *************************************
 //
@@ -3887,53 +4223,61 @@ TableEditorSC.ScrollTableDownOneRow = function(editor: any) {
 // *************************************
 
 /** @param {any} element @param {any} editor */
-TableEditorSC.InputBox = function(element: any, editor: any) {
+TableEditorSC.InputBox = function (element: any, editor: any) {
+  if (!element) return; // invoked without enough data to work
 
-   if (!element) return; // invoked without enough data to work
+  this.element = element; // the input element associated with this InputBox
+  this.editor = editor; // the TableEditor this belongs to
+  this.inputEcho = null;
 
-   this.element = element; // the input element associated with this InputBox
-   this.editor = editor; // the TableEditor this belongs to
-   this.inputEcho = null;
+  editor.inputBox = this;
 
-   editor.inputBox = this;
+  element.onmousedown = TableEditorSC.InputBoxOnMouseDown;
 
-   element.onmousedown = TableEditorSC.InputBoxOnMouseDown;
-
-   /** @param {any} e */
-   editor.MoveECellCallback.formulabar = function(e: any){
-      if (e.state!="start") return; // if not in normal keyboard mode don't replace formula bar
-      editor.inputBox.DisplayCellContents(e.ecell.coord);
-      };
-   }
-
+  /** @param {any} e */
+  editor.MoveECellCallback.formulabar = function (e: any) {
+    if (e.state != "start") return; // if not in normal keyboard mode don't replace formula bar
+    editor.inputBox.DisplayCellContents(e.ecell.coord);
+  };
+};
 
 // Methods:
 
 /** @param {any} coord */
-TableEditorSC.InputBox.prototype.DisplayCellContents = function(coord: any) {TableEditorSC.InputBoxDisplayCellContents(this, coord);};
+TableEditorSC.InputBox.prototype.DisplayCellContents = function (coord: any) {
+  TableEditorSC.InputBoxDisplayCellContents(this, coord);
+};
 /** @param {any} show */
-TableEditorSC.InputBox.prototype.ShowInputBox = function(show: any) {this.editor.inputEcho.ShowInputEcho(show);};
-TableEditorSC.InputBox.prototype.GetText = function() {return this.element.value;};
+TableEditorSC.InputBox.prototype.ShowInputBox = function (show: any) {
+  this.editor.inputEcho.ShowInputEcho(show);
+};
+TableEditorSC.InputBox.prototype.GetText = function () {
+  return this.element.value;
+};
 /** @param {any} newtext */
-TableEditorSC.InputBox.prototype.SetText = function(newtext: any) {
-   if (!this.element) return;
-   this.element.value=newtext;
-   this.editor.inputEcho.SetText(newtext+"_");
-   };
-TableEditorSC.InputBox.prototype.Focus = function() {TableEditorSC.InputBoxFocus(this);};
-TableEditorSC.InputBox.prototype.Blur = function() {return this.element.blur();};
+TableEditorSC.InputBox.prototype.SetText = function (newtext: any) {
+  if (!this.element) return;
+  this.element.value = newtext;
+  this.editor.inputEcho.SetText(newtext + "_");
+};
+TableEditorSC.InputBox.prototype.Focus = function () {
+  TableEditorSC.InputBoxFocus(this);
+};
+TableEditorSC.InputBox.prototype.Blur = function () {
+  return this.element.blur();
+};
 /** @param {any} t */
-TableEditorSC.InputBox.prototype.Select = function(t: any) {
-   if (!this.element) return;
-   switch (t) {
-      case "end":
-         if (this.element.selectionStart!=undefined) {
-            this.element.selectionStart=this.element.value.length;
-            this.element.selectionEnd=this.element.value.length;
-         }
-         break;
+TableEditorSC.InputBox.prototype.Select = function (t: any) {
+  if (!this.element) return;
+  switch (t) {
+    case "end":
+      if (this.element.selectionStart != undefined) {
+        this.element.selectionStart = this.element.value.length;
+        this.element.selectionEnd = this.element.value.length;
       }
-   };
+      break;
+  }
+};
 
 // Functions:
 
@@ -3944,30 +4288,26 @@ TableEditorSC.InputBox.prototype.Select = function(t: any) {
 //
 
 /** @param {any} inputbox @param {any} coord */
-TableEditorSC.InputBoxDisplayCellContents = function(inputbox: any, coord: any) {
+TableEditorSC.InputBoxDisplayCellContents = function (inputbox: any, coord: any) {
+  var scc = TableEditorSC.Constants;
 
-   var scc = TableEditorSC.Constants;
-
-   if (!inputbox) return;
-   if (!coord) {
-     if (!inputbox.editor) return; // not initialized yet
-     if (!inputbox.editor.ecell) return; // not initialized yet
-     coord = inputbox.editor.ecell.coord;
-   }
-   var text = TableEditorSC.GetCellContents(inputbox.editor.context.sheetobj, coord);
-   if (text.indexOf("\n")!=-1) {
-      text = scc.s_inputboxdisplaymultilinetext;
-      inputbox.element.disabled = true;
-      }
-   else if (inputbox.editor.ECellReadonly()) {
-      inputbox.element.disabled = true;
-      }
-   else {
-      inputbox.element.disabled = false;
-      }
-   inputbox.SetText(text);
-
-   }
+  if (!inputbox) return;
+  if (!coord) {
+    if (!inputbox.editor) return; // not initialized yet
+    if (!inputbox.editor.ecell) return; // not initialized yet
+    coord = inputbox.editor.ecell.coord;
+  }
+  var text = TableEditorSC.GetCellContents(inputbox.editor.context.sheetobj, coord);
+  if (text.indexOf("\n") != -1) {
+    text = scc.s_inputboxdisplaymultilinetext;
+    inputbox.element.disabled = true;
+  } else if (inputbox.editor.ECellReadonly()) {
+    inputbox.element.disabled = true;
+  } else {
+    inputbox.element.disabled = false;
+  }
+  inputbox.SetText(text);
+};
 
 //
 // SocialCalc.InputBoxFocus(inputbox)
@@ -3977,19 +4317,17 @@ TableEditorSC.InputBoxDisplayCellContents = function(inputbox: any, coord: any) 
 //
 
 /** @param {any} inputbox */
-TableEditorSC.InputBoxFocus = function(inputbox: any) {
-
-   if (!inputbox) return;
-   inputbox.element.focus();
-   var editor = inputbox.editor;
-   editor.state = "input";
-   var wval = editor.workingvalues;
-   wval.partialexpr = "";
-   wval.ecoord = editor.ecell.coord;
-   wval.erow = editor.ecell.row;
-   wval.ecol = editor.ecell.col;
-
-   };
+TableEditorSC.InputBoxFocus = function (inputbox: any) {
+  if (!inputbox) return;
+  inputbox.element.focus();
+  var editor = inputbox.editor;
+  editor.state = "input";
+  var wval = editor.workingvalues;
+  wval.partialexpr = "";
+  wval.ecoord = editor.ecell.coord;
+  wval.erow = editor.ecell.row;
+  wval.ecol = editor.ecell.col;
+};
 
 //
 // SocialCalc.InputBoxOnMouseDown(e)
@@ -3999,35 +4337,33 @@ TableEditorSC.InputBoxFocus = function(inputbox: any) {
 //
 
 /** @param {any} e */
-TableEditorSC.InputBoxOnMouseDown = function(e: any) {
+TableEditorSC.InputBoxOnMouseDown = function (_e: any) {
+  var editor = TableEditorSC.Keyboard.focusTable; // get TableEditor doing keyboard stuff
+  if (!editor) return true; // we're not handling it -- let browser do default
+  var wval = editor.workingvalues;
 
-   var editor = TableEditorSC.Keyboard.focusTable; // get TableEditor doing keyboard stuff
-   if (!editor) return true; // we're not handling it -- let browser do default
-   var wval = editor.workingvalues;
+  switch (editor.state) {
+    case "start":
+      editor.state = "inputboxdirect";
+      wval.partialexpr = "";
+      wval.ecoord = editor.ecell.coord;
+      wval.erow = editor.ecell.row;
+      wval.ecol = editor.ecell.col;
+      editor.inputEcho.ShowInputEcho(true);
+      break;
 
-   switch (editor.state) {
-      case "start":
-         editor.state="inputboxdirect";
-         wval.partialexpr = "";
-         wval.ecoord = editor.ecell.coord;
-         wval.erow = editor.ecell.row;
-         wval.ecol = editor.ecell.col;
-         editor.inputEcho.ShowInputEcho(true);
-         break;
+    case "input":
+      wval.partialexpr = ""; // make sure not pointing
+      editor.MoveECell(wval.ecoord);
+      editor.state = "inputboxdirect";
+      TableEditorSC.KeyboardFocus(); // may have come here from outside of grid
+      break;
 
-      case "input":
-         wval.partialexpr = ""; // make sure not pointing
-         editor.MoveECell(wval.ecoord);
-         editor.state="inputboxdirect";
-         TableEditorSC.KeyboardFocus(); // may have come here from outside of grid
-         break;
-
-      case "inputboxdirect":
-         break;
-      }
-   return undefined;
-   }
-
+    case "inputboxdirect":
+      break;
+  }
+  return undefined;
+};
 
 // *************************************
 //
@@ -4039,145 +4375,149 @@ TableEditorSC.InputBoxOnMouseDown = function(e: any) {
 // *************************************
 
 /** @param {any} editor */
-TableEditorSC.InputEcho = function(editor: any) {
+TableEditorSC.InputEcho = function (editor: any) {
+  var scc = TableEditorSC.Constants;
 
-   var scc = TableEditorSC.Constants;
+  this.editor = editor; // the TableEditor this belongs to
+  this.text = ""; // current value of what is displayed
+  this.interval = null; // timer handle
 
-   this.editor = editor; // the TableEditor this belongs to
-   this.text = ""; // current value of what is displayed
-   this.interval = null; // timer handle
+  this.container = null; // element containing main echo as well as prompt line
+  this.main = null; // main echo area
+  this.prompt = null;
+  this.hint = null; // focus cell hint area
 
-   this.container = null; // element containing main echo as well as prompt line
-   this.main = null; // main echo area
-   this.prompt = null;
-   this.hint = null; // focus cell hint area
+  this.functionbox = null; // function chooser dialog
 
-   this.functionbox = null; // function chooser dialog
+  this.container = document.createElement("div");
+  TableEditorSC.setStyles(this.container, "display:none;position:absolute;zIndex:10;");
 
-   this.container = document.createElement("div");
-   TableEditorSC.setStyles(this.container, "display:none;position:absolute;zIndex:10;");
+  this.main = document.createElement("div");
+  if (scc.defaultInputEchoClass) this.main.className = scc.defaultInputEchoClass;
+  if (scc.defaultInputEchoStyle) TableEditorSC.setStyles(this.main, scc.defaultInputEchoStyle);
+  this.main.innerHTML = "&nbsp;";
 
-   this.main = document.createElement("div");
-   if (scc.defaultInputEchoClass) this.main.className = scc.defaultInputEchoClass;
-   if (scc.defaultInputEchoStyle) TableEditorSC.setStyles(this.main, scc.defaultInputEchoStyle);
-   this.main.innerHTML = "&nbsp;";
+  this.hint = document.createElement("div");
+  if (scc.defaultInputEchoHintClass) this.hint.className = scc.defaultInputEchoHintClass;
+  if (scc.defaultInputEchoHintStyle)
+    TableEditorSC.setStyles(this.hint, scc.defaultInputEchoHintStyle);
+  this.hint.innerHTML = "";
 
-   this.hint = document.createElement("div");
-   if (scc.defaultInputEchoHintClass) this.hint.className = scc.defaultInputEchoHintClass;
-   if (scc.defaultInputEchoHintStyle) TableEditorSC.setStyles(this.hint, scc.defaultInputEchoHintStyle);
-   this.hint.innerHTML = "";
+  this.container.appendChild(this.hint);
+  this.container.appendChild(this.main);
 
-   this.container.appendChild(this.hint);
-   this.container.appendChild(this.main);
+  this.prompt = document.createElement("div");
+  if (scc.defaultInputEchoPromptClass) this.prompt.className = scc.defaultInputEchoPromptClass;
+  if (scc.defaultInputEchoPromptStyle)
+    TableEditorSC.setStyles(this.prompt, scc.defaultInputEchoPromptStyle);
+  this.prompt.innerHTML = "";
 
-   this.prompt = document.createElement("div");
-   if (scc.defaultInputEchoPromptClass) this.prompt.className = scc.defaultInputEchoPromptClass;
-   if (scc.defaultInputEchoPromptStyle) TableEditorSC.setStyles(this.prompt, scc.defaultInputEchoPromptStyle);
-   this.prompt.innerHTML = "";
+  this.container.appendChild(this.prompt);
 
-   this.container.appendChild(this.prompt);
+  TableEditorSC.DragRegister(
+    this.main,
+    true,
+    true,
+    {
+      MouseDown: TableEditorSC.DragFunctionStart,
+      MouseMove: TableEditorSC.DragFunctionPosition,
+      MouseUp: TableEditorSC.DragFunctionPosition,
+      Disabled: null,
+      positionobj: this.container,
+    },
+    this.editor.toplevel,
+  );
 
-   TableEditorSC.DragRegister(this.main, true, true,
-                 {MouseDown: TableEditorSC.DragFunctionStart,
-                  MouseMove: TableEditorSC.DragFunctionPosition,
-                  MouseUp: TableEditorSC.DragFunctionPosition,
-                  Disabled: null, positionobj: this.container},
-                  this.editor.toplevel);
-
-   editor.toplevel.appendChild(this.container);
-
-   }
+  editor.toplevel.appendChild(this.container);
+};
 
 // Methods:
 
 /** @param {any} show */
-TableEditorSC.InputEcho.prototype.ShowInputEcho = function(show: any) {return TableEditorSC.ShowInputEcho(this, show);};
+TableEditorSC.InputEcho.prototype.ShowInputEcho = function (show: any) {
+  return TableEditorSC.ShowInputEcho(this, show);
+};
 /** @param {any} str */
-TableEditorSC.InputEcho.prototype.SetText = function(str: any) {return TableEditorSC.SetInputEchoText(this, str);};
+TableEditorSC.InputEcho.prototype.SetText = function (str: any) {
+  return TableEditorSC.SetInputEchoText(this, str);
+};
 
 // Functions:
 
 /** @param {any} inputecho @param {any} show */
-TableEditorSC.ShowInputEcho = function(inputecho: any, show: any) {
+TableEditorSC.ShowInputEcho = function (inputecho: any, show: any) {
+  var cell, position;
+  var editor = inputecho.editor;
 
-   var cell, position;
-   var editor = inputecho.editor;
+  if (!editor) return;
 
-   if (!editor) return;
-
-   if (show) {
-      editor.cellhandles.ShowCellHandles(false);
-      cell=TableEditorSC.GetEditorCellElement(editor, editor.ecell.row, editor.ecell.col);
-      if (cell) {
-         position = TableEditorSC.GetElementPosition(cell.element);
-         inputecho.container.style.left = (position.left-1)+"px";
-         inputecho.container.style.top = (position.top-1)+"px";
-         }
-      inputecho.hint.innerHTML = editor.ecell.coord;
-      inputecho.container.style.display = "block";
-      if (inputecho.interval) window.clearInterval(inputecho.interval); // just in case
-      inputecho.interval = window.setInterval(TableEditorSC.InputEchoHeartbeat, 50);
-      }
-   else {
-      if (inputecho.interval) window.clearInterval(inputecho.interval);
-      inputecho.container.style.display = "none";
-      }
-
-   }
+  if (show) {
+    editor.cellhandles.ShowCellHandles(false);
+    cell = TableEditorSC.GetEditorCellElement(editor, editor.ecell.row, editor.ecell.col);
+    if (cell) {
+      position = TableEditorSC.GetElementPosition(cell.element);
+      inputecho.container.style.left = position.left - 1 + "px";
+      inputecho.container.style.top = position.top - 1 + "px";
+    }
+    inputecho.hint.innerHTML = editor.ecell.coord;
+    inputecho.container.style.display = "block";
+    if (inputecho.interval) window.clearInterval(inputecho.interval); // just in case
+    inputecho.interval = window.setInterval(TableEditorSC.InputEchoHeartbeat as () => void, 50);
+  } else {
+    if (inputecho.interval) window.clearInterval(inputecho.interval);
+    inputecho.container.style.display = "none";
+  }
+};
 
 /** @param {any} inputecho @param {any} str */
-TableEditorSC.SetInputEchoText = function(inputecho: any, str: any) {
+TableEditorSC.SetInputEchoText = function (inputecho: any, str: any) {
+  var scc = TableEditorSC.Constants;
+  var fname, fstr;
+  var newstr = TableEditorSC.special_chars(str);
+  newstr = newstr.replace(/\n/g, "<br>");
 
-   var scc = TableEditorSC.Constants;
-   var fname, fstr;
-   var newstr = TableEditorSC.special_chars(str);
-   newstr = newstr.replace(/\n/g,"<br>");
+  if (inputecho.text != newstr) {
+    inputecho.main.innerHTML = newstr;
+    inputecho.text = newstr;
+  }
 
-   if (inputecho.text != newstr) {
-      inputecho.main.innerHTML = newstr;
-      inputecho.text = newstr;
-      }
+  var parts = str.match(/.*[+\-*/&^<>=,(]([A-Za-z][A-Za-z][\w.]*?)\([^)]*$/);
+  if (str.charAt(0) == "=" && parts) {
+    fname = parts[1].toUpperCase();
+    if (TableEditorSC.Formula.FunctionList[fname]) {
+      TableEditorSC.Formula.FillFunctionInfo(); //  make sure filled
+      fstr = TableEditorSC.special_chars(
+        fname + "(" + TableEditorSC.Formula.FunctionArgString(fname) + ")",
+      );
+    } else {
+      fstr = scc.ietUnknownFunction + fname;
+    }
+    if (inputecho.prompt.innerHTML != fstr) {
+      inputecho.prompt.innerHTML = fstr;
+      inputecho.prompt.style.display = "block";
+    }
+  } else if (inputecho.prompt.style.display != "none") {
+    inputecho.prompt.innerHTML = "";
+    inputecho.prompt.style.display = "none";
+  }
+};
 
-   var parts = str.match(/.*[\+\-\*\/\&\^\<\>\=\,\(]([A-Za-z][A-Za-z][\w\.]*?)\([^\)]*$/);
-   if (str.charAt(0)=="=" && parts) {
-      fname = parts[1].toUpperCase();
-      if (TableEditorSC.Formula.FunctionList[fname]) {
-         TableEditorSC.Formula.FillFunctionInfo(); //  make sure filled
-         fstr = TableEditorSC.special_chars(fname+"("+TableEditorSC.Formula.FunctionArgString(fname)+")");
-         }
-      else {
-         fstr = scc.ietUnknownFunction+fname;
-         }
-      if (inputecho.prompt.innerHTML != fstr) {
-         inputecho.prompt.innerHTML = fstr;
-         inputecho.prompt.style.display = "block";
-         }
-      }
-   else if (inputecho.prompt.style.display != "none") {
-      inputecho.prompt.innerHTML = "";
-      inputecho.prompt.style.display = "none";
-      }
+TableEditorSC.InputEchoHeartbeat = function () {
+  var editor = TableEditorSC.Keyboard.focusTable; // get TableEditor doing keyboard stuff
+  if (!editor) return true; // we're not handling it -- let browser do default
 
-   }
-
-TableEditorSC.InputEchoHeartbeat = function() {
-
-   var editor = TableEditorSC.Keyboard.focusTable; // get TableEditor doing keyboard stuff
-   if (!editor) return true; // we're not handling it -- let browser do default
-
-   editor.inputEcho.SetText(editor.inputBox.GetText()+"_");
-   return undefined;
-   }
+  editor.inputEcho.SetText(editor.inputBox.GetText() + "_");
+  return undefined;
+};
 
 /** @param {any} e */
-TableEditorSC.InputEchoMouseDown = function(e: any) {
-      var editor = TableEditorSC.Keyboard.focusTable; // get TableEditor doing keyboard stuff
-      if (!editor) return true; // we're not handling it -- let browser do default
+TableEditorSC.InputEchoMouseDown = function (_e: any) {
+  var editor = TableEditorSC.Keyboard.focusTable; // get TableEditor doing keyboard stuff
+  if (!editor) return true; // we're not handling it -- let browser do default
 
-      editor.inputBox.element.focus();
-      return undefined;
-      };
-
+  editor.inputBox.element.focus();
+  return undefined;
+};
 
 // *************************************
 //
@@ -4188,181 +4528,199 @@ TableEditorSC.InputEchoMouseDown = function(e: any) {
 // *************************************
 
 /** @param {any} editor */
-TableEditorSC.CellHandles = function(editor: any) {
+TableEditorSC.CellHandles = function (editor: any) {
+  if (editor.noEdit) return; // leave us with nothing
 
-   var scc = TableEditorSC.Constants;
-   var functions: any;
+  this.editor = editor; // the TableEditor this belongs to
 
-   if (editor.noEdit) return; // leave us with nothing
+  this.noCursorSuffix = false;
 
-   this.editor = editor; // the TableEditor this belongs to
+  this.movedmouse = false; // used to detect no-op
 
-   this.noCursorSuffix = false;
+  this.draghandle = document.createElement("div");
+  TableEditorSC.setStyles(
+    this.draghandle,
+    "display:none;position:absolute;zIndex:8;border:1px solid white;width:4px;height:4px;fontSize:1px;backgroundColor:#0E93D8;cursor:default;",
+  );
+  this.draghandle.innerHTML = "&nbsp;";
+  editor.toplevel.appendChild(this.draghandle);
+  TableEditorSC.AssignID(editor, this.draghandle, "draghandle");
 
-   this.movedmouse = false; // used to detect no-op
+  var imagetype = "png";
 
-   this.draghandle = document.createElement("div");
-   TableEditorSC.setStyles(this.draghandle, "display:none;position:absolute;zIndex:8;border:1px solid white;width:4px;height:4px;fontSize:1px;backgroundColor:#0E93D8;cursor:default;");
-   this.draghandle.innerHTML = '&nbsp;';
-   editor.toplevel.appendChild(this.draghandle);
-   TableEditorSC.AssignID(editor, this.draghandle, "draghandle");
+  this.dragpalette = document.createElement("div");
+  TableEditorSC.setStyles(
+    this.dragpalette,
+    "display:none;position:absolute;zIndex:8;width:90px;height:90px;fontSize:1px;textAlign:center;cursor:default;" +
+      "backgroundImage:url(" +
+      TableEditorSC.Constants.defaultImagePrefix +
+      "drag-handles." +
+      imagetype +
+      ");",
+  );
+  this.dragpalette.innerHTML = "&nbsp;";
+  editor.toplevel.appendChild(this.dragpalette);
+  TableEditorSC.AssignID(editor, this.dragpalette, "dragpalette");
 
-   var imagetype = "png";
+  this.dragtooltip = document.createElement("div");
+  TableEditorSC.setStyles(
+    this.dragtooltip,
+    "display:none;position:absolute;zIndex:9;border:1px solid black;width:100px;height:auto;fontSize:10px;backgroundColor:#FFFFFF;",
+  );
+  this.dragtooltip.innerHTML = "&nbsp;";
+  editor.toplevel.appendChild(this.dragtooltip);
+  TableEditorSC.AssignID(editor, this.dragtooltip, "dragtooltip");
 
-   this.dragpalette = document.createElement("div");
-   TableEditorSC.setStyles(this.dragpalette, "display:none;position:absolute;zIndex:8;width:90px;height:90px;fontSize:1px;textAlign:center;cursor:default;"+
-      "backgroundImage:url("+TableEditorSC.Constants.defaultImagePrefix+"drag-handles."+imagetype+");");
-   this.dragpalette.innerHTML = '&nbsp;';
-   editor.toplevel.appendChild(this.dragpalette);
-   TableEditorSC.AssignID(editor, this.dragpalette, "dragpalette");
+  this.fillinghandle = document.createElement("div");
+  TableEditorSC.setStyles(
+    this.fillinghandle,
+    "display:none;position:absolute;zIndex:9;border:1px solid black;width:auto;height:14px;fontSize:10px;backgroundColor:#FFFFFF;",
+  );
+  this.fillinghandle.innerHTML = "&nbsp;";
+  editor.toplevel.appendChild(this.fillinghandle);
+  TableEditorSC.AssignID(editor, this.fillinghandle, "fillinghandle");
 
-   this.dragtooltip = document.createElement("div");
-   TableEditorSC.setStyles(this.dragtooltip, "display:none;position:absolute;zIndex:9;border:1px solid black;width:100px;height:auto;fontSize:10px;backgroundColor:#FFFFFF;");
-   this.dragtooltip.innerHTML = '&nbsp;';
-   editor.toplevel.appendChild(this.dragtooltip);
-   TableEditorSC.AssignID(editor, this.dragtooltip, "dragtooltip");
-
-   this.fillinghandle = document.createElement("div");
-   TableEditorSC.setStyles(this.fillinghandle, "display:none;position:absolute;zIndex:9;border:1px solid black;width:auto;height:14px;fontSize:10px;backgroundColor:#FFFFFF;");
-   this.fillinghandle.innerHTML = '&nbsp;';
-   editor.toplevel.appendChild(this.fillinghandle);
-   TableEditorSC.AssignID(editor, this.fillinghandle, "fillinghandle");
-
-   this.draghandle.addEventListener("mousemove", TableEditorSC.CellHandlesMouseMoveOnHandle, false);
-   this.dragpalette.addEventListener("mousedown", TableEditorSC.CellHandlesMouseDown, false);
-   this.dragpalette.addEventListener("mousemove", TableEditorSC.CellHandlesMouseMoveOnHandle, false);
-
-   }
+  this.draghandle.addEventListener("mousemove", TableEditorSC.CellHandlesMouseMoveOnHandle, false);
+  this.dragpalette.addEventListener("mousedown", TableEditorSC.CellHandlesMouseDown, false);
+  this.dragpalette.addEventListener("mousemove", TableEditorSC.CellHandlesMouseMoveOnHandle, false);
+};
 
 // Methods:
 
 /** @param {any} show @param {any} moveshow */
-TableEditorSC.CellHandles.prototype.ShowCellHandles = function(show: any, moveshow: any) {return TableEditorSC.ShowCellHandles(this, show, moveshow);};
+TableEditorSC.CellHandles.prototype.ShowCellHandles = function (show: any, moveshow: any) {
+  return TableEditorSC.ShowCellHandles(this, show, moveshow);
+};
 
 // Functions:
 
 /** @param {any} cellhandles @param {any} show @param {any} moveshow */
-TableEditorSC.ShowCellHandles = function(cellhandles: any, show: any, moveshow: any) {
+TableEditorSC.ShowCellHandles = function (cellhandles: any, show: any, moveshow: any) {
+  var cell;
+  var editor = cellhandles.editor;
+  var doshow = false;
+  var row, col;
+  var colinc = 1,
+    rowinc = 1;
 
-   var cell, cell2, position, position2;
-   var editor = cellhandles.editor;
-   var doshow = false;
-   var row, col;
-   var colinc = 1, rowinc = 1;
+  if (!editor) return;
+  if (!editor.ecell) return;
 
-   if (!editor) return;
-   if (!editor.ecell) return;
+  showCellHandlesBlock: {
+    // a block that can you can "break" out of easily
 
-   do { // a block that can you can "break" out of easily
+    if (!show) break showCellHandlesBlock;
 
-      if (!show) break;
+    row = editor.ecell.row;
+    col = editor.ecell.col;
 
-      row = editor.ecell.row;
-      col = editor.ecell.col;
+    if (editor.state != "start") break showCellHandlesBlock;
+    if (row >= editor.lastvisiblerow) break showCellHandlesBlock;
+    if (col >= editor.lastvisiblecol) break showCellHandlesBlock;
+    if (row < editor.firstscrollingrow) break showCellHandlesBlock;
+    if (col < editor.firstscrollingcol) break showCellHandlesBlock;
 
-      if (editor.state != "start") break;
-      if (row >= editor.lastvisiblerow) break;
-      if (col >= editor.lastvisiblecol) break;
-      if (row < editor.firstscrollingrow) break;
-      if (col < editor.firstscrollingcol) break;
+    // Go beyond one column if hidden.
+    while (
+      editor.context.sheetobj.colattribs.hide[TableEditorSC.rcColname(col + colinc)] == "yes"
+    ) {
+      colinc++;
+    }
 
-      // Go beyond one column if hidden.
-      while (editor.context.sheetobj.colattribs.hide[TableEditorSC.rcColname(col+colinc)] == "yes") {
-         colinc++;
-         }
+    // Go beyond one row if hidden.
+    while (editor.context.sheetobj.rowattribs.hide[row + rowinc] == "yes") {
+      rowinc++;
+    }
 
-      // Go beyond one row if hidden.
-      while (editor.context.sheetobj.rowattribs.hide[row+rowinc] == "yes") {
-         rowinc++;
-         }
+    // Check colspan and rowspan.
+    cell =
+      editor.context.sheetobj.cells[TableEditorSC.crToCoord(col + colinc - 1, row + rowinc - 1)];
+    if (typeof cell != "undefined") {
+      colinc += (cell.colspan || 1) - 1;
+      rowinc += (cell.rowspan || 1) - 1;
+    }
 
-      // Check colspan and rowspan.
-      cell = editor.context.sheetobj.cells[TableEditorSC.crToCoord(col+colinc-1, row+rowinc-1)];
-      if (typeof cell != "undefined") {
-         colinc += (cell.colspan || 1) - 1;
-         rowinc += (cell.rowspan || 1) - 1;
-         }
+    if (editor.rowpositions[row + rowinc] + 20 > editor.horizontaltablecontrol.controlborder) {
+      break showCellHandlesBlock;
+    }
+    if (editor.rowpositions[row + rowinc] - 10 < editor.headposition.top) {
+      break showCellHandlesBlock;
+    }
+    if (editor.colpositions[col + colinc] + 20 > editor.verticaltablecontrol.controlborder) {
+      break showCellHandlesBlock;
+    }
+    if (editor.colpositions[col + colinc] - 30 < editor.headposition.left) {
+      break showCellHandlesBlock;
+    }
 
-      if (editor.rowpositions[row+rowinc]+20>editor.horizontaltablecontrol.controlborder) {
-         break;
-         }
-      if (editor.rowpositions[row+rowinc]-10<editor.headposition.top) {
-         break;
-         }
-      if (editor.colpositions[col+colinc]+20>editor.verticaltablecontrol.controlborder) {
-         break;
-         }
-      if (editor.colpositions[col+colinc]-30<editor.headposition.left) {
-         break;
-         }
+    cellhandles.draghandle.style.left = editor.colpositions[col + colinc] - 1 + "px";
+    cellhandles.draghandle.style.top = editor.rowpositions[row + rowinc] - 1 + "px";
+    cellhandles.draghandle.style.display = "block";
 
-      cellhandles.draghandle.style.left = (editor.colpositions[col+colinc]-1)+"px";
-      cellhandles.draghandle.style.top = (editor.rowpositions[row+rowinc]-1)+"px";
-      cellhandles.draghandle.style.display = "block";
-
-      if (moveshow) {
-         cellhandles.draghandle.style.display = "none";
-         cellhandles.dragpalette.style.left = (editor.colpositions[col+colinc]-45)+"px";
-         cellhandles.dragpalette.style.top = (editor.rowpositions[row+rowinc]-45)+"px";
-         cellhandles.dragpalette.style.display = "block";
-         cellhandles.dragtooltip.style.left = (editor.colpositions[col+colinc]-45)+"px";
-         cellhandles.dragtooltip.style.top = (editor.rowpositions[row+rowinc]+45)+"px";
-         cellhandles.dragtooltip.style.display = "none";
-         }
-
-      doshow = true;
-
-      }
-   while (false); // only do once
-
-   if (!doshow) {
+    if (moveshow) {
       cellhandles.draghandle.style.display = "none";
-      }
-   if (!moveshow) {
-      cellhandles.dragpalette.style.display = "none";
+      cellhandles.dragpalette.style.left = editor.colpositions[col + colinc] - 45 + "px";
+      cellhandles.dragpalette.style.top = editor.rowpositions[row + rowinc] - 45 + "px";
+      cellhandles.dragpalette.style.display = "block";
+      cellhandles.dragtooltip.style.left = editor.colpositions[col + colinc] - 45 + "px";
+      cellhandles.dragtooltip.style.top = editor.rowpositions[row + rowinc] + 45 + "px";
       cellhandles.dragtooltip.style.display = "none";
-      }
+    }
 
-   }
+    doshow = true;
+  } // only do once
+
+  if (!doshow) {
+    cellhandles.draghandle.style.display = "none";
+  }
+  if (!moveshow) {
+    cellhandles.dragpalette.style.display = "none";
+    cellhandles.dragtooltip.style.display = "none";
+  }
+};
 
 /** @param {any} e */
-TableEditorSC.CellHandlesMouseMoveOnHandle = function(e: any) {
+TableEditorSC.CellHandlesMouseMoveOnHandle = function (e: any) {
+  var scc = TableEditorSC.Constants;
 
-   var scc = TableEditorSC.Constants;
+  var event = e || window.event;
+  var target = event.target || event.srcElement;
 
-   var event = e || window.event;
-   var target = event.target || event.srcElement
+  var editor = TableEditorSC.Keyboard.focusTable; // get TableEditor doing keyboard stuff
+  if (!editor) return true; // we're not handling it -- let browser do default
+  var cellhandles = editor.cellhandles;
+  if (!cellhandles.editor) return true; // no handles
 
-   var editor = TableEditorSC.Keyboard.focusTable; // get TableEditor doing keyboard stuff
-   if (!editor) return true; // we're not handling it -- let browser do default
-   var cellhandles = editor.cellhandles;
-   if (!cellhandles.editor) return true; // no handles
+  var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
+  var clientX = event.clientX - pos.left;
+  var clientY = event.clientY - pos.top;
 
-   var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
-   var clientX = event.clientX - pos.left;
-   var clientY = event.clientY - pos.top;
+  if (!editor.cellhandles.mouseDown) {
+    editor.cellhandles.ShowCellHandles(true, true); // show move handles, too
 
-   if (!editor.cellhandles.mouseDown) {
-      editor.cellhandles.ShowCellHandles(true, true); // show move handles, too
+    if (target == cellhandles.dragpalette) {
+      var whichhandle = TableEditorSC.SegmentDivHit(
+        [scc.CH_radius1, scc.CH_radius2],
+        editor.cellhandles.dragpalette,
+        clientX,
+        clientY,
+      );
+      if (whichhandle == 0) {
+        // off of active part of palette
+        TableEditorSC.CellHandlesHoverTimeout();
+        return;
+      }
+    }
 
-      if (target == cellhandles.dragpalette) {
-         var whichhandle = TableEditorSC.SegmentDivHit([scc.CH_radius1, scc.CH_radius2], editor.cellhandles.dragpalette, clientX, clientY);
-         if (whichhandle==0) { // off of active part of palette
-            TableEditorSC.CellHandlesHoverTimeout();
-            return;
-            }
-         }
+    if (cellhandles.timer) {
+      window.clearTimeout(cellhandles.timer);
+      cellhandles.timer = null;
+    }
+    cellhandles.timer = window.setTimeout(TableEditorSC.CellHandlesHoverTimeout as () => void, 3000);
+  }
 
-      if (cellhandles.timer) {
-         window.clearTimeout(cellhandles.timer);
-         cellhandles.timer = null;
-         }
-      cellhandles.timer = window.setTimeout(TableEditorSC.CellHandlesHoverTimeout, 3000);
-   }
-
-   return;
-
-   }
+  return;
+};
 
 //
 // whichsegment = SocialCalc.SegmentDivHit(segtable, divWithMouseHit, x, y)
@@ -4379,590 +4737,604 @@ TableEditorSC.CellHandlesMouseMoveOnHandle = function(e: any) {
 //
 
 /** @param {any} segtable @param {any} divWithMouseHit @param {any} x @param {any} y */
-TableEditorSC.SegmentDivHit = function(segtable: any, divWithMouseHit: any, x: any, y: any) {
+TableEditorSC.SegmentDivHit = function (segtable: any, divWithMouseHit: any, x: any, y: any) {
+  var width = divWithMouseHit.offsetWidth;
+  var height = divWithMouseHit.offsetHeight;
+  var left = divWithMouseHit.offsetLeft;
+  var top = divWithMouseHit.offsetTop;
+  var v = 0;
+  var table = segtable;
+  var quadrant = "";
+  var len = Math.sqrt(
+    Math.pow(x - left - (width / 2.0 - 0.5), 2) + Math.pow(y - top - (height / 2.0 - 0.5), 2),
+  );
 
-   var width = divWithMouseHit.offsetWidth;
-   var height = divWithMouseHit.offsetHeight;
-   var left = divWithMouseHit.offsetLeft;
-   var top = divWithMouseHit.offsetTop;
-   var v = 0;
-   var table = segtable;
-   var quadrant = "";
-   var len = Math.sqrt(Math.pow(x-left-(width/2.0-.5), 2)+Math.pow(y-top-(height/2.0-.5), 2));
+  if (table.length == 2) {
+    // type 2 segtable
+    if (x >= left && x < left + width / 2 && y >= top && y < top + height / 2) {
+      // upper left
+      if (len <= segtable[0]) v = -1;
+      else if (len <= segtable[1]) v = 1;
+    }
+    if (x >= left + width / 2 && x < left + width && y >= top && y < top + height / 2) {
+      // upper right
+      if (len <= segtable[0]) v = -2;
+      else if (len <= segtable[1]) v = 2;
+    }
+    if (x >= left + width / 2 && x < left + width && y >= top + height / 2 && y < top + height) {
+      // bottom right
+      if (len <= segtable[0]) v = -3;
+      else if (len <= segtable[1]) v = 3;
+    }
+    if (x >= left && x < left + width / 2 && y >= top + height / 2 && y < top + height) {
+      // bottom right
+      if (len <= segtable[0]) v = -4;
+      else if (len <= segtable[1]) v = 4;
+    }
+    return v;
+  }
 
-   if (table.length==2) { // type 2 segtable
-      if (x >= left && x < left+width/2 && y >= top && y < top+height/2) { // upper left
-         if (len <= segtable[0]) v = -1;
-         else if (len <= segtable[1]) v = 1;
-         }
-      if (x >= left+width/2 && x < left+width && y >= top && y < top+height/2) { // upper right
-         if (len <= segtable[0]) v = -2;
-         else if (len <= segtable[1]) v = 2;
-         }
-      if (x >= left+width/2 && x < left+width && y >= top+height/2 && y < top+height) { // bottom right
-         if (len <= segtable[0]) v = -3;
-         else if (len <= segtable[1]) v = 3;
-         }
-      if (x >= left && x < left+width/2 && y >= top+height/2 && y < top+height) { // bottom right
-         if (len <= segtable[0]) v = -4;
-         else if (len <= segtable[1]) v = 4;
-         }
-      return v;
+  while (true) {
+    if (x >= left && x < left + width / 2 && y >= top && y < top + height / 2) {
+      // upper left
+      quadrant += "1";
+      v = table[0];
+      if (typeof v == "number") {
+        break;
       }
-
-   while (true) {
-      if (x >= left && x < left+width/2 && y >= top && y < top+height/2) { // upper left
-         quadrant += "1";
-         v = table[0];
-         if (typeof v == "number") {
-            break;
-            }
-         table = v;
-         width = width/2;
-         height = height/2;
-         continue;
-         }
-      if (x >= left+width/2 && x < left+width && y >= top && y < top+height/2) { // upper right
-         quadrant += "2";
-         v = table[1];
-         if (typeof v == "number") {
-            break;
-            }
-         table = v;
-         width = width/2;
-         left = left+width;
-         height = height/2;
-         continue;
-         }
-      if (x >= left+width/2 && x < left+width && y >= top+height/2 && y < top+height) { // bottom right
-         quadrant += "3";
-         v = table[2];
-         if (typeof v == "number") {
-            break;
-            }
-         table = v;
-         width = width/2;
-         left = left + width;
-         height = height/2;
-         top = top + height;
-         continue;
-         }
-      if (x >= left && x < left+width/2 && y >= top+height/2 && y < top+height) { // bottom right
-         quadrant += "4";
-         v = table[3];
-         if (typeof v == "number") {
-            break;
-            }
-         table = v;
-         width = width/2;
-         height = height/2;
-         top = top + height;
-         continue;
-         }
-      return 0; // didn't match
+      table = v;
+      width = width / 2;
+      height = height / 2;
+      continue;
+    }
+    if (x >= left + width / 2 && x < left + width && y >= top && y < top + height / 2) {
+      // upper right
+      quadrant += "2";
+      v = table[1];
+      if (typeof v == "number") {
+        break;
       }
-
-//addmsg((x-divWithMouseHit.offsetLeft)+","+(y-divWithMouseHit.offsetTop)+"="+quadrant+" "+v);
-   return v;
-
-}
-
-TableEditorSC.CellHandlesHoverTimeout = function() {
-
-   var editor = TableEditorSC.Keyboard.focusTable; // get TableEditor doing keyboard stuff
-   if (!editor) return true; // we're not handling it -- let browser do default
-   var cellhandles = editor.cellhandles;
-   if (cellhandles.timer) {
-      window.clearTimeout(cellhandles.timer);
-      cellhandles.timer = null;
+      table = v;
+      width = width / 2;
+      left = left + width;
+      height = height / 2;
+      continue;
+    }
+    if (x >= left + width / 2 && x < left + width && y >= top + height / 2 && y < top + height) {
+      // bottom right
+      quadrant += "3";
+      v = table[2];
+      if (typeof v == "number") {
+        break;
       }
-   editor.cellhandles.ShowCellHandles(true, false); // hide move handles
-   return undefined;
-}
+      table = v;
+      width = width / 2;
+      left = left + width;
+      height = height / 2;
+      top = top + height;
+      continue;
+    }
+    if (x >= left && x < left + width / 2 && y >= top + height / 2 && y < top + height) {
+      // bottom right
+      quadrant += "4";
+      v = table[3];
+      if (typeof v == "number") {
+        break;
+      }
+      table = v;
+      width = width / 2;
+      height = height / 2;
+      top = top + height;
+      continue;
+    }
+    return 0; // didn't match
+  }
+
+  //addmsg((x-divWithMouseHit.offsetLeft)+","+(y-divWithMouseHit.offsetTop)+"="+quadrant+" "+v);
+  return v;
+};
+
+TableEditorSC.CellHandlesHoverTimeout = function () {
+  var editor = TableEditorSC.Keyboard.focusTable; // get TableEditor doing keyboard stuff
+  if (!editor) return true; // we're not handling it -- let browser do default
+  var cellhandles = editor.cellhandles;
+  if (cellhandles.timer) {
+    window.clearTimeout(cellhandles.timer);
+    cellhandles.timer = null;
+  }
+  editor.cellhandles.ShowCellHandles(true, false); // hide move handles
+  return undefined;
+};
 
 /** @param {any} e */
-TableEditorSC.CellHandlesMouseDown = function(e: any) {
+TableEditorSC.CellHandlesMouseDown = function (e: any) {
+  var scc = TableEditorSC.Constants;
+  var editor, coord, range;
 
-   var scc = TableEditorSC.Constants;
-   var editor, result, coord, textarea, wval, range;
+  var event = e || window.event;
 
-   var event = e || window.event;
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
 
-   var mouseinfo = TableEditorSC.EditorMouseInfo;
+  editor = TableEditorSC.Keyboard.focusTable; // get TableEditor doing keyboard stuff
+  if (!editor) return true; // we're not handling it -- let browser do default
 
-   editor = TableEditorSC.Keyboard.focusTable; // get TableEditor doing keyboard stuff
-   if (!editor) return true; // we're not handling it -- let browser do default
+  if (editor.busy) return; // don't do anything when busy (is this correct?)
 
-   if (editor.busy) return; // don't do anything when busy (is this correct?)
+  var cellhandles = editor.cellhandles;
 
-   var cellhandles = editor.cellhandles;
+  cellhandles.movedmouse = false; // detect no-op
 
-   cellhandles.movedmouse = false; // detect no-op
+  var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
+  var clientX = event.clientX - pos.left;
+  var clientY = event.clientY - pos.top;
 
-   var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
-   var clientX = event.clientX - pos.left;
-   var clientY = event.clientY - pos.top;
+  if (cellhandles.timer) {
+    // cancel timer
+    window.clearTimeout(cellhandles.timer);
+    cellhandles.timer = null;
+  }
 
-   if (cellhandles.timer) { // cancel timer
-      window.clearTimeout(cellhandles.timer);
-      cellhandles.timer = null;
+  cellhandles.dragtooltip.innerHTML = "&nbsp;";
+  cellhandles.dragtooltip.style.display = "none";
+
+  range = editor.range;
+
+  var whichhandle = TableEditorSC.SegmentDivHit(
+    [scc.CH_radius1, scc.CH_radius2],
+    editor.cellhandles.dragpalette,
+    clientX,
+    clientY,
+  );
+  if (whichhandle == 1 || whichhandle == -1 || whichhandle == 0) {
+    cellhandles.ShowCellHandles(true, false); // hide move handles
+    return;
+  }
+
+  mouseinfo.ignore = true; // stop other code from looking at the mouse
+
+  if (whichhandle == -3) {
+    cellhandles.dragtype = "Fill";
+    //      mouseinfo.element = editor.cellhandles.fillhandle;
+    cellhandles.noCursorSuffix = false;
+  } else if (whichhandle == 3) {
+    cellhandles.dragtype = "FillC";
+    //      mouseinfo.element = editor.cellhandles.fillhandle;
+    cellhandles.noCursorSuffix = false;
+  } else if (whichhandle == -2) {
+    cellhandles.dragtype = "Move";
+    //      mouseinfo.element = editor.cellhandles.movehandle1;
+    cellhandles.noCursorSuffix = true;
+  } else if (whichhandle == -4) {
+    cellhandles.dragtype = "MoveI";
+    //      mouseinfo.element = editor.cellhandles.movehandle2;
+    cellhandles.noCursorSuffix = false;
+  } else if (whichhandle == 2) {
+    cellhandles.dragtype = "MoveC";
+    //      mouseinfo.element = editor.cellhandles.movehandle1;
+    cellhandles.noCursorSuffix = true;
+  } else if (whichhandle == 4) {
+    cellhandles.dragtype = "MoveIC";
+    //      mouseinfo.element = editor.cellhandles.movehandle2;
+    cellhandles.noCursorSuffix = false;
+  }
+
+  cellhandles.filltype = null;
+
+  switch (cellhandles.dragtype) {
+    case "Fill":
+    case "FillC":
+      if (!range.hasrange) {
+        editor.RangeAnchor();
       }
+      editor.range2.top = editor.range.top;
+      editor.range2.right = editor.range.right;
+      editor.range2.bottom = editor.range.bottom;
+      editor.range2.left = editor.range.left;
+      editor.range2.hasrange = true;
+      break;
 
-   cellhandles.dragtooltip.innerHTML = "&nbsp;";
-   cellhandles.dragtooltip.style.display = "none";
-
-   range = editor.range;
-
-   var whichhandle = TableEditorSC.SegmentDivHit([scc.CH_radius1, scc.CH_radius2], editor.cellhandles.dragpalette, clientX, clientY);
-   if (whichhandle==1 || whichhandle==-1 || whichhandle==0) {
-      cellhandles.ShowCellHandles(true, false); // hide move handles
-      return;
+    case "Move":
+    case "MoveI":
+    case "MoveC":
+    case "MoveIC":
+      if (!range.hasrange) {
+        editor.RangeAnchor();
       }
+      editor.range2.top = editor.range.top;
+      editor.range2.right = editor.range.right;
+      editor.range2.bottom = editor.range.bottom;
+      editor.range2.left = editor.range.left;
+      editor.range2.hasrange = true;
+      editor.RangeRemove();
+      break;
 
-   mouseinfo.ignore = true; // stop other code from looking at the mouse
+    default:
+      return; // not for us
+  }
 
-   if (whichhandle==-3) {
-      cellhandles.dragtype = "Fill";
-//      mouseinfo.element = editor.cellhandles.fillhandle;
-      cellhandles.noCursorSuffix = false;
-      }
-   else if (whichhandle==3) {
-      cellhandles.dragtype = "FillC";
-//      mouseinfo.element = editor.cellhandles.fillhandle;
-      cellhandles.noCursorSuffix = false;
-      }
-   else if (whichhandle==-2) {
-      cellhandles.dragtype = "Move";
-//      mouseinfo.element = editor.cellhandles.movehandle1;
-      cellhandles.noCursorSuffix = true;
-      }
-   else if (whichhandle==-4) {
-      cellhandles.dragtype = "MoveI";
-//      mouseinfo.element = editor.cellhandles.movehandle2;
-      cellhandles.noCursorSuffix = false;
-      }
-   else if (whichhandle==2) {
-      cellhandles.dragtype = "MoveC";
-//      mouseinfo.element = editor.cellhandles.movehandle1;
-      cellhandles.noCursorSuffix = true;
-      }
-   else if (whichhandle==4) {
-      cellhandles.dragtype = "MoveIC";
-//      mouseinfo.element = editor.cellhandles.movehandle2;
-      cellhandles.noCursorSuffix = false;
-      }
+  cellhandles.fillinghandle.style.left = clientX + "px";
+  cellhandles.fillinghandle.style.top = clientY - 17 + "px";
+  cellhandles.fillinghandle.innerHTML =
+    scc.s_CHindicatorOperationLookup[cellhandles.dragtype] +
+    (scc.s_CHindicatorDirectionLookup[editor.cellhandles.filltype] || "");
+  cellhandles.fillinghandle.style.display = "block";
 
-   cellhandles.filltype = null;
+  cellhandles.ShowCellHandles(true, false); // hide move handles
+  cellhandles.mouseDown = true;
 
-   switch (cellhandles.dragtype) {
-      case "Fill":
-      case "FillC":
-         if (!range.hasrange) {
-            editor.RangeAnchor();
-            }
-         editor.range2.top = editor.range.top;
-         editor.range2.right = editor.range.right;
-         editor.range2.bottom = editor.range.bottom;
-         editor.range2.left = editor.range.left;
-         editor.range2.hasrange = true;
-         break;
+  mouseinfo.editor = editor; // remember for later
 
-      case "Move":
-      case "MoveI":
-      case "MoveC":
-      case "MoveIC":
-         if (!range.hasrange) {
-            editor.RangeAnchor();
-            }
-         editor.range2.top = editor.range.top;
-         editor.range2.right = editor.range.right;
-         editor.range2.bottom = editor.range.bottom;
-         editor.range2.left = editor.range.left;
-         editor.range2.hasrange = true;
-         editor.RangeRemove();
-         break;
+  coord = editor.ecell.coord; // start with cell with handles
 
-      default:
-         return; // not for us
-      }
+  cellhandles.startingcoord = coord;
+  cellhandles.startingX = clientX;
+  cellhandles.startingY = clientY;
 
-   cellhandles.fillinghandle.style.left = (clientX)+"px";
-   cellhandles.fillinghandle.style.top = (clientY - 17)+"px";
-   cellhandles.fillinghandle.innerHTML = scc.s_CHindicatorOperationLookup[cellhandles.dragtype]+
-                                         (scc.s_CHindicatorDirectionLookup[editor.cellhandles.filltype] || "");
-   cellhandles.fillinghandle.style.display = "block";
+  mouseinfo.mouselastcoord = coord;
 
-   cellhandles.ShowCellHandles(true, false); // hide move handles
-   cellhandles.mouseDown = true;
+  TableEditorSC.KeyboardSetFocus(editor);
 
-   mouseinfo.editor = editor; // remember for later
-
-   coord = editor.ecell.coord; // start with cell with handles
-
-   cellhandles.startingcoord = coord;
-   cellhandles.startingX = clientX;
-   cellhandles.startingY = clientY;
-
-   mouseinfo.mouselastcoord = coord;
-
-   TableEditorSC.KeyboardSetFocus(editor);
-
-   document.addEventListener("mousemove", TableEditorSC.CellHandlesMouseMove, true); // capture everywhere
-   document.addEventListener("mouseup", TableEditorSC.CellHandlesMouseUp, true); // capture everywhere
-   TableEditorSC.StopPropagation(event);
-   return;
-
-   }
+  document.addEventListener("mousemove", TableEditorSC.CellHandlesMouseMove, true); // capture everywhere
+  document.addEventListener("mouseup", TableEditorSC.CellHandlesMouseUp, true); // capture everywhere
+  TableEditorSC.StopPropagation(event);
+  return;
+};
 
 /** @param {any} e */
-TableEditorSC.CellHandlesMouseMove = function(e: any) {
+TableEditorSC.CellHandlesMouseMove = function (e: any) {
+  var scc = TableEditorSC.Constants;
+  var editor, result;
+  var crstart, crend, c, r;
 
-   var scc = TableEditorSC.Constants;
-   var editor, element, result, coord, now, textarea, sheetobj, cellobj, wval;
-   var crstart, crend, cr, c, r;
+  var event = e || window.event;
 
-   var event = e || window.event;
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  editor = mouseinfo.editor;
+  if (!editor) return; // not us, ignore
+  var cellhandles = editor.cellhandles;
 
-   var mouseinfo = TableEditorSC.EditorMouseInfo;
-   editor = mouseinfo.editor;
-   if (!editor) return; // not us, ignore
-   var cellhandles = editor.cellhandles;
+  var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
+  var clientX = event.clientX - pos.left;
+  var clientY = event.clientY - pos.top;
+  result = TableEditorSC.GridMousePosition(editor, clientX, clientY); // get cell with move
 
-   element = mouseinfo.element;
+  if (!result) return;
 
-   var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
-   var clientX = event.clientX - pos.left;
-   var clientY = event.clientY - pos.top;
-   result = TableEditorSC.GridMousePosition(editor, clientX, clientY); // get cell with move
+  if (result && !result.coord) {
+    TableEditorSC.SetDragAutoRepeat(editor, result, TableEditorSC.CellHandlesDragAutoRepeat);
+    return;
+  }
 
-   if (!result) return;
+  TableEditorSC.SetDragAutoRepeat(editor, null); // stop repeating if it was
 
-   if (result && !result.coord) {
-      TableEditorSC.SetDragAutoRepeat(editor, result, TableEditorSC.CellHandlesDragAutoRepeat);
-      return;
+  if (!result.coord) return;
+
+  crstart = TableEditorSC.coordToCr(editor.cellhandles.startingcoord);
+  crend = TableEditorSC.coordToCr(result.coord);
+
+  cellhandles.movedmouse = true; // did move, so not no-op
+
+  switch (cellhandles.dragtype) {
+    case "Fill":
+    case "FillC":
+      if (result.coord == cellhandles.startingcoord) {
+        // reset when come back
+        cellhandles.filltype = null;
+        cellhandles.startingX = clientX;
+        cellhandles.startingY = clientY;
+      } else if (cellhandles.filltype) {
+        // moving and have already determined filltype
+        if (cellhandles.filltype == "Down") {
+          // coerse to that
+          crend.col = crstart.col;
+          if (crend.row < crstart.row) crend.row = crstart.row;
+        } else {
+          crend.row = crstart.row;
+          if (crend.col < crstart.col) crend.col = crstart.col;
+        }
+      } else {
+        if (Math.abs(clientY - cellhandles.startingY) > 10) cellhandles.filltype = "Down";
+        else if (Math.abs(clientX - cellhandles.startingX) > 10) cellhandles.filltype = "Right";
+        crend.col = crstart.col; // until decide, leave it at start
+        crend.row = crstart.row;
       }
-
-   TableEditorSC.SetDragAutoRepeat(editor, null); // stop repeating if it was
-
-   if (!result.coord) return;
-
-   crstart = TableEditorSC.coordToCr(editor.cellhandles.startingcoord);
-   crend = TableEditorSC.coordToCr(result.coord);
-
-
-   cellhandles.movedmouse = true; // did move, so not no-op
-
-   switch (cellhandles.dragtype) {
-      case "Fill":
-      case "FillC":
-
-         if (result.coord == cellhandles.startingcoord) { // reset when come back
-            cellhandles.filltype = null;
-            cellhandles.startingX = clientX;
-            cellhandles.startingY = clientY;
-            }
-         else if (cellhandles.filltype) { // moving and have already determined filltype
-            if (cellhandles.filltype=="Down") { // coerse to that
-               crend.col = crstart.col;
-               if (crend.row < crstart.row) crend.row = crstart.row;
-               }
-            else {
-               crend.row = crstart.row;
-               if (crend.col < crstart.col) crend.col = crstart.col;
-               }
-            }
-         else {
-            if (Math.abs(clientY - cellhandles.startingY) > 10) cellhandles.filltype = "Down";
-            else if (Math.abs(clientX - cellhandles.startingX) > 10) cellhandles.filltype = "Right";
-            crend.col = crstart.col; // until decide, leave it at start
-            crend.row = crstart.row;
-            }
-         result.coord = TableEditorSC.crToCoord(crend.col, crend.row);
-         if (result.coord!=mouseinfo.mouselastcoord) {
-            editor.MoveECell(result.coord);
-            editor.RangeExtend();
-            }
-         break;
-
-      case "Move":
-      case "MoveC":
-         if (result.coord!=mouseinfo.mouselastcoord) {
-            editor.MoveECell(result.coord);
-            c = editor.range2.right - editor.range2.left + result.col;
-            r = editor.range2.bottom - editor.range2.top + result.row;
-            editor.RangeAnchor(TableEditorSC.crToCoord(c, r));
-            editor.RangeExtend();
-            }
-         break;
-
-      case "MoveI":
-      case "MoveIC":
-         if (result.coord == cellhandles.startingcoord) { // reset when come back
-            cellhandles.filltype = null;
-            cellhandles.startingX = clientX;
-            cellhandles.startingY = clientY;
-            }
-         else if (cellhandles.filltype) { // moving and have already determined filltype
-            if (cellhandles.filltype=="Vertical") { // coerse to that
-               crend.col = editor.range2.left;
-               if (crend.row>=editor.range2.top && crend.row<=editor.range2.bottom+1) crend.row = editor.range2.bottom+2;
-               }
-            else {
-               crend.row = editor.range2.top;
-               if (crend.col>=editor.range2.left && crend.col<=editor.range2.right+1) crend.col = editor.range2.right+2;
-               }
-            }
-         else {
-            if (Math.abs(clientY - cellhandles.startingY) > 10) cellhandles.filltype = "Vertical";
-            else if (Math.abs(clientX - cellhandles.startingX) > 10) cellhandles.filltype = "Horizontal";
-            crend.col = crstart.col; // until decide, leave it at start
-            crend.row = crstart.row;
-            }
-         result.coord = TableEditorSC.crToCoord(crend.col, crend.row);
-         if (result.coord!=mouseinfo.mouselastcoord) {
-            editor.MoveECell(result.coord);
-            if (!cellhandles.filltype) editor.RangeRemove(); // no fill type
-            else {
-               c = editor.range2.right - editor.range2.left + crend.col;
-               r = editor.range2.bottom - editor.range2.top + crend.row;
-               editor.RangeAnchor(TableEditorSC.crToCoord(c, r));
-               editor.RangeExtend();
-               }
-            }
-         break;
-
+      result.coord = TableEditorSC.crToCoord(crend.col, crend.row);
+      if (result.coord != mouseinfo.mouselastcoord) {
+        editor.MoveECell(result.coord);
+        editor.RangeExtend();
       }
+      break;
 
+    case "Move":
+    case "MoveC":
+      if (result.coord != mouseinfo.mouselastcoord) {
+        editor.MoveECell(result.coord);
+        c = editor.range2.right - editor.range2.left + result.col;
+        r = editor.range2.bottom - editor.range2.top + result.row;
+        editor.RangeAnchor(TableEditorSC.crToCoord(c, r));
+        editor.RangeExtend();
+      }
+      break;
 
-   cellhandles.fillinghandle.style.left = clientX+"px";
-   cellhandles.fillinghandle.style.top = (clientY - 17)+"px";
-   cellhandles.fillinghandle.innerHTML = scc.s_CHindicatorOperationLookup[cellhandles.dragtype]+
-                                         (scc.s_CHindicatorDirectionLookup[editor.cellhandles.filltype] || "");
-   cellhandles.fillinghandle.style.display = "block";
+    case "MoveI":
+    case "MoveIC":
+      if (result.coord == cellhandles.startingcoord) {
+        // reset when come back
+        cellhandles.filltype = null;
+        cellhandles.startingX = clientX;
+        cellhandles.startingY = clientY;
+      } else if (cellhandles.filltype) {
+        // moving and have already determined filltype
+        if (cellhandles.filltype == "Vertical") {
+          // coerse to that
+          crend.col = editor.range2.left;
+          if (crend.row >= editor.range2.top && crend.row <= editor.range2.bottom + 1)
+            crend.row = editor.range2.bottom + 2;
+        } else {
+          crend.row = editor.range2.top;
+          if (crend.col >= editor.range2.left && crend.col <= editor.range2.right + 1)
+            crend.col = editor.range2.right + 2;
+        }
+      } else {
+        if (Math.abs(clientY - cellhandles.startingY) > 10) cellhandles.filltype = "Vertical";
+        else if (Math.abs(clientX - cellhandles.startingX) > 10)
+          cellhandles.filltype = "Horizontal";
+        crend.col = crstart.col; // until decide, leave it at start
+        crend.row = crstart.row;
+      }
+      result.coord = TableEditorSC.crToCoord(crend.col, crend.row);
+      if (result.coord != mouseinfo.mouselastcoord) {
+        editor.MoveECell(result.coord);
+        if (!cellhandles.filltype)
+          editor.RangeRemove(); // no fill type
+        else {
+          c = editor.range2.right - editor.range2.left + crend.col;
+          r = editor.range2.bottom - editor.range2.top + crend.row;
+          editor.RangeAnchor(TableEditorSC.crToCoord(c, r));
+          editor.RangeExtend();
+        }
+      }
+      break;
+  }
 
-   mouseinfo.mouselastcoord = result.coord;
-   TableEditorSC.StopPropagation(event);
-   return;
-   }
+  cellhandles.fillinghandle.style.left = clientX + "px";
+  cellhandles.fillinghandle.style.top = clientY - 17 + "px";
+  cellhandles.fillinghandle.innerHTML =
+    scc.s_CHindicatorOperationLookup[cellhandles.dragtype] +
+    (scc.s_CHindicatorDirectionLookup[editor.cellhandles.filltype] || "");
+  cellhandles.fillinghandle.style.display = "block";
+
+  mouseinfo.mouselastcoord = result.coord;
+  TableEditorSC.StopPropagation(event);
+  return;
+};
 
 /** @param {any} coord @param {any} direction */
-TableEditorSC.CellHandlesDragAutoRepeat = function(coord: any, direction: any) {
+TableEditorSC.CellHandlesDragAutoRepeat = function (coord: any, direction: any) {
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  var editor = mouseinfo.editor;
+  if (!editor) return; // not us, ignore
+  var cellhandles = editor.cellhandles;
 
-   var mouseinfo = TableEditorSC.EditorMouseInfo;
-   var editor = mouseinfo.editor;
-   if (!editor) return; // not us, ignore
-   var cellhandles = editor.cellhandles;
+  var crstart = TableEditorSC.coordToCr(editor.cellhandles.startingcoord);
+  var crend = TableEditorSC.coordToCr(coord);
 
-   var crstart = TableEditorSC.coordToCr(editor.cellhandles.startingcoord);
-   var crend = TableEditorSC.coordToCr(coord);
+  var newcoord, c, r;
 
-   var newcoord, c, r;
+  var vscroll = 0;
+  var hscroll = 0;
 
-   var vscroll = 0;
-   var hscroll = 0;
+  if (direction == "left") hscroll = -1;
+  else if (direction == "right") hscroll = 1;
+  else if (direction == "up") vscroll = -1;
+  else if (direction == "down") vscroll = 1;
+  editor.ScrollRelativeBoth(vscroll, hscroll);
 
-   if (direction == "left") hscroll = -1;
-   else if (direction == "right") hscroll = 1;
-   else if (direction == "up") vscroll = -1;
-   else if (direction == "down") vscroll = 1;
-   editor.ScrollRelativeBoth(vscroll, hscroll);
-
-
-   switch (cellhandles.dragtype) {
-      case "Fill":
-      case "FillC":
-         if (cellhandles.filltype) { // moving and have already determined filltype
-            if (cellhandles.filltype=="Down") { // coerse to that
-               crend.col = crstart.col;
-               if (crend.row < crstart.row) crend.row = crstart.row;
-               }
-            else {
-               crend.row = crstart.row;
-               if (crend.col < crstart.col) crend.col = crstart.col;
-               }
-            }
-         else {
-            crend.col = crstart.col; // until decide, leave it at start
-            crend.row = crstart.row;
-            }
-
-         newcoord = TableEditorSC.crToCoord(crend.col, crend.row);
-         if (newcoord!=mouseinfo.mouselastcoord) {
-            editor.MoveECell(coord);
-            editor.RangeExtend();
-            }
-         break;
-
-      case "Move":
-      case "MoveC":
-         if (coord!=mouseinfo.mouselastcoord) {
-            editor.MoveECell(coord);
-            c = editor.range2.right - editor.range2.left + editor.ecell.col;
-            r = editor.range2.bottom - editor.range2.top + editor.ecell.row;
-            editor.RangeAnchor(TableEditorSC.crToCoord(c, r));
-            editor.RangeExtend();
-            }
-         break;
-
-      case "MoveI":
-      case "MoveIC":
-         if (cellhandles.filltype) { // moving and have already determined filltype
-            if (cellhandles.filltype=="Vertical") { // coerse to that
-               crend.col = editor.range2.left;
-               if (crend.row>=editor.range2.top && crend.row<=editor.range2.bottom+1) crend.row = editor.range2.bottom+2;
-               }
-            else {
-               crend.row = editor.range2.top;
-               if (crend.col>=editor.range2.left && crend.col<=editor.range2.right+1) crend.col = editor.range2.right+2;
-               }
-            }
-         else {
-            crend.col = crstart.col; // until decide, leave it at start
-            crend.row = crstart.row;
-            }
-
-         newcoord = TableEditorSC.crToCoord(crend.col, crend.row);
-         if (newcoord!=mouseinfo.mouselastcoord) {
-            editor.MoveECell(newcoord);
-            c = editor.range2.right - editor.range2.left + crend.col;
-            r = editor.range2.bottom - editor.range2.top + crend.row;
-            editor.RangeAnchor(TableEditorSC.crToCoord(c, r));
-            editor.RangeExtend();
-            }
-         break;
-
+  switch (cellhandles.dragtype) {
+    case "Fill":
+    case "FillC":
+      if (cellhandles.filltype) {
+        // moving and have already determined filltype
+        if (cellhandles.filltype == "Down") {
+          // coerse to that
+          crend.col = crstart.col;
+          if (crend.row < crstart.row) crend.row = crstart.row;
+        } else {
+          crend.row = crstart.row;
+          if (crend.col < crstart.col) crend.col = crstart.col;
+        }
+      } else {
+        crend.col = crstart.col; // until decide, leave it at start
+        crend.row = crstart.row;
       }
 
-   mouseinfo.mouselastcoord = newcoord;
+      newcoord = TableEditorSC.crToCoord(crend.col, crend.row);
+      if (newcoord != mouseinfo.mouselastcoord) {
+        editor.MoveECell(coord);
+        editor.RangeExtend();
+      }
+      break;
 
-   }
+    case "Move":
+    case "MoveC":
+      if (coord != mouseinfo.mouselastcoord) {
+        editor.MoveECell(coord);
+        c = editor.range2.right - editor.range2.left + editor.ecell.col;
+        r = editor.range2.bottom - editor.range2.top + editor.ecell.row;
+        editor.RangeAnchor(TableEditorSC.crToCoord(c, r));
+        editor.RangeExtend();
+      }
+      break;
+
+    case "MoveI":
+    case "MoveIC":
+      if (cellhandles.filltype) {
+        // moving and have already determined filltype
+        if (cellhandles.filltype == "Vertical") {
+          // coerse to that
+          crend.col = editor.range2.left;
+          if (crend.row >= editor.range2.top && crend.row <= editor.range2.bottom + 1)
+            crend.row = editor.range2.bottom + 2;
+        } else {
+          crend.row = editor.range2.top;
+          if (crend.col >= editor.range2.left && crend.col <= editor.range2.right + 1)
+            crend.col = editor.range2.right + 2;
+        }
+      } else {
+        crend.col = crstart.col; // until decide, leave it at start
+        crend.row = crstart.row;
+      }
+
+      newcoord = TableEditorSC.crToCoord(crend.col, crend.row);
+      if (newcoord != mouseinfo.mouselastcoord) {
+        editor.MoveECell(newcoord);
+        c = editor.range2.right - editor.range2.left + crend.col;
+        r = editor.range2.bottom - editor.range2.top + crend.row;
+        editor.RangeAnchor(TableEditorSC.crToCoord(c, r));
+        editor.RangeExtend();
+      }
+      break;
+  }
+
+  mouseinfo.mouselastcoord = newcoord;
+};
 
 /** @param {any} e */
-TableEditorSC.CellHandlesMouseUp = function(e: any) {
+TableEditorSC.CellHandlesMouseUp = function (e: any) {
+  var editor, result, cstr, cmdtype, cmdtype2;
+  var crstart, crend;
+  var sizec, sizer;
 
-   var editor, element, result, coord, now, textarea, sheetobj, cellobj, wval, cstr, cmdtype, cmdtype2;
-   var crstart, crend;
-   var sizec, sizer, deltac, deltar;
+  var event = e || window.event;
 
-   var event = e || window.event;
+  var mouseinfo = TableEditorSC.EditorMouseInfo;
+  editor = mouseinfo.editor;
+  if (!editor) return; // not us, ignore
+  var cellhandles = editor.cellhandles;
 
-   var mouseinfo = TableEditorSC.EditorMouseInfo;
-   editor = mouseinfo.editor;
-   if (!editor) return; // not us, ignore
-   var cellhandles = editor.cellhandles;
+  mouseinfo.ignore = false;
 
-   element = mouseinfo.element;
+  var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
+  var clientX = event.clientX - pos.left;
+  var clientY = event.clientY - pos.top;
+  result = TableEditorSC.GridMousePosition(editor, clientX, clientY); // get cell with up
 
-   mouseinfo.ignore = false;
+  TableEditorSC.SetDragAutoRepeat(editor, null); // stop repeating if it was
 
-   var pos = TableEditorSC.GetElementPositionWithScroll(editor.toplevel);
-   var clientX = event.clientX - pos.left;
-   var clientY = event.clientY - pos.top;
-   result = TableEditorSC.GridMousePosition(editor, clientX, clientY); // get cell with up
+  cellhandles.mouseDown = false;
+  cellhandles.noCursorSuffix = false;
 
-   TableEditorSC.SetDragAutoRepeat(editor, null); // stop repeating if it was
+  cellhandles.fillinghandle.style.display = "none";
 
-   cellhandles.mouseDown = false;
-   cellhandles.noCursorSuffix = false;
+  if (!result) result = {};
+  if (!result.coord) result.coord = editor.ecell.coord;
 
-   cellhandles.fillinghandle.style.display = "none";
+  switch (cellhandles.dragtype) {
+    case "Fill":
+    case "Move":
+    case "MoveI":
+      cmdtype2 = " all";
+      break;
+    case "FillC":
+    case "MoveC":
+    case "MoveIC":
+      cmdtype2 = " formulas";
+      break;
+  }
 
-   if (!result) result = {};
-   if (!result.coord) result.coord = editor.ecell.coord;
+  if (!cellhandles.movedmouse) {
+    // didn't move: just leave one cell selected
+    cellhandles.dragtype = "Nothing";
+  }
 
-   switch (cellhandles.dragtype) {
-      case "Fill":
-      case "Move":
-      case "MoveI":
-         cmdtype2 = " all";
-            break;
-      case "FillC":
-      case "MoveC":
-      case "MoveIC":
-         cmdtype2 = " formulas";
-         break;
+  switch (cellhandles.dragtype) {
+    case "Nothing":
+      editor.Range2Remove();
+      editor.RangeRemove();
+      break;
+
+    case "Fill":
+    case "FillC":
+      crstart = TableEditorSC.coordToCr(cellhandles.startingcoord);
+      crend = TableEditorSC.coordToCr(result.coord);
+      if (cellhandles.filltype) {
+        if (cellhandles.filltype == "Down") {
+          crend.col = crstart.col;
+        } else {
+          crend.row = crstart.row;
+        }
       }
+      result.coord = TableEditorSC.crToCoord(crend.col, crend.row);
 
-   if (!cellhandles.movedmouse) { // didn't move: just leave one cell selected
-      cellhandles.dragtype = "Nothing";
+      editor.MoveECell(result.coord);
+      editor.RangeExtend();
+
+      if (editor.cellhandles.filltype == "Right") {
+        cmdtype = "right";
+      } else {
+        cmdtype = "down";
       }
+      cstr =
+        "fill" +
+        cmdtype +
+        " " +
+        TableEditorSC.crToCoord(editor.range.left, editor.range.top) +
+        ":" +
+        TableEditorSC.crToCoord(editor.range.right, editor.range.bottom) +
+        cmdtype2;
+      editor.EditorScheduleSheetCommands(cstr, true, false);
+      break;
 
-   switch (cellhandles.dragtype) {
-      case "Nothing":
-         editor.Range2Remove();
-         editor.RangeRemove();
-         break;
+    case "Move":
+    case "MoveC":
+      editor.context.cursorsuffix = "";
+      cstr =
+        "movepaste " +
+        TableEditorSC.crToCoord(editor.range2.left, editor.range2.top) +
+        ":" +
+        TableEditorSC.crToCoord(editor.range2.right, editor.range2.bottom) +
+        " " +
+        editor.ecell.coord +
+        cmdtype2;
+      editor.EditorScheduleSheetCommands(cstr, true, false);
+      editor.Range2Remove();
 
-      case "Fill":
-      case "FillC":
+      break;
 
-         crstart = TableEditorSC.coordToCr(cellhandles.startingcoord);
-         crend = TableEditorSC.coordToCr(result.coord);
-         if (cellhandles.filltype) {
-            if (cellhandles.filltype=="Down") {
-               crend.col = crstart.col;
-               }
-            else {
-               crend.row = crstart.row;
-               }
-            }
-         result.coord = TableEditorSC.crToCoord(crend.col, crend.row);
+    case "MoveI":
+    case "MoveIC":
+      editor.context.cursorsuffix = "";
+      sizec = editor.range2.right - editor.range2.left;
+      sizer = editor.range2.bottom - editor.range2.top;
+      cstr =
+        "moveinsert " +
+        TableEditorSC.crToCoord(editor.range2.left, editor.range2.top) +
+        ":" +
+        TableEditorSC.crToCoord(editor.range2.right, editor.range2.bottom) +
+        " " +
+        editor.ecell.coord +
+        cmdtype2;
+      editor.EditorScheduleSheetCommands(cstr, true, false);
+      editor.Range2Remove();
+      editor.RangeRemove();
+      // Dead code removed: compared filltype to " Horizontal"/" Vertical"
+      // (with leading space) but filltype is never assigned with a space.
+      editor.RangeAnchor(
+        TableEditorSC.crToCoord(editor.ecell.col + sizec, editor.ecell.row + sizer),
+      );
+      editor.RangeExtend();
 
-         editor.MoveECell(result.coord);
-         editor.RangeExtend();
-
-         if (editor.cellhandles.filltype=="Right") {
-            cmdtype = "right";
-            }
-         else {
-            cmdtype = "down";
-            }
-         cstr = "fill"+cmdtype+" "+TableEditorSC.crToCoord(editor.range.left, editor.range.top)+
-                   ":"+TableEditorSC.crToCoord(editor.range.right, editor.range.bottom)+cmdtype2;
-         editor.EditorScheduleSheetCommands(cstr, true, false);
-         break;
-
-      case "Move":
-      case "MoveC":
-         editor.context.cursorsuffix = "";
-         cstr = "movepaste "+
-                     TableEditorSC.crToCoord(editor.range2.left, editor.range2.top) + ":" +
-                     TableEditorSC.crToCoord(editor.range2.right, editor.range2.bottom)
-                     +" "+editor.ecell.coord+cmdtype2;
-         editor.EditorScheduleSheetCommands(cstr, true, false);
-         editor.Range2Remove();
-
-         break;
-
-      case "MoveI":
-      case "MoveIC":
-         editor.context.cursorsuffix = "";
-         sizec = editor.range2.right - editor.range2.left;
-         sizer = editor.range2.bottom - editor.range2.top;
-         deltac = editor.ecell.col - editor.range2.left;
-         deltar = editor.ecell.row - editor.range2.top;
-         cstr = "moveinsert "+
-                     TableEditorSC.crToCoord(editor.range2.left, editor.range2.top) + ":" +
-                     TableEditorSC.crToCoord(editor.range2.right, editor.range2.bottom)
-                     +" "+editor.ecell.coord+cmdtype2;
-         editor.EditorScheduleSheetCommands(cstr, true, false);
-         editor.Range2Remove();
-         editor.RangeRemove();
-         // Dead code removed: compared filltype to " Horizontal"/" Vertical"
-         // (with leading space) but filltype is never assigned with a space.
-         editor.RangeAnchor(TableEditorSC.crToCoord(editor.ecell.col+sizec, editor.ecell.row+sizer));
-         editor.RangeExtend();
-
-         break;
-
-      }
-    TableEditorSC.RemoveMouseMoveUp(TableEditorSC.CellHandlesMouseMove,
-				    TableEditorSC.CellHandlesMouseUp,
-				    cellhandles.draghandle,
-				    event);
-   mouseinfo.editor = null;
-   return false;
-   }
+      break;
+  }
+  TableEditorSC.RemoveMouseMoveUp(
+    TableEditorSC.CellHandlesMouseMove,
+    TableEditorSC.CellHandlesMouseUp,
+    cellhandles.draghandle,
+    event,
+  );
+  mouseinfo.editor = null;
+  return false;
+};
 
 // *************************************
 //
@@ -4997,294 +5369,355 @@ TableEditorSC.CellHandlesMouseUp = function(e: any) {
 // *************************************
 
 /** @param {any} editor @param {any} vertical @param {any} size */
-TableEditorSC.TableControl = function(editor: any, vertical: any, size: any) {
+TableEditorSC.TableControl = function (editor: any, vertical: any, size: any) {
+  var scc = TableEditorSC.Constants;
 
-   var scc = TableEditorSC.Constants;
+  this.editor = editor; // the TableEditor this belongs to
 
-   this.editor = editor; // the TableEditor this belongs to
+  this.vertical = vertical; // true if vertical control, false if horizontal
+  this.size = size; // length in pixels
 
-   this.vertical = vertical; // true if vertical control, false if horizontal
-   this.size = size; // length in pixels
+  this.main = null; // main element containing all the others
+  this.endcap = null; // the area at the top/left between the end and the pane slider
+  this.paneslider = null; // the slider to adjust the pane split
+  this.lessbutton = null; // the top/left scroll button
+  this.morebutton = null; // the bottom/right scroll button
+  this.scrollarea = null; // the area between the scroll buttons
+  this.thumb = null; // the sliding thing in the scrollarea
 
-   this.main = null; // main element containing all the others
-   this.endcap = null; // the area at the top/left between the end and the pane slider
-   this.paneslider = null; // the slider to adjust the pane split
-   this.lessbutton = null; // the top/left scroll button
-   this.morebutton = null; // the bottom/right scroll button
-   this.scrollarea = null; // the area between the scroll buttons
-   this.thumb = null; // the sliding thing in the scrollarea
+  // computed position values:
 
-   // computed position values:
+  this.controlborder = null; // left or top screen position for vertical or horizontal control
+  this.endcapstart = null; // top or left screen position for vertical or horizontal control
+  this.panesliderstart = null;
+  this.lessbuttonstart = null;
+  this.morebuttonstart = null;
+  this.scrollareastart = null;
+  this.scrollareaend = null;
+  this.scrollareasize = null;
+  this.thumbpos = null;
 
-   this.controlborder = null; // left or top screen position for vertical or horizontal control
-   this.endcapstart = null; // top or left screen position for vertical or horizontal control
-   this.panesliderstart = null;
-   this.lessbuttonstart = null;
-   this.morebuttonstart = null;
-   this.scrollareastart = null;
-   this.scrollareaend = null;
-   this.scrollareasize = null;
-   this.thumbpos = null;
+  // constants:
 
-   // constants:
-
-   this.controlthickness = scc.defaultTableControlThickness; // other dimension of complete control in pixels
-   this.sliderthickness = scc.defaultTCSliderThickness;
-   this.buttonthickness = scc.defaultTCButtonThickness;
-   this.thumbthickness = scc.defaultTCThumbThickness;
-   this.minscrollingpanesize = this.buttonthickness+this.buttonthickness+this.thumbthickness+20; // the 20 is to leave a little space
-
-   }
+  this.controlthickness = scc.defaultTableControlThickness; // other dimension of complete control in pixels
+  this.sliderthickness = scc.defaultTCSliderThickness;
+  this.buttonthickness = scc.defaultTCButtonThickness;
+  this.thumbthickness = scc.defaultTCThumbThickness;
+  this.minscrollingpanesize =
+    this.buttonthickness + this.buttonthickness + this.thumbthickness + 20; // the 20 is to leave a little space
+};
 
 // Methods:
 
-TableEditorSC.TableControl.prototype.CreateTableControl = function() {return TableEditorSC.CreateTableControl(this);};
-TableEditorSC.TableControl.prototype.PositionTableControlElements = function() {TableEditorSC.PositionTableControlElements(this);};
-TableEditorSC.TableControl.prototype.ComputeTableControlPositions = function() {TableEditorSC.ComputeTableControlPositions(this);};
+TableEditorSC.TableControl.prototype.CreateTableControl = function () {
+  return TableEditorSC.CreateTableControl(this);
+};
+TableEditorSC.TableControl.prototype.PositionTableControlElements = function () {
+  TableEditorSC.PositionTableControlElements(this);
+};
+TableEditorSC.TableControl.prototype.ComputeTableControlPositions = function () {
+  TableEditorSC.ComputeTableControlPositions(this);
+};
 
 // Functions:
 
 /** @param {any} control */
-TableEditorSC.CreateTableControl = function(control: any) {
+TableEditorSC.CreateTableControl = function (control: any) {
+  var s;
+  /** @type {any} */
+  var functions: any;
+  /** @type {any} */
+  var params: any;
+  var AssignID = TableEditorSC.AssignID;
+  var setStyles = TableEditorSC.setStyles;
+  var scc = TableEditorSC.Constants;
 
-   var s;
-   /** @type {any} */
-   var functions: any;
-   /** @type {any} */
-   var params: any;
-   var AssignID = TableEditorSC.AssignID;
-   var setStyles = TableEditorSC.setStyles;
-   var scc = TableEditorSC.Constants;
+  var imageprefix = control.editor.imageprefix;
+  var vh = control.vertical ? "v" : "h";
+  var SCLoc = TableEditorSC.LocalizeString;
 
-   var imageprefix = control.editor.imageprefix;
-   var vh = control.vertical ? "v" : "h";
-   var SCLoc = TableEditorSC.LocalizeString;
+  control.main = document.createElement("div");
+  s = control.main.style;
+  s.height = (control.vertical ? control.size : control.controlthickness) + "px";
+  s.width = (control.vertical ? control.controlthickness : control.size) + "px";
+  s.zIndex = 0;
+  setStyles(control.main, scc.TCmainStyle);
+  s.backgroundImage = "url(" + imageprefix + "main-" + vh + ".gif)";
+  if (scc.TCmainClass) control.main.className = scc.TCmainClass;
 
-   control.main = document.createElement("div");
-   s = control.main.style;
-   s.height = (control.vertical ? control.size : control.controlthickness)+"px";
-   s.width = (control.vertical ? control.controlthickness : control.size)+"px";
-   s.zIndex = 0;
-   setStyles(control.main, scc.TCmainStyle);
-   s.backgroundImage="url("+imageprefix+"main-"+vh+".gif)";
-   if (scc.TCmainClass) control.main.className = scc.TCmainClass;
+  control.main.style.display = "none"; // wait for layout
 
-   control.main.style.display="none"; // wait for layout
+  control.endcap = document.createElement("div");
+  s = control.endcap.style;
+  s.height = control.controlthickness + "px";
+  s.width = control.controlthickness + "px";
+  s.zIndex = 1;
+  s.overflow = "hidden"; // IE will make the DIV at least font-size height...so use this
+  s.position = "absolute";
+  setStyles(control.endcap, scc.TCendcapStyle);
+  s.backgroundImage = "url(" + imageprefix + "endcap-" + vh + ".gif)";
+  if (scc.TCendcapClass) control.endcap.className = scc.TCendcapClass;
+  AssignID(control.editor, control.endcap, "endcap" + vh);
 
-   control.endcap = document.createElement("div");
-   s = control.endcap.style;
-   s.height = control.controlthickness+"px";
-   s.width = control.controlthickness+"px";
-   s.zIndex = 1;
-   s.overflow = "hidden"; // IE will make the DIV at least font-size height...so use this
-   s.position = "absolute";
-   setStyles(control.endcap, scc.TCendcapStyle);
-   s.backgroundImage="url("+imageprefix+"endcap-"+vh+".gif)";
-   if (scc.TCendcapClass) control.endcap.className = scc.TCendcapClass;
-   AssignID(control.editor, control.endcap, "endcap"+vh);
+  control.main.appendChild(control.endcap);
 
-   control.main.appendChild(control.endcap);
+  control.paneslider = document.createElement("div");
+  s = control.paneslider.style;
+  s.height = (control.vertical ? control.sliderthickness : control.controlthickness) + "px";
+  s.overflow = "hidden"; // IE will make the DIV at least font-size height...so use this
+  s.width = (control.vertical ? control.controlthickness : control.sliderthickness) + "px";
+  s.position = "absolute";
+  s[control.vertical ? "top" : "left"] = "4px";
+  s.zIndex = 3;
+  s.backgroundImage = "url(" + imageprefix + "paneslider-" + vh + ".gif)";
+  if (scc.TCpanesliderClass) control.paneslider.className = scc.TCpanesliderClass;
+  AssignID(control.editor, control.paneslider, "paneslider" + vh);
+  control.paneslider.title = SCLoc(
+    control.vertical ? "Drag to lock pane horizontally" : "Drag to lock pane vertically",
+  );
 
-   control.paneslider = document.createElement("div");
-   s = control.paneslider.style;
-   s.height = (control.vertical ? control.sliderthickness : control.controlthickness)+"px";
-   s.overflow = "hidden"; // IE will make the DIV at least font-size height...so use this
-   s.width = (control.vertical ? control.controlthickness : control.sliderthickness)+"px";
-   s.position = "absolute";
-   s[control.vertical?"top":"left"] = "4px";
-   s.zIndex = 3;
-   s.backgroundImage="url("+imageprefix+"paneslider-"+vh+".gif)";
-   if (scc.TCpanesliderClass) control.paneslider.className = scc.TCpanesliderClass;
-   AssignID(control.editor, control.paneslider, "paneslider"+vh);
-   control.paneslider.title = SCLoc(control.vertical ? "Drag to lock pane horizontally" : "Drag to lock pane vertically");
+  functions = {
+    MouseDown: TableEditorSC.TCPSDragFunctionStart,
+    MouseMove: TableEditorSC.TCPSDragFunctionMove,
+    MouseUp: TableEditorSC.TCPSDragFunctionStop,
+    Disabled: function () {
+      return control.editor.busy;
+    },
+  };
 
-   functions = {MouseDown:TableEditorSC.TCPSDragFunctionStart,
-                    MouseMove: TableEditorSC.TCPSDragFunctionMove,
-                    MouseUp: TableEditorSC.TCPSDragFunctionStop,
-                    Disabled: function() {return control.editor.busy;}};
+  functions.control = control; // make sure this is there
 
-   functions.control = control; // make sure this is there
+  // Drag pane slider - every thing but app view
+  if (TableEditorSC._app != true)
+    TableEditorSC.DragRegister(
+      control.paneslider,
+      control.vertical,
+      !control.vertical,
+      functions,
+      control.editor.toplevel,
+    );
 
-   // Drag pane slider - every thing but app view
-   if (TableEditorSC._app != true) TableEditorSC.DragRegister(control.paneslider, control.vertical, !control.vertical, functions, control.editor.toplevel);
+  control.main.appendChild(control.paneslider);
 
-   control.main.appendChild(control.paneslider);
+  control.lessbutton = document.createElement("div");
+  s = control.lessbutton.style;
+  s.height = (control.vertical ? control.buttonthickness : control.controlthickness) + "px";
+  s.width = (control.vertical ? control.controlthickness : control.buttonthickness) + "px";
+  s.zIndex = 2;
+  s.overflow = "hidden"; // IE will make the DIV at least font-size height...so use this
+  s.position = "absolute";
+  setStyles(control.lessbutton, scc.TClessbuttonStyle);
+  s.backgroundImage = "url(" + imageprefix + "less-" + vh + "n.gif)";
+  if (scc.TClessbuttonClass) control.lessbutton.className = scc.TClessbuttonClass;
+  AssignID(control.editor, control.lessbutton, "lessbutton" + vh);
 
-   control.lessbutton = document.createElement("div");
-   s = control.lessbutton.style;
-   s.height = (control.vertical ? control.buttonthickness : control.controlthickness)+"px";
-   s.width = (control.vertical ? control.controlthickness : control.buttonthickness)+"px";
-   s.zIndex = 2;
-   s.overflow = "hidden"; // IE will make the DIV at least font-size height...so use this
-   s.position = "absolute";
-   setStyles(control.lessbutton, scc.TClessbuttonStyle);
-   s.backgroundImage="url("+imageprefix+"less-"+vh+"n.gif)"
-   if (scc.TClessbuttonClass) control.lessbutton.className = scc.TClessbuttonClass;
-   AssignID(control.editor, control.lessbutton, "lessbutton"+vh);
+  params = {
+    repeatwait: scc.TClessbuttonRepeatWait,
+    repeatinterval: scc.TClessbuttonRepeatInterval,
+    normalstyle: "backgroundImage:url(" + imageprefix + "less-" + vh + "n.gif);",
+    downstyle: "backgroundImage:url(" + imageprefix + "less-" + vh + "d.gif);",
+    hoverstyle: "backgroundImage:url(" + imageprefix + "less-" + vh + "h.gif);",
+  };
+  functions = {
+    MouseDown: function () {
+      if (!control.editor.busy) control.editor.ScrollRelative(control.vertical, -1);
+    },
+    Repeat: function () {
+      if (!control.editor.busy) control.editor.ScrollRelative(control.vertical, -1);
+    },
+    Disabled: function () {
+      return control.editor.busy;
+    },
+  };
 
-   params = {repeatwait:scc.TClessbuttonRepeatWait, repeatinterval:scc.TClessbuttonRepeatInterval,
-             normalstyle: "backgroundImage:url("+imageprefix+"less-"+vh+"n.gif);",
-             downstyle: "backgroundImage:url("+imageprefix+"less-"+vh+"d.gif);",
-             hoverstyle: "backgroundImage:url("+imageprefix+"less-"+vh+"h.gif);"};
-   functions = {MouseDown:function(){if(!control.editor.busy) control.editor.ScrollRelative(control.vertical, -1);},
-                Repeat:function(){if(!control.editor.busy) control.editor.ScrollRelative(control.vertical, -1);},
-                Disabled: function() {return control.editor.busy;}};
+  TableEditorSC.ButtonRegister(control.editor, control.lessbutton, params, functions);
 
-   TableEditorSC.ButtonRegister(control.editor, control.lessbutton, params, functions);
+  control.main.appendChild(control.lessbutton);
 
-   control.main.appendChild(control.lessbutton);
+  control.morebutton = document.createElement("div");
+  s = control.morebutton.style;
+  s.height = (control.vertical ? control.buttonthickness : control.controlthickness) + "px";
+  s.width = (control.vertical ? control.controlthickness : control.buttonthickness) + "px";
+  s.zIndex = 2;
+  s.overflow = "hidden"; // IE will make the DIV at least font-size height...so use this
+  s.position = "absolute";
+  setStyles(control.morebutton, scc.TCmorebuttonStyle);
+  s.backgroundImage = "url(" + imageprefix + "more-" + vh + "n.gif)";
+  if (scc.TCmorebuttonClass) control.morebutton.className = scc.TCmorebuttonClass;
+  AssignID(control.editor, control.morebutton, "morebutton" + vh);
 
-   control.morebutton = document.createElement("div");
-   s = control.morebutton.style;
-   s.height = (control.vertical ? control.buttonthickness : control.controlthickness)+"px";
-   s.width = (control.vertical ? control.controlthickness : control.buttonthickness)+"px";
-   s.zIndex = 2;
-   s.overflow = "hidden"; // IE will make the DIV at least font-size height...so use this
-   s.position = "absolute";
-   setStyles(control.morebutton, scc.TCmorebuttonStyle);
-   s.backgroundImage="url("+imageprefix+"more-"+vh+"n.gif)"
-   if (scc.TCmorebuttonClass) control.morebutton.className = scc.TCmorebuttonClass;
-   AssignID(control.editor, control.morebutton, "morebutton"+vh);
+  params = {
+    repeatwait: scc.TCmorebuttonRepeatWait,
+    repeatinterval: scc.TCmorebuttonRepeatInterval,
+    normalstyle: "backgroundImage:url(" + imageprefix + "more-" + vh + "n.gif);",
+    downstyle: "backgroundImage:url(" + imageprefix + "more-" + vh + "d.gif);",
+    hoverstyle: "backgroundImage:url(" + imageprefix + "more-" + vh + "h.gif);",
+  };
+  functions = {
+    MouseDown: function () {
+      if (!control.editor.busy) control.editor.ScrollRelative(control.vertical, +1);
+    },
+    Repeat: function () {
+      if (!control.editor.busy) control.editor.ScrollRelative(control.vertical, +1);
+    },
+    Disabled: function () {
+      return control.editor.busy;
+    },
+  };
 
-   params = {repeatwait:scc.TCmorebuttonRepeatWait, repeatinterval:scc.TCmorebuttonRepeatInterval,
-             normalstyle: "backgroundImage:url("+imageprefix+"more-"+vh+"n.gif);",
-             downstyle: "backgroundImage:url("+imageprefix+"more-"+vh+"d.gif);",
-             hoverstyle: "backgroundImage:url("+imageprefix+"more-"+vh+"h.gif);"};
-   functions = {MouseDown:function(){if(!control.editor.busy) control.editor.ScrollRelative(control.vertical, +1);},
-                Repeat:function(){if(!control.editor.busy) control.editor.ScrollRelative(control.vertical, +1);},
-                Disabled: function() {return control.editor.busy;}};
+  TableEditorSC.ButtonRegister(control.editor, control.morebutton, params, functions);
 
-   TableEditorSC.ButtonRegister(control.editor, control.morebutton, params, functions);
+  control.main.appendChild(control.morebutton);
 
-   control.main.appendChild(control.morebutton);
+  control.scrollarea = document.createElement("div");
+  s = control.scrollarea.style;
+  s.height = control.controlthickness + "px";
+  s.width = control.controlthickness + "px";
+  s.zIndex = 1;
+  s.overflow = "hidden"; // IE will make the DIV at least font-size height...so use this
+  s.position = "absolute";
+  setStyles(control.scrollarea, scc.TCscrollareaStyle);
+  s.backgroundImage = "url(" + imageprefix + "scrollarea-" + vh + ".gif)";
+  if (scc.TCscrollareaClass) control.scrollarea.className = scc.TCscrollareaClass;
+  AssignID(control.editor, control.scrollarea, "scrollarea" + vh);
 
-   control.scrollarea = document.createElement("div");
-   s = control.scrollarea.style;
-   s.height = control.controlthickness+"px";
-   s.width = control.controlthickness+"px";
-   s.zIndex = 1;
-   s.overflow = "hidden"; // IE will make the DIV at least font-size height...so use this
-   s.position = "absolute";
-   setStyles(control.scrollarea, scc.TCscrollareaStyle);
-   s.backgroundImage="url("+imageprefix+"scrollarea-"+vh+".gif)";
-   if (scc.TCscrollareaClass) control.scrollarea.className = scc.TCscrollareaClass;
-   AssignID(control.editor, control.scrollarea, "scrollarea"+vh);
+  params = { repeatwait: scc.TCscrollareaRepeatWait, repeatinterval: scc.TCscrollareaRepeatWait };
+  functions = {
+    MouseDown: TableEditorSC.ScrollAreaClick,
+    Repeat: TableEditorSC.ScrollAreaClick,
+    Disabled: function () {
+      return control.editor.busy;
+    },
+  };
+  functions.control = control;
 
-   params = {repeatwait:scc.TCscrollareaRepeatWait, repeatinterval:scc.TCscrollareaRepeatWait};
-   functions = {MouseDown:TableEditorSC.ScrollAreaClick, Repeat:TableEditorSC.ScrollAreaClick,
-                Disabled: function() {return control.editor.busy;}};
-   functions.control = control;
+  TableEditorSC.ButtonRegister(control.editor, control.scrollarea, params, functions);
 
-   TableEditorSC.ButtonRegister(control.editor, control.scrollarea, params, functions);
+  control.main.appendChild(control.scrollarea);
 
-   control.main.appendChild(control.scrollarea);
+  control.thumb = document.createElement("div");
+  s = control.thumb.style;
+  s.height = (control.vertical ? control.thumbthickness : control.controlthickness) + "px";
+  s.width = (control.vertical ? control.controlthickness : control.thumbthickness) + "px";
+  s.zIndex = 2;
+  s.overflow = "hidden"; // IE will make the DIV at least font-size height...so use this
+  s.position = "absolute";
+  setStyles(control.thumb, scc.TCthumbStyle);
+  control.thumb.style.backgroundImage = "url(" + imageprefix + "thumb-" + vh + "n.gif)";
+  if (scc.TCthumbClass) control.thumb.className = scc.TCthumbClass;
+  AssignID(control.editor, control.thumb, "thumb" + vh);
 
-   control.thumb = document.createElement("div");
-   s = control.thumb.style;
-   s.height =  (control.vertical ? control.thumbthickness : control.controlthickness)+"px";
-   s.width = (control.vertical ? control.controlthickness : control.thumbthickness)+"px";
-   s.zIndex = 2;
-   s.overflow = "hidden"; // IE will make the DIV at least font-size height...so use this
-   s.position = "absolute";
-   setStyles(control.thumb, scc.TCthumbStyle);
-   control.thumb.style.backgroundImage="url("+imageprefix+"thumb-"+vh+"n.gif)";
-   if (scc.TCthumbClass) control.thumb.className = scc.TCthumbClass;
-   AssignID(control.editor, control.thumb, "thumb"+vh);
+  functions = {
+    MouseDown: TableEditorSC.TCTDragFunctionStart,
+    MouseMove: TableEditorSC.TCTDragFunctionMove,
+    MouseUp: TableEditorSC.TCTDragFunctionStop,
+    Disabled: function () {
+      return control.editor.busy;
+    },
+  };
+  functions.control = control; // make sure this is there
 
-   functions = {MouseDown:TableEditorSC.TCTDragFunctionStart,
-                MouseMove: TableEditorSC.TCTDragFunctionMove,
-                MouseUp: TableEditorSC.TCTDragFunctionStop,
-                Disabled: function() {return control.editor.busy;}};
-   functions.control = control; // make sure this is there
+  // Drag pane slider - every thing but app view
+  if (TableEditorSC._app != true)
+    TableEditorSC.DragRegister(
+      control.thumb,
+      control.vertical,
+      !control.vertical,
+      functions,
+      control.editor.toplevel,
+    );
 
-   // Drag pane slider - every thing but app view
-   if (TableEditorSC._app != true) TableEditorSC.DragRegister(control.thumb, control.vertical, !control.vertical, functions, control.editor.toplevel);
+  params = {
+    normalstyle: "backgroundImage:url(" + imageprefix + "thumb-" + vh + "n.gif)",
+    name: "Thumb",
+    downstyle: "backgroundImage:url(" + imageprefix + "thumb-" + vh + "d.gif)",
+    hoverstyle: "backgroundImage:url(" + imageprefix + "thumb-" + vh + "h.gif)",
+  };
+  TableEditorSC.ButtonRegister(control.editor, control.thumb, params, null); // give it button-like visual behavior
 
-   params = {normalstyle: "backgroundImage:url("+imageprefix+"thumb-"+vh+"n.gif)", name:"Thumb",
-             downstyle:  "backgroundImage:url("+imageprefix+"thumb-"+vh+"d.gif)",
-             hoverstyle:  "backgroundImage:url("+imageprefix+"thumb-"+vh+"h.gif)"};
-   TableEditorSC.ButtonRegister(control.editor, control.thumb, params, null); // give it button-like visual behavior
+  control.main.appendChild(control.thumb);
 
-   control.main.appendChild(control.thumb);
-
-   return control.main;
-
-}
+  return control.main;
+};
 
 //
 // ScrollAreaClick - Button function to process pageup/down clicks
 //
 
 /** @param {any} e @param {any} buttoninfo @param {any} bobj */
-TableEditorSC.ScrollAreaClick = function(e: any, buttoninfo: any, bobj: any) {
+TableEditorSC.ScrollAreaClick = function (e: any, buttoninfo: any, bobj: any) {
+  var control = bobj.functionobj.control;
+  var pos = TableEditorSC.GetElementPositionWithScroll(control.editor.toplevel);
+  var clickpos = control.vertical ? buttoninfo.clientY - pos.top : buttoninfo.clientX - pos.left;
+  if (control.editor.busy) {
+    // ignore if busy - wait for next repeat
+    return;
+  }
+  control.editor.PageRelative(control.vertical, clickpos > control.thumbpos ? 1 : -1);
 
-   var control = bobj.functionobj.control;
-   var pos = TableEditorSC.GetElementPositionWithScroll(control.editor.toplevel);
-   var clickpos = control.vertical ? buttoninfo.clientY-pos.top : buttoninfo.clientX-pos.left;
-   if (control.editor.busy) { // ignore if busy - wait for next repeat
-      return;
-      }
-   control.editor.PageRelative(control.vertical, clickpos > control.thumbpos ? 1 : -1);
-
-   return;
-
-}
+  return;
+};
 
 //
 // PositionTableControlElements
 //
 
 /** @param {any} control */
-TableEditorSC.PositionTableControlElements = function(control: any) {
+TableEditorSC.PositionTableControlElements = function (control: any) {
+  var border, realend, thumbpos;
 
-   var border, realend, thumbpos;
+  var editor = control.editor;
 
-   var editor = control.editor;
-
-   if (control.vertical) {
-      border = control.controlborder+"px";
-      control.endcap.style.top = control.endcapstart+"px";
-      control.endcap.style.left = border;
-      control.paneslider.style.top = control.panesliderstart+"px";
-      control.paneslider.style.left = border
-      control.lessbutton.style.top = control.lessbuttonstart+"px";
-      control.lessbutton.style.left = border;
-      control.morebutton.style.top = control.morebuttonstart+"px";
-      control.morebutton.style.left = border;
-      control.scrollarea.style.top = control.scrollareastart+"px";
-      control.scrollarea.style.left = border;
-      control.scrollarea.style.height = control.scrollareasize+"px";
-      realend = Math.max(editor.context.sheetobj.attribs.lastrow, editor.firstscrollingrow+1);
-      thumbpos = ((editor.firstscrollingrow-(editor.lastnonscrollingrow+1))*(control.scrollareasize-3*control.thumbthickness))/
-         (realend-(editor.lastnonscrollingrow+1))+control.scrollareastart-1;
-      thumbpos = Math.floor(thumbpos);
-      control.thumb.style.top = thumbpos+"px";
-      control.thumb.style.left = border;
-      }
-   else {
-      border = control.controlborder+"px";
-      control.endcap.style.left = control.endcapstart+"px";
-      control.endcap.style.top = border;
-      control.paneslider.style.left = control.panesliderstart+"px";
-      control.paneslider.style.top = border
-      control.lessbutton.style.left = control.lessbuttonstart+"px";
-      control.lessbutton.style.top = border;
-      control.morebutton.style.left = control.morebuttonstart+"px";
-      control.morebutton.style.top = border;
-      control.scrollarea.style.left = control.scrollareastart+"px";
-      control.scrollarea.style.top = border;
-      control.scrollarea.style.width = control.scrollareasize+"px";
-      realend = Math.max(editor.context.sheetobj.attribs.lastcol, editor.firstscrollingcol+1);
-      thumbpos = ((editor.firstscrollingcol-(editor.lastnonscrollingcol+1))*(control.scrollareasize-control.thumbthickness))/
-         (realend-editor.lastnonscrollingcol)+control.scrollareastart-1;
-      thumbpos = Math.floor(thumbpos);
-      control.thumb.style.left = thumbpos+"px";
-      control.thumb.style.top = border;
-      }
-   control.thumbpos = thumbpos;
-   control.main.style.display="block";
-
-   }
+  if (control.vertical) {
+    border = control.controlborder + "px";
+    control.endcap.style.top = control.endcapstart + "px";
+    control.endcap.style.left = border;
+    control.paneslider.style.top = control.panesliderstart + "px";
+    control.paneslider.style.left = border;
+    control.lessbutton.style.top = control.lessbuttonstart + "px";
+    control.lessbutton.style.left = border;
+    control.morebutton.style.top = control.morebuttonstart + "px";
+    control.morebutton.style.left = border;
+    control.scrollarea.style.top = control.scrollareastart + "px";
+    control.scrollarea.style.left = border;
+    control.scrollarea.style.height = control.scrollareasize + "px";
+    realend = Math.max(editor.context.sheetobj.attribs.lastrow, editor.firstscrollingrow + 1);
+    thumbpos =
+      ((editor.firstscrollingrow - (editor.lastnonscrollingrow + 1)) *
+        (control.scrollareasize - 3 * control.thumbthickness)) /
+        (realend - (editor.lastnonscrollingrow + 1)) +
+      control.scrollareastart -
+      1;
+    thumbpos = Math.floor(thumbpos);
+    control.thumb.style.top = thumbpos + "px";
+    control.thumb.style.left = border;
+  } else {
+    border = control.controlborder + "px";
+    control.endcap.style.left = control.endcapstart + "px";
+    control.endcap.style.top = border;
+    control.paneslider.style.left = control.panesliderstart + "px";
+    control.paneslider.style.top = border;
+    control.lessbutton.style.left = control.lessbuttonstart + "px";
+    control.lessbutton.style.top = border;
+    control.morebutton.style.left = control.morebuttonstart + "px";
+    control.morebutton.style.top = border;
+    control.scrollarea.style.left = control.scrollareastart + "px";
+    control.scrollarea.style.top = border;
+    control.scrollarea.style.width = control.scrollareasize + "px";
+    realend = Math.max(editor.context.sheetobj.attribs.lastcol, editor.firstscrollingcol + 1);
+    thumbpos =
+      ((editor.firstscrollingcol - (editor.lastnonscrollingcol + 1)) *
+        (control.scrollareasize - control.thumbthickness)) /
+        (realend - editor.lastnonscrollingcol) +
+      control.scrollareastart -
+      1;
+    thumbpos = Math.floor(thumbpos);
+    control.thumb.style.left = thumbpos + "px";
+    control.thumb.style.top = border;
+  }
+  control.thumbpos = thumbpos;
+  control.main.style.display = "block";
+};
 
 //
 // ComputeTableControlPositions
@@ -5294,33 +5727,34 @@ TableEditorSC.PositionTableControlElements = function(control: any) {
 //
 
 /** @param {any} control */
-TableEditorSC.ComputeTableControlPositions = function(control: any) {
+TableEditorSC.ComputeTableControlPositions = function (control: any) {
+  var editor = control.editor;
 
-   var editor = control.editor;
+  if (!editor.gridposition || !editor.headposition)
+    throw "Can't compute table control positions before editor positions";
 
-   if (!editor.gridposition || !editor.headposition) throw("Can't compute table control positions before editor positions");
-
-   if (control.vertical) {
-      control.controlborder = editor.gridposition.left+editor.tablewidth; // border=left position
-      control.endcapstart = editor.gridposition.top; // start=top position
-      control.panesliderstart = editor.firstscrollingrowtop-control.sliderthickness;
-      control.lessbuttonstart = editor.firstscrollingrowtop-1;
-      control.morebuttonstart = editor.gridposition.top+editor.tableheight-control.buttonthickness;
-      control.scrollareastart = editor.firstscrollingrowtop-1+control.buttonthickness;
-      control.scrollareaend = control.morebuttonstart-1;
-      control.scrollareasize = control.scrollareaend-control.scrollareastart+1;
-      }
-   else {
-      control.controlborder = editor.gridposition.top+editor.tableheight; // border=top position
-      control.endcapstart = editor.gridposition.left; // start=left position
-      control.panesliderstart = editor.firstscrollingcolleft-control.sliderthickness;
-      control.lessbuttonstart = editor.firstscrollingcolleft-1;
-      control.morebuttonstart = editor.gridposition.left+editor.tablewidth-control.buttonthickness;
-      control.scrollareastart = editor.firstscrollingcolleft-1+control.buttonthickness;
-      control.scrollareaend = control.morebuttonstart-1;
-      control.scrollareasize = control.scrollareaend-control.scrollareastart+1;
-      }
-   }
+  if (control.vertical) {
+    control.controlborder = editor.gridposition.left + editor.tablewidth; // border=left position
+    control.endcapstart = editor.gridposition.top; // start=top position
+    control.panesliderstart = editor.firstscrollingrowtop - control.sliderthickness;
+    control.lessbuttonstart = editor.firstscrollingrowtop - 1;
+    control.morebuttonstart =
+      editor.gridposition.top + editor.tableheight - control.buttonthickness;
+    control.scrollareastart = editor.firstscrollingrowtop - 1 + control.buttonthickness;
+    control.scrollareaend = control.morebuttonstart - 1;
+    control.scrollareasize = control.scrollareaend - control.scrollareastart + 1;
+  } else {
+    control.controlborder = editor.gridposition.top + editor.tableheight; // border=top position
+    control.endcapstart = editor.gridposition.left; // start=left position
+    control.panesliderstart = editor.firstscrollingcolleft - control.sliderthickness;
+    control.lessbuttonstart = editor.firstscrollingcolleft - 1;
+    control.morebuttonstart =
+      editor.gridposition.left + editor.tablewidth - control.buttonthickness;
+    control.scrollareastart = editor.firstscrollingcolleft - 1 + control.buttonthickness;
+    control.scrollareaend = control.morebuttonstart - 1;
+    control.scrollareasize = control.scrollareaend - control.scrollareastart + 1;
+  }
+};
 
 ////// TCPS - TableControl Pan Slider methods
 
@@ -5331,143 +5765,156 @@ TableEditorSC.ComputeTableControlPositions = function(control: any) {
 //
 
 /** @param {any} event @param {any} draginfo @param {any} dobj */
-TableEditorSC.TCPSDragFunctionStart = function(event: any, draginfo: any, dobj: any) {
+TableEditorSC.TCPSDragFunctionStart = function (event: any, draginfo: any, dobj: any) {
+  var editor = dobj.functionobj.control.editor;
+  var scc = TableEditorSC.Constants;
 
-   var editor = dobj.functionobj.control.editor;
-   var scc = TableEditorSC.Constants;
+  TableEditorSC.DragFunctionStart(event, draginfo, dobj);
 
-   TableEditorSC.DragFunctionStart(event, draginfo, dobj);
+  draginfo.trackingline = document.createElement("div");
+  draginfo.trackingline.style.height = dobj.vertical
+    ? scc.TCPStrackinglineThickness
+    : editor.tableheight - (editor.headposition.top - editor.gridposition.top) + "px";
+  draginfo.trackingline.style.width = dobj.vertical
+    ? editor.tablewidth - (editor.headposition.left - editor.gridposition.left) + "px"
+    : scc.TCPStrackinglineThickness;
+  draginfo.trackingline.style.backgroundImage =
+    "url(" + editor.imageprefix + "trackingline-" + (dobj.vertical ? "v" : "h") + ".gif)";
+  if (scc.TCPStrackinglineClass) draginfo.trackingline.className = scc.TCPStrackinglineClass;
+  TableEditorSC.setStyles(draginfo.trackingline, scc.TCPStrackinglineStyle);
 
-   draginfo.trackingline = document.createElement("div");
-   draginfo.trackingline.style.height = dobj.vertical ? scc.TCPStrackinglineThickness :
-      (editor.tableheight-(editor.headposition.top-editor.gridposition.top))+"px";
-   draginfo.trackingline.style.width = dobj.vertical ?
-      (editor.tablewidth-(editor.headposition.left-editor.gridposition.left))+"px" : scc.TCPStrackinglineThickness;
-   draginfo.trackingline.style.backgroundImage="url("+editor.imageprefix+"trackingline-"+(dobj.vertical?"v":"h")+".gif)";;
-   if (scc.TCPStrackinglineClass) draginfo.trackingline.className = scc.TCPStrackinglineClass;
-   TableEditorSC.setStyles(draginfo.trackingline, scc.TCPStrackinglineStyle);
+  if (dobj.vertical) {
+    var row = TableEditorSC.Lookup(
+      draginfo.clientY + dobj.functionobj.control.sliderthickness,
+      editor.rowpositions,
+    );
+    draginfo.trackingline.style.top = (editor.rowpositions[row] || editor.headposition.top) + "px";
+    draginfo.trackingline.style.left = editor.headposition.left + "px";
+    draginfo.trackingline.id = "trackingline-vertical";
+    if (editor.context.rowpanes.length - 1) {
+      // has 2 already
+      editor.context.SetRowPaneFirstLast(
+        1,
+        editor.context.rowpanes[0].last + 1,
+        editor.context.rowpanes[0].last + 1,
+      );
+      editor.FitToEditTable();
+      editor.ScheduleRender();
+    }
+  } else {
+    var col = TableEditorSC.Lookup(
+      draginfo.clientX + dobj.functionobj.control.sliderthickness,
+      editor.colpositions,
+    );
+    draginfo.trackingline.style.top = editor.headposition.top + "px";
+    draginfo.trackingline.style.left =
+      (editor.colpositions[col] || editor.headposition.left) + "px";
+    draginfo.trackingline.id = "trackingline-horizon";
+    if (editor.context.colpanes.length - 1) {
+      // has 2 already
+      editor.context.SetColPaneFirstLast(
+        1,
+        editor.context.colpanes[0].last + 1,
+        editor.context.colpanes[0].last + 1,
+      );
+      editor.FitToEditTable();
+      editor.ScheduleRender();
+    }
+  }
 
-   if (dobj.vertical) {
-      var row = TableEditorSC.Lookup(draginfo.clientY+dobj.functionobj.control.sliderthickness, editor.rowpositions);
-      draginfo.trackingline.style.top = (editor.rowpositions[row] || editor.headposition.top)+"px";
-      draginfo.trackingline.style.left = editor.headposition.left+"px";
-      draginfo.trackingline.id = 'trackingline-vertical';
-      if (editor.context.rowpanes.length-1) { // has 2 already
-         editor.context.SetRowPaneFirstLast(1, editor.context.rowpanes[0].last+1, editor.context.rowpanes[0].last+1);
-         editor.FitToEditTable();
-         editor.ScheduleRender();
-         }
-      }
-   else {
-      var col = TableEditorSC.Lookup(draginfo.clientX+dobj.functionobj.control.sliderthickness, editor.colpositions);
-      draginfo.trackingline.style.top = editor.headposition.top+"px";
-      draginfo.trackingline.style.left = (editor.colpositions[col] || editor.headposition.left)+"px";
-      draginfo.trackingline.id = 'trackingline-horizon';
-      if (editor.context.colpanes.length-1) { // has 2 already
-         editor.context.SetColPaneFirstLast(1, editor.context.colpanes[0].last+1, editor.context.colpanes[0].last+1);
-         editor.FitToEditTable();
-         editor.ScheduleRender();
-         }
-      }
-
-   editor.griddiv.appendChild(draginfo.trackingline);
-
-   }
+  editor.griddiv.appendChild(draginfo.trackingline);
+};
 
 //
 // TCPSDragFunctionMove(event, draginfo, dobj)
 //
 
 /** @param {any} event @param {any} draginfo @param {any} dobj */
-TableEditorSC.TCPSDragFunctionMove = function(event: any, draginfo: any, dobj: any) {
+TableEditorSC.TCPSDragFunctionMove = function (event: any, draginfo: any, dobj: any) {
+  var row, col, max, min;
+  var control = dobj.functionobj.control;
+  var sliderthickness = control.sliderthickness;
+  var editor = control.editor;
 
-   var row, col, max, min;
-   var control = dobj.functionobj.control;
-   var sliderthickness = control.sliderthickness;
-   var editor = control.editor;
+  if (dobj.vertical) {
+    max = control.morebuttonstart - control.minscrollingpanesize - draginfo.offsetY; // restrict movement
+    if (draginfo.clientY > max) draginfo.clientY = max;
+    min = editor.headposition.top - sliderthickness - draginfo.offsetY;
+    if (draginfo.clientY < min) draginfo.clientY = min;
 
-   if (dobj.vertical) {
-      max = control.morebuttonstart - control.minscrollingpanesize - draginfo.offsetY; // restrict movement
-      if (draginfo.clientY > max) draginfo.clientY = max;
-      min = editor.headposition.top - sliderthickness - draginfo.offsetY;
-      if (draginfo.clientY < min) draginfo.clientY = min;
+    row = TableEditorSC.Lookup(draginfo.clientY + sliderthickness, editor.rowpositions);
 
-      row = TableEditorSC.Lookup(draginfo.clientY+sliderthickness, editor.rowpositions);
+    // Handle hidden row.
+    while (editor.context.sheetobj.rowattribs.hide[row] == "yes") {
+      row++;
+    }
 
-      // Handle hidden row.
-      while (editor.context.sheetobj.rowattribs.hide[row] == "yes") {
-         row++;
-         }
+    draginfo.trackingline.style.top = (editor.rowpositions[row] || editor.headposition.top) + "px";
+  } else {
+    max = control.morebuttonstart - control.minscrollingpanesize - draginfo.offsetX;
+    if (draginfo.clientX > max) draginfo.clientX = max;
+    min = editor.headposition.left - sliderthickness - draginfo.offsetX;
+    if (draginfo.clientX < min) draginfo.clientX = min;
 
-      draginfo.trackingline.style.top = (editor.rowpositions[row] || editor.headposition.top)+"px";
-      }
-   else {
-      max = control.morebuttonstart - control.minscrollingpanesize - draginfo.offsetX;
-      if (draginfo.clientX > max) draginfo.clientX = max;
-      min = editor.headposition.left - sliderthickness - draginfo.offsetX;
-      if (draginfo.clientX < min) draginfo.clientX = min;
+    col = TableEditorSC.Lookup(draginfo.clientX + sliderthickness, editor.colpositions);
 
-      col = TableEditorSC.Lookup(draginfo.clientX+sliderthickness, editor.colpositions);
+    // Handle hidden column.
+    while (editor.context.sheetobj.colattribs.hide[TableEditorSC.rcColname(col)] == "yes") {
+      col++;
+    }
 
-      // Handle hidden column.
-      while (editor.context.sheetobj.colattribs.hide[TableEditorSC.rcColname(col)] == "yes") {
-         col++;
-         }
+    draginfo.trackingline.style.left =
+      (editor.colpositions[col] || editor.headposition.left) + "px";
+  }
 
-      draginfo.trackingline.style.left = (editor.colpositions[col] || editor.headposition.left)+"px";
-      }
-
-   TableEditorSC.DragFunctionPosition(event, draginfo, dobj);
-
-   }
+  TableEditorSC.DragFunctionPosition(event, draginfo, dobj);
+};
 
 //
 // TCPSDragFunctionStop(event, draginfo, dobj)
 //
 
 /** @param {any} event @param {any} draginfo @param {any} dobj */
-TableEditorSC.TCPSDragFunctionStop = function(event: any, draginfo: any, dobj: any) {
+TableEditorSC.TCPSDragFunctionStop = function (event: any, draginfo: any, dobj: any) {
+  var row, col, max, min;
+  var control = dobj.functionobj.control;
+  var sliderthickness = control.sliderthickness;
+  var editor = control.editor;
 
-   var row, col, max, min, dc;
-   var control = dobj.functionobj.control;
-   var sliderthickness = control.sliderthickness;
-   var editor = control.editor;
+  if (dobj.vertical) {
+    max = control.morebuttonstart - control.minscrollingpanesize - draginfo.offsetY; // restrict movement
+    if (draginfo.clientY > max) draginfo.clientY = max;
+    min = editor.headposition.top - sliderthickness - draginfo.offsetY;
+    if (draginfo.clientY < min) draginfo.clientY = min;
 
-   if (dobj.vertical) {
-     max = control.morebuttonstart - control.minscrollingpanesize - draginfo.offsetY; // restrict movement
-     if (draginfo.clientY > max) draginfo.clientY = max;
-     min = editor.headposition.top - sliderthickness - draginfo.offsetY;
-     if (draginfo.clientY < min) draginfo.clientY = min;
+    row = TableEditorSC.Lookup(draginfo.clientY + sliderthickness, editor.rowpositions);
+    if (row > editor.context.sheetobj.attribs.lastrow)
+      row = editor.context.sheetobj.attribs.lastrow; // can't extend sheet here
 
-     row = TableEditorSC.Lookup(draginfo.clientY+sliderthickness, editor.rowpositions);
-     if (row>editor.context.sheetobj.attribs.lastrow) row=editor.context.sheetobj.attribs.lastrow; // can't extend sheet here
+    // Handle hidden row.
+    while (editor.context.sheetobj.rowattribs.hide[row] == "yes") {
+      row++;
+    }
 
-     // Handle hidden row.
-     while (editor.context.sheetobj.rowattribs.hide[row] == "yes") {
-       row++;
-     }
+    editor.EditorScheduleSheetCommands("pane row " + row, true, false);
+  } else {
+    max = control.morebuttonstart - control.minscrollingpanesize - draginfo.offsetX;
+    if (draginfo.clientX > max) draginfo.clientX = max;
+    min = editor.headposition.left - sliderthickness - draginfo.offsetX;
+    if (draginfo.clientX < min) draginfo.clientX = min;
 
+    col = TableEditorSC.Lookup(draginfo.clientX + sliderthickness, editor.colpositions);
+    if (col > editor.context.sheetobj.attribs.lastcol)
+      col = editor.context.sheetobj.attribs.lastcol; // can't extend sheet here
 
-     editor.EditorScheduleSheetCommands('pane row ' + row, true, false);
-   }
-   else {
-     max = control.morebuttonstart - control.minscrollingpanesize - draginfo.offsetX;
-     if (draginfo.clientX > max) draginfo.clientX = max;
-     min = editor.headposition.left - sliderthickness - draginfo.offsetX;
-     if (draginfo.clientX < min) draginfo.clientX = min;
+    // Handle hidden column.
+    while (editor.context.sheetobj.colattribs.hide[TableEditorSC.rcColname(col)] == "yes") {
+      col++;
+    }
 
-     col = TableEditorSC.Lookup(draginfo.clientX+sliderthickness, editor.colpositions);
-     if (col>editor.context.sheetobj.attribs.lastcol) col=editor.context.sheetobj.attribs.lastcol; // can't extend sheet here
-
-     // Handle hidden column.
-     while (editor.context.sheetobj.colattribs.hide[TableEditorSC.rcColname(col)] == "yes") {
-       col++;
-     }
-
-     editor.EditorScheduleSheetCommands('pane col ' + col, true, false);
-   }
-
-   }
+    editor.EditorScheduleSheetCommands("pane col " + col, true, false);
+  }
+};
 
 ////// TCT - TableControl Thumb methods
 
@@ -5482,56 +5929,57 @@ TableEditorSC.TCPSDragFunctionStop = function(event: any, draginfo: any, dobj: a
 //
 
 /** @param {any} event @param {any} draginfo @param {any} dobj */
-TableEditorSC.TCTDragFunctionStart = function(event: any, draginfo: any, dobj: any) {
+TableEditorSC.TCTDragFunctionStart = function (event: any, draginfo: any, dobj: any) {
+  var control = dobj.functionobj.control;
+  var editor = control.editor;
+  var scc = TableEditorSC.Constants;
 
-   var rowpane, colpane, row, col;
+  TableEditorSC.DragFunctionStart(event, draginfo, dobj);
 
-   var control = dobj.functionobj.control;
-   var editor = control.editor;
-   var scc = TableEditorSC.Constants;
+  if (draginfo.thumbstatus) {
+    // get rid of old one if mouseup was out of window
+    if (draginfo.thumbstatus.rowmsgele) draginfo.thumbstatus.rowmsgele = null;
+    if (draginfo.thumbstatus.rowpreviewele) draginfo.thumbstatus.rowpreviewele = null;
+    editor.toplevel.removeChild(draginfo.thumbstatus);
+    draginfo.thumbstatus = null;
+  }
 
-   TableEditorSC.DragFunctionStart(event, draginfo, dobj);
+  draginfo.thumbstatus = document.createElement("div");
 
-   if (draginfo.thumbstatus) { // get rid of old one if mouseup was out of window
-      if (draginfo.thumbstatus.rowmsgele) draginfo.thumbstatus.rowmsgele = null;
-      if (draginfo.thumbstatus.rowpreviewele) draginfo.thumbstatus.rowpreviewele = null;
-      editor.toplevel.removeChild(draginfo.thumbstatus);
-      draginfo.thumbstatus = null;
-      }
+  if (dobj.vertical) {
+    if (scc.TCTDFSthumbstatusvClass) draginfo.thumbstatus.className = scc.TCTDFSthumbstatusvClass;
+    TableEditorSC.setStyles(draginfo.thumbstatus, scc.TCTDFSthumbstatusvStyle);
+    draginfo.thumbstatus.style.top = draginfo.clientY + scc.TCTDFStopOffsetv + "px";
+    draginfo.thumbstatus.style.left = control.controlborder - 10 - editor.tablewidth / 2 + "px";
+    draginfo.thumbstatus.style.width = editor.tablewidth / 2 + "px";
 
-   draginfo.thumbstatus = document.createElement("div");
-
-   if (dobj.vertical) {
-      if (scc.TCTDFSthumbstatusvClass) draginfo.thumbstatus.className = scc.TCTDFSthumbstatusvClass;
-      TableEditorSC.setStyles(draginfo.thumbstatus, scc.TCTDFSthumbstatusvStyle);
-      draginfo.thumbstatus.style.top = (draginfo.clientY+scc.TCTDFStopOffsetv)+"px";
-      draginfo.thumbstatus.style.left = (control.controlborder-10-(editor.tablewidth/2))+"px";
-      draginfo.thumbstatus.style.width = (editor.tablewidth/2)+"px";
-
-      draginfo.thumbcontext = new TableEditorSC.RenderContext(editor.context.sheetobj);
-      draginfo.thumbcontext.showGrid = true;
-      draginfo.thumbcontext.rowpanes = [{first: 1, last: 1}];
-      var pane = editor.context.colpanes[editor.context.colpanes.length-1];
-      draginfo.thumbcontext.colpanes = [{first: pane.first, last: pane.last}];
-      draginfo.thumbstatus.innerHTML = '<table cellspacing="0" cellpadding="0"><tr><td valign="top" style="'+
-        scc.TCTDFSthumbstatusrownumStyle+'" class="'+scc.TCTDFSthumbstatusrownumClass+
-        '"><div>msg</div></td><td valign="top"><div style="overflow:hidden;">preview</div></td></tr></table>';
-      draginfo.thumbstatus.rowmsgele = draginfo.thumbstatus.firstChild.firstChild.firstChild.firstChild.firstChild;
-      draginfo.thumbstatus.rowpreviewele = draginfo.thumbstatus.firstChild.firstChild.firstChild.childNodes[1].firstChild;
-      editor.toplevel.appendChild(draginfo.thumbstatus);
-      TableEditorSC.TCTDragFunctionRowSetStatus(draginfo, editor, editor.firstscrollingrow || 1);
-      }
-   else {
-      if (scc.TCTDFSthumbstatushClass) draginfo.thumbstatus.className = scc.TCTDFSthumbstatushClass;
-      TableEditorSC.setStyles(draginfo.thumbstatus, scc.TCTDFSthumbstatushStyle);
-      draginfo.thumbstatus.style.top = (control.controlborder+scc.TCTDFStopOffseth)+"px";
-      draginfo.thumbstatus.style.left = (draginfo.clientX+scc.TCTDFSleftOffseth)+"px";
-      editor.toplevel.appendChild(draginfo.thumbstatus);
-      draginfo.thumbstatus.innerHTML = scc.s_TCTDFthumbstatusPrefixh+TableEditorSC.rcColname(editor.firstscrollingcol);
-      }
-
-   }
-
+    draginfo.thumbcontext = new TableEditorSC.RenderContext(editor.context.sheetobj);
+    draginfo.thumbcontext.showGrid = true;
+    draginfo.thumbcontext.rowpanes = [{ first: 1, last: 1 }];
+    var pane = editor.context.colpanes[editor.context.colpanes.length - 1];
+    draginfo.thumbcontext.colpanes = [{ first: pane.first, last: pane.last }];
+    draginfo.thumbstatus.innerHTML =
+      '<table cellspacing="0" cellpadding="0"><tr><td valign="top" style="' +
+      scc.TCTDFSthumbstatusrownumStyle +
+      '" class="' +
+      scc.TCTDFSthumbstatusrownumClass +
+      '"><div>msg</div></td><td valign="top"><div style="overflow:hidden;">preview</div></td></tr></table>';
+    draginfo.thumbstatus.rowmsgele =
+      draginfo.thumbstatus.firstChild.firstChild.firstChild.firstChild.firstChild;
+    draginfo.thumbstatus.rowpreviewele =
+      draginfo.thumbstatus.firstChild.firstChild.firstChild.childNodes[1].firstChild;
+    editor.toplevel.appendChild(draginfo.thumbstatus);
+    TableEditorSC.TCTDragFunctionRowSetStatus(draginfo, editor, editor.firstscrollingrow || 1);
+  } else {
+    if (scc.TCTDFSthumbstatushClass) draginfo.thumbstatus.className = scc.TCTDFSthumbstatushClass;
+    TableEditorSC.setStyles(draginfo.thumbstatus, scc.TCTDFSthumbstatushStyle);
+    draginfo.thumbstatus.style.top = control.controlborder + scc.TCTDFStopOffseth + "px";
+    draginfo.thumbstatus.style.left = draginfo.clientX + scc.TCTDFSleftOffseth + "px";
+    editor.toplevel.appendChild(draginfo.thumbstatus);
+    draginfo.thumbstatus.innerHTML =
+      scc.s_TCTDFthumbstatusPrefixh + TableEditorSC.rcColname(editor.firstscrollingcol);
+  }
+};
 
 //
 // SocialCalc.TCTDragFunctionRowSetStatus(draginfo, editor, row)
@@ -5540,119 +5988,123 @@ TableEditorSC.TCTDragFunctionStart = function(event: any, draginfo: any, dobj: a
 //
 
 /** @param {any} draginfo @param {any} editor @param {any} row */
-TableEditorSC.TCTDragFunctionRowSetStatus = function(draginfo: any, editor: any, row: any) {
+TableEditorSC.TCTDragFunctionRowSetStatus = function (draginfo: any, editor: any, row: any) {
+  var scc = TableEditorSC.Constants;
+  var msg = scc.s_TCTDFthumbstatusPrefixv + row + " ";
 
-   var scc = TableEditorSC.Constants;
-   var msg = scc.s_TCTDFthumbstatusPrefixv+row+" ";
+  draginfo.thumbstatus.rowmsgele.innerHTML = msg;
 
-   draginfo.thumbstatus.rowmsgele.innerHTML = msg;
+  draginfo.thumbcontext.rowpanes = [{ first: row, last: row }];
+  draginfo.thumbrowshown = row;
 
-   draginfo.thumbcontext.rowpanes = [{first: row, last: row}];
-   draginfo.thumbrowshown = row;
-
-   var ele = draginfo.thumbcontext.RenderSheet(draginfo.thumbstatus.rowpreviewele.firstChild, {type: "html"});
-
-   }
-
+  draginfo.thumbcontext.RenderSheet(draginfo.thumbstatus.rowpreviewele.firstChild, {
+    type: "html",
+  });
+};
 
 //
 // TCTDragFunctionMove(event, draginfo, dobj)
 //
 
 /** @param {any} event @param {any} draginfo @param {any} dobj */
-TableEditorSC.TCTDragFunctionMove = function(event: any, draginfo: any, dobj: any) {
+TableEditorSC.TCTDragFunctionMove = function (event: any, draginfo: any, dobj: any) {
+  var first, msg;
+  var control = dobj.functionobj.control;
+  var editor = control.editor;
+  var scc = TableEditorSC.Constants;
 
-   var first, msg;
-   var control = dobj.functionobj.control;
-   var thumbthickness = control.thumbthickness;
-   var editor = control.editor;
-   var scc = TableEditorSC.Constants;
+  if (dobj.vertical) {
+    if (draginfo.clientY > control.scrollareaend - draginfo.offsetY - control.thumbthickness + 2)
+      draginfo.clientY = control.scrollareaend - draginfo.offsetY - control.thumbthickness + 2;
+    if (draginfo.clientY < control.scrollareastart - draginfo.offsetY - 1)
+      draginfo.clientY = control.scrollareastart - draginfo.offsetY - 1;
+    draginfo.thumbstatus.style.top = draginfo.clientY + "px";
 
-   if (dobj.vertical) {
-      if (draginfo.clientY > control.scrollareaend - draginfo.offsetY - control.thumbthickness + 2)
-         draginfo.clientY = control.scrollareaend - draginfo.offsetY - control.thumbthickness + 2;
-      if (draginfo.clientY < control.scrollareastart - draginfo.offsetY - 1)
-         draginfo.clientY = control.scrollareastart - draginfo.offsetY - 1;
-      draginfo.thumbstatus.style.top = draginfo.clientY+"px";
+    first =
+      ((draginfo.clientY + draginfo.offsetY - control.scrollareastart + 1) /
+        (control.scrollareasize - control.thumbthickness)) *
+        (editor.context.sheetobj.attribs.lastrow - editor.lastnonscrollingrow) +
+      editor.lastnonscrollingrow +
+      1;
+    first = Math.floor(first);
+    if (first <= editor.lastnonscrollingrow) first = editor.lastnonscrollingrow + 1;
+    if (first > editor.context.sheetobj.attribs.lastrow)
+      first = editor.context.sheetobj.attribs.lastrow;
+    //      msg = scc.s_TCTDFthumbstatusPrefixv+first;
+    if (first != draginfo.thumbrowshown) {
+      TableEditorSC.TCTDragFunctionRowSetStatus(draginfo, editor, first);
+    }
+  } else {
+    if (draginfo.clientX > control.scrollareaend - draginfo.offsetX - control.thumbthickness + 2)
+      draginfo.clientX = control.scrollareaend - draginfo.offsetX - control.thumbthickness + 2;
+    if (draginfo.clientX < control.scrollareastart - draginfo.offsetX - 1)
+      draginfo.clientX = control.scrollareastart - draginfo.offsetX - 1;
+    draginfo.thumbstatus.style.left = draginfo.clientX + "px";
 
-      first =
-         ((draginfo.clientY+draginfo.offsetY-control.scrollareastart+1)/(control.scrollareasize-control.thumbthickness))
-         * (editor.context.sheetobj.attribs.lastrow-editor.lastnonscrollingrow)
-         + editor.lastnonscrollingrow + 1;
-      first = Math.floor(first);
-      if (first <= editor.lastnonscrollingrow) first = editor.lastnonscrollingrow + 1;
-      if (first > editor.context.sheetobj.attribs.lastrow) first = editor.context.sheetobj.attribs.lastrow;
-//      msg = scc.s_TCTDFthumbstatusPrefixv+first;
-      if (first != draginfo.thumbrowshown) {
-         TableEditorSC.TCTDragFunctionRowSetStatus(draginfo, editor, first);
-         }
-      }
-   else {
-      if (draginfo.clientX > control.scrollareaend - draginfo.offsetX - control.thumbthickness + 2)
-         draginfo.clientX = control.scrollareaend - draginfo.offsetX - control.thumbthickness + 2;
-      if (draginfo.clientX < control.scrollareastart - draginfo.offsetX - 1)
-         draginfo.clientX = control.scrollareastart - draginfo.offsetX - 1;
-      draginfo.thumbstatus.style.left = draginfo.clientX+"px";
+    first =
+      ((draginfo.clientX + draginfo.offsetX - control.scrollareastart + 1) /
+        (control.scrollareasize - control.thumbthickness)) *
+        (editor.context.sheetobj.attribs.lastcol - editor.lastnonscrollingcol) +
+      editor.lastnonscrollingcol +
+      1;
+    first = Math.floor(first);
+    if (first <= editor.lastnonscrollingcol) first = editor.lastnonscrollingcol + 1;
+    if (first > editor.context.sheetobj.attribs.lastcol)
+      first = editor.context.sheetobj.attribs.lastcol;
+    msg = scc.s_TCTDFthumbstatusPrefixh + TableEditorSC.rcColname(first);
+    draginfo.thumbstatus.innerHTML = msg;
+  }
 
-      first =
-         ((draginfo.clientX+draginfo.offsetX-control.scrollareastart+1)/(control.scrollareasize-control.thumbthickness))
-         * (editor.context.sheetobj.attribs.lastcol-editor.lastnonscrollingcol)
-         + editor.lastnonscrollingcol + 1;
-      first = Math.floor(first);
-      if (first <= editor.lastnonscrollingcol) first = editor.lastnonscrollingcol + 1;
-      if (first > editor.context.sheetobj.attribs.lastcol) first = editor.context.sheetobj.attribs.lastcol;
-      msg = scc.s_TCTDFthumbstatusPrefixh+TableEditorSC.rcColname(first);
-      draginfo.thumbstatus.innerHTML = msg;
-      }
-
-   TableEditorSC.DragFunctionPosition(event, draginfo, dobj);
-
-   }
+  TableEditorSC.DragFunctionPosition(event, draginfo, dobj);
+};
 
 //
 // TCTDragFunctionStop(event, draginfo, dobj)
 //
 
 /** @param {any} event @param {any} draginfo @param {any} dobj */
-TableEditorSC.TCTDragFunctionStop = function(event: any, draginfo: any, dobj: any) {
+TableEditorSC.TCTDragFunctionStop = function (event: any, draginfo: any, dobj: any) {
+  var first;
+  var control = dobj.functionobj.control;
+  var editor = control.editor;
 
-   var first;
-   var control = dobj.functionobj.control;
-   var editor = control.editor;
+  if (dobj.vertical) {
+    first =
+      ((draginfo.clientY + draginfo.offsetY - control.scrollareastart + 1) /
+        (control.scrollareasize - control.thumbthickness)) *
+        (editor.context.sheetobj.attribs.lastrow - editor.lastnonscrollingrow) +
+      editor.lastnonscrollingrow +
+      1;
+    first = Math.floor(first);
+    if (first <= editor.lastnonscrollingrow) first = editor.lastnonscrollingrow + 1;
+    if (first > editor.context.sheetobj.attribs.lastrow)
+      first = editor.context.sheetobj.attribs.lastrow;
 
-   if (dobj.vertical) {
-      first =
-         ((draginfo.clientY+draginfo.offsetY-control.scrollareastart+1)/(control.scrollareasize-control.thumbthickness))
-         * (editor.context.sheetobj.attribs.lastrow-editor.lastnonscrollingrow)
-         + editor.lastnonscrollingrow + 1;
-      first = Math.floor(first);
-      if (first <= editor.lastnonscrollingrow) first = editor.lastnonscrollingrow + 1;
-      if (first > editor.context.sheetobj.attribs.lastrow) first = editor.context.sheetobj.attribs.lastrow;
+    editor.context.SetRowPaneFirstLast(editor.context.rowpanes.length - 1, first, first + 1);
+  } else {
+    first =
+      ((draginfo.clientX + draginfo.offsetX - control.scrollareastart + 1) /
+        (control.scrollareasize - control.thumbthickness)) *
+        (editor.context.sheetobj.attribs.lastcol - editor.lastnonscrollingcol) +
+      editor.lastnonscrollingcol +
+      1;
+    first = Math.floor(first);
+    if (first <= editor.lastnonscrollingcol) first = editor.lastnonscrollingcol + 1;
+    if (first > editor.context.sheetobj.attribs.lastcol)
+      first = editor.context.sheetobj.attribs.lastcol;
 
-      editor.context.SetRowPaneFirstLast(editor.context.rowpanes.length-1, first, first+1);
-      }
-   else {
-      first =
-         ((draginfo.clientX+draginfo.offsetX-control.scrollareastart+1)/(control.scrollareasize-control.thumbthickness))
-         * (editor.context.sheetobj.attribs.lastcol-editor.lastnonscrollingcol)
-         + editor.lastnonscrollingcol + 1;
-      first = Math.floor(first);
-      if (first <= editor.lastnonscrollingcol) first = editor.lastnonscrollingcol + 1;
-      if (first > editor.context.sheetobj.attribs.lastcol) first = editor.context.sheetobj.attribs.lastcol;
+    editor.context.SetColPaneFirstLast(editor.context.colpanes.length - 1, first, first + 1);
+  }
 
-      editor.context.SetColPaneFirstLast(editor.context.colpanes.length-1, first, first+1);
-      }
+  editor.FitToEditTable();
 
-   editor.FitToEditTable();
+  if (draginfo.thumbstatus.rowmsgele) draginfo.thumbstatus.rowmsgele = null;
+  if (draginfo.thumbstatus.rowpreviewele) draginfo.thumbstatus.rowpreviewele = null;
+  editor.toplevel.removeChild(draginfo.thumbstatus);
+  draginfo.thumbstatus = null;
 
-   if (draginfo.thumbstatus.rowmsgele) draginfo.thumbstatus.rowmsgele = null;
-   if (draginfo.thumbstatus.rowpreviewele) draginfo.thumbstatus.rowpreviewele = null;
-   editor.toplevel.removeChild(draginfo.thumbstatus);
-   draginfo.thumbstatus = null;
-
-   editor.ScheduleRender();
-
-   }
+  editor.ScheduleRender();
+};
 
 // *************************************
 //
@@ -5661,29 +6113,27 @@ TableEditorSC.TCTDragFunctionStop = function(event: any, draginfo: any, dobj: an
 // *************************************
 
 TableEditorSC.DragInfo = {
+  // There is only one of these -- no "new" is done.
+  // Only one dragging operation can be active at a time.
+  // The registeredElements array is used to decide which item to drag.
 
-   // There is only one of these -- no "new" is done.
-   // Only one dragging operation can be active at a time.
-   // The registeredElements array is used to decide which item to drag.
+  // One item for each draggable thing, each an object with:
+  //    .element, .vertical, .horizontal, .functionobj, .parent
 
-   // One item for each draggable thing, each an object with:
-   //    .element, .vertical, .horizontal, .functionobj, .parent
+  registeredElements: [],
 
-   registeredElements: [],
+  // Items used during a drag
 
-   // Items used during a drag
-
-   draggingElement: null, // item being processed (.element is the actual element)
-   startX: 0,
-   startY: 0,
-   startZ: 0,
-   clientX: 0, // modifyable version to restrict movement
-   clientY: 0,
-   offsetX: 0,
-   offsetY: 0,
-   relativeOffset: {left:0,top:0} // retrieved at drag start
-
-   }
+  draggingElement: null, // item being processed (.element is the actual element)
+  startX: 0,
+  startY: 0,
+  startZ: 0,
+  clientX: 0, // modifyable version to restrict movement
+  clientY: 0,
+  offsetX: 0,
+  offsetY: 0,
+  relativeOffset: { left: 0, top: 0 }, // retrieved at drag start
+};
 
 //
 // DragRegister(element, vertical, horizontal, functionobj, parent) - make element draggable
@@ -5692,163 +6142,172 @@ TableEditorSC.DragInfo = {
 //
 
 /** @param {any} element @param {any} vertical @param {any} horizontal @param {any} functionobj @param {any} parent */
-TableEditorSC.DragRegister = function(element: any, vertical: any, horizontal: any, functionobj: any, parent: any) {
+TableEditorSC.DragRegister = function (
+  element: any,
+  vertical: any,
+  horizontal: any,
+  functionobj: any,
+  parent: any,
+) {
+  var draginfo = TableEditorSC.DragInfo;
 
-   var draginfo = TableEditorSC.DragInfo;
+  if (!functionobj) {
+    functionobj = {
+      MouseDown: TableEditorSC.DragFunctionStart,
+      MouseMove: TableEditorSC.DragFunctionPosition,
+      MouseUp: TableEditorSC.DragFunctionPosition,
+      Disabled: null,
+    };
+  }
 
-   if (!functionobj) {
-      functionobj = {MouseDown: TableEditorSC.DragFunctionStart, MouseMove: TableEditorSC.DragFunctionPosition,
-                     MouseUp: TableEditorSC.DragFunctionPosition,
-                     Disabled: null};
-      }
+  draginfo.registeredElements.push({
+    element: element,
+    vertical: vertical,
+    horizontal: horizontal,
+    functionobj: functionobj,
+    parent: parent,
+  });
 
-   draginfo.registeredElements.push(
-      {element: element, vertical: vertical, horizontal: horizontal, functionobj: functionobj, parent: parent}
-      );
-
-   element.addEventListener("mousedown", TableEditorSC.DragMouseDown, false);
-
-   }
+  element.addEventListener("mousedown", TableEditorSC.DragMouseDown, false);
+};
 
 //
 // DragUnregister(element) - remove object from list
 //
 
 /** @param {any} element */
-TableEditorSC.DragUnregister = function(element: any) {
+TableEditorSC.DragUnregister = function (element: any) {
+  var draginfo = TableEditorSC.DragInfo;
 
-   var draginfo = TableEditorSC.DragInfo;
+  var i;
 
-   var i;
+  if (!element) return;
 
-   if (!element) return;
+  for (i = 0; i < draginfo.registeredElements.length; i++) {
+    if (draginfo.registeredElements[i].element == element) {
+      draginfo.registeredElements.splice(i, 1);
+      element.removeEventListener("mousedown", TableEditorSC.DragMouseDown, false);
+      return;
+    }
+  }
 
-   for (i=0; i<draginfo.registeredElements.length; i++) {
-      if (draginfo.registeredElements[i].element == element) {
-         draginfo.registeredElements.splice(i,1);
-         element.removeEventListener("mousedown", TableEditorSC.DragMouseDown, false);
-         return;
-         }
-      }
-
-   return; // ignore if not in list
-
-   }
+  return; // ignore if not in list
+};
 
 //
 // DragMouseDown(event)
 //
 
 /** @param {any} event */
-TableEditorSC.DragMouseDown = function(event: any) {
+TableEditorSC.DragMouseDown = function (event: any) {
+  var e = event || window.event;
 
-   var e = event || window.event;
+  var draginfo = TableEditorSC.DragInfo;
 
-   var draginfo = TableEditorSC.DragInfo;
+  var dobj = TableEditorSC.LookupElement(e.target || e.srcElement, draginfo.registeredElements);
+  if (!dobj) return;
 
-   var dobj = TableEditorSC.LookupElement(e.target || e.srcElement, draginfo.registeredElements);
-   if (!dobj) return;
+  if (dobj && dobj.functionobj && dobj.functionobj.Disabled) {
+    if (dobj.functionobj.Disabled(e, draginfo, dobj)) {
+      return;
+    }
+  }
 
-   if (dobj && dobj.functionobj && dobj.functionobj.Disabled) {
-      if (dobj.functionobj.Disabled(e, draginfo, dobj)) {
-         return;
-         }
-      }
+  draginfo.draggingElement = dobj;
+  if (dobj.parent) {
+    draginfo.relativeOffset = TableEditorSC.GetElementPositionWithScroll(dobj.parent);
+  }
+  draginfo.clientX = e.clientX - draginfo.relativeOffset.left;
+  draginfo.clientY = e.clientY - draginfo.relativeOffset.top;
+  draginfo.startX = draginfo.clientX;
+  draginfo.startY = draginfo.clientY;
+  draginfo.startZ = dobj.element.style.zIndex;
+  draginfo.offsetX = 0;
+  draginfo.offsetY = 0;
 
-   draginfo.draggingElement = dobj;
-   if (dobj.parent) {
-      draginfo.relativeOffset = TableEditorSC.GetElementPositionWithScroll(dobj.parent);
-      }
-   draginfo.clientX = e.clientX - draginfo.relativeOffset.left;
-   draginfo.clientY = e.clientY - draginfo.relativeOffset.top;
-   draginfo.startX = draginfo.clientX;
-   draginfo.startY = draginfo.clientY;
-   draginfo.startZ = dobj.element.style.zIndex;
-   draginfo.offsetX = 0;
-   draginfo.offsetY = 0;
+  dobj.element.style.zIndex = "100";
+  TableEditorSC.SetMouseMoveUp(
+    TableEditorSC.DragMouseMove,
+    TableEditorSC.DragMouseUp,
+    dobj.element,
+    e,
+  );
+  if (dobj && dobj.functionobj && dobj.functionobj.MouseDown)
+    dobj.functionobj.MouseDown(e, draginfo, dobj);
 
-   dobj.element.style.zIndex = "100";
-   TableEditorSC.SetMouseMoveUp(TableEditorSC.DragMouseMove,
-			     TableEditorSC.DragMouseUp,
-			     dobj.element,
-			     e);
-   if (dobj && dobj.functionobj && dobj.functionobj.MouseDown) dobj.functionobj.MouseDown(e, draginfo, dobj);
-
-   return false;
-
-   }
+  return false;
+};
 
 //
 // DragMouseMove(event)
 //
 
 /** @param {any} event */
-TableEditorSC.DragMouseMove = function(event: any) {
+TableEditorSC.DragMouseMove = function (event: any) {
+  var e = event || window.event;
 
-   var e = event || window.event;
+  var draginfo = TableEditorSC.DragInfo;
+  var dobj = draginfo.draggingElement;
 
-   var draginfo = TableEditorSC.DragInfo;
-   var dobj = draginfo.draggingElement;
-
-   draginfo.clientX = e.clientX - draginfo.relativeOffset.left;
-   draginfo.clientY = e.clientY - draginfo.relativeOffset.top;
-   TableEditorSC.StopPropagation(e);
-   if (dobj && dobj.functionobj && dobj.functionobj.MouseMove) dobj.functionobj.MouseMove(e, draginfo, dobj);
-   return false;
-   }
+  draginfo.clientX = e.clientX - draginfo.relativeOffset.left;
+  draginfo.clientY = e.clientY - draginfo.relativeOffset.top;
+  TableEditorSC.StopPropagation(e);
+  if (dobj && dobj.functionobj && dobj.functionobj.MouseMove)
+    dobj.functionobj.MouseMove(e, draginfo, dobj);
+  return false;
+};
 
 //
 // DragMouseUp(event)
 //
 
 /** @param {any} event */
-TableEditorSC.DragMouseUp = function(event: any) {
+TableEditorSC.DragMouseUp = function (event: any) {
+  var e = event || window.event;
 
-   var e = event || window.event;
+  var draginfo = TableEditorSC.DragInfo;
+  var dobj = draginfo.draggingElement;
 
-   var draginfo = TableEditorSC.DragInfo;
-   var dobj = draginfo.draggingElement;
+  draginfo.clientX = e.clientX - draginfo.relativeOffset.left;
+  draginfo.clientY = e.clientY - draginfo.relativeOffset.top;
 
-   draginfo.clientX = e.clientX - draginfo.relativeOffset.left;
-   draginfo.clientY = e.clientY - draginfo.relativeOffset.top;
+  dobj.element.style.zIndex = draginfo.startZ;
 
-   dobj.element.style.zIndex = draginfo.startZ;
-
-   if (dobj && dobj.functionobj && dobj.functionobj.MouseUp) dobj.functionobj.MouseUp(e, draginfo, dobj);
-   TableEditorSC.RemoveMouseMoveUp(TableEditorSC.DragMouseMove,
-				TableEditorSC.DragMouseUp,
-				dobj.element, e);
-   draginfo.draggingElement = null;
-   return false;
-   }
+  if (dobj && dobj.functionobj && dobj.functionobj.MouseUp)
+    dobj.functionobj.MouseUp(e, draginfo, dobj);
+  TableEditorSC.RemoveMouseMoveUp(
+    TableEditorSC.DragMouseMove,
+    TableEditorSC.DragMouseUp,
+    dobj.element,
+    e,
+  );
+  draginfo.draggingElement = null;
+  return false;
+};
 
 //
 // DragFunctionStart(event, draginfo, dobj)
 //
 
 /** @param {any} event @param {any} draginfo @param {any} dobj */
-TableEditorSC.DragFunctionStart = function(event: any, draginfo: any, dobj: any) {
+TableEditorSC.DragFunctionStart = function (event: any, draginfo: any, dobj: any) {
+  var element = dobj.functionobj.positionobj || dobj.element;
 
-   var element = dobj.functionobj.positionobj || dobj.element;
-
-   draginfo.offsetY = parseInt(element.style.top) - draginfo.clientY;
-   draginfo.offsetX = parseInt(element.style.left) - draginfo.clientX;
-
-   }
+  draginfo.offsetY = parseInt(element.style.top) - draginfo.clientY;
+  draginfo.offsetX = parseInt(element.style.left) - draginfo.clientX;
+};
 
 //
 // DragFunctionPosition(event, draginfo, dobj)
 //
 
 /** @param {any} event @param {any} draginfo @param {any} dobj */
-TableEditorSC.DragFunctionPosition = function(event: any, draginfo: any, dobj: any) {
+TableEditorSC.DragFunctionPosition = function (event: any, draginfo: any, dobj: any) {
+  var element = dobj.functionobj.positionobj || dobj.element;
 
-   var element = dobj.functionobj.positionobj || dobj.element;
-
-   if (dobj.vertical) element.style.top = (draginfo.clientY + draginfo.offsetY)+"px";
-   if (dobj.horizontal) element.style.left = (draginfo.clientX + draginfo.offsetX)+"px";
-
-   }
+  if (dobj.vertical) element.style.top = draginfo.clientY + draginfo.offsetY + "px";
+  if (dobj.horizontal) element.style.left = draginfo.clientX + draginfo.offsetX + "px";
+};
 
 // *************************************
 //
@@ -5857,33 +6316,31 @@ TableEditorSC.DragFunctionPosition = function(event: any, draginfo: any, dobj: a
 // *************************************
 
 TableEditorSC.ButtonInfo = {
+  // There is only one of these -- no "new" is done.
+  // Only one button operation can be active at a time.
+  // The registeredElements array is used to identify items.
 
-   // There is only one of these -- no "new" is done.
-   // Only one button operation can be active at a time.
-   // The registeredElements array is used to identify items.
+  // One item for each clickable element, each an object with:
+  //    .element, .normalstyle, .hoverstyle, .downstyle, .repeatinterval, .functionobj, .editor
+  //
+  // .functionobj is an object with optional function objects for:
+  //    mouseover, mouseout, mousedown, repeatinterval, mouseup, disabled
 
-   // One item for each clickable element, each an object with:
-   //    .element, .normalstyle, .hoverstyle, .downstyle, .repeatinterval, .functionobj, .editor
-   //
-   // .functionobj is an object with optional function objects for:
-   //    mouseover, mouseout, mousedown, repeatinterval, mouseup, disabled
+  registeredElements: [],
 
-   registeredElements: [],
+  // Items used during hover over an element, clicking, repeating, etc.
 
-   // Items used during hover over an element, clicking, repeating, etc.
+  buttonElement: null, // item being processed, hover or down (.element is the actual element)
+  doingHover: false, // true if mouse is over one of our elements
+  buttonDown: false, // true if button down and buttonElement not null
+  timer: null, // timer object for repeating
 
-   buttonElement: null, // item being processed, hover or down (.element is the actual element)
-   doingHover: false, // true if mouse is over one of our elements
-   buttonDown: false, // true if button down and buttonElement not null
-   timer: null, // timer object for repeating
+  // Used while processing an event
 
-   // Used while processing an event
-
-   relativeOffset: null,
-   clientX: 0,
-   clientY: 0
-
-   }
+  relativeOffset: null,
+  clientX: 0,
+  clientY: 0,
+};
 
 //
 // ButtonRegister(editor, element, paramobj, functionobj) - make element clickable
@@ -5892,191 +6349,199 @@ TableEditorSC.ButtonInfo = {
 // The paramobj has the optional normalstyle, hoverstyle, downstyle, repeatwait, repeatinterval settings
 
 /** @param {any} editor @param {any} element @param {any} paramobj @param {any} functionobj */
-TableEditorSC.ButtonRegister = function(editor: any, element: any, paramobj: any, functionobj: any) {
+TableEditorSC.ButtonRegister = function (
+  editor: any,
+  element: any,
+  paramobj: any,
+  functionobj: any,
+) {
+  var buttoninfo = TableEditorSC.ButtonInfo;
 
-   var buttoninfo = TableEditorSC.ButtonInfo;
+  if (!paramobj) paramobj = {};
 
-   if (!paramobj) paramobj = {};
+  buttoninfo.registeredElements.push({
+    name: paramobj.name,
+    element: element,
+    editor: editor,
+    normalstyle: paramobj.normalstyle,
+    hoverstyle: paramobj.hoverstyle,
+    downstyle: paramobj.downstyle,
+    repeatwait: paramobj.repeatwait,
+    repeatinterval: paramobj.repeatinterval,
+    functionobj: functionobj,
+  });
 
-   buttoninfo.registeredElements.push(
-      {name: paramobj.name, element: element, editor: editor,
-       normalstyle: paramobj.normalstyle, hoverstyle: paramobj.hoverstyle, downstyle: paramobj.downstyle,
-       repeatwait: paramobj.repeatwait, repeatinterval: paramobj.repeatinterval, functionobj: functionobj}
-      );
+  element.addEventListener("mousedown", TableEditorSC.ButtonMouseDown, false);
+  element.addEventListener("mouseover", TableEditorSC.ButtonMouseOver, false);
+  element.addEventListener("mouseout", TableEditorSC.ButtonMouseOut, false);
 
-   element.addEventListener("mousedown", TableEditorSC.ButtonMouseDown, false);
-   element.addEventListener("mouseover", TableEditorSC.ButtonMouseOver, false);
-   element.addEventListener("mouseout", TableEditorSC.ButtonMouseOut, false);
-
-   return;
-   }
+  return;
+};
 
 //
 // ButtonMouseOver(event)
 //
 
 /** @param {any} event */
-TableEditorSC.ButtonMouseOver = function(event: any) {
+TableEditorSC.ButtonMouseOver = function (event: any) {
+  var e = event || window.event;
 
-   var e = event || window.event;
+  var buttoninfo = TableEditorSC.ButtonInfo;
 
-   var buttoninfo = TableEditorSC.ButtonInfo;
+  var bobj = TableEditorSC.LookupElement(e.target || e.srcElement, buttoninfo.registeredElements);
 
-   var bobj = TableEditorSC.LookupElement(e.target || e.srcElement, buttoninfo.registeredElements);
+  if (!bobj) return;
 
-   if (!bobj) return;
+  if (buttoninfo.buttonDown) {
+    if (buttoninfo.buttonElement == bobj) {
+      buttoninfo.doingHover = true; // keep track whether we are on the pressed button or not
+    }
+    return;
+  }
 
-   if (buttoninfo.buttonDown) {
-      if (buttoninfo.buttonElement==bobj) {
-         buttoninfo.doingHover = true; // keep track whether we are on the pressed button or not
-         }
-      return;
-      }
+  if (buttoninfo.buttonElement && buttoninfo.buttonElement != bobj && buttoninfo.doingHover) {
+    // moved to a new one, undo hover there
+    TableEditorSC.setStyles(buttoninfo.buttonElement.element, buttoninfo.buttonElement.normalstyle);
+  }
 
-   if (buttoninfo.buttonElement &&
-          buttoninfo.buttonElement!=bobj && buttoninfo.doingHover) { // moved to a new one, undo hover there
-      TableEditorSC.setStyles(buttoninfo.buttonElement.element, buttoninfo.buttonElement.normalstyle);
-      }
+  buttoninfo.buttonElement = bobj; // remember this one is hovering
+  buttoninfo.doingHover = true;
 
-   buttoninfo.buttonElement = bobj; // remember this one is hovering
-   buttoninfo.doingHover = true;
+  TableEditorSC.setStyles(bobj.element, bobj.hoverstyle); // set style (if provided)
 
-   TableEditorSC.setStyles(bobj.element, bobj.hoverstyle); // set style (if provided)
+  if (bobj && bobj.functionobj && bobj.functionobj.MouseOver)
+    bobj.functionobj.MouseOver(e, buttoninfo, bobj);
 
-   if (bobj && bobj.functionobj && bobj.functionobj.MouseOver) bobj.functionobj.MouseOver(e, buttoninfo, bobj);
-
-   return;
-
-   }
+  return;
+};
 
 //
 // ButtonMouseOut(event)
 //
 
 /** @param {any} event */
-TableEditorSC.ButtonMouseOut = function(event: any) {
+TableEditorSC.ButtonMouseOut = function (event: any) {
+  var e = event || window.event;
 
-   var e = event || window.event;
+  var buttoninfo = TableEditorSC.ButtonInfo;
 
-   var buttoninfo = TableEditorSC.ButtonInfo;
+  if (buttoninfo.buttonDown) {
+    buttoninfo.doingHover = false; // keep track of overs and outs
+    return;
+  }
 
-   if (buttoninfo.buttonDown) {
-      buttoninfo.doingHover = false; // keep track of overs and outs
-      return;
-      }
+  var bobj = TableEditorSC.LookupElement(e.target || e.srcElement, buttoninfo.registeredElements);
 
-   var bobj = TableEditorSC.LookupElement(e.target || e.srcElement, buttoninfo.registeredElements);
+  if (buttoninfo.doingHover) {
+    // if there was a hover, undo it
+    if (buttoninfo.buttonElement)
+      TableEditorSC.setStyles(
+        buttoninfo.buttonElement.element,
+        buttoninfo.buttonElement.normalstyle,
+      );
+    buttoninfo.buttonElement = null;
+    buttoninfo.doingHover = false;
+  }
 
-   if (buttoninfo.doingHover) { // if there was a hover, undo it
-      if (buttoninfo.buttonElement)
-         TableEditorSC.setStyles(buttoninfo.buttonElement.element, buttoninfo.buttonElement.normalstyle);
-      buttoninfo.buttonElement = null;
-      buttoninfo.doingHover = false;
-      }
+  if (bobj && bobj.functionobj && bobj.functionobj.MouseOut)
+    bobj.functionobj.MouseOut(e, buttoninfo, bobj);
 
-   if (bobj && bobj.functionobj && bobj.functionobj.MouseOut) bobj.functionobj.MouseOut(e, buttoninfo, bobj);
-
-   return;
-
-   }
+  return;
+};
 
 //
 // ButtonMouseDown(event)
 //
 
 /** @param {any} event */
-TableEditorSC.ButtonMouseDown = function(event: any) {
+TableEditorSC.ButtonMouseDown = function (event: any) {
+  var e = event || window.event;
 
-   var e = event || window.event;
+  var buttoninfo = TableEditorSC.ButtonInfo;
 
-   var buttoninfo = TableEditorSC.ButtonInfo;
+  var bobj = TableEditorSC.LookupElement(e.target || e.srcElement, buttoninfo.registeredElements);
 
-   var viewportinfo = TableEditorSC.GetViewportInfo();
+  if (!bobj) return; // not one of our elements
 
-   var bobj = TableEditorSC.LookupElement(e.target || e.srcElement, buttoninfo.registeredElements);
+  if (bobj && bobj.functionobj && bobj.functionobj.Disabled) {
+    if (bobj.functionobj.Disabled(e, buttoninfo, bobj)) {
+      return;
+    }
+  }
 
-   if (!bobj) return; // not one of our elements
+  buttoninfo.buttonElement = bobj;
+  buttoninfo.buttonDown = true;
 
-   if (bobj && bobj.functionobj && bobj.functionobj.Disabled) {
-      if (bobj.functionobj.Disabled(e, buttoninfo, bobj)) {
-         return;
-         }
-      }
+  TableEditorSC.setStyles(bobj.element, buttoninfo.buttonElement.downstyle);
 
-   buttoninfo.buttonElement = bobj;
-   buttoninfo.buttonDown = true;
+  // Register event handler for mouse up
 
-   TableEditorSC.setStyles(bobj.element, buttoninfo.buttonElement.downstyle);
+  // Event code from JavaScript, Flanagan, 5th Edition, pg. 422
+  document.addEventListener("mouseup", TableEditorSC.ButtonMouseUp, true); // capture everywhere
+  TableEditorSC.StopPropagation(e);
+  buttoninfo.relativeOffset = TableEditorSC.GetElementPositionWithScroll(bobj.editor.toplevel);
+  buttoninfo.clientX = e.clientX - buttoninfo.relativeOffset.left;
+  buttoninfo.clientY = e.clientY - buttoninfo.relativeOffset.top;
 
-   // Register event handler for mouse up
+  if (bobj && bobj.functionobj && bobj.functionobj.MouseDown)
+    bobj.functionobj.MouseDown(e, buttoninfo, bobj);
 
-   // Event code from JavaScript, Flanagan, 5th Edition, pg. 422
-   document.addEventListener("mouseup", TableEditorSC.ButtonMouseUp, true); // capture everywhere
-   TableEditorSC.StopPropagation(e);
-   buttoninfo.relativeOffset = TableEditorSC.GetElementPositionWithScroll(bobj.editor.toplevel);
-   buttoninfo.clientX = e.clientX - buttoninfo.relativeOffset.left;
-   buttoninfo.clientY = e.clientY - buttoninfo.relativeOffset.top;
+  if (bobj.repeatwait) {
+    // if a repeat wait is set, then starting waiting for first repetition
+    buttoninfo.timer = window.setTimeout(TableEditorSC.ButtonRepeat as () => void, bobj.repeatwait);
+  }
 
-   if (bobj && bobj.functionobj && bobj.functionobj.MouseDown) bobj.functionobj.MouseDown(e, buttoninfo, bobj);
-
-   if (bobj.repeatwait) { // if a repeat wait is set, then starting waiting for first repetition
-      buttoninfo.timer = window.setTimeout(TableEditorSC.ButtonRepeat, bobj.repeatwait);
-      }
-
-   return;
-
-   }
+  return;
+};
 
 //
 // ButtonMouseUp(event)
 //
 
 /** @param {any} event */
-TableEditorSC.ButtonMouseUp = function(event: any) {
+TableEditorSC.ButtonMouseUp = function (event: any) {
+  var e = event || window.event;
 
-   var e = event || window.event;
+  var buttoninfo = TableEditorSC.ButtonInfo;
+  var bobj = buttoninfo.buttonElement;
 
-   var buttoninfo = TableEditorSC.ButtonInfo;
-   var bobj = buttoninfo.buttonElement;
+  if (buttoninfo.timer) {
+    // if repeating, cancel it
+    window.clearTimeout(buttoninfo.timer); // cancel timer
+    buttoninfo.timer = null;
+  }
 
-   if (buttoninfo.timer) { // if repeating, cancel it
-      window.clearTimeout(buttoninfo.timer); // cancel timer
-      buttoninfo.timer = null;
-      }
+  if (!buttoninfo.buttonDown) return; // already did this
+  TableEditorSC.StopPropagation(e);
+  document.removeEventListener("mouseup", TableEditorSC.ButtonMouseUp, true);
 
-   if (!buttoninfo.buttonDown) return; // already did this
-   TableEditorSC.StopPropagation(e);
-   document.removeEventListener("mouseup", TableEditorSC.ButtonMouseUp, true);
+  if (buttoninfo.buttonElement.downstyle) {
+    if (buttoninfo.doingHover)
+      TableEditorSC.setStyles(bobj.element, buttoninfo.buttonElement.hoverstyle);
+    else TableEditorSC.setStyles(bobj.element, buttoninfo.buttonElement.normalstyle);
+  }
 
-   if (buttoninfo.buttonElement.downstyle) {
-      if (buttoninfo.doingHover)
-         TableEditorSC.setStyles(bobj.element, buttoninfo.buttonElement.hoverstyle);
-      else
-         TableEditorSC.setStyles(bobj.element, buttoninfo.buttonElement.normalstyle);
-      }
+  buttoninfo.buttonDown = false;
 
-   buttoninfo.buttonDown = false;
-
-   if (bobj && bobj.functionobj && bobj.functionobj.MouseUp) bobj.functionobj.MouseUp(e, buttoninfo, bobj);
-
-   }
+  if (bobj && bobj.functionobj && bobj.functionobj.MouseUp)
+    bobj.functionobj.MouseUp(e, buttoninfo, bobj);
+};
 
 //
 // ButtonRepeat()
 //
 
-TableEditorSC.ButtonRepeat = function() {
+TableEditorSC.ButtonRepeat = function () {
+  var buttoninfo = TableEditorSC.ButtonInfo;
+  var bobj = buttoninfo.buttonElement;
 
-   var buttoninfo = TableEditorSC.ButtonInfo;
-   var bobj = buttoninfo.buttonElement;
+  if (!bobj) return;
 
-   if (!bobj) return;
+  if (bobj && bobj.functionobj && bobj.functionobj.Repeat)
+    bobj.functionobj.Repeat(null, buttoninfo, bobj);
 
-   if (bobj && bobj.functionobj && bobj.functionobj.Repeat) bobj.functionobj.Repeat(null, buttoninfo, bobj);
-
-   buttoninfo.timer = window.setTimeout(TableEditorSC.ButtonRepeat, bobj.repeatinterval || 100);
-
-   }
+  buttoninfo.timer = window.setTimeout(TableEditorSC.ButtonRepeat as () => void, bobj.repeatinterval || 100);
+};
 
 // *************************************
 //
@@ -6085,67 +6550,60 @@ TableEditorSC.ButtonRepeat = function() {
 // *************************************
 
 TableEditorSC.MouseWheelInfo = {
+  // There is only one of these -- no "new" is done.
+  // The mousewheel only affects the one area the mouse pointer is over
+  // The registeredElements array is used to identify items.
 
-   // There is only one of these -- no "new" is done.
-   // The mousewheel only affects the one area the mouse pointer is over
-   // The registeredElements array is used to identify items.
+  // One item for each element to respond to the mousewheel, each an object with:
+  //    .element, .functionobj
 
-   // One item for each element to respond to the mousewheel, each an object with:
-   //    .element, .functionobj
-
-   registeredElements: []
-
-   }
+  registeredElements: [],
+};
 
 //
 // MouseWheelRegister(element, functionobj) - make element respond to mousewheel
 //
 
 /** @param {any} element @param {any} functionobj */
-TableEditorSC.MouseWheelRegister = function(element: any, functionobj: any) {
+TableEditorSC.MouseWheelRegister = function (element: any, functionobj: any) {
+  var mousewheelinfo = TableEditorSC.MouseWheelInfo;
 
-   var mousewheelinfo = TableEditorSC.MouseWheelInfo;
+  mousewheelinfo.registeredElements.push({ element: element, functionobj: functionobj });
 
-   mousewheelinfo.registeredElements.push(
-      {element: element, functionobj: functionobj}
-      );
+  element.addEventListener("DOMMouseScroll", TableEditorSC.ProcessMouseWheel, false);
+  element.addEventListener("mousewheel", TableEditorSC.ProcessMouseWheel, false); // Opera needs this
 
-   element.addEventListener("DOMMouseScroll", TableEditorSC.ProcessMouseWheel, false);
-   element.addEventListener("mousewheel", TableEditorSC.ProcessMouseWheel, false); // Opera needs this
-
-   return;
-
-   }
+  return;
+};
 
 /** @param {any} e */
-TableEditorSC.ProcessMouseWheel = function(e: any) {
+TableEditorSC.ProcessMouseWheel = function (e: any) {
+  var event = e || window.event;
+  var delta;
 
-   var event = e || window.event;
-   var delta;
+  if (TableEditorSC.Keyboard.passThru) return; // ignore
 
-   if (TableEditorSC.Keyboard.passThru) return; // ignore
+  var mousewheelinfo = TableEditorSC.MouseWheelInfo;
+  var ele = event.target || event.srcElement; // source object is often within what we want
+  var wobj;
 
-   var mousewheelinfo = TableEditorSC.MouseWheelInfo;
-   var ele = event.target || event.srcElement; // source object is often within what we want
-   var wobj;
+  for (wobj = null; !wobj && ele; ele = ele.parentNode) {
+    // go up tree looking for one of our elements
+    wobj = TableEditorSC.LookupElement(ele, mousewheelinfo.registeredElements);
+  }
+  if (!wobj) return; // not one of our elements
 
-   for (wobj=null; !wobj && ele; ele=ele.parentNode) { // go up tree looking for one of our elements
-      wobj = TableEditorSC.LookupElement(ele, mousewheelinfo.registeredElements);
-      }
-   if (!wobj) return; // not one of our elements
+  if (event.wheelDelta) {
+    delta = event.wheelDelta / 120;
+  } else delta = -event.detail / 3;
+  if (!delta) delta = 0;
 
-   if (event.wheelDelta) {
-      delta = event.wheelDelta/120;
-      }
-   else delta = -event.detail/3;
-   if (!delta) delta = 0;
+  if (wobj.functionobj && wobj.functionobj.WheelMove)
+    wobj.functionobj.WheelMove(event, delta, mousewheelinfo, wobj);
 
-   if (wobj.functionobj && wobj.functionobj.WheelMove) wobj.functionobj.WheelMove(event, delta, mousewheelinfo, wobj);
-
-   if (event.preventDefault) event.preventDefault();
-   event.returnValue = false;
-
-   }
+  if (event.preventDefault) event.preventDefault();
+  event.returnValue = false;
+};
 
 // *************************************
 //
@@ -6156,212 +6614,248 @@ TableEditorSC.ProcessMouseWheel = function(e: any) {
 // *************************************
 
 TableEditorSC.keyboardTables = {
+  specialKeysCommon: {
+    8: "[backspace]",
+    9: "[tab]",
+    13: "[enter]",
+    25: "[tab]",
+    27: "[esc]",
+    33: "[pgup]",
+    34: "[pgdn]",
+    35: "[end]",
+    36: "[home]",
+    37: "[aleft]",
+    38: "[aup]",
+    39: "[aright]",
+    40: "[adown]",
+    45: "[ins]",
+    46: "[del]",
+    113: "[f2]",
+  },
 
-   specialKeysCommon: {
-      8: "[backspace]", 9: "[tab]", 13: "[enter]", 25: "[tab]", 27: "[esc]", 33: "[pgup]", 34: "[pgdn]",
-      35: "[end]", 36: "[home]", 37: "[aleft]", 38: "[aup]", 39: "[aright]", 40: "[adown]", 45: "[ins]",
-      46: "[del]", 113: "[f2]"
-      },
+  controlKeysIE: {
+    65: "[ctrl-a]",
+    67: "[ctrl-c]",
+    83: "[ctrl-s]",
+    86: "[ctrl-v]",
+    88: "[ctrl-x]",
+    90: "[ctrl-z]",
+  },
 
-   controlKeysIE: {
-      65: "[ctrl-a]",
-      67: "[ctrl-c]",
-      83: "[ctrl-s]",
-      86: "[ctrl-v]",
-      88: "[ctrl-x]",
-      90: "[ctrl-z]"
-      },
+  specialKeysSafari: {
+    8: "[backspace]",
+    9: "[tab]",
+    13: "[enter]",
+    25: "[tab]",
+    27: "[esc]",
+    63232: "[aup]",
+    63233: "[adown]",
+    63234: "[aleft]",
+    63235: "[aright]",
+    63272: "[del]",
+    63273: "[home]",
+    63275: "[end]",
+    63276: "[pgup]",
+    63277: "[pgdn]",
+    63237: "[f2]",
+  },
 
-   specialKeysSafari: {
-      8: "[backspace]", 9: "[tab]", 13: "[enter]", 25: "[tab]", 27: "[esc]", 63232: "[aup]", 63233: "[adown]",
-      63234: "[aleft]", 63235: "[aright]", 63272: "[del]", 63273: "[home]", 63275: "[end]", 63276: "[pgup]",
-      63277: "[pgdn]", 63237: "[f2]"
-      },
+  controlKeysSafari: {
+    97: "[ctrl-a]",
+    99: "[ctrl-c]",
+    115: "[ctrl-s]",
+    118: "[ctrl-v]",
+    120: "[ctrl-x]",
+    122: "[ctrl-z]",
+  },
 
-   controlKeysSafari: {
-      97: "[ctrl-a]",
-      99: "[ctrl-c]",
-      115: "[ctrl-s]",
-      118: "[ctrl-v]",
-      120: "[ctrl-x]",
-      122: "[ctrl-z]"
-      },
+  ignoreKeysSafari: {
+    63236: "[f1]",
+    63238: "[f3]",
+    63239: "[f4]",
+    63240: "[f5]",
+    63241: "[f6]",
+    63242: "[f7]",
+    63243: "[f8]",
+    63244: "[f9]",
+    63245: "[f10]",
+    63246: "[f11]",
+    63247: "[f12]",
+    63289: "[numlock]",
+  },
 
-   ignoreKeysSafari: {
-      63236: "[f1]", 63238: "[f3]", 63239: "[f4]", 63240: "[f5]", 63241: "[f6]", 63242: "[f7]",
-      63243: "[f8]", 63244: "[f9]", 63245: "[f10]", 63246: "[f11]", 63247: "[f12]", 63289: "[numlock]"
-      },
+  specialKeysFirefox: {
+    8: "[backspace]",
+    9: "[tab]",
+    13: "[enter]",
+    25: "[tab]",
+    27: "[esc]",
+    33: "[pgup]",
+    34: "[pgdn]",
+    35: "[end]",
+    36: "[home]",
+    37: "[aleft]",
+    38: "[aup]",
+    39: "[aright]",
+    40: "[adown]",
+    45: "[ins]",
+    46: "[del]",
+    113: "[f2]",
+  },
 
-   specialKeysFirefox: {
-      8: "[backspace]", 9: "[tab]", 13: "[enter]", 25: "[tab]", 27: "[esc]", 33: "[pgup]", 34: "[pgdn]",
-      35: "[end]", 36: "[home]", 37: "[aleft]", 38: "[aup]", 39: "[aright]", 40: "[adown]", 45: "[ins]",
-      46: "[del]", 113: "[f2]"
-      },
-
-   controlKeysFirefox: {
-      97: "[ctrl-a]",
-      99: "[ctrl-c]",
-      115: "[ctrl-s]",
-      118: "[ctrl-v]",
-      120: "[ctrl-x]",
-      122: "[ctrl-z]"
-      }
-   }
+  controlKeysFirefox: {
+    97: "[ctrl-a]",
+    99: "[ctrl-c]",
+    115: "[ctrl-s]",
+    118: "[ctrl-v]",
+    120: "[ctrl-x]",
+    122: "[ctrl-z]",
+  },
+};
 
 TableEditorSC.Keyboard = {
-   areListener: false, // if true, we have been installed as a listener for keyboard events
-   focusTable: null, // the table editor object that gets keystrokes or null
-   passThru: null, // if not null, control element with focus to pass keyboard events to (has blur method), or "true"
-   didProcessKey: false, // did TableEditorSC.ProcessKey in keydown
-   statusFromProcessKey: false, // the status from the keydown TableEditorSC.ProcessKey
-   repeatingKeyPress: false, // some browsers (Opera, Gecko Mac) repeat special keys as KeyPress not KeyDown
-   chForProcessKey: "" // remember so can do repeat in those cases
-   };
+  areListener: false, // if true, we have been installed as a listener for keyboard events
+  focusTable: null, // the table editor object that gets keystrokes or null
+  passThru: null, // if not null, control element with focus to pass keyboard events to (has blur method), or "true"
+  didProcessKey: false, // did TableEditorSC.ProcessKey in keydown
+  statusFromProcessKey: false, // the status from the keydown TableEditorSC.ProcessKey
+  repeatingKeyPress: false, // some browsers (Opera, Gecko Mac) repeat special keys as KeyPress not KeyDown
+  chForProcessKey: "", // remember so can do repeat in those cases
+};
 
 /** @param {any} editor */
-TableEditorSC.KeyboardSetFocus = function(editor: any) {
+TableEditorSC.KeyboardSetFocus = function (editor: any) {
+  TableEditorSC.Keyboard.focusTable = editor;
 
-   TableEditorSC.Keyboard.focusTable = editor;
+  if (!TableEditorSC.Keyboard.areListener) {
+    document.onkeydown = TableEditorSC.ProcessKeyDown;
+    document.onkeypress = TableEditorSC.ProcessKeyPress;
+    TableEditorSC.Keyboard.areListener = true;
+  }
+  if (TableEditorSC.Keyboard.passThru) {
+    if (TableEditorSC.Keyboard.passThru.blur) {
+      TableEditorSC.Keyboard.passThru.blur();
+    }
+    TableEditorSC.Keyboard.passThru = null;
+  }
+  window.focus();
+};
 
-   if (!TableEditorSC.Keyboard.areListener) {
-      document.onkeydown = TableEditorSC.ProcessKeyDown;
-      document.onkeypress = TableEditorSC.ProcessKeyPress;
-      TableEditorSC.Keyboard.areListener = true;
-      }
-   if (TableEditorSC.Keyboard.passThru) {
-      if (TableEditorSC.Keyboard.passThru.blur) {
-         TableEditorSC.Keyboard.passThru.blur();
-         }
-      TableEditorSC.Keyboard.passThru = null;
-      }
-   window.focus();
-   }
-
-TableEditorSC.KeyboardFocus = function() {
-
-   TableEditorSC.Keyboard.passThru = null;
-   window.focus();
-
-   }
+TableEditorSC.KeyboardFocus = function () {
+  TableEditorSC.Keyboard.passThru = null;
+  window.focus();
+};
 
 /** @param {any} e */
-TableEditorSC.ProcessKeyDown = function(e: any) {
+TableEditorSC.ProcessKeyDown = function (e: any) {
+  var kt = TableEditorSC.keyboardTables;
+  kt.didProcessKey = false; // always start false
+  kt.statusFromProcessKey = false;
+  kt.repeatingKeyPress = false;
 
-   var kt = TableEditorSC.keyboardTables;
-   kt.didProcessKey = false; // always start false
-   kt.statusFromProcessKey = false;
-   kt.repeatingKeyPress = false;
+  var ch = "";
+  var status = true;
 
-   var ch="";
-   var status=true;
+  if (TableEditorSC._app) return; // // ignore in app - widgets need control
+  if (TableEditorSC.Keyboard.passThru) return; // ignore
 
-   if (TableEditorSC._app) return; // // ignore in app - widgets need control
-   if (TableEditorSC.Keyboard.passThru) return; // ignore
+  e = e || window.event;
 
-   e = e || window.event;
-
-   if (e.which==undefined) { // IE
-      ch = kt.specialKeysCommon[e.keyCode];
-      if (!ch) {
-         if (e.ctrlKey) {
-            ch=kt.controlKeysIE[e.keyCode];
-            }
-         if (!ch)
-            return true;
-         }
-      status = TableEditorSC.ProcessKey(ch, e);
-
-      if (!status) {
-         if (e.preventDefault) e.preventDefault();
-            e.returnValue = false;
-         }
+  if (e.which == undefined) {
+    // IE
+    ch = kt.specialKeysCommon[e.keyCode];
+    if (!ch) {
+      if (e.ctrlKey) {
+        ch = kt.controlKeysIE[e.keyCode];
       }
+      if (!ch) return true;
+    }
+    status = TableEditorSC.ProcessKey(ch, e);
 
-   else {
-      ch = kt.specialKeysCommon[e.keyCode];
-      if (!ch) {
-//         return true;
-         if (e.ctrlKey || e.metaKey) {
-            ch=kt.controlKeysIE[e.keyCode]; // this works here
-            }
-         if (!ch)
-            return true;
-         }
-
-      status = TableEditorSC.ProcessKey(ch, e); // process the key
-      kt.didProcessKey = true; // remember what happened
-      kt.statusFromProcessKey = status;
-      kt.chForProcessKey = ch;
-      }
-
-   return status;
-
-   }
-
-/** @param {any} e */
-TableEditorSC.ProcessKeyPress = function(e: any) {
-
-   var kt = TableEditorSC.keyboardTables;
-
-   var ch="";
-
-   e = e || window.event;
-   if (TableEditorSC._app) return; // // ignore in app - widgets need control
-
-   if (TableEditorSC.Keyboard.passThru) return; // ignore
-   if (kt.didProcessKey) { // already processed this key
-      if (kt.repeatingKeyPress) {
-         return TableEditorSC.ProcessKey(kt.chForProcessKey, e); // process the same key as on KeyDown
-         }
-      else {
-         kt.repeatingKeyPress = true; // see if get another KeyPress before KeyDown
-         return kt.statusFromProcessKey; // do what it said to do
-         }
-      }
-
-   if (e.which==undefined) { // IE
-      // Note: Esc and Enter will come through here, too, if not stopped at KeyDown
-      ch=String.fromCharCode(e.keyCode); // convert to a character (special chars handled at ev1)
-      }
-
-   else { // not IE
-      if (!e.which)
-         return false; // ignore - special key
-      if (e.keyCode==e.charCode) { // Safari
-         ch = kt.specialKeysSafari[e.keyCode];
-         if (!ch) {
-            if (kt.ignoreKeysSafari[e.keyCode]) // pass this through
-               return true;
-            if (e.metaKey) {
-               ch=kt.controlKeysSafari[e.keyCode];
-               }
-            else {
-               ch = String.fromCharCode(e.which);
-               }
-            }
-         }
-
-      else { // Firefox
-         if (kt.specialKeysFirefox[e.keyCode]) {
-            return true;
-            }
-         ch = String.fromCharCode(e.which);
-         if (e.ctrlKey || e.metaKey) {
-            ch = kt.controlKeysFirefox[e.which];
-            }
-         }
-      }
-
-   var status = TableEditorSC.ProcessKey(ch, e);
-
-   if (!status) {
+    if (!status) {
       if (e.preventDefault) e.preventDefault();
       e.returnValue = false;
+    }
+  } else {
+    ch = kt.specialKeysCommon[e.keyCode];
+    if (!ch) {
+      //         return true;
+      if (e.ctrlKey || e.metaKey) {
+        ch = kt.controlKeysIE[e.keyCode]; // this works here
       }
+      if (!ch) return true;
+    }
 
-   return status;
+    status = TableEditorSC.ProcessKey(ch, e); // process the key
+    kt.didProcessKey = true; // remember what happened
+    kt.statusFromProcessKey = status;
+    kt.chForProcessKey = ch;
+  }
 
-   }
+  return status;
+};
+
+/** @param {any} e */
+TableEditorSC.ProcessKeyPress = function (e: any) {
+  var kt = TableEditorSC.keyboardTables;
+
+  var ch = "";
+
+  e = e || window.event;
+  if (TableEditorSC._app) return; // // ignore in app - widgets need control
+
+  if (TableEditorSC.Keyboard.passThru) return; // ignore
+  if (kt.didProcessKey) {
+    // already processed this key
+    if (kt.repeatingKeyPress) {
+      return TableEditorSC.ProcessKey(kt.chForProcessKey, e); // process the same key as on KeyDown
+    } else {
+      kt.repeatingKeyPress = true; // see if get another KeyPress before KeyDown
+      return kt.statusFromProcessKey; // do what it said to do
+    }
+  }
+
+  if (e.which == undefined) {
+    // IE
+    // Note: Esc and Enter will come through here, too, if not stopped at KeyDown
+    ch = String.fromCharCode(e.keyCode); // convert to a character (special chars handled at ev1)
+  } else {
+    // not IE
+    if (!e.which) return false; // ignore - special key
+    if (e.keyCode == e.charCode) {
+      // Safari
+      ch = kt.specialKeysSafari[e.keyCode];
+      if (!ch) {
+        if (kt.ignoreKeysSafari[e.keyCode])
+          // pass this through
+          return true;
+        if (e.metaKey) {
+          ch = kt.controlKeysSafari[e.keyCode];
+        } else {
+          ch = String.fromCharCode(e.which);
+        }
+      }
+    } else {
+      // Firefox
+      if (kt.specialKeysFirefox[e.keyCode]) {
+        return true;
+      }
+      ch = String.fromCharCode(e.which);
+      if (e.ctrlKey || e.metaKey) {
+        ch = kt.controlKeysFirefox[e.which];
+      }
+    }
+  }
+
+  var status = TableEditorSC.ProcessKey(ch, e);
+
+  if (!status) {
+    if (e.preventDefault) e.preventDefault();
+    e.returnValue = false;
+  }
+
+  return status;
+};
 
 //
 // status = SocialCalc.ProcessKey(ch, e)
@@ -6371,7 +6865,7 @@ TableEditorSC.ProcessKeyPress = function(e: any) {
 
 /** @param {any} ch @param {any} e */
 TableEditorSC.ProcessKey = function (ch: any, e: any) {
-   var ft = TableEditorSC.Keyboard.focusTable;
-   if (!ft) return true; // we're not handling it -- let browser do default
-   return ft.EditorProcessKey(ch, e);
-   }
+  var ft = TableEditorSC.Keyboard.focusTable;
+  if (!ft) return true; // we're not handling it -- let browser do default
+  return ft.EditorProcessKey(ch, e);
+};

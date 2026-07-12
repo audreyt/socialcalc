@@ -18,71 +18,61 @@
 const testsFilter = process.env.MUTATE_TESTS?.trim();
 const inPlace = process.env.MUTATE_IN_PLACE === "1";
 
-const testCommand = testsFilter
-    ? `bun test ${testsFilter}`
-    : "bun test";
+const testCommand = testsFilter ? `vp test run ${testsFilter}` : "vp test";
 
 /** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 export default {
-    mutate: [
-        "js/formatnumber2.ts",
-        "js/formula1.ts",
-        "js/socialcalc-3.ts",
-        "js/socialcalctableeditor.ts",
-        "js/socialcalcpopup.ts",
-        "js/socialcalcspreadsheetcontrol.ts",
-        "js/socialcalcviewer.ts",
+  mutate: [
+    "js/formatnumber2.ts",
+    "js/formula1.ts",
+    "js/socialcalc-3.ts",
+    "js/socialcalctableeditor.ts",
+    "js/socialcalcpopup.ts",
+    "js/socialcalcspreadsheetcontrol.ts",
+    "js/socialcalcviewer.ts",
+  ],
+
+  testRunner: "command",
+  commandRunner: {
+    command: `bun run build.ts && ${testCommand}`,
+  },
+  coverageAnalysis: "off",
+
+  // inPlace mode skips the per-mutant sandbox copy (node_modules + all
+  // assets). Required for fast iteration. Safe because the helper reverts
+  // source files after each mutant and we don't leak state across test
+  // processes.
+  inPlace,
+
+  // With inPlace there's only one working copy, so concurrency must be 1.
+  concurrency: inPlace ? 1 : 4,
+
+  reporters: ["clear-text", "progress", "html", "json"],
+  htmlReporter: { fileName: "reports/mutation/index.html" },
+  jsonReporter: { fileName: "reports/mutation/mutation.json" },
+
+  thresholds: { high: 90, low: 70, break: null },
+
+  // Formula RATE solver can take a few hundred ms, so keep headroom.
+  timeoutMS: 60000,
+  timeoutFactor: 2,
+
+  incremental: true,
+  incrementalFile: ".stryker-tmp/incremental.json",
+  tempDirName: ".stryker-tmp",
+
+  logLevel: "info",
+  fileLogLevel: "trace",
+
+  ignorePatterns: ["node_modules", "dist", "coverage", "reports", ".stryker-tmp", "images", ".git"],
+
+  mutator: {
+    excludedMutations: [
+      // User-facing strings churn with no behavioural signal.
+      "StringLiteral",
+      // Date/format regex mutants generate near-equivalent behaviours
+      // on our inputs; leave the regex path alone.
+      "Regex",
     ],
-
-    testRunner: "command",
-    commandRunner: {
-        command: `bun run build.ts && ${testCommand}`,
-    },
-    coverageAnalysis: "off",
-
-    // inPlace mode skips the per-mutant sandbox copy (node_modules + all
-    // assets). Required for fast iteration. Safe because the helper reverts
-    // source files after each mutant and we don't leak state across test
-    // processes.
-    inPlace,
-
-    // With inPlace there's only one working copy, so concurrency must be 1.
-    concurrency: inPlace ? 1 : 4,
-
-    reporters: ["clear-text", "progress", "html", "json"],
-    htmlReporter: { fileName: "reports/mutation/index.html" },
-    jsonReporter: { fileName: "reports/mutation/mutation.json" },
-
-    thresholds: { high: 90, low: 70, break: null },
-
-    // Formula RATE solver can take a few hundred ms, so keep headroom.
-    timeoutMS: 60000,
-    timeoutFactor: 2,
-
-    incremental: true,
-    incrementalFile: ".stryker-tmp/incremental.json",
-    tempDirName: ".stryker-tmp",
-
-    logLevel: "info",
-    fileLogLevel: "trace",
-
-    ignorePatterns: [
-        "node_modules",
-        "dist",
-        "coverage",
-        "reports",
-        ".stryker-tmp",
-        "images",
-        ".git",
-    ],
-
-    mutator: {
-        excludedMutations: [
-            // User-facing strings churn with no behavioural signal.
-            "StringLiteral",
-            // Date/format regex mutants generate near-equivalent behaviours
-            // on our inputs; leave the regex path alone.
-            "Regex",
-        ],
-    },
+  },
 };

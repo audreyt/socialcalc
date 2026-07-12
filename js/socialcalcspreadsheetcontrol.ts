@@ -73,10 +73,10 @@ not governed by the terms of the CPAL.
 
 */
 
-
 // Mutable progressive-init bridges for ambient nested namespaces.
-(SocialCalc as unknown as { OtherSaveParts: { [key: string]: unknown } }).OtherSaveParts = {} as { [key: string]: unknown };
-const OtherSavePartsMut = (SocialCalc as unknown as { OtherSaveParts: { [key: string]: unknown } }).OtherSaveParts;
+(SocialCalc as unknown as { OtherSaveParts: { [key: string]: unknown } }).OtherSaveParts = {} as {
+  [key: string]: unknown;
+};
 const SpreadsheetControlSC = SocialCalc as any;
 
 //
@@ -96,10 +96,9 @@ See the comments in the main SocialCalc code module file of the SocialCalc packa
 
 */
 
-   // Module-load guards removed — in the concatenated UMD bundle, SocialCalc
-   // and SocialCalc.TableEditor are always defined by the time this file
-   // runs.
-
+// Module-load guards removed — in the concatenated UMD bundle, SocialCalc
+// and SocialCalc.TableEditor are always defined by the time this file
+// runs.
 
 // *************************************
 //
@@ -109,842 +108,1055 @@ See the comments in the main SocialCalc code module file of the SocialCalc packa
 
 // Global constants:
 
-   SpreadsheetControlSC.CurrentSpreadsheetControlObject = null; // right now there can only be one active at a time
-
+SpreadsheetControlSC.CurrentSpreadsheetControlObject = null; // right now there can only be one active at a time
 
 // Constructor:
 
-SpreadsheetControlSC.SpreadsheetControl = function(idPrefix: any) {
+SpreadsheetControlSC.SpreadsheetControl = function (idPrefix: any) {
+  var scc = SocialCalc.Constants;
 
-   var scc = SocialCalc.Constants;
+  // Properties:
 
-   // Properties:
+  this.parentNode = null;
+  this.spreadsheetDiv = null;
+  this.requestedHeight = 0;
+  this.requestedWidth = 0;
+  this.requestedSpaceBelow = 0;
+  this.height = 0;
+  this.width = 0;
+  this.viewheight = 0; // calculated amount for views below toolbar, etc.
 
-   this.parentNode = null;
-   this.spreadsheetDiv = null;
-   this.requestedHeight = 0;
-   this.requestedWidth = 0;
-   this.requestedSpaceBelow = 0;
-   this.height = 0;
-   this.width = 0;
-   this.viewheight = 0; // calculated amount for views below toolbar, etc.
+  // Tab definitions: An array where each tab is an object of the form:
+  //
+  //    name: "name",
+  //    text: "text-on-tab",
+  //    html: "html-to-create div",
+  //       replacements:
+  //         "%s.": "SocialCalc", "%id.": spreadsheet.idPrefix, "%tbt.": spreadsheet.toolbartext
+  //         Other replacements from spreadsheet.tabreplacements:
+  //            replacementname: {regex: regular-expression-to-match-with-g, replacement: string}
+  //    view: "viewname", // view to show when selected; "sheet" or missing/null is spreadsheet
+  //    oncreate: function(spreadsheet, tab-name), // called when first created to initialize
+  //    onclick: function(spreadsheet, tab-name), missing/null is sheet default
+  //    onclickFocus: text, // spreadsheet.idPrefix+text is given the focus if present instead of normal KeyboardFocus
+  //       or if text isn't a string, that value (e.g., true) is used for SocialCalc.CmdGotFocus
+  //    onunclick: function(spreadsheet, tab-name), missing/null is sheet default
 
-   // Tab definitions: An array where each tab is an object of the form:
-   //
-   //    name: "name",
-   //    text: "text-on-tab",
-   //    html: "html-to-create div",
-   //       replacements:
-   //         "%s.": "SocialCalc", "%id.": spreadsheet.idPrefix, "%tbt.": spreadsheet.toolbartext
-   //         Other replacements from spreadsheet.tabreplacements:
-   //            replacementname: {regex: regular-expression-to-match-with-g, replacement: string}
-   //    view: "viewname", // view to show when selected; "sheet" or missing/null is spreadsheet
-   //    oncreate: function(spreadsheet, tab-name), // called when first created to initialize
-   //    onclick: function(spreadsheet, tab-name), missing/null is sheet default
-   //    onclickFocus: text, // spreadsheet.idPrefix+text is given the focus if present instead of normal KeyboardFocus
-   //       or if text isn't a string, that value (e.g., true) is used for SocialCalc.CmdGotFocus
-   //    onunclick: function(spreadsheet, tab-name), missing/null is sheet default
+  this.tabs = [];
+  this.tabnums = {}; // when adding tabs, add tab-name: array-index to this object
+  this.tabreplacements = {}; // see use above
+  this.currentTab = -1; // currently selected tab index in this.tabs or -1 (maintained by SocialCalc.SetTab)
 
-   this.tabs = [];
-   this.tabnums = {}; // when adding tabs, add tab-name: array-index to this object
-   this.tabreplacements = {}; // see use above
-   this.currentTab = -1; // currently selected tab index in this.tabs or -1 (maintained by SocialCalc.SetTab)
+  // View definitions: An object where each view is an object of the form:
+  //
+  //    name: "name", // localized when first set using SocialCalc.LocalizeString
+  //    element: node-in-the-dom, // filled in when initialized
+  //    replacements: {}, // see below
+  //    html: "html-to-create div",
+  //       replacements:
+  //         "%s.": "SocialCalc", "%id.": spreadsheet.idPrefix, "%tbt.": spreadsheet.toolbartext, "%img.": spreadsheet.imagePrefix,
+  //         SocialCalc.LocalizeSubstring replacements ("%loc!string!" and "%ssc!constant-name!")
+  //         Other replacements from viewobject.replacements:
+  //            replacementname: {regex: regular-expression-to-match-with-g, replacement: string}
+  //    divStyle: attributes for sheet div (SocialCalc.setStyles format)
+  //    oncreate: function(spreadsheet, viewobject), // called when first created to initialize
+  //    needsresize: true/false/null, // if true, do resize calc after displaying
+  //    onresize: function(spreadsheet, viewobject), // called if needs resize
+  //    values: {} // optional values to share with onclick handlers, etc.
+  //
+  // There is always a "sheet" view.
 
-   // View definitions: An object where each view is an object of the form:
-   //
-   //    name: "name", // localized when first set using SocialCalc.LocalizeString
-   //    element: node-in-the-dom, // filled in when initialized
-   //    replacements: {}, // see below
-   //    html: "html-to-create div",
-   //       replacements:
-   //         "%s.": "SocialCalc", "%id.": spreadsheet.idPrefix, "%tbt.": spreadsheet.toolbartext, "%img.": spreadsheet.imagePrefix,
-   //         SocialCalc.LocalizeSubstring replacements ("%loc!string!" and "%ssc!constant-name!")
-   //         Other replacements from viewobject.replacements:
-   //            replacementname: {regex: regular-expression-to-match-with-g, replacement: string}
-   //    divStyle: attributes for sheet div (SocialCalc.setStyles format)
-   //    oncreate: function(spreadsheet, viewobject), // called when first created to initialize
-   //    needsresize: true/false/null, // if true, do resize calc after displaying
-   //    onresize: function(spreadsheet, viewobject), // called if needs resize
-   //    values: {} // optional values to share with onclick handlers, etc.
-   //
-   // There is always a "sheet" view.
+  this.views = {}; // {viewname: view-object, ...}
 
-   this.views = {}; // {viewname: view-object, ...}
+  // Dynamic properties (sheet/context/editor assigned below):
 
-   // Dynamic properties (sheet/context/editor assigned below):
+  this.spreadsheetDiv = null;
+  this.editorDiv = null;
 
-   this.spreadsheetDiv = null;
-   this.editorDiv = null;
+  this.sortrange = ""; // remembered range for sort tab
 
-   this.sortrange = ""; // remembered range for sort tab
+  this.moverange = ""; // remembered range from movefrom used by movepaste/moveinsert
 
-   this.moverange = ""; // remembered range from movefrom used by movepaste/moveinsert
+  // Constants:
 
-   // Constants:
+  this.idPrefix = idPrefix || "SocialCalc-"; // prefix added to element ids used here, should end in "-"
+  this.multipartBoundary = "SocialCalcSpreadsheetControlSave"; // boundary used by SpreadsheetControlCreateSpreadsheetSave
+  this.imagePrefix = scc.defaultImagePrefix; // prefix added to img src
 
-   this.idPrefix = idPrefix || "SocialCalc-"; // prefix added to element ids used here, should end in "-"
-   this.multipartBoundary = "SocialCalcSpreadsheetControlSave"; // boundary used by SpreadsheetControlCreateSpreadsheetSave
-   this.imagePrefix = scc.defaultImagePrefix; // prefix added to img src
+  this.toolbarbackground = scc.SCToolbarbackground;
+  this.tabbackground = scc.SCTabbackground; // "background-color:#CCC;";
+  this.tabselectedCSS = scc.SCTabselectedCSS;
+  this.tabplainCSS = scc.SCTabplainCSS;
+  this.toolbartext = scc.SCToolbartext;
 
-   this.toolbarbackground = scc.SCToolbarbackground;
-   this.tabbackground = scc.SCTabbackground; // "background-color:#CCC;";
-   this.tabselectedCSS = scc.SCTabselectedCSS;
-   this.tabplainCSS = scc.SCTabplainCSS;
-   this.toolbartext = scc.SCToolbartext;
+  this.formulabarheight = scc.SCFormulabarheight; // in pixels, will contain a text input box
 
-   this.formulabarheight = scc.SCFormulabarheight; // in pixels, will contain a text input box
+  this.statuslineheight = scc.SCStatuslineheight; // in pixels
+  this.statuslineCSS = scc.SCStatuslineCSS;
 
-   this.statuslineheight = scc.SCStatuslineheight; // in pixels
-   this.statuslineCSS = scc.SCStatuslineCSS;
+  // Callbacks:
 
-   // Callbacks:
+  this.ExportCallback = null; // a function called for Clipboard Export button: this.ExportCallback(spreadsheet_control_object)
 
-   this.ExportCallback = null; // a function called for Clipboard Export button: this.ExportCallback(spreadsheet_control_object)
+  // Initialization Code:
 
-   // Initialization Code:
+  // eddy Initialization {
+  if (typeof SocialCalc.debug_log === "undefined") SocialCalc.debug_log = [];
+  // }
 
-   // eddy Initialization {
-   if(typeof SocialCalc.debug_log === 'undefined') SocialCalc.debug_log = [];   
-   // }   
-   
-   this.sheet = new SocialCalc.Sheet();
-   this.context = new SocialCalc.RenderContext(this.sheet);
-   this.context.showGrid=true;
-   this.context.showRCHeaders=true;
-   this.editor = new SocialCalc.TableEditor(this.context);
-   this.editor.StatusCallback.statusline =
-      {func: SocialCalc.SpreadsheetControlStatuslineCallback,
-       params: {statuslineid: this.idPrefix+"statusline",
-                recalcid1: this.idPrefix+"divider_recalc",
-                recalcid2: this.idPrefix+"button_recalc"}};
+  this.sheet = new SocialCalc.Sheet();
+  this.context = new SocialCalc.RenderContext(this.sheet);
+  this.context.showGrid = true;
+  this.context.showRCHeaders = true;
+  this.editor = new SocialCalc.TableEditor(this.context);
+  this.editor.StatusCallback.statusline = {
+    func: SocialCalc.SpreadsheetControlStatuslineCallback,
+    params: {
+      statuslineid: this.idPrefix + "statusline",
+      recalcid1: this.idPrefix + "divider_recalc",
+      recalcid2: this.idPrefix + "button_recalc",
+    },
+  };
 
-   SpreadsheetControlSC.CurrentSpreadsheetControlObject = this; // remember this for rendezvousing on events
+  SpreadsheetControlSC.CurrentSpreadsheetControlObject = this; // remember this for rendezvousing on events
 
-   this.editor.MoveECellCallback.movefrom = /** @param {any} editor */ function(editor: any) {
-      var cr;
-      var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-      spreadsheet.context.cursorsuffix = "";
-      if (editor.range2.hasrange && !editor.cellhandles.noCursorSuffix) {
-         if (editor.ecell.row==editor.range2.top && (editor.ecell.col<editor.range2.left || editor.ecell.col>editor.range2.right+1)) {
-            spreadsheet.context.cursorsuffix = "insertleft";
-            }
-         if (editor.ecell.col==editor.range2.left && (editor.ecell.row<editor.range2.top || editor.ecell.row>editor.range2.bottom+1)) {
-            spreadsheet.context.cursorsuffix = "insertup";
-            }
-         }
-      };
-
-   // formula bar buttons
-
-   this.formulabuttons = {
-      formulafunctions: {image: "insertformula.png", tooltip: "Functions", // tooltips are localized when set below
-                         command: SpreadsheetControlSC.SpreadsheetControl.DoFunctionList},
-      multilineinput: {image: "listbox.png", tooltip: "Multi-line Input Box",
-                         command: SpreadsheetControlSC.SpreadsheetControl.DoMultiline},
-      link: {image: "inserthyperlink.png", tooltip: "Link Input Box",
-                         command: SpreadsheetControlSC.SpreadsheetControl.DoLink},
-      sum: {image: "autosum.png", tooltip: "Auto Sum",
-                         command: SpreadsheetControlSC.SpreadsheetControl.DoSum}
+  this.editor.MoveECellCallback.movefrom = /** @param {any} editor */ function (editor: any) {
+    var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+    spreadsheet.context.cursorsuffix = "";
+    if (editor.range2.hasrange && !editor.cellhandles.noCursorSuffix) {
+      if (
+        editor.ecell.row == editor.range2.top &&
+        (editor.ecell.col < editor.range2.left || editor.ecell.col > editor.range2.right + 1)
+      ) {
+        spreadsheet.context.cursorsuffix = "insertleft";
       }
-   
-   // find buttons
-   this.findbuttons = {
-       last: {image: 'upsearch.png', tooltip: 'Find Previous',
-              command: SpreadsheetControlSC.SpreadsheetControl.SearchUp},
-       next: {image: 'downsearch.png', tooltip: 'Find Next', 
-              command: SpreadsheetControlSC.SpreadsheetControl.SearchDown}
-   }
+      if (
+        editor.ecell.col == editor.range2.left &&
+        (editor.ecell.row < editor.range2.top || editor.ecell.row > editor.range2.bottom + 1)
+      ) {
+        spreadsheet.context.cursorsuffix = "insertup";
+      }
+    }
+  };
 
-   // Default tabs:
+  // formula bar buttons
 
-   // Edit
+  this.formulabuttons = {
+    formulafunctions: {
+      image: "insertformula.png",
+      tooltip: "Functions", // tooltips are localized when set below
+      command: SpreadsheetControlSC.SpreadsheetControl.DoFunctionList,
+    },
+    multilineinput: {
+      image: "listbox.png",
+      tooltip: "Multi-line Input Box",
+      command: SpreadsheetControlSC.SpreadsheetControl.DoMultiline,
+    },
+    link: {
+      image: "inserthyperlink.png",
+      tooltip: "Link Input Box",
+      command: SpreadsheetControlSC.SpreadsheetControl.DoLink,
+    },
+    sum: {
+      image: "autosum.png",
+      tooltip: "Auto Sum",
+      command: SpreadsheetControlSC.SpreadsheetControl.DoSum,
+    },
+  };
 
-   this.tabnums.edit = this.tabs.length;
-   this.tabs.push({name: "edit", text: "Edit", html:
-     ' <div id="%id.edittools" style="padding:10px 0px 0px 0px;">'+
-'&nbsp;<img id="%id.button_undo" src="%img.undo.png" style="vertical-align:bottom;">'+
-' <img id="%id.button_redo" src="%img.redo.png" style="vertical-align:bottom;">'+
-' &nbsp;<img src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; '+
-'<img id="%id.button_copy" src="%img.copy.png" style="vertical-align:bottom;">'+
-' <img id="%id.button_cut" src="%img.cut.png" style="vertical-align:bottom;">'+
-' <img id="%id.button_paste" src="%img.paste.png" style="vertical-align:bottom;">'+
-' &nbsp;<img src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; '+
-'<img id="%id.button_delete" src="%img.delete.png" style="vertical-align:bottom;">'+
-' <img id="%id.button_pasteformats" src="%img.formatpaintbrush.png" style="vertical-align:bottom;">'+
-' &nbsp;<img src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; '+
-' <span id="%id.locktools"><img id="%id.button_lock" src="%img.lock.png" style="vertical-align:bottom;">'+
-' <img id="%id.button_unlock" src="%img.unlock.png" style="vertical-align:bottom;">'+
-' &nbsp;<img src="%img.divider1.png" style="vertical-align:bottom;">&nbsp;</span> '+
-'<img id="%id.button_filldown" src="%img.filldown.png" style="vertical-align:bottom;">'+
-' <img id="%id.button_fillright" src="%img.fillright.png" style="vertical-align:bottom;">'+
-' &nbsp;<img src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; '+
-'<img id="%id.button_movefrom" src="%img.movefromoff.gif" style="vertical-align:bottom;">'+
-' <img id="%id.button_movepaste" src="%img.movepasteoff.gif" style="vertical-align:bottom;">'+
-' <img id="%id.button_moveinsert" src="%img.moveinsertoff.gif" style="vertical-align:bottom;">'+
-' &nbsp;<img src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; '+
-'<img id="%id.button_alignleft" src="%img.alignleft.png" style="vertical-align:bottom;">'+
-' <img id="%id.button_aligncenter" src="%img.aligncenter.png" style="vertical-align:bottom;">'+
-' <img id="%id.button_alignright" src="%img.alignright.png" style="vertical-align:bottom;">'+
-' &nbsp;<img src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; '+
-'<img id="%id.button_borderon" src="%img.borderson.png" style="vertical-align:bottom;"> '+
-' <img id="%id.button_borderoff" src="%img.bordersoff.png" style="vertical-align:bottom;"> '+
-' <img id="%id.button_swapcolors" src="%img.swapcolors.png" style="vertical-align:bottom;"> '+
-' &nbsp;<img src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; '+
-'<img id="%id.button_merge" src="%img.mergecells.png" style="vertical-align:bottom;"> '+
-' &nbsp;<img src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; '+
-'<img id="%id.button_insertrow" src="%img.insertrows.png" style="vertical-align:bottom;"> '+
-' <img id="%id.button_insertcol" src="%img.insertcolumns.png" style="vertical-align:bottom;"> '+
-' <img id="%id.button_deleterow" src="%img.deleterows.png" style="vertical-align:bottom;"> '+
-' <img id="%id.button_deletecol" src="%img.deletecolumns.png" style="vertical-align:bottom;"> '+
-' <img id="%id.button_hiderow" src="%img.hiderow.png" style="vertical-align:bottom;"> '+
-' <img id="%id.button_hidecol" src="%img.hidecol.png" style="vertical-align:bottom;"> '+
-' &nbsp;<img id="%id.divider_recalc" src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; '+
-'<img id="%id.button_recalc" src="%img.recalc.png" style="vertical-align:bottom;"> '+
-      ' </div>',
-      oncreate: null, //function(spreadsheet: any, viewobject: any) {SocialCalc.DoCmd(null, "fill-rowcolstuff");},
-      onclick: null});
+  // find buttons
+  this.findbuttons = {
+    last: {
+      image: "upsearch.png",
+      tooltip: "Find Previous",
+      command: SpreadsheetControlSC.SpreadsheetControl.SearchUp,
+    },
+    next: {
+      image: "downsearch.png",
+      tooltip: "Find Next",
+      command: SpreadsheetControlSC.SpreadsheetControl.SearchDown,
+    },
+  };
 
-   // Settings (Format)
+  // Default tabs:
 
-   this.tabnums.settings = this.tabs.length;
-   this.tabs.push({name: "settings", text: "Format", html:
-      '<div id="%id.settingstools" style="display:none;">'+
-      ' <div id="%id.sheetsettingstoolbar" style="display:none;">'+
-      '  <table cellspacing="0" cellpadding="0"><tr><td>'+
-      '   <div style="%tbt.">%loc!SHEET SETTINGS!:</div>'+
-      '   </td></tr><tr><td>'+
-      '   <input id="%id.settings-savesheet" type="button" value="%loc!Save!" onclick="SocialCalc.SettingsControlSave(\'sheet\');">'+
-      '   <input type="button" value="%loc!Cancel!" onclick="SocialCalc.SettingsControlSave(\'cancel\');">'+
-      '   <input type="button" value="%loc!Show Cell Settings!" onclick="SocialCalc.SpreadsheetControlSettingsSwitch(\'cell\');return false;">'+
-      '   </td></tr></table>'+
-      ' </div>'+
-      ' <div id="%id.cellsettingstoolbar" style="display:none;">'+
-      '  <table cellspacing="0" cellpadding="0"><tr><td>'+
-      '   <div style="%tbt.">%loc!CELL SETTINGS!: <span id="%id.settingsecell">&nbsp;</span></div>'+
-      '   </td></tr><tr><td>'+
-      '  <input id="%id.settings-savecell" type="button" value="%loc!Save!" onclick="SocialCalc.SettingsControlSave(\'cell\');">'+
-      '  <input type="button" value="%loc!Cancel!" onclick="SocialCalc.SettingsControlSave(\'cancel\');">'+
-      '  <input type="button" value="%loc!Show Sheet Settings!" onclick="SocialCalc.SpreadsheetControlSettingsSwitch(\'sheet\');return false;">'+
-      '  </td></tr></table>'+
-      ' </div>'+
-      '</div>',
-      view: "settings",
-      onclick: /** @param {any} s @param {any} t */ function(s: any, t: any) {
-         SpreadsheetControlSC.SettingsControls.idPrefix = s.idPrefix; // used to get color chooser div
-         SocialCalc.SettingControlReset();
-         var sheetattribs = s.sheet.EncodeSheetAttributes();
-         var cellattribs = s.sheet.EncodeCellAttributes(s.editor.ecell.coord);
-         SocialCalc.SettingsControlLoadPanel(s.views.settings.values.sheetspanel, sheetattribs);
-         SocialCalc.SettingsControlLoadPanel(s.views.settings.values.cellspanel, cellattribs);
-         /** @type {any} */((document as any).getElementById(s.idPrefix+"settingsecell")).innerHTML = s.editor.ecell.coord;
-         SocialCalc.SpreadsheetControlSettingsSwitch("cell");
-         s.views.settings.element.style.height = s.viewheight+"px";
-         s.views.settings.element.firstChild.style.height = s.viewheight+"px";
+  // Edit
 
-         var range;  // set save message
-         if (s.editor.range.hasrange) {
-            range = SocialCalc.crToCoord(s.editor.range.left, s.editor.range.top) + ":" +
-               SocialCalc.crToCoord(s.editor.range.right, s.editor.range.bottom);
+  this.tabnums.edit = this.tabs.length;
+  this.tabs.push({
+    name: "edit",
+    text: "Edit",
+    html:
+      ' <div id="%id.edittools" style="padding:10px 0px 0px 0px;">' +
+      '&nbsp;<img id="%id.button_undo" src="%img.undo.png" style="vertical-align:bottom;">' +
+      ' <img id="%id.button_redo" src="%img.redo.png" style="vertical-align:bottom;">' +
+      ' &nbsp;<img src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; ' +
+      '<img id="%id.button_copy" src="%img.copy.png" style="vertical-align:bottom;">' +
+      ' <img id="%id.button_cut" src="%img.cut.png" style="vertical-align:bottom;">' +
+      ' <img id="%id.button_paste" src="%img.paste.png" style="vertical-align:bottom;">' +
+      ' &nbsp;<img src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; ' +
+      '<img id="%id.button_delete" src="%img.delete.png" style="vertical-align:bottom;">' +
+      ' <img id="%id.button_pasteformats" src="%img.formatpaintbrush.png" style="vertical-align:bottom;">' +
+      ' &nbsp;<img src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; ' +
+      ' <span id="%id.locktools"><img id="%id.button_lock" src="%img.lock.png" style="vertical-align:bottom;">' +
+      ' <img id="%id.button_unlock" src="%img.unlock.png" style="vertical-align:bottom;">' +
+      ' &nbsp;<img src="%img.divider1.png" style="vertical-align:bottom;">&nbsp;</span> ' +
+      '<img id="%id.button_filldown" src="%img.filldown.png" style="vertical-align:bottom;">' +
+      ' <img id="%id.button_fillright" src="%img.fillright.png" style="vertical-align:bottom;">' +
+      ' &nbsp;<img src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; ' +
+      '<img id="%id.button_movefrom" src="%img.movefromoff.gif" style="vertical-align:bottom;">' +
+      ' <img id="%id.button_movepaste" src="%img.movepasteoff.gif" style="vertical-align:bottom;">' +
+      ' <img id="%id.button_moveinsert" src="%img.moveinsertoff.gif" style="vertical-align:bottom;">' +
+      ' &nbsp;<img src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; ' +
+      '<img id="%id.button_alignleft" src="%img.alignleft.png" style="vertical-align:bottom;">' +
+      ' <img id="%id.button_aligncenter" src="%img.aligncenter.png" style="vertical-align:bottom;">' +
+      ' <img id="%id.button_alignright" src="%img.alignright.png" style="vertical-align:bottom;">' +
+      ' &nbsp;<img src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; ' +
+      '<img id="%id.button_borderon" src="%img.borderson.png" style="vertical-align:bottom;"> ' +
+      ' <img id="%id.button_borderoff" src="%img.bordersoff.png" style="vertical-align:bottom;"> ' +
+      ' <img id="%id.button_swapcolors" src="%img.swapcolors.png" style="vertical-align:bottom;"> ' +
+      ' &nbsp;<img src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; ' +
+      '<img id="%id.button_merge" src="%img.mergecells.png" style="vertical-align:bottom;"> ' +
+      ' &nbsp;<img src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; ' +
+      '<img id="%id.button_insertrow" src="%img.insertrows.png" style="vertical-align:bottom;"> ' +
+      ' <img id="%id.button_insertcol" src="%img.insertcolumns.png" style="vertical-align:bottom;"> ' +
+      ' <img id="%id.button_deleterow" src="%img.deleterows.png" style="vertical-align:bottom;"> ' +
+      ' <img id="%id.button_deletecol" src="%img.deletecolumns.png" style="vertical-align:bottom;"> ' +
+      ' <img id="%id.button_hiderow" src="%img.hiderow.png" style="vertical-align:bottom;"> ' +
+      ' <img id="%id.button_hidecol" src="%img.hidecol.png" style="vertical-align:bottom;"> ' +
+      ' &nbsp;<img id="%id.divider_recalc" src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; ' +
+      '<img id="%id.button_recalc" src="%img.recalc.png" style="vertical-align:bottom;"> ' +
+      " </div>",
+    oncreate: null, //function(spreadsheet: any, viewobject: any) {SocialCalc.DoCmd(null, "fill-rowcolstuff");},
+    onclick: null,
+  });
+
+  // Settings (Format)
+
+  this.tabnums.settings = this.tabs.length;
+  this.tabs.push({
+    name: "settings",
+    text: "Format",
+    html:
+      '<div id="%id.settingstools" style="display:none;">' +
+      ' <div id="%id.sheetsettingstoolbar" style="display:none;">' +
+      '  <table cellspacing="0" cellpadding="0"><tr><td>' +
+      '   <div style="%tbt.">%loc!SHEET SETTINGS!:</div>' +
+      "   </td></tr><tr><td>" +
+      '   <input id="%id.settings-savesheet" type="button" value="%loc!Save!" onclick="SocialCalc.SettingsControlSave(\'sheet\');">' +
+      '   <input type="button" value="%loc!Cancel!" onclick="SocialCalc.SettingsControlSave(\'cancel\');">' +
+      '   <input type="button" value="%loc!Show Cell Settings!" onclick="SocialCalc.SpreadsheetControlSettingsSwitch(\'cell\');return false;">' +
+      "   </td></tr></table>" +
+      " </div>" +
+      ' <div id="%id.cellsettingstoolbar" style="display:none;">' +
+      '  <table cellspacing="0" cellpadding="0"><tr><td>' +
+      '   <div style="%tbt.">%loc!CELL SETTINGS!: <span id="%id.settingsecell">&nbsp;</span></div>' +
+      "   </td></tr><tr><td>" +
+      '  <input id="%id.settings-savecell" type="button" value="%loc!Save!" onclick="SocialCalc.SettingsControlSave(\'cell\');">' +
+      '  <input type="button" value="%loc!Cancel!" onclick="SocialCalc.SettingsControlSave(\'cancel\');">' +
+      '  <input type="button" value="%loc!Show Sheet Settings!" onclick="SocialCalc.SpreadsheetControlSettingsSwitch(\'sheet\');return false;">' +
+      "  </td></tr></table>" +
+      " </div>" +
+      "</div>",
+    view: "settings",
+    onclick: /** @param {any} s @param {any} _t */ function (s: any, _t: any) {
+      SpreadsheetControlSC.SettingsControls.idPrefix = s.idPrefix; // used to get color chooser div
+      SocialCalc.SettingControlReset();
+      var sheetattribs = s.sheet.EncodeSheetAttributes();
+      var cellattribs = s.sheet.EncodeCellAttributes(s.editor.ecell.coord);
+      SocialCalc.SettingsControlLoadPanel(s.views.settings.values.sheetspanel, sheetattribs);
+      SocialCalc.SettingsControlLoadPanel(s.views.settings.values.cellspanel, cellattribs);
+      /** @type {any} */ (
+        (document as any).getElementById(s.idPrefix + "settingsecell")
+      ).innerHTML = s.editor.ecell.coord;
+      SocialCalc.SpreadsheetControlSettingsSwitch("cell");
+      s.views.settings.element.style.height = s.viewheight + "px";
+      s.views.settings.element.firstChild.style.height = s.viewheight + "px";
+
+      var range; // set save message
+      if (s.editor.range.hasrange) {
+        range =
+          SocialCalc.crToCoord(s.editor.range.left, s.editor.range.top) +
+          ":" +
+          SocialCalc.crToCoord(s.editor.range.right, s.editor.range.bottom);
+      } else {
+        range = s.editor.ecell.coord;
+      }
+      /** @type {any} */ (
+        (document as any).getElementById(s.idPrefix + "settings-savecell")
+      ).value = SocialCalc.LocalizeString("Save to") + ": " + range;
+    },
+    onclickFocus: true,
+  });
+
+  this.views["settings"] = {
+    name: "settings",
+    values: {},
+    oncreate: /** @param {any} s @param {any} viewobj */ function (s: any, viewobj: any) {
+      var scc = SocialCalc.Constants;
+
+      viewobj.values.sheetspanel = {
+        //            name: "sheet",
+        colorchooser: { id: s.idPrefix + "scolorchooser" },
+        formatnumber: {
+          setting: "numberformat",
+          type: "PopupList",
+          id: s.idPrefix + "formatnumber",
+          initialdata: scc.SCFormatNumberFormats,
+        },
+        formattext: {
+          setting: "textformat",
+          type: "PopupList",
+          id: s.idPrefix + "formattext",
+          initialdata: scc.SCFormatTextFormats,
+        },
+        fontfamily: {
+          setting: "fontfamily",
+          type: "PopupList",
+          id: s.idPrefix + "fontfamily",
+          initialdata: scc.SCFormatFontfamilies,
+        },
+        fontlook: {
+          setting: "fontlook",
+          type: "PopupList",
+          id: s.idPrefix + "fontlook",
+          initialdata: scc.SCFormatFontlook,
+        },
+        fontsize: {
+          setting: "fontsize",
+          type: "PopupList",
+          id: s.idPrefix + "fontsize",
+          initialdata: scc.SCFormatFontsizes,
+        },
+        textalignhoriz: {
+          setting: "textalignhoriz",
+          type: "PopupList",
+          id: s.idPrefix + "textalignhoriz",
+          initialdata: scc.SCFormatTextAlignhoriz,
+        },
+        numberalignhoriz: {
+          setting: "numberalignhoriz",
+          type: "PopupList",
+          id: s.idPrefix + "numberalignhoriz",
+          initialdata: scc.SCFormatNumberAlignhoriz,
+        },
+        alignvert: {
+          setting: "alignvert",
+          type: "PopupList",
+          id: s.idPrefix + "alignvert",
+          initialdata: scc.SCFormatAlignVertical,
+        },
+        textcolor: { setting: "textcolor", type: "ColorChooser", id: s.idPrefix + "textcolor" },
+        bgcolor: { setting: "bgcolor", type: "ColorChooser", id: s.idPrefix + "bgcolor" },
+        padtop: {
+          setting: "padtop",
+          type: "PopupList",
+          id: s.idPrefix + "padtop",
+          initialdata: scc.SCFormatPadsizes,
+        },
+        padright: {
+          setting: "padright",
+          type: "PopupList",
+          id: s.idPrefix + "padright",
+          initialdata: scc.SCFormatPadsizes,
+        },
+        padbottom: {
+          setting: "padbottom",
+          type: "PopupList",
+          id: s.idPrefix + "padbottom",
+          initialdata: scc.SCFormatPadsizes,
+        },
+        padleft: {
+          setting: "padleft",
+          type: "PopupList",
+          id: s.idPrefix + "padleft",
+          initialdata: scc.SCFormatPadsizes,
+        },
+        colwidth: {
+          setting: "colwidth",
+          type: "PopupList",
+          id: s.idPrefix + "colwidth",
+          initialdata: scc.SCFormatColwidth,
+        },
+        recalc: {
+          setting: "recalc",
+          type: "PopupList",
+          id: s.idPrefix + "recalc",
+          initialdata: scc.SCFormatRecalc,
+        },
+        usermaxcol: {
+          setting: "usermaxcol",
+          type: "PopupList",
+          id: s.idPrefix + "usermaxcol",
+          initialdata: scc.SCFormatUserMaxCol,
+        },
+        usermaxrow: {
+          setting: "usermaxrow",
+          type: "PopupList",
+          id: s.idPrefix + "usermaxrow",
+          initialdata: scc.SCFormatUserMaxRow,
+        },
+      };
+      viewobj.values.cellspanel = {
+        name: "cell",
+        colorchooser: { id: s.idPrefix + "scolorchooser" },
+        cformatnumber: {
+          setting: "numberformat",
+          type: "PopupList",
+          id: s.idPrefix + "cformatnumber",
+          initialdata: scc.SCFormatNumberFormats,
+        },
+        cformattext: {
+          setting: "textformat",
+          type: "PopupList",
+          id: s.idPrefix + "cformattext",
+          initialdata: scc.SCFormatTextFormats,
+        },
+        cfontfamily: {
+          setting: "fontfamily",
+          type: "PopupList",
+          id: s.idPrefix + "cfontfamily",
+          initialdata: scc.SCFormatFontfamilies,
+        },
+        cfontlook: {
+          setting: "fontlook",
+          type: "PopupList",
+          id: s.idPrefix + "cfontlook",
+          initialdata: scc.SCFormatFontlook,
+        },
+        cfontsize: {
+          setting: "fontsize",
+          type: "PopupList",
+          id: s.idPrefix + "cfontsize",
+          initialdata: scc.SCFormatFontsizes,
+        },
+        calignhoriz: {
+          setting: "alignhoriz",
+          type: "PopupList",
+          id: s.idPrefix + "calignhoriz",
+          initialdata: scc.SCFormatTextAlignhoriz,
+        },
+        calignvert: {
+          setting: "alignvert",
+          type: "PopupList",
+          id: s.idPrefix + "calignvert",
+          initialdata: scc.SCFormatAlignVertical,
+        },
+        ctextcolor: { setting: "textcolor", type: "ColorChooser", id: s.idPrefix + "ctextcolor" },
+        cbgcolor: { setting: "bgcolor", type: "ColorChooser", id: s.idPrefix + "cbgcolor" },
+        cbt: { setting: "bt", type: "BorderSide", id: s.idPrefix + "cbt" },
+        cbr: { setting: "br", type: "BorderSide", id: s.idPrefix + "cbr" },
+        cbb: { setting: "bb", type: "BorderSide", id: s.idPrefix + "cbb" },
+        cbl: { setting: "bl", type: "BorderSide", id: s.idPrefix + "cbl" },
+        cpadtop: {
+          setting: "padtop",
+          type: "PopupList",
+          id: s.idPrefix + "cpadtop",
+          initialdata: scc.SCFormatPadsizes,
+        },
+        cpadright: {
+          setting: "padright",
+          type: "PopupList",
+          id: s.idPrefix + "cpadright",
+          initialdata: scc.SCFormatPadsizes,
+        },
+        cpadbottom: {
+          setting: "padbottom",
+          type: "PopupList",
+          id: s.idPrefix + "cpadbottom",
+          initialdata: scc.SCFormatPadsizes,
+        },
+        cpadleft: {
+          setting: "padleft",
+          type: "PopupList",
+          id: s.idPrefix + "cpadleft",
+          initialdata: scc.SCFormatPadsizes,
+        },
+      };
+
+      SocialCalc.SettingsControlInitializePanel(viewobj.values.sheetspanel);
+      SocialCalc.SettingsControlInitializePanel(viewobj.values.cellspanel);
+    },
+    replacements: {
+      itemtitle: {
+        regex: /%itemtitle\./g,
+        replacement:
+          'style="padding:12px 10px 0px 10px;font-weight:bold;text-align:right;vertical-align:top;font-size:small;"',
+      },
+      sectiontitle: {
+        regex: /%sectiontitle\./g,
+        replacement:
+          'style="padding:16px 10px 0px 0px;font-weight:bold;vertical-align:top;font-size:small;color:#C00;"',
+      },
+      parttitle: {
+        regex: /%parttitle\./g,
+        replacement: 'style="font-weight:bold;font-size:x-small;padding:0px 0px 3px 0px;"',
+      },
+      itembody: {
+        regex: /%itembody\./g,
+        replacement: 'style="padding:12px 0px 0px 0px;vertical-align:top;font-size:small;"',
+      },
+      bodypart: {
+        regex: /%bodypart\./g,
+        replacement: 'style="padding:0px 10px 0px 0px;font-size:small;vertical-align:top;"',
+      },
+    },
+    divStyle: "border:1px solid black;overflow:auto;",
+    html:
+      '<div id="%id.scolorchooser" style="display:none;position:absolute;z-index:20;"></div>' +
+      '<table cellspacing="0" cellpadding="0">' +
+      ' <tr><td style="vertical-align:top;">' +
+      '<table id="%id.sheetsettingstable" style="display:none;" cellspacing="0" cellpadding="0">' +
+      "<tr>" +
+      " <td %itemtitle.><br>%loc!Default Format!:</td>" +
+      " <td %itembody.>" +
+      '   <table cellspacing="0" cellpadding="0"><tr>' +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Number!</div>" +
+      '     <span id="%id.formatnumber"></span>' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Text!</div>" +
+      '     <span id="%id.formattext"></span>' +
+      "    </td>" +
+      "   </tr></table>" +
+      " </td>" +
+      "</tr>" +
+      "<tr>" +
+      " <td %itemtitle.><br>%loc!Default Alignment!:</td>" +
+      " <td %itembody.>" +
+      '   <table cellspacing="0" cellpadding="0"><tr>' +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Text Horizontal!</div>" +
+      '     <span id="%id.textalignhoriz"></span>' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Number Horizontal!</div>" +
+      '     <span id="%id.numberalignhoriz"></span>' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Vertical!</div>" +
+      '     <span id="%id.alignvert"></span>' +
+      "    </td>" +
+      "   </tr></table>" +
+      " </td>" +
+      "</tr>" +
+      "<tr>" +
+      " <td %itemtitle.><br>%loc!Default Font!:</td>" +
+      " <td %itembody.>" +
+      '   <table cellspacing="0" cellpadding="0"><tr>' +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Family!</div>" +
+      '     <span id="%id.fontfamily"></span>' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Bold &amp; Italics!</div>" +
+      '     <span id="%id.fontlook"></span>' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Size!</div>" +
+      '     <span id="%id.fontsize"></span>' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Color!</div>" +
+      '     <div id="%id.textcolor"></div>' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Background!</div>" +
+      '     <div id="%id.bgcolor"></div>' +
+      "    </td>" +
+      "   </tr></table>" +
+      " </td>" +
+      "</tr>" +
+      "<tr>" +
+      " <td %itemtitle.><br>%loc!Default Padding!:</td>" +
+      " <td %itembody.>" +
+      '   <table cellspacing="0" cellpadding="0"><tr>' +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Top!</div>" +
+      '     <span id="%id.padtop"></span>' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Right!</div>" +
+      '     <span id="%id.padright"></span>' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Bottom!</div>" +
+      '     <span id="%id.padbottom"></span>' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Left!</div>" +
+      '     <span id="%id.padleft"></span>' +
+      "    </td>" +
+      "   </tr></table>" +
+      " </td>" +
+      "</tr>" +
+      "<tr>" +
+      " <td %itemtitle.><br>%loc!Default Column Width!:</td>" +
+      " <td %itembody.>" +
+      '   <table cellspacing="0" cellpadding="0"><tr>' +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>&nbsp;</div>" +
+      '     <span id="%id.colwidth"></span>' +
+      "    </td>" +
+      "   </tr></table>" +
+      " </td>" +
+      "</tr>" +
+      "<tr>" +
+      " <td %itemtitle.><br>%loc!Recalculation!:</td>" +
+      " <td %itembody.>" +
+      '   <table cellspacing="0" cellpadding="0"><tr>' +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>&nbsp;</div>" +
+      '     <span id="%id.recalc"></span>' +
+      "    </td>" +
+      "   </tr></table>" +
+      " </td>" +
+      "</tr>" +
+      "<tr>" +
+      " <td %itemtitle.><br>%loc!Dimensions!:</td>" +
+      " <td %itembody.>" +
+      '   <table cellspacing="0" cellpadding="0"><tr>' +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Columns!</div>" +
+      '     <span id="%id.usermaxcol"></span>' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Rows!</div>" +
+      '     <span id="%id.usermaxrow"></span>' +
+      "    </td>" +
+      "   </tr></table>" +
+      " </td>" +
+      "</tr>" +
+      "</table>" +
+      '<table id="%id.cellsettingstable" cellspacing="0" cellpadding="0">' +
+      "<tr>" +
+      " <td %itemtitle.><br>%loc!Format!:</td>" +
+      " <td %itembody.>" +
+      '   <table cellspacing="0" cellpadding="0"><tr>' +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Number!</div>" +
+      '     <span id="%id.cformatnumber"></span>' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Text!</div>" +
+      '     <span id="%id.cformattext"></span>' +
+      "    </td>" +
+      "   </tr></table>" +
+      " </td>" +
+      "</tr>" +
+      "<tr>" +
+      " <td %itemtitle.><br>%loc!Alignment!:</td>" +
+      " <td %itembody.>" +
+      '   <table cellspacing="0" cellpadding="0"><tr>' +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Horizontal!</div>" +
+      '     <span id="%id.calignhoriz"></span>' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Vertical!</div>" +
+      '     <span id="%id.calignvert"></span>' +
+      "    </td>" +
+      "   </tr></table>" +
+      " </td>" +
+      "</tr>" +
+      "<tr>" +
+      " <td %itemtitle.><br>%loc!Font!:</td>" +
+      " <td %itembody.>" +
+      '   <table cellspacing="0" cellpadding="0"><tr>' +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Family!</div>" +
+      '     <span id="%id.cfontfamily"></span>' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Bold &amp; Italics!</div>" +
+      '     <span id="%id.cfontlook"></span>' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Size!</div>" +
+      '     <span id="%id.cfontsize"></span>' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Color!</div>" +
+      '     <div id="%id.ctextcolor"></div>' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Background!</div>" +
+      '     <div id="%id.cbgcolor"></div>' +
+      "    </td>" +
+      "   </tr></table>" +
+      " </td>" +
+      "</tr>" +
+      "<tr>" +
+      " <td %itemtitle.><br>%loc!Borders!:</td>" +
+      " <td %itembody.>" +
+      '   <table cellspacing="0" cellpadding="0">' +
+      '    <tr><td %bodypart. colspan="3"><div %parttitle.>%loc!Top Border!</div></td>' +
+      '     <td %bodypart. colspan="3"><div %parttitle.>%loc!Right Border!</div></td>' +
+      '     <td %bodypart. colspan="3"><div %parttitle.>%loc!Bottom Border!</div></td>' +
+      '     <td %bodypart. colspan="3"><div %parttitle.>%loc!Left Border!</div></td>' +
+      "    </tr><tr>" +
+      "    <td %bodypart.>" +
+      '     <input id="%id.cbt-onoff-bcb" onclick="SocialCalc.SettingsControlOnchangeBorder(this);" type="checkbox">' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      '     <div id="%id.cbt-color"></div>' +
+      "    </td>" +
+      "    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>" +
+      "    <td %bodypart.>" +
+      '     <input id="%id.cbr-onoff-bcb" onclick="SocialCalc.SettingsControlOnchangeBorder(this);" type="checkbox">' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      '     <div id="%id.cbr-color"></div>' +
+      "    </td>" +
+      "    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>" +
+      "    <td %bodypart.>" +
+      '     <input id="%id.cbb-onoff-bcb" onclick="SocialCalc.SettingsControlOnchangeBorder(this);" type="checkbox">' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      '     <div id="%id.cbb-color"></div>' +
+      "    </td>" +
+      "    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>" +
+      "    <td %bodypart.>" +
+      '     <input id="%id.cbl-onoff-bcb" onclick="SocialCalc.SettingsControlOnchangeBorder(this);" type="checkbox">' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      '     <div id="%id.cbl-color"></div>' +
+      "    </td>" +
+      "    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>" +
+      "   </tr></table>" +
+      " </td>" +
+      "</tr>" +
+      "<tr>" +
+      " <td %itemtitle.><br>%loc!Padding!:</td>" +
+      " <td %itembody.>" +
+      '   <table cellspacing="0" cellpadding="0"><tr>' +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Top!</div>" +
+      '     <span id="%id.cpadtop"></span>' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Right!</div>" +
+      '     <span id="%id.cpadright"></span>' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Bottom!</div>" +
+      '     <span id="%id.cpadbottom"></span>' +
+      "    </td>" +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>%loc!Left!</div>" +
+      '     <span id="%id.cpadleft"></span>' +
+      "    </td>" +
+      "   </tr></table>" +
+      " </td>" +
+      "</tr>" +
+      "</table>" +
+      ' </td><td style="vertical-align:top;padding:12px 0px 0px 12px;">' +
+      '  <div style="width:100px;height:100px;overflow:hidden;border:1px solid black;background-color:#EEE;padding:6px;">' +
+      '   <table cellspacing="0" cellpadding="0"><tr>' +
+      '    <td id="sample-text" style="height:100px;width:100px;"><div>%loc!This is a<br>sample!</div><div>-1234.5</div></td>' +
+      "   </tr></table>" +
+      "  </div>" +
+      " </td></tr></table>" +
+      "<br>",
+  };
+
+  // Sort
+
+  this.tabnums.sort = this.tabs.length;
+  this.tabs.push({
+    name: "sort",
+    text: "Sort",
+    html:
+      ' <div id="%id.sorttools" style="display:none;">' +
+      '  <table cellspacing="0" cellpadding="0"><tr>' +
+      '   <td style="vertical-align:top;padding-right:4px;width:160px;">' +
+      '    <div style="%tbt.">%loc!Set Cells To Sort!</div>' +
+      '    <select id="%id.sortlist" size="1" onfocus="%s.CmdGotFocus(this);"><option selected>[select range]</option><option value="all">Sort All</option></select>' +
+      '    <input type="button" value="%loc!OK!" onclick="%s.DoCmd(this, \'ok-setsort\');" style="font-size:x-small;">' +
+      "   </td>" +
+      '   <td style="vertical-align:middle;padding-right:16px;width:100px;text-align:right;">' +
+      '    <div style="%tbt.">&nbsp;</div>' +
+      '    <input type="button" id="%id.sortbutton" value="%loc!Sort Cells! A1:A1" onclick="%s.DoCmd(this, \'dosort\');" style="visibility:hidden;">' +
+      "   </td>" +
+      '   <td style="vertical-align:top;padding-right:16px;">' +
+      '    <table cellspacing="0" cellpadding="0"><tr>' +
+      '     <td style="vertical-align:top;">' +
+      '      <div style="%tbt.">%loc!Major Sort!</div>' +
+      '      <select id="%id.majorsort" size="1" onfocus="%s.CmdGotFocus(this);"></select>' +
+      "     </td><td>" +
+      '      <input type="radio" name="majorsort" id="%id.majorsortup" value="up" checked><span style="font-size:x-small;color:#555753;">%loc!Up!</span><br>' +
+      '      <input type="radio" name="majorsort" id="%id.majorsortdown" value="down"><span style="font-size:x-small;color:#555753;">%loc!Down!</span>' +
+      "     </td>" +
+      "    </tr></table>" +
+      "   </td>" +
+      '   <td style="vertical-align:top;padding-right:16px;">' +
+      '    <table cellspacing="0" cellpadding="0"><tr>' +
+      '     <td style="vertical-align:top;">' +
+      '      <div style="%tbt.">%loc!Minor Sort!</div>' +
+      '      <select id="%id.minorsort" size="1" onfocus="%s.CmdGotFocus(this);"></select>' +
+      "     </td><td>" +
+      '      <input type="radio" name="minorsort" id="%id.minorsortup" value="up" checked><span style="font-size:x-small;color:#555753;">%loc!Up!</span><br>' +
+      '      <input type="radio" name="minorsort" id="%id.minorsortdown" value="down"><span style="font-size:x-small;color:#555753;">%loc!Down!</span>' +
+      "     </td>" +
+      "    </tr></table>" +
+      "   </td>" +
+      '   <td style="vertical-align:top;padding-right:16px;">' +
+      '    <table cellspacing="0" cellpadding="0"><tr>' +
+      '     <td style="vertical-align:top;">' +
+      '      <div style="%tbt.">%loc!Last Sort!</div>' +
+      '      <select id="%id.lastsort" size="1" onfocus="%s.CmdGotFocus(this);"></select>' +
+      "     </td><td>" +
+      '      <input type="radio" name="lastsort" id="%id.lastsortup" value="up" checked><span style="font-size:x-small;color:#555753;">%loc!Up!</span><br>' +
+      '      <input type="radio" name="lastsort" id="%id.lastsortdown" value="down"><span style="font-size:x-small;color:#555753;">%loc!Down!</span>' +
+      "     </td>" +
+      "    </tr></table>" +
+      "   </td>" +
+      "  </tr></table>" +
+      " </div>",
+    onclick: SocialCalc.SpreadsheetControlSortOnclick,
+  });
+  this.editor.SettingsCallbacks.sort = {
+    save: SocialCalc.SpreadsheetControlSortSave,
+    load: SocialCalc.SpreadsheetControlSortLoad,
+  };
+
+  // Audit
+
+  this.tabnums.audit = this.tabs.length;
+  this.tabs.push({
+    name: "audit",
+    text: "Audit",
+    html:
+      '<div id="%id.audittools" style="display:none;">' +
+      ' <div style="%tbt.">&nbsp;</div>' +
+      "</div>",
+    view: "audit",
+    onclick:
+      /** @param {any} s @param {any} _t */ function (s: any, _t: any) {
+        var SCLoc = SocialCalc.LocalizeString;
+        var i, j;
+        var str =
+          '<table cellspacing="0" cellpadding="0" style="margin-bottom:10px;"><tr><td style="font-size:small;padding:6px;"><b>' +
+          SCLoc("Audit Trail This Session") +
+          ":</b><br><br>";
+        var stack = s.sheet.changes.stack;
+        var tos = s.sheet.changes.tos;
+        for (i = 0; i < stack.length; i++) {
+          if (i == tos + 1)
+            str +=
+              '<br></td></tr><tr><td style="font-size:small;background-color:#EEE;padding:6px;">' +
+              SCLoc("UNDONE STEPS") +
+              ":<br>";
+          for (j = 0; j < stack[i].command.length; j++) {
+            str += SocialCalc.special_chars(stack[i].command[j]) + "<br>";
+          }
+        }
+        // --------------------------------------------
+        // eddy log {
+
+        // --------------------------------------------
+        /** @type {any} */
+        var ObjToSource: any = /** @param {any} o */ function (o: any) {
+          if (typeof o == "string") return o;
+          if (!o) return "null";
+          if (typeof o == "object") {
+            if (!ObjToSource.check) ObjToSource.check = new Array();
+            for (var i = 0, k2 = ObjToSource.check.length; i < k2; ++i) {
+              if (ObjToSource.check[i] == o) {
+                return "{}";
+              }
             }
-         else {
-            range = s.editor.ecell.coord;
-            }
-         /** @type {any} */((document as any).getElementById(s.idPrefix+"settings-savecell")).value = SocialCalc.LocalizeString("Save to")+": "+range;
-         },
-      onclickFocus: true
-         });
+            ObjToSource.check.push(o);
+          }
+          var k = "",
+            na = typeof o.length == "undefined" ? 1 : 0,
+            str = "";
+          for (var p in o) {
+            if (na) k = "'" + p + "':";
+            if (typeof o[p] == "string") str += k + "'" + o[p] + "',";
+            else if (typeof o[p] == "object") str += k + ObjToSource(o[p]) + ",";
+            else str += k + o[p] + ",";
+          }
+          if (typeof o == "object") ObjToSource.check.pop();
+          if (na) return "{" + str.slice(0, -1) + "}";
+          else return "[" + str.slice(0, -1) + "]";
+        };
 
-   this.views["settings"] = {name: "settings", values: {},
-      oncreate: /** @param {any} s @param {any} viewobj */ function(s: any, viewobj: any) {
-         var scc = SocialCalc.Constants;
+        // --------------------------------------------
 
-         viewobj.values.sheetspanel = {
-//            name: "sheet",
-            colorchooser: {id: s.idPrefix+"scolorchooser"},
-            formatnumber: {setting: "numberformat", type: "PopupList", id: s.idPrefix+"formatnumber",
-               initialdata: scc.SCFormatNumberFormats},
-            formattext: {setting: "textformat", type: "PopupList", id: s.idPrefix+"formattext",
-               initialdata: scc.SCFormatTextFormats},
-            fontfamily: {setting: "fontfamily", type: "PopupList", id: s.idPrefix+"fontfamily",
-               initialdata: scc.SCFormatFontfamilies},
-            fontlook: {setting: "fontlook", type: "PopupList", id: s.idPrefix+"fontlook",
-               initialdata: scc.SCFormatFontlook},
-            fontsize: {setting: "fontsize", type: "PopupList", id: s.idPrefix+"fontsize",
-               initialdata: scc.SCFormatFontsizes},
-            textalignhoriz: {setting: "textalignhoriz", type: "PopupList", id: s.idPrefix+"textalignhoriz",
-               initialdata: scc.SCFormatTextAlignhoriz},
-            numberalignhoriz: {setting: "numberalignhoriz", type: "PopupList", id: s.idPrefix+"numberalignhoriz",
-               initialdata: scc.SCFormatNumberAlignhoriz},
-            alignvert: {setting: "alignvert", type: "PopupList", id: s.idPrefix+"alignvert",
-               initialdata: scc.SCFormatAlignVertical},
-            textcolor: {setting: "textcolor", type: "ColorChooser", id: s.idPrefix+"textcolor"},
-            bgcolor: {setting: "bgcolor", type: "ColorChooser", id: s.idPrefix+"bgcolor"},
-            padtop: {setting: "padtop", type: "PopupList", id: s.idPrefix+"padtop",
-               initialdata: scc.SCFormatPadsizes},
-            padright: {setting: "padright", type: "PopupList", id: s.idPrefix+"padright",
-               initialdata: scc.SCFormatPadsizes},
-            padbottom: {setting: "padbottom", type: "PopupList", id: s.idPrefix+"padbottom",
-               initialdata: scc.SCFormatPadsizes},
-            padleft: {setting: "padleft", type: "PopupList", id: s.idPrefix+"padleft",
-               initialdata: scc.SCFormatPadsizes},
-            colwidth: {setting: "colwidth", type: "PopupList", id: s.idPrefix+"colwidth",
-               initialdata: scc.SCFormatColwidth},
-            recalc: {setting: "recalc", type: "PopupList", id: s.idPrefix+"recalc",
-               initialdata: scc.SCFormatRecalc},
-            usermaxcol: {setting: "usermaxcol", type: "PopupList", id: s.idPrefix+"usermaxcol",
-               initialdata: scc.SCFormatUserMaxCol},
-            usermaxrow: {setting: "usermaxrow", type: "PopupList", id: s.idPrefix+"usermaxrow",
-               initialdata: scc.SCFormatUserMaxRow}
+        if (typeof SocialCalc.debug_log != "undefined") {
+          for (const item of SocialCalc.debug_log) {
+            str += ObjToSource(item) + "<br>";
+          }
+        }
+        // }
+        // --------------------------------------------
 
-            };
-         viewobj.values.cellspanel = {
-            name: "cell",
-            colorchooser: {id: s.idPrefix+"scolorchooser"},
-            cformatnumber: {setting: "numberformat", type: "PopupList", id: s.idPrefix+"cformatnumber",
-               initialdata: scc.SCFormatNumberFormats},
-            cformattext: {setting: "textformat", type: "PopupList", id: s.idPrefix+"cformattext",
-               initialdata: scc.SCFormatTextFormats},
-            cfontfamily: {setting: "fontfamily", type: "PopupList", id: s.idPrefix+"cfontfamily",
-               initialdata: scc.SCFormatFontfamilies},
-            cfontlook: {setting: "fontlook", type: "PopupList", id: s.idPrefix+"cfontlook",
-               initialdata: scc.SCFormatFontlook},
-            cfontsize: {setting: "fontsize", type: "PopupList", id: s.idPrefix+"cfontsize",
-               initialdata: scc.SCFormatFontsizes},
-            calignhoriz: {setting: "alignhoriz", type: "PopupList", id: s.idPrefix+"calignhoriz",
-               initialdata: scc.SCFormatTextAlignhoriz},
-            calignvert: {setting: "alignvert", type: "PopupList", id: s.idPrefix+"calignvert",
-               initialdata: scc.SCFormatAlignVertical},
-            ctextcolor: {setting: "textcolor", type: "ColorChooser", id: s.idPrefix+"ctextcolor"},
-            cbgcolor: {setting: "bgcolor", type: "ColorChooser", id: s.idPrefix+"cbgcolor"},
-            cbt: {setting: "bt", type: "BorderSide", id: s.idPrefix+"cbt"},
-            cbr: {setting: "br", type: "BorderSide", id: s.idPrefix+"cbr"},
-            cbb: {setting: "bb", type: "BorderSide", id: s.idPrefix+"cbb"},
-            cbl: {setting: "bl", type: "BorderSide", id: s.idPrefix+"cbl"},
-            cpadtop: {setting: "padtop", type: "PopupList", id: s.idPrefix+"cpadtop",
-               initialdata: scc.SCFormatPadsizes},
-            cpadright: {setting: "padright", type: "PopupList", id: s.idPrefix+"cpadright",
-               initialdata: scc.SCFormatPadsizes},
-            cpadbottom: {setting: "padbottom", type: "PopupList", id: s.idPrefix+"cpadbottom",
-               initialdata: scc.SCFormatPadsizes},
-            cpadleft: {setting: "padleft", type: "PopupList", id: s.idPrefix+"cpadleft",
-               initialdata: scc.SCFormatPadsizes}
-            };
+        s.views.audit.element.innerHTML = str + "</td></tr></table>";
+        SocialCalc.CmdGotFocus(true);
+      },
+    onclickFocus: true,
+  });
 
-         SocialCalc.SettingsControlInitializePanel(viewobj.values.sheetspanel);
-         SocialCalc.SettingsControlInitializePanel(viewobj.values.cellspanel);
-         },
-      replacements: {
-         itemtitle: {regex: /\%itemtitle\./g, replacement: 'style="padding:12px 10px 0px 10px;font-weight:bold;text-align:right;vertical-align:top;font-size:small;"'},
-         sectiontitle: {regex: /\%sectiontitle\./g, replacement: 'style="padding:16px 10px 0px 0px;font-weight:bold;vertical-align:top;font-size:small;color:#C00;"'},
-         parttitle: {regex: /\%parttitle\./g, replacement: 'style="font-weight:bold;font-size:x-small;padding:0px 0px 3px 0px;"'},
-         itembody: {regex: /\%itembody\./g, replacement: 'style="padding:12px 0px 0px 0px;vertical-align:top;font-size:small;"'},
-         bodypart: {regex: /\%bodypart\./g, replacement: 'style="padding:0px 10px 0px 0px;font-size:small;vertical-align:top;"'}
-         },
-      divStyle: "border:1px solid black;overflow:auto;",
-      html:
- '<div id="%id.scolorchooser" style="display:none;position:absolute;z-index:20;"></div>'+
-'<table cellspacing="0" cellpadding="0">'+
-' <tr><td style="vertical-align:top;">'+
-'<table id="%id.sheetsettingstable" style="display:none;" cellspacing="0" cellpadding="0">'+
-'<tr>'+
-' <td %itemtitle.><br>%loc!Default Format!:</td>'+
-' <td %itembody.>'+
-'   <table cellspacing="0" cellpadding="0"><tr>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Number!</div>'+
-'     <span id="%id.formatnumber"></span>'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Text!</div>'+
-'     <span id="%id.formattext"></span>'+
-'    </td>'+
-'   </tr></table>'+
-' </td>'+
-'</tr>'+
-'<tr>'+
-' <td %itemtitle.><br>%loc!Default Alignment!:</td>'+
-' <td %itembody.>'+
-'   <table cellspacing="0" cellpadding="0"><tr>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Text Horizontal!</div>'+
-'     <span id="%id.textalignhoriz"></span>'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Number Horizontal!</div>'+
-'     <span id="%id.numberalignhoriz"></span>'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Vertical!</div>'+
-'     <span id="%id.alignvert"></span>'+
-'    </td>'+
-'   </tr></table>'+
-' </td>'+
-'</tr>'+
-'<tr>'+
-' <td %itemtitle.><br>%loc!Default Font!:</td>'+
-' <td %itembody.>'+
-'   <table cellspacing="0" cellpadding="0"><tr>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Family!</div>'+
-'     <span id="%id.fontfamily"></span>'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Bold &amp; Italics!</div>'+
-'     <span id="%id.fontlook"></span>'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Size!</div>'+
-'     <span id="%id.fontsize"></span>'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Color!</div>'+
-'     <div id="%id.textcolor"></div>'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Background!</div>'+
-'     <div id="%id.bgcolor"></div>'+
-'    </td>'+
-'   </tr></table>'+
-' </td>'+
-'</tr>'+
-'<tr>'+
-' <td %itemtitle.><br>%loc!Default Padding!:</td>'+
-' <td %itembody.>'+
-'   <table cellspacing="0" cellpadding="0"><tr>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Top!</div>'+
-'     <span id="%id.padtop"></span>'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Right!</div>'+
-'     <span id="%id.padright"></span>'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Bottom!</div>'+
-'     <span id="%id.padbottom"></span>'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Left!</div>'+
-'     <span id="%id.padleft"></span>'+
-'    </td>'+
-'   </tr></table>'+
-' </td>'+
-'</tr>'+
-'<tr>'+
-' <td %itemtitle.><br>%loc!Default Column Width!:</td>'+
-' <td %itembody.>'+
-'   <table cellspacing="0" cellpadding="0"><tr>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>&nbsp;</div>'+
-'     <span id="%id.colwidth"></span>'+
-'    </td>'+
-'   </tr></table>'+
-' </td>'+
-'</tr>'+
-'<tr>'+
-' <td %itemtitle.><br>%loc!Recalculation!:</td>'+
-' <td %itembody.>'+
-'   <table cellspacing="0" cellpadding="0"><tr>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>&nbsp;</div>'+
-'     <span id="%id.recalc"></span>'+
-'    </td>'+
-'   </tr></table>'+
-' </td>'+
-'</tr>'+
-'<tr>'+
-' <td %itemtitle.><br>%loc!Dimensions!:</td>'+
-' <td %itembody.>'+
-'   <table cellspacing="0" cellpadding="0"><tr>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Columns!</div>'+
-'     <span id="%id.usermaxcol"></span>'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Rows!</div>'+
-'     <span id="%id.usermaxrow"></span>'+
-'    </td>'+
-'   </tr></table>'+
-' </td>'+
-'</tr>'+
-'</table>'+
-'<table id="%id.cellsettingstable" cellspacing="0" cellpadding="0">'+
-'<tr>'+
-' <td %itemtitle.><br>%loc!Format!:</td>'+
-' <td %itembody.>'+
-'   <table cellspacing="0" cellpadding="0"><tr>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Number!</div>'+
-'     <span id="%id.cformatnumber"></span>'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Text!</div>'+
-'     <span id="%id.cformattext"></span>'+
-'    </td>'+
-'   </tr></table>'+
-' </td>'+
-'</tr>'+
-'<tr>'+
-' <td %itemtitle.><br>%loc!Alignment!:</td>'+
-' <td %itembody.>'+
-'   <table cellspacing="0" cellpadding="0"><tr>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Horizontal!</div>'+
-'     <span id="%id.calignhoriz"></span>'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Vertical!</div>'+
-'     <span id="%id.calignvert"></span>'+
-'    </td>'+
-'   </tr></table>'+
-' </td>'+
-'</tr>'+
-'<tr>'+
-' <td %itemtitle.><br>%loc!Font!:</td>'+
-' <td %itembody.>'+
-'   <table cellspacing="0" cellpadding="0"><tr>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Family!</div>'+
-'     <span id="%id.cfontfamily"></span>'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Bold &amp; Italics!</div>'+
-'     <span id="%id.cfontlook"></span>'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Size!</div>'+
-'     <span id="%id.cfontsize"></span>'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Color!</div>'+
-'     <div id="%id.ctextcolor"></div>'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Background!</div>'+
-'     <div id="%id.cbgcolor"></div>'+
-'    </td>'+
-'   </tr></table>'+
-' </td>'+
-'</tr>'+
-'<tr>'+
-' <td %itemtitle.><br>%loc!Borders!:</td>'+
-' <td %itembody.>'+
-'   <table cellspacing="0" cellpadding="0">'+
-'    <tr><td %bodypart. colspan="3"><div %parttitle.>%loc!Top Border!</div></td>'+
-'     <td %bodypart. colspan="3"><div %parttitle.>%loc!Right Border!</div></td>'+
-'     <td %bodypart. colspan="3"><div %parttitle.>%loc!Bottom Border!</div></td>'+
-'     <td %bodypart. colspan="3"><div %parttitle.>%loc!Left Border!</div></td>'+
-'    </tr><tr>'+
-'    <td %bodypart.>'+
-'     <input id="%id.cbt-onoff-bcb" onclick="SocialCalc.SettingsControlOnchangeBorder(this);" type="checkbox">'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div id="%id.cbt-color"></div>'+
-'    </td>'+
-'    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>'+
-'    <td %bodypart.>'+
-'     <input id="%id.cbr-onoff-bcb" onclick="SocialCalc.SettingsControlOnchangeBorder(this);" type="checkbox">'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div id="%id.cbr-color"></div>'+
-'    </td>'+
-'    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>'+
-'    <td %bodypart.>'+
-'     <input id="%id.cbb-onoff-bcb" onclick="SocialCalc.SettingsControlOnchangeBorder(this);" type="checkbox">'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div id="%id.cbb-color"></div>'+
-'    </td>'+
-'    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>'+
-'    <td %bodypart.>'+
-'     <input id="%id.cbl-onoff-bcb" onclick="SocialCalc.SettingsControlOnchangeBorder(this);" type="checkbox">'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div id="%id.cbl-color"></div>'+
-'    </td>'+
-'    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>'+
-'   </tr></table>'+
-' </td>'+
-'</tr>'+
-'<tr>'+
-' <td %itemtitle.><br>%loc!Padding!:</td>'+
-' <td %itembody.>'+
-'   <table cellspacing="0" cellpadding="0"><tr>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Top!</div>'+
-'     <span id="%id.cpadtop"></span>'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Right!</div>'+
-'     <span id="%id.cpadright"></span>'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Bottom!</div>'+
-'     <span id="%id.cpadbottom"></span>'+
-'    </td>'+
-'    <td %bodypart.>'+
-'     <div %parttitle.>%loc!Left!</div>'+
-'     <span id="%id.cpadleft"></span>'+
-'    </td>'+
-'   </tr></table>'+
-' </td>'+
-'</tr>'+
-'</table>'+
-' </td><td style="vertical-align:top;padding:12px 0px 0px 12px;">'+
-'  <div style="width:100px;height:100px;overflow:hidden;border:1px solid black;background-color:#EEE;padding:6px;">'+
-'   <table cellspacing="0" cellpadding="0"><tr>'+
-'    <td id="sample-text" style="height:100px;width:100px;"><div>%loc!This is a<br>sample!</div><div>-1234.5</div></td>'+
-'   </tr></table>'+
-'  </div>'+
-' </td></tr></table>'+
-'<br>'
-      };
+  this.views["audit"] = {
+    name: "audit",
+    divStyle: "border:1px solid black;overflow:auto;",
+    html: "Audit Trail",
+  };
 
-   // Sort
+  // Comment
 
-   this.tabnums.sort = this.tabs.length;
-   this.tabs.push({name: "sort", text: "Sort", html:
-      ' <div id="%id.sorttools" style="display:none;">'+
-      '  <table cellspacing="0" cellpadding="0"><tr>'+
-      '   <td style="vertical-align:top;padding-right:4px;width:160px;">'+
-      '    <div style="%tbt.">%loc!Set Cells To Sort!</div>'+
-      '    <select id="%id.sortlist" size="1" onfocus="%s.CmdGotFocus(this);"><option selected>[select range]</option><option value="all">Sort All</option></select>'+
-      '    <input type="button" value="%loc!OK!" onclick="%s.DoCmd(this, \'ok-setsort\');" style="font-size:x-small;">'+
-      '   </td>'+
-      '   <td style="vertical-align:middle;padding-right:16px;width:100px;text-align:right;">'+
-      '    <div style="%tbt.">&nbsp;</div>'+
-      '    <input type="button" id="%id.sortbutton" value="%loc!Sort Cells! A1:A1" onclick="%s.DoCmd(this, \'dosort\');" style="visibility:hidden;">'+
-      '   </td>'+
-      '   <td style="vertical-align:top;padding-right:16px;">'+
-      '    <table cellspacing="0" cellpadding="0"><tr>'+
-      '     <td style="vertical-align:top;">'+
-      '      <div style="%tbt.">%loc!Major Sort!</div>'+
-      '      <select id="%id.majorsort" size="1" onfocus="%s.CmdGotFocus(this);"></select>'+
-      '     </td><td>'+
-      '      <input type="radio" name="majorsort" id="%id.majorsortup" value="up" checked><span style="font-size:x-small;color:#555753;">%loc!Up!</span><br>'+
-      '      <input type="radio" name="majorsort" id="%id.majorsortdown" value="down"><span style="font-size:x-small;color:#555753;">%loc!Down!</span>'+
-      '     </td>'+
-      '    </tr></table>'+
-      '   </td>'+
-      '   <td style="vertical-align:top;padding-right:16px;">'+
-      '    <table cellspacing="0" cellpadding="0"><tr>'+
-      '     <td style="vertical-align:top;">'+
-      '      <div style="%tbt.">%loc!Minor Sort!</div>'+
-      '      <select id="%id.minorsort" size="1" onfocus="%s.CmdGotFocus(this);"></select>'+
-      '     </td><td>'+
-      '      <input type="radio" name="minorsort" id="%id.minorsortup" value="up" checked><span style="font-size:x-small;color:#555753;">%loc!Up!</span><br>'+
-      '      <input type="radio" name="minorsort" id="%id.minorsortdown" value="down"><span style="font-size:x-small;color:#555753;">%loc!Down!</span>'+
-      '     </td>'+
-      '    </tr></table>'+
-      '   </td>'+
-      '   <td style="vertical-align:top;padding-right:16px;">'+
-      '    <table cellspacing="0" cellpadding="0"><tr>'+
-      '     <td style="vertical-align:top;">'+
-      '      <div style="%tbt.">%loc!Last Sort!</div>'+
-      '      <select id="%id.lastsort" size="1" onfocus="%s.CmdGotFocus(this);"></select>'+
-      '     </td><td>'+
-      '      <input type="radio" name="lastsort" id="%id.lastsortup" value="up" checked><span style="font-size:x-small;color:#555753;">%loc!Up!</span><br>'+
-      '      <input type="radio" name="lastsort" id="%id.lastsortdown" value="down"><span style="font-size:x-small;color:#555753;">%loc!Down!</span>'+
-      '     </td>'+
-      '    </tr></table>'+
-      '   </td>'+
-      '  </tr></table>'+
-      ' </div>',
-      onclick: SocialCalc.SpreadsheetControlSortOnclick});
-   this.editor.SettingsCallbacks.sort = {save: SocialCalc.SpreadsheetControlSortSave, load: SocialCalc.SpreadsheetControlSortLoad};
+  this.tabnums.comment = this.tabs.length;
+  this.tabs.push({
+    name: "comment",
+    text: "Comment",
+    html:
+      '<div id="%id.commenttools" style="display:none;">' +
+      '<table cellspacing="0" cellpadding="0"><tr><td>' +
+      '<textarea id="%id.commenttext" style="font-size:small;height:32px;width:600px;overflow:auto;" onfocus="%s.CmdGotFocus(this);"></textarea>' +
+      '</td><td style="vertical-align:top;">' +
+      '&nbsp;<input type="button" value="%loc!Save!" onclick="%s.SpreadsheetControlCommentSet();" style="font-size:x-small;">' +
+      "</td></tr></table>" +
+      "</div>",
+    view: "sheet",
+    onclick: SocialCalc.SpreadsheetControlCommentOnclick,
+    onunclick: SocialCalc.SpreadsheetControlCommentOnunclick,
+  });
 
-   // Audit
+  // Names
 
-   this.tabnums.audit = this.tabs.length;
-   this.tabs.push({name: "audit", text: "Audit", html:
-      '<div id="%id.audittools" style="display:none;">'+
-      ' <div style="%tbt.">&nbsp;</div>'+
-      '</div>',
-      view: "audit",
-      onclick:
-         /** @param {any} s @param {any} t */ function(s: any, t: any) {
-            var SCLoc = SocialCalc.LocalizeString;
-            var i, j;
-            var str = '<table cellspacing="0" cellpadding="0" style="margin-bottom:10px;"><tr><td style="font-size:small;padding:6px;"><b>'+SCLoc("Audit Trail This Session")+':</b><br><br>';
-            var stack = s.sheet.changes.stack;
-            var tos = s.sheet.changes.tos;
-            for (i=0; i<stack.length; i++) {
-               if (i==tos+1) str += '<br></td></tr><tr><td style="font-size:small;background-color:#EEE;padding:6px;">'+SCLoc("UNDONE STEPS")+':<br>';
-               for (j=0; j<stack[i].command.length; j++) {
-                  str += SocialCalc.special_chars(stack[i].command[j]) + "<br>";
-                  }
-               }
-			// --------------------------------------------   
- 		    // eddy log {
+  this.tabnums.names = this.tabs.length;
+  this.tabs.push({
+    name: "names",
+    text: "Names",
+    html:
+      '<div id="%id.namestools" style="display:none;">' +
+      '  <table cellspacing="0" cellpadding="0"><tr>' +
+      '   <td style="vertical-align:top;padding-right:24px;">' +
+      '    <div style="%tbt.">%loc!Existing Names!</div>' +
+      '    <select id="%id.nameslist" size="1" onchange="%s.SpreadsheetControlNamesChangedName();" onfocus="%s.CmdGotFocus(this);"><option selected>[New]</option></select>' +
+      "   </td>" +
+      '   <td style="vertical-align:top;padding-right:6px;">' +
+      '    <div style="%tbt.">%loc!Name!</div>' +
+      '    <input type="text" id="%id.namesname" style="font-size:x-small;width:75px;" onfocus="%s.CmdGotFocus(this);">' +
+      "   </td>" +
+      '   <td style="vertical-align:top;padding-right:6px;">' +
+      '    <div style="%tbt.">%loc!Description!</div>' +
+      '    <input type="text" id="%id.namesdesc" style="font-size:x-small;width:150px;" onfocus="%s.CmdGotFocus(this);">' +
+      "   </td>" +
+      '   <td style="vertical-align:top;padding-right:6px;">' +
+      '    <div style="%tbt.">%loc!Value!</div>' +
+      '    <input type="text" id="%id.namesvalue" width="16" style="font-size:x-small;width:100px;" onfocus="%s.CmdGotFocus(this);">' +
+      "   </td>" +
+      '   <td style="vertical-align:top;padding-right:12px;width:100px;">' +
+      '    <div style="%tbt.">%loc!Set Value To!</div>' +
+      '    <input type="button" id="%id.namesrangeproposal" value="A1" onclick="%s.SpreadsheetControlNamesSetValue();" style="font-size:x-small;">' +
+      "   </td>" +
+      '   <td style="vertical-align:top;padding-right:6px;">' +
+      '    <div style="%tbt.">&nbsp;</div>' +
+      '    <input type="button" value="%loc!Save!" onclick="%s.SpreadsheetControlNamesSave();" style="font-size:x-small;">' +
+      '    <input type="button" value="%loc!Delete!" onclick="%s.SpreadsheetControlNamesDelete()" style="font-size:x-small;">' +
+      "   </td>" +
+      "  </tr></table>" +
+      "</div>",
+    view: "sheet",
+    onclick: SocialCalc.SpreadsheetControlNamesOnclick,
+    onunclick: SocialCalc.SpreadsheetControlNamesOnunclick,
+  });
 
-			// --------------------------------------------   
-			/** @type {any} */
-			var ObjToSource: any = /** @param {any} o */ function(o: any){
-				if (typeof(o) == "string") return o;
-				if (!o) return 'null';
-				if (typeof(o) == "object") {
-					if (!ObjToSource.check) ObjToSource.check = new Array();
-					for (var i=0, k2=ObjToSource.check.length ; i<k2 ; ++i) {
-						if (ObjToSource.check[i] == o) {return '{}';}
-					}
-					ObjToSource.check.push(o);
-				}
-				var k="",na=typeof(o.length)=="undefined"?1:0,str="";
-				for(var p in o){
-					if (na) k = "'"+p+ "':";
-					if (typeof o[p] == "string") str += k + "'" + o[p]+"',";
-					else if (typeof o[p] == "object") str += k + ObjToSource(o[p])+",";
-					else str += k + o[p] + ",";
-				}
-				if (typeof(o) == "object") ObjToSource.check.pop();
-				if (na) return "{"+str.slice(0,-1)+"}";
-				else return "["+str.slice(0,-1)+"]";
-			}
-			
-			// --------------------------------------------   
-			
-		    if(typeof SocialCalc.debug_log != 'undefined') {
-				for(var index in SocialCalc.debug_log) { 
-					str += ObjToSource(SocialCalc.debug_log[index]) + "<br>";
-				}
-			}
-		    // }   
-			// --------------------------------------------   
-			   
-            s.views.audit.element.innerHTML = str+"</td></tr></table>";
-            SocialCalc.CmdGotFocus(true);
-            },
-      onclickFocus: true
-         });
+  // Clipboard
 
-   this.views["audit"] = {name: "audit",
-      divStyle: "border:1px solid black;overflow:auto;",
-      html: 'Audit Trail'
-      };
+  this.tabnums.clipboard = this.tabs.length;
+  this.tabs.push({
+    name: "clipboard",
+    text: "Clipboard",
+    html:
+      '<div id="%id.clipboardtools" style="display:none;">' +
+      '  <table cellspacing="0" cellpadding="0"><tr>' +
+      '   <td style="vertical-align:top;padding-right:24px;">' +
+      '    <div style="%tbt.">' +
+      "     &nbsp;" +
+      "    </div>" +
+      "   </td>" +
+      "  </tr></table>" +
+      "</div>",
+    view: "clipboard",
+    onclick: SocialCalc.SpreadsheetControlClipboardOnclick,
+    onclickFocus: "clipboardtext",
+  });
 
-   // Comment
+  this.views["clipboard"] = {
+    name: "clipboard",
+    divStyle: "overflow:auto;",
+    html:
+      ' <div style="font-size:x-small;padding:5px 0px 10px 0px;">' +
+      "  <b>%loc!Display Clipboard in!:</b>" +
+      '  <input type="radio" id="%id.clipboardformat-tab" name="%id.clipboardformat" checked onclick="%s.SpreadsheetControlClipboardFormat(\'tab\');"> %loc!Tab-delimited format! &nbsp;' +
+      '  <input type="radio" id="%id.clipboardformat-csv" name="%id.clipboardformat" onclick="%s.SpreadsheetControlClipboardFormat(\'csv\');"> %loc!CSV format! &nbsp;' +
+      '  <input type="radio" id="%id.clipboardformat-scsave" name="%id.clipboardformat" onclick="%s.SpreadsheetControlClipboardFormat(\'scsave\');"> %loc!SocialCalc-save format!' +
+      " </div>" +
+      ' <input type="button" value="%loc!Load SocialCalc Clipboard With This!" style="font-size:x-small;" onclick="%s.SpreadsheetControlClipboardLoad();">&nbsp; ' +
+      ' <input type="button" value="%loc!Clear SocialCalc Clipboard!" style="font-size:x-small;" onclick="%s.SpreadsheetControlClipboardClear();">&nbsp; ' +
+      " <br>" +
+      ' <textarea id="%id.clipboardtext" style="font-size:small;height:350px;width:800px;overflow:auto;" onfocus="%s.CmdGotFocus(this);"></textarea>',
+  };
 
-   this.tabnums.comment = this.tabs.length;
-   this.tabs.push({name: "comment", text: "Comment", html:
-      '<div id="%id.commenttools" style="display:none;">'+
-      '<table cellspacing="0" cellpadding="0"><tr><td>'+
-      '<textarea id="%id.commenttext" style="font-size:small;height:32px;width:600px;overflow:auto;" onfocus="%s.CmdGotFocus(this);"></textarea>'+
-      '</td><td style="vertical-align:top;">'+
-      '&nbsp;<input type="button" value="%loc!Save!" onclick="%s.SpreadsheetControlCommentSet();" style="font-size:x-small;">'+
-      '</td></tr></table>'+
-      '</div>',
-      view: "sheet",
-      onclick: SocialCalc.SpreadsheetControlCommentOnclick,
-      onunclick: SocialCalc.SpreadsheetControlCommentOnunclick
-      });
-
-   // Names
-
-   this.tabnums.names = this.tabs.length;
-   this.tabs.push({name: "names", text: "Names", html:
-      '<div id="%id.namestools" style="display:none;">'+
-      '  <table cellspacing="0" cellpadding="0"><tr>'+
-      '   <td style="vertical-align:top;padding-right:24px;">'+
-      '    <div style="%tbt.">%loc!Existing Names!</div>'+
-      '    <select id="%id.nameslist" size="1" onchange="%s.SpreadsheetControlNamesChangedName();" onfocus="%s.CmdGotFocus(this);"><option selected>[New]</option></select>'+
-      '   </td>'+
-      '   <td style="vertical-align:top;padding-right:6px;">'+
-      '    <div style="%tbt.">%loc!Name!</div>'+
-      '    <input type="text" id="%id.namesname" style="font-size:x-small;width:75px;" onfocus="%s.CmdGotFocus(this);">'+
-      '   </td>'+
-      '   <td style="vertical-align:top;padding-right:6px;">'+
-      '    <div style="%tbt.">%loc!Description!</div>'+
-      '    <input type="text" id="%id.namesdesc" style="font-size:x-small;width:150px;" onfocus="%s.CmdGotFocus(this);">'+
-      '   </td>'+
-      '   <td style="vertical-align:top;padding-right:6px;">'+
-      '    <div style="%tbt.">%loc!Value!</div>'+
-      '    <input type="text" id="%id.namesvalue" width="16" style="font-size:x-small;width:100px;" onfocus="%s.CmdGotFocus(this);">'+
-      '   </td>'+
-      '   <td style="vertical-align:top;padding-right:12px;width:100px;">'+
-      '    <div style="%tbt.">%loc!Set Value To!</div>'+
-      '    <input type="button" id="%id.namesrangeproposal" value="A1" onclick="%s.SpreadsheetControlNamesSetValue();" style="font-size:x-small;">'+
-      '   </td>'+
-      '   <td style="vertical-align:top;padding-right:6px;">'+
-      '    <div style="%tbt.">&nbsp;</div>'+
-      '    <input type="button" value="%loc!Save!" onclick="%s.SpreadsheetControlNamesSave();" style="font-size:x-small;">'+
-      '    <input type="button" value="%loc!Delete!" onclick="%s.SpreadsheetControlNamesDelete()" style="font-size:x-small;">'+
-      '   </td>'+
-      '  </tr></table>'+
-      '</div>',
-      view: "sheet",
-      onclick: SocialCalc.SpreadsheetControlNamesOnclick,
-      onunclick: SocialCalc.SpreadsheetControlNamesOnunclick
-      });
-
-   // Clipboard
-
-   this.tabnums.clipboard = this.tabs.length;
-   this.tabs.push({name: "clipboard", text: "Clipboard", html:
-      '<div id="%id.clipboardtools" style="display:none;">'+
-      '  <table cellspacing="0" cellpadding="0"><tr>'+
-      '   <td style="vertical-align:top;padding-right:24px;">'+
-      '    <div style="%tbt.">'+
-      '     &nbsp;'+
-      '    </div>'+
-      '   </td>'+
-      '  </tr></table>'+
-      '</div>',
-      view: "clipboard",
-      onclick: SocialCalc.SpreadsheetControlClipboardOnclick,
-      onclickFocus: "clipboardtext"
-      });
-
-   this.views["clipboard"] = {name: "clipboard", divStyle: "overflow:auto;", html:
-      ' <div style="font-size:x-small;padding:5px 0px 10px 0px;">'+
-      '  <b>%loc!Display Clipboard in!:</b>'+
-      '  <input type="radio" id="%id.clipboardformat-tab" name="%id.clipboardformat" checked onclick="%s.SpreadsheetControlClipboardFormat(\'tab\');"> %loc!Tab-delimited format! &nbsp;'+
-      '  <input type="radio" id="%id.clipboardformat-csv" name="%id.clipboardformat" onclick="%s.SpreadsheetControlClipboardFormat(\'csv\');"> %loc!CSV format! &nbsp;'+
-      '  <input type="radio" id="%id.clipboardformat-scsave" name="%id.clipboardformat" onclick="%s.SpreadsheetControlClipboardFormat(\'scsave\');"> %loc!SocialCalc-save format!'+
-      ' </div>'+
-      ' <input type="button" value="%loc!Load SocialCalc Clipboard With This!" style="font-size:x-small;" onclick="%s.SpreadsheetControlClipboardLoad();">&nbsp; '+
-      ' <input type="button" value="%loc!Clear SocialCalc Clipboard!" style="font-size:x-small;" onclick="%s.SpreadsheetControlClipboardClear();">&nbsp; '+
-      ' <br>'+
-      ' <textarea id="%id.clipboardtext" style="font-size:small;height:350px;width:800px;overflow:auto;" onfocus="%s.CmdGotFocus(this);"></textarea>'
-      };
-
-   return;
-
-   };
-
+  return;
+};
 
 // Methods:
 
 SpreadsheetControlSC.SpreadsheetControl.prototype.InitializeSpreadsheetControl =
-   /** @param {any} node @param {number} [height] @param {number} [width] @param {number} [spacebelow] */
-   function(node: any, height: any, width: any, spacebelow: any) {return SocialCalc.InitializeSpreadsheetControl(this, node, height, width, spacebelow);};
-SpreadsheetControlSC.SpreadsheetControl.prototype.DoOnResize = function() {return SocialCalc.DoOnResize(this);};
-SpreadsheetControlSC.SpreadsheetControl.prototype.SizeSSDiv = function() {return SocialCalc.SizeSSDiv(this);};
+  /** @param {any} node @param {number} [height] @param {number} [width] @param {number} [spacebelow] */
+  function (node: any, height: any, width: any, spacebelow: any) {
+    return SocialCalc.InitializeSpreadsheetControl(this, node, height, width, spacebelow);
+  };
+SpreadsheetControlSC.SpreadsheetControl.prototype.DoOnResize = function () {
+  return SocialCalc.DoOnResize(this);
+};
+SpreadsheetControlSC.SpreadsheetControl.prototype.SizeSSDiv = function () {
+  return SocialCalc.SizeSSDiv(this);
+};
 SpreadsheetControlSC.SpreadsheetControl.prototype.ExecuteCommand =
-   /** @param {string} combostr @param {string} [sstr] */
-   function(combostr: any, sstr: any) {return SocialCalc.SpreadsheetControlExecuteCommand(this, combostr, sstr);};
-SpreadsheetControlSC.SpreadsheetControl.prototype.CreateSheetHTML =
-   function() {return SocialCalc.SpreadsheetControlCreateSheetHTML(this);};
+  /** @param {string} combostr @param {string} [sstr] */
+  function (combostr: any, sstr: any) {
+    return SocialCalc.SpreadsheetControlExecuteCommand(this, combostr, sstr);
+  };
+SpreadsheetControlSC.SpreadsheetControl.prototype.CreateSheetHTML = function () {
+  return SocialCalc.SpreadsheetControlCreateSheetHTML(this);
+};
 SpreadsheetControlSC.SpreadsheetControl.prototype.CreateSpreadsheetSave =
-   /** @param {{[k: string]: string}} [otherparts] */
-   function(otherparts: any) {return SocialCalc.SpreadsheetControlCreateSpreadsheetSave(this, otherparts);};
+  /** @param {{[k: string]: string}} [otherparts] */
+  function (otherparts: any) {
+    return SocialCalc.SpreadsheetControlCreateSpreadsheetSave(this, otherparts);
+  };
 SpreadsheetControlSC.SpreadsheetControl.prototype.DecodeSpreadsheetSave =
-   /** @param {string} str */
-   function(str: any) {return SocialCalc.SpreadsheetControlDecodeSpreadsheetSave(this, str);};
+  /** @param {string} str */
+  function (str: any) {
+    return SocialCalc.SpreadsheetControlDecodeSpreadsheetSave(this, str);
+  };
 SpreadsheetControlSC.SpreadsheetControl.prototype.CreateCellHTML =
-   /** @param {string} coord */
-   function(coord: any) {return SocialCalc.SpreadsheetControlCreateCellHTML(this, coord);};
+  /** @param {string} coord */
+  function (coord: any) {
+    return SocialCalc.SpreadsheetControlCreateCellHTML(this, coord);
+  };
 SpreadsheetControlSC.SpreadsheetControl.prototype.CreateCellHTMLSave =
-   /** @param {string} [range] */
-   function(range: any) {return SocialCalc.SpreadsheetControlCreateCellHTMLSave(this, range);};
-
+  /** @param {string} [range] */
+  function (range: any) {
+    return SocialCalc.SpreadsheetControlCreateCellHTMLSave(this, range);
+  };
 
 // Sheet Methods to make things a little easier:
 
 SpreadsheetControlSC.SpreadsheetControl.prototype.ParseSheetSave =
-   /** @param {string} str */
-   function(str: any) {return this.sheet.ParseSheetSave(str);};
-SpreadsheetControlSC.SpreadsheetControl.prototype.CreateSheetSave = function() {return this.sheet.CreateSheetSave();};
-
+  /** @param {string} str */
+  function (str: any) {
+    return this.sheet.ParseSheetSave(str);
+  };
+SpreadsheetControlSC.SpreadsheetControl.prototype.CreateSheetSave = function () {
+  return this.sheet.CreateSheetSave();
+};
 
 // Functions:
 
@@ -969,289 +1181,369 @@ SpreadsheetControlSC.SpreadsheetControl.prototype.CreateSheetSave = function() {
  * @param {number} [width]
  * @param {number} [spacebelow]
  */
-SpreadsheetControlSC.InitializeSpreadsheetControl = function(spreadsheet: any, node: any, height: any, width: any, spacebelow: any) {
+SpreadsheetControlSC.InitializeSpreadsheetControl = function (
+  spreadsheet: any,
+  node: any,
+  height: any,
+  width: any,
+  spacebelow: any,
+) {
+  var scc = SocialCalc.Constants;
+  var SCLoc = SocialCalc.LocalizeString;
+  var SCLocSS = SocialCalc.LocalizeSubstrings;
 
-   var scc = SocialCalc.Constants;
-   var SCLoc = SocialCalc.LocalizeString;
-   var SCLocSS = SocialCalc.LocalizeSubstrings;
+  var html, child, i, vname, v, style, button, bele;
+  var tabs = spreadsheet.tabs;
+  var views: any = spreadsheet.views;
 
-   var html, child, i, vname, v, style, button, bele;
-   var tabs = spreadsheet.tabs;
-   var views: any = spreadsheet.views;
+  spreadsheet.requestedHeight = height;
+  spreadsheet.requestedWidth = width;
+  spreadsheet.requestedSpaceBelow = spacebelow;
 
-   spreadsheet.requestedHeight = height;
-   spreadsheet.requestedWidth = width;
-   spreadsheet.requestedSpaceBelow = spacebelow;
+  if (typeof node == "string") node = /** @type {any} */ ((document as any).getElementById(node));
 
-   if (typeof node == "string") node = /** @type {any} */((document as any).getElementById(node));
+  if (node == null) {
+    alert("SocialCalc.SpreadsheetControl not given parent node.");
+  }
 
-   if (node == null) {
-      alert("SocialCalc.SpreadsheetControl not given parent node.");
-      }
+  spreadsheet.parentNode = node;
 
-   spreadsheet.parentNode = node;
+  // create node to hold spreadsheet control
 
-   // create node to hold spreadsheet control
+  spreadsheet.spreadsheetDiv = document.createElement("div");
 
-   spreadsheet.spreadsheetDiv = document.createElement("div");
+  spreadsheet.SizeSSDiv(); // calculate and fill in the size values
 
-   spreadsheet.SizeSSDiv(); // calculate and fill in the size values
+  for (child = node.firstChild; child != null; child = node.firstChild) {
+    node.removeChild(child);
+  }
 
-   for (child=node.firstChild; child!=null; child=node.firstChild) {
-      node.removeChild(child);
-      }
+  // create the tabbed UI at the top
 
-   // create the tabbed UI at the top
+  html = "<div>";
+  html +=
+    '<div style="' +
+    spreadsheet.tabbackground +
+    '">' +
+    '<table cellpadding="0" cellspacing="0"><tr>';
 
-   html = '<div>'
-   html += '<div style="'+spreadsheet.tabbackground+'">'+
-      '<table cellpadding="0" cellspacing="0"><tr>';
+  for (i = 0; i < tabs.length; i++) {
+    html +=
+      '  <td id="%id.' +
+      tabs[i].name +
+      'tab" style="' +
+      (i == 0 ? spreadsheet.tabselectedCSS : spreadsheet.tabplainCSS) +
+      '" onclick="%s.SetTab(this);">' +
+      SCLoc(tabs[i].text) +
+      "</td>";
+  }
 
-   for (i=0; i<tabs.length; i++) {
-      html += '  <td id="%id.' + tabs[i].name + 'tab" style="' +
-         (i==0 ? spreadsheet.tabselectedCSS : spreadsheet.tabplainCSS) +
-         '" onclick="%s.SetTab(this);">' + SCLoc(tabs[i].text) + '</td>';
-      }
+  html += " </tr></table></div>";
+  html += '<div style="' + spreadsheet.toolbarbackground + 'padding:12px 10px 10px 4px;">';
 
-   html += ' </tr></table></div>'
-   html += '<div style="'+spreadsheet.toolbarbackground+'padding:12px 10px 10px 4px;">';
+  for (i = 0; i < tabs.length; i++) {
+    html += tabs[i].html;
+  }
 
-   for (i=0; i<tabs.length; i++) {
-      html += tabs[i].html;
-      }
+  html += "</div>";
+  html += "</div>";
 
-   html += '</div>'
-   html += '</div>';
+  spreadsheet.currentTab = 0; // this is where we started
 
-   spreadsheet.currentTab = 0; // this is where we started
+  for (style in spreadsheet.tabreplacements) {
+    html = html.replace(
+      spreadsheet.tabreplacements[style].regex,
+      spreadsheet.tabreplacements[style].replacement,
+    );
+  }
+  html = html.replace(/%s\./g, "SocialCalc.");
+  html = html.replace(/%id\./g, spreadsheet.idPrefix);
+  html = html.replace(/%tbt\./g, spreadsheet.toolbartext);
+  html = html.replace(/%img\./g, spreadsheet.imagePrefix);
 
-   for (style in spreadsheet.tabreplacements) {
-      html = html.replace(spreadsheet.tabreplacements[style].regex, spreadsheet.tabreplacements[style].replacement);
-      }
-   html = html.replace(/\%s\./g, "SocialCalc.");
-   html = html.replace(/\%id\./g, spreadsheet.idPrefix);
-   html = html.replace(/\%tbt\./g, spreadsheet.toolbartext);
-   html = html.replace(/\%img\./g, spreadsheet.imagePrefix);
+  html = SCLocSS(html); // localize with %loc!string! and %scc!constant!
 
-   html = SCLocSS(html); // localize with %loc!string! and %scc!constant!
+  spreadsheet.spreadsheetDiv.innerHTML = html;
 
-   spreadsheet.spreadsheetDiv.innerHTML = html;
+  node.appendChild(spreadsheet.spreadsheetDiv);
 
-   node.appendChild(spreadsheet.spreadsheetDiv);
+  // Initialize SocialCalc buttons
 
-   // Initialize SocialCalc buttons
+  spreadsheet.Buttons = {
+    button_undo: { tooltip: "Undo", command: "undo" },
+    button_redo: { tooltip: "Redo", command: "redo" },
+    button_copy: { tooltip: "Copy", command: "copy" },
+    button_cut: { tooltip: "Cut", command: "cut" },
+    button_paste: { tooltip: "Paste", command: "paste" },
+    button_pasteformats: { tooltip: "Paste Formats", command: "pasteformats" },
+    button_lock: { tooltip: "Lock Cell", command: "lock" },
+    button_unlock: { tooltip: "Unlock Cell", command: "unlock" },
+    button_delete: { tooltip: "Delete Cell Contents", command: "delete" },
+    button_filldown: { tooltip: "Fill Down", command: "filldown" },
+    button_fillright: { tooltip: "Fill Right", command: "fillright" },
+    button_movefrom: { tooltip: "Set/Clear Move From", command: "movefrom" },
+    button_movepaste: { tooltip: "Move Paste", command: "movepaste" },
+    button_moveinsert: { tooltip: "Move Insert", command: "moveinsert" },
+    button_alignleft: { tooltip: "Align Left", command: "align-left" },
+    button_aligncenter: { tooltip: "Align Center", command: "align-center" },
+    button_alignright: { tooltip: "Align Right", command: "align-right" },
+    button_borderon: { tooltip: "Borders On", command: "borderon" },
+    button_borderoff: { tooltip: "Borders Off", command: "borderoff" },
+    button_swapcolors: { tooltip: "Swap Colors", command: "swapcolors" },
+    button_merge: { tooltip: "Merge/Unmerge Cells", command: "merge" },
+    button_insertrow: { tooltip: "Insert Row Before", command: "insertrow" },
+    button_insertcol: { tooltip: "Insert Column Before", command: "insertcol" },
+    button_deleterow: { tooltip: "Delete Row", command: "deleterow" },
+    button_deletecol: { tooltip: "Delete Column", command: "deletecol" },
+    button_hiderow: { tooltip: "Hide Row", command: "hiderow" },
+    button_hidecol: { tooltip: "Hide Column", command: "hidecol" },
+    button_recalc: { tooltip: "Recalculate", command: "recalc" },
+  };
 
-spreadsheet.Buttons = {
-   button_undo: {tooltip: "Undo", command: "undo"},
-   button_redo: {tooltip: "Redo", command: "redo"},
-   button_copy: {tooltip: "Copy", command: "copy"},
-   button_cut: {tooltip: "Cut", command: "cut"},
-   button_paste: {tooltip: "Paste", command: "paste"},
-   button_pasteformats: {tooltip: "Paste Formats", command: "pasteformats"},
-   button_lock: {tooltip: "Lock Cell", command: "lock"},
-   button_unlock: {tooltip: "Unlock Cell", command: "unlock"},
-   button_delete: {tooltip: "Delete Cell Contents", command: "delete"},
-   button_filldown: {tooltip: "Fill Down", command: "filldown"},
-   button_fillright: {tooltip: "Fill Right", command: "fillright"},
-   button_movefrom: {tooltip: "Set/Clear Move From", command: "movefrom"},
-   button_movepaste: {tooltip: "Move Paste", command: "movepaste"},
-   button_moveinsert: {tooltip: "Move Insert", command: "moveinsert"},
-   button_alignleft: {tooltip: "Align Left", command: "align-left"},
-   button_aligncenter: {tooltip: "Align Center", command: "align-center"},
-   button_alignright: {tooltip: "Align Right", command: "align-right"},
-   button_borderon: {tooltip: "Borders On", command: "borderon"},
-   button_borderoff: {tooltip: "Borders Off", command: "borderoff"},
-   button_swapcolors: {tooltip: "Swap Colors", command: "swapcolors"},
-   button_merge: {tooltip: "Merge/Unmerge Cells", command: "merge"},
-   button_insertrow: {tooltip: "Insert Row Before", command: "insertrow"},
-   button_insertcol: {tooltip: "Insert Column Before", command: "insertcol"},
-   button_deleterow: {tooltip: "Delete Row", command: "deleterow"},
-   button_deletecol: {tooltip: "Delete Column", command: "deletecol"},
-   button_hiderow: {tooltip: "Hide Row", command: "hiderow"},
-   button_hidecol: {tooltip: "Hide Column", command: "hidecol"},
-   button_recalc: {tooltip: "Recalculate", command: "recalc"}
-   }
+  for (button in spreadsheet.Buttons) {
+    bele = /** @type {any} */ ((document as any).getElementById(spreadsheet.idPrefix + button));
+    if (!bele) {
+      alert("Button " + (spreadsheet.idPrefix + button) + " missing");
+      continue;
+    }
+    bele.style.border = "1px solid " + scc.ISCButtonBorderNormal;
+    bele.title = SCLoc(spreadsheet.Buttons[button].tooltip);
+    SocialCalc.ButtonRegister(
+      spreadsheet.editor,
+      bele,
+      {
+        normalstyle:
+          "border:1px solid " +
+          scc.ISCButtonBorderNormal +
+          ";background-color:" +
+          scc.ISCButtonNormalBackground +
+          ";",
+        hoverstyle:
+          "border:1px solid " +
+          scc.ISCButtonBorderHover +
+          ";background-color:" +
+          scc.ISCButtonHoverBackground +
+          ";",
+        downstyle:
+          "border:1px solid " +
+          scc.ISCButtonBorderDown +
+          ";background-color:" +
+          scc.ISCButtonDownBackground +
+          ";",
+      },
+      { MouseDown: SocialCalc.DoButtonCmd as any, command: spreadsheet.Buttons[button].command },
+    );
+  }
 
-   for (button in spreadsheet.Buttons) {
-      bele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+button));
-      if (!bele) {alert("Button "+(spreadsheet.idPrefix+button)+" missing"); continue;}
-      bele.style.border = "1px solid "+scc.ISCButtonBorderNormal;
-      bele.title = SCLoc(spreadsheet.Buttons[button].tooltip);
-      SocialCalc.ButtonRegister(spreadsheet.editor, bele,
-         {normalstyle: "border:1px solid "+scc.ISCButtonBorderNormal+";background-color:"+scc.ISCButtonNormalBackground+";",
-          hoverstyle: "border:1px solid "+scc.ISCButtonBorderHover+";background-color:"+scc.ISCButtonHoverBackground+";",
-          downstyle: "border:1px solid "+scc.ISCButtonBorderDown+";background-color:"+scc.ISCButtonDownBackground+";"}, 
-         {MouseDown: SocialCalc.DoButtonCmd as any, command: spreadsheet.Buttons[button].command});
-      }
+  // create formula bar
 
-   // create formula bar
+  spreadsheet.formulabarDiv = document.createElement("div");
+  //spreadsheet.formulabarDiv.style.height = spreadsheet.formulabarheight + "px"; // Allow line wrapping
+  spreadsheet.formulabarDiv.innerHTML = '<input type="text" size="60" value="">&nbsp;'; //'<textarea rows="4" cols="60" style="z-index:5;background-color:white;position:relative;"></textarea>&nbsp;';
+  spreadsheet.spreadsheetDiv.appendChild(spreadsheet.formulabarDiv);
+  new SocialCalc.InputBox(spreadsheet.formulabarDiv.firstChild, spreadsheet.editor);
 
-   spreadsheet.formulabarDiv = document.createElement("div");
-   //spreadsheet.formulabarDiv.style.height = spreadsheet.formulabarheight + "px"; // Allow line wrapping
-   spreadsheet.formulabarDiv.innerHTML = '<input type="text" size="60" value="">&nbsp;'; //'<textarea rows="4" cols="60" style="z-index:5;background-color:white;position:relative;"></textarea>&nbsp;';
-   spreadsheet.spreadsheetDiv.appendChild(spreadsheet.formulabarDiv);
-   var inputbox = new SocialCalc.InputBox(spreadsheet.formulabarDiv.firstChild, spreadsheet.editor);
-   
-   for (button in spreadsheet.formulabuttons) {
-      bele = document.createElement("img");
-      bele.id = spreadsheet.idPrefix+button;
-      bele.src = (spreadsheet.formulabuttons[button].skipImagePrefix ? "" : spreadsheet.imagePrefix)+spreadsheet.formulabuttons[button].image;
-      bele.style.verticalAlign = "middle";
-      bele.style.border = "1px solid #FFF";
-      bele.style.marginLeft = "4px";
-      bele.title = SCLoc(spreadsheet.formulabuttons[button].tooltip);
-      SocialCalc.ButtonRegister(spreadsheet.editor, bele,
-         {normalstyle: "border:1px solid #FFF;backgroundColor:#FFF;",
-          hoverstyle: "border:1px solid #CCC;backgroundColor:#FFF;",
-          downstyle: "border:1px solid #000;backgroundColor:#FFF;"}, 
-         {MouseDown: spreadsheet.formulabuttons[button].command, Disabled: function() {return spreadsheet.editor.ECellReadonly();}});
-   spreadsheet.formulabarDiv.appendChild(bele);
-   }
+  for (button in spreadsheet.formulabuttons) {
+    bele = document.createElement("img");
+    bele.id = spreadsheet.idPrefix + button;
+    bele.src =
+      (spreadsheet.formulabuttons[button].skipImagePrefix ? "" : spreadsheet.imagePrefix) +
+      spreadsheet.formulabuttons[button].image;
+    bele.style.verticalAlign = "middle";
+    bele.style.border = "1px solid #FFF";
+    bele.style.marginLeft = "4px";
+    bele.title = SCLoc(spreadsheet.formulabuttons[button].tooltip);
+    SocialCalc.ButtonRegister(
+      spreadsheet.editor,
+      bele,
+      {
+        normalstyle: "border:1px solid #FFF;backgroundColor:#FFF;",
+        hoverstyle: "border:1px solid #CCC;backgroundColor:#FFF;",
+        downstyle: "border:1px solid #000;backgroundColor:#FFF;",
+      },
+      {
+        MouseDown: spreadsheet.formulabuttons[button].command,
+        Disabled: function () {
+          return spreadsheet.editor.ECellReadonly();
+        },
+      },
+    );
+    spreadsheet.formulabarDiv.appendChild(bele);
+  }
 
-   var input = $("<input id='searchbarinput' value='' placeholder='Search sheet…'>");
-   var searchBar = $("<span id='searchbar'></span>");
-   searchBar.append("<div id='searchstatus'></div>");
-   searchBar.append(input);
+  var input = $("<input id='searchbarinput' value='' placeholder='Search sheet…'>");
+  var searchBar = $("<span id='searchbar'></span>");
+  searchBar.append("<div id='searchstatus'></div>");
+  searchBar.append(input);
 
-   // find buttons (right of formula bar)
-   for (button in spreadsheet.findbuttons) {
-      bele = document.createElement("img");
-      bele.id = spreadsheet.idPrefix+button;
-      bele.src = (spreadsheet.imagePrefix)+spreadsheet.findbuttons[button].image;
-      bele.style.verticalAlign = "middle";
-      bele.style.border = "1px solid #FFF";
-      bele.title = SCLoc(spreadsheet.findbuttons[button].tooltip);
-      SocialCalc.ButtonRegister(spreadsheet.editor, bele,
-         {normalstyle: "border:1px solid #FFF;backgroundColor:#FFF;",
-          hoverstyle: "border:1px solid #CCC;backgroundColor:#FFF;",
-          downstyle: "border:1px solid #000;backgroundColor:#FFF;"}, 
-         {MouseDown: spreadsheet.findbuttons[button].command, Disabled: function() {return false;}});
-      searchBar[0].appendChild(bele);
-   } 
-   input.on('input', SpreadsheetControlSC.SpreadsheetControl.FindInSheet);
-   input.on('focus', function() {
-        SpreadsheetControlSC.Keyboard.passThru = true;
-   });
-   input.on('blur', function() {
-        SpreadsheetControlSC.Keyboard.passThru = false;
-   });
-   input.keyup(/** @param {any} e */ function (e: any) {
-        if (e.keyCode == 13) {
-           // search down when enter is pressed
-           if (e.shiftKey) {
-               SpreadsheetControlSC.SpreadsheetControl.SearchUp();
-           } else {
-               SpreadsheetControlSC.SpreadsheetControl.SearchDown();
-           }
+  // find buttons (right of formula bar)
+  for (button in spreadsheet.findbuttons) {
+    bele = document.createElement("img");
+    bele.id = spreadsheet.idPrefix + button;
+    bele.src = spreadsheet.imagePrefix + spreadsheet.findbuttons[button].image;
+    bele.style.verticalAlign = "middle";
+    bele.style.border = "1px solid #FFF";
+    bele.title = SCLoc(spreadsheet.findbuttons[button].tooltip);
+    SocialCalc.ButtonRegister(
+      spreadsheet.editor,
+      bele,
+      {
+        normalstyle: "border:1px solid #FFF;backgroundColor:#FFF;",
+        hoverstyle: "border:1px solid #CCC;backgroundColor:#FFF;",
+        downstyle: "border:1px solid #000;backgroundColor:#FFF;",
+      },
+      {
+        MouseDown: spreadsheet.findbuttons[button].command,
+        Disabled: function () {
+          return false;
+        },
+      },
+    );
+    searchBar[0].appendChild(bele);
+  }
+  input.on("input", SpreadsheetControlSC.SpreadsheetControl.FindInSheet);
+  input.on("focus", function () {
+    SpreadsheetControlSC.Keyboard.passThru = true;
+  });
+  input.on("blur", function () {
+    SpreadsheetControlSC.Keyboard.passThru = false;
+  });
+  input.keyup(
+    /** @param {any} e */ function (e: any) {
+      if (e.keyCode == 13) {
+        // search down when enter is pressed
+        if (e.shiftKey) {
+          SpreadsheetControlSC.SpreadsheetControl.SearchUp();
+        } else {
+          SpreadsheetControlSC.SpreadsheetControl.SearchDown();
         }
-   });
-   spreadsheet.formulabarDiv.appendChild(searchBar[0]);
-   
-   // initialize tabs that need it
-
-   for (i=0; i<tabs.length; i++) { // execute any tab-specific initialization code
-      if (tabs[i].oncreate) {
-         tabs[i].oncreate(spreadsheet, tabs[i].name);
-         }
       }
+    },
+  );
+  spreadsheet.formulabarDiv.appendChild(searchBar[0]);
 
-   // create sheet view and others
+  // initialize tabs that need it
 
-   // InitializeSpreadsheetControl eddy {
-   SocialCalc.CalculateSheetNonViewHeight(spreadsheet);
-   // } InitializeSpreadsheetControl
-   spreadsheet.viewheight = spreadsheet.height-spreadsheet.nonviewheight;
-   spreadsheet.editorDiv=spreadsheet.editor.CreateTableEditor(spreadsheet.width, spreadsheet.viewheight);
+  for (i = 0; i < tabs.length; i++) {
+    // execute any tab-specific initialization code
+    if (tabs[i].oncreate) {
+      tabs[i].oncreate(spreadsheet, tabs[i].name);
+    }
+  }
 
-// eddy test add input 
-   var appViewDiv = document.createElement("div");
-   appViewDiv.id = "te_appView";
-   
-   appViewDiv.appendChild(spreadsheet.editorDiv)
-   spreadsheet.editorDiv = appViewDiv;
+  // create sheet view and others
 
-   var formDataDiv = document.createElement("div");
-   formDataDiv.id = "te_formData";
-   //formDataDiv.style.visibility = "hidden";
-   formDataDiv.style.display = "none";
-   //formDataDiv.style.display = "inline";
-   
-  // spreadsheet.spreadsheetDiv.appendChild(formDataDiv);   
-   spreadsheet.editorDiv.appendChild(formDataDiv);
-       
-// }
-      
-   spreadsheet.spreadsheetDiv.appendChild(spreadsheet.editorDiv);
+  // InitializeSpreadsheetControl eddy {
+  SocialCalc.CalculateSheetNonViewHeight(spreadsheet);
+  // } InitializeSpreadsheetControl
+  spreadsheet.viewheight = spreadsheet.height - spreadsheet.nonviewheight;
+  spreadsheet.editorDiv = spreadsheet.editor.CreateTableEditor(
+    spreadsheet.width,
+    spreadsheet.viewheight,
+  );
 
-// form data sheet - all input formulas set values in this sheet as well as the loaded sheet
-   spreadsheet.formDataViewer = new SocialCalc.SpreadsheetViewer("te_FormData-"); // should end with -
-   spreadsheet.formDataViewer.InitializeSpreadsheetViewer(formDataDiv.id, 180, 0, 200);
-   spreadsheet.formDataViewer.editor.ignoreRender = true; // formDataViewer is used for ExecuteSheetCommand only - no need to render
-// end
-   
-   for (vname in views) {
-      html = views[vname].html;
-      for (style in views[vname].replacements) {
-         html = html.replace(views[vname].replacements[style].regex, views[vname].replacements[style].replacement);
-         }
-      html = html.replace(/\%s\./g, "SocialCalc.");
-      html = html.replace(/\%id\./g, spreadsheet.idPrefix);
-      html = html.replace(/\%tbt\./g, spreadsheet.toolbartext);
-      html = html.replace(/\%img\./g, spreadsheet.imagePrefix);
-      v = document.createElement("div");
-      SocialCalc.setStyles(v, views[vname].divStyle);
-      v.style.display = "none";
-      v.style.width = spreadsheet.width + "px";
-      v.style.height = spreadsheet.viewheight + "px";
-      v.id = spreadsheet.idPrefix + views[vname].name + "view";
+  // eddy test add input
+  var appViewDiv = document.createElement("div");
+  appViewDiv.id = "te_appView";
 
-      html = SCLocSS(html); // localize with %loc!string!, etc.
+  appViewDiv.appendChild(spreadsheet.editorDiv);
+  spreadsheet.editorDiv = appViewDiv;
 
-      v.innerHTML = html;
-      spreadsheet.spreadsheetDiv.appendChild(v);
-      views[vname].element = v;
-      if (views[vname].oncreate) {
-         views[vname].oncreate(spreadsheet, views[vname]);
-         }
-      }
+  var formDataDiv = document.createElement("div");
+  formDataDiv.id = "te_formData";
+  //formDataDiv.style.visibility = "hidden";
+  formDataDiv.style.display = "none";
+  //formDataDiv.style.display = "inline";
 
-   views.sheet = {name: "sheet", element: spreadsheet.editorDiv};
+  // spreadsheet.spreadsheetDiv.appendChild(formDataDiv);
+  spreadsheet.editorDiv.appendChild(formDataDiv);
 
-   // create statusline
+  // }
 
-   spreadsheet.statuslineDiv = document.createElement("div");
-   spreadsheet.statuslineDiv.style.cssText = spreadsheet.statuslineCSS;
-   spreadsheet.statuslineDiv.style.height = spreadsheet.statuslineheight -
-      (spreadsheet.statuslineDiv.style.paddingTop.slice(0,-2)-0) -
-      (spreadsheet.statuslineDiv.style.paddingBottom.slice(0,-2)-0) + "px";
-   spreadsheet.statuslineDiv.id = spreadsheet.idPrefix+"statusline";
-   spreadsheet.spreadsheetDiv.appendChild(spreadsheet.statuslineDiv);
+  spreadsheet.spreadsheetDiv.appendChild(spreadsheet.editorDiv);
 
-   // set current control object based on mouseover
+  // form data sheet - all input formulas set values in this sheet as well as the loaded sheet
+  spreadsheet.formDataViewer = new SocialCalc.SpreadsheetViewer("te_FormData-"); // should end with -
+  spreadsheet.formDataViewer.InitializeSpreadsheetViewer(formDataDiv.id, 180, 0, 200);
+  spreadsheet.formDataViewer.editor.ignoreRender = true; // formDataViewer is used for ExecuteSheetCommand only - no need to render
+  // end
 
-   spreadsheet.spreadsheetDiv.addEventListener("mousedown", function() { SocialCalc.SetSpreadsheetControlObject(spreadsheet); }, false);
-   spreadsheet.spreadsheetDiv.addEventListener("mouseover", function() { SocialCalc.SetSpreadsheetControlObject(spreadsheet); }, false);
+  for (vname in views) {
+    html = views[vname].html;
+    for (style in views[vname].replacements) {
+      html = html.replace(
+        views[vname].replacements[style].regex,
+        views[vname].replacements[style].replacement,
+      );
+    }
+    html = html.replace(/%s\./g, "SocialCalc.");
+    html = html.replace(/%id\./g, spreadsheet.idPrefix);
+    html = html.replace(/%tbt\./g, spreadsheet.toolbartext);
+    html = html.replace(/%img\./g, spreadsheet.imagePrefix);
+    v = document.createElement("div");
+    SocialCalc.setStyles(v, views[vname].divStyle);
+    v.style.display = "none";
+    v.style.width = spreadsheet.width + "px";
+    v.style.height = spreadsheet.viewheight + "px";
+    v.id = spreadsheet.idPrefix + views[vname].name + "view";
 
-   // done - refresh screen needed
+    html = SCLocSS(html); // localize with %loc!string!, etc.
 
-   return;
+    v.innerHTML = html;
+    spreadsheet.spreadsheetDiv.appendChild(v);
+    views[vname].element = v;
+    if (views[vname].oncreate) {
+      views[vname].oncreate(spreadsheet, views[vname]);
+    }
+  }
 
-   }
+  views.sheet = { name: "sheet", element: spreadsheet.editorDiv };
 
+  // create statusline
+
+  spreadsheet.statuslineDiv = document.createElement("div");
+  spreadsheet.statuslineDiv.style.cssText = spreadsheet.statuslineCSS;
+  spreadsheet.statuslineDiv.style.height =
+    spreadsheet.statuslineheight -
+    (spreadsheet.statuslineDiv.style.paddingTop.slice(0, -2) - 0) -
+    (spreadsheet.statuslineDiv.style.paddingBottom.slice(0, -2) - 0) +
+    "px";
+  spreadsheet.statuslineDiv.id = spreadsheet.idPrefix + "statusline";
+  spreadsheet.spreadsheetDiv.appendChild(spreadsheet.statuslineDiv);
+
+  // set current control object based on mouseover
+
+  spreadsheet.spreadsheetDiv.addEventListener(
+    "mousedown",
+    function () {
+      SocialCalc.SetSpreadsheetControlObject(spreadsheet);
+    },
+    false,
+  );
+  spreadsheet.spreadsheetDiv.addEventListener(
+    "mouseover",
+    function () {
+      SocialCalc.SetSpreadsheetControlObject(spreadsheet);
+    },
+    false,
+  );
+
+  // done - refresh screen needed
+
+  return;
+};
 
 // eddy CalculateSheetNonViewHeight {
 /** @param {any} spreadsheet */
-SpreadsheetControlSC.CalculateSheetNonViewHeight = function(spreadsheet: any) {
+SpreadsheetControlSC.CalculateSheetNonViewHeight = function (spreadsheet: any) {
   spreadsheet.nonviewheight = spreadsheet.statuslineheight;
-  for(var nodeIndex = 0;  nodeIndex < spreadsheet.spreadsheetDiv.childNodes.length;  nodeIndex++ ) {
-    if(spreadsheet.spreadsheetDiv.childNodes[nodeIndex].id == "SocialCalc-statusline") continue;
+  for (var nodeIndex = 0; nodeIndex < spreadsheet.spreadsheetDiv.childNodes.length; nodeIndex++) {
+    if (spreadsheet.spreadsheetDiv.childNodes[nodeIndex].id == "SocialCalc-statusline") continue;
     spreadsheet.nonviewheight += spreadsheet.spreadsheetDiv.childNodes[nodeIndex].offsetHeight;
   }
-  
-}
+};
 
 // }
-
 
 //
 // outstr = SocialCalc.LocalizeString(str)
@@ -1276,32 +1568,29 @@ SpreadsheetControlSC.CalculateSheetNonViewHeight = function(spreadsheet: any) {
 // Returns the current spreadsheet control object
 //
 
-SpreadsheetControlSC.GetSpreadsheetControlObject = function() {
+SpreadsheetControlSC.GetSpreadsheetControlObject = function () {
+  // if in viewer mode return CurrentSpreadsheetViewerObject because CurrentSpreadsheetControlObject is null (bug fix)
+  var csco =
+    SocialCalc.CurrentSpreadsheetControlObject != null
+      ? SocialCalc.CurrentSpreadsheetControlObject
+      : SocialCalc.CurrentSpreadsheetViewerObject;
+  if (csco) return csco;
 
-  // if in viewer mode return CurrentSpreadsheetViewerObject because CurrentSpreadsheetControlObject is null (bug fix) 
-   var csco = (SocialCalc.CurrentSpreadsheetControlObject != null) 
-   ? SocialCalc.CurrentSpreadsheetControlObject : SocialCalc.CurrentSpreadsheetViewerObject;
-   if (csco) return csco;
-
-//   throw ("No current SpreadsheetControl object.");
-
-   }
+  //   throw ("No current SpreadsheetControl object.");
+};
 
 //
 // SetSpreadsheetControlObject(spreadsheet)
 //
 
 /** @param {any} spreadsheet */
-SpreadsheetControlSC.SetSpreadsheetControlObject = function(spreadsheet: any) {
+SpreadsheetControlSC.SetSpreadsheetControlObject = function (spreadsheet: any) {
+  SpreadsheetControlSC.CurrentSpreadsheetControlObject = spreadsheet;
 
-   SpreadsheetControlSC.CurrentSpreadsheetControlObject = spreadsheet;
-
-   if (SpreadsheetControlSC.Keyboard.focusTable && spreadsheet) {
-      SpreadsheetControlSC.Keyboard.focusTable = spreadsheet.editor;
-      }
-
-   }
-
+  if (SpreadsheetControlSC.Keyboard.focusTable && spreadsheet) {
+    SpreadsheetControlSC.Keyboard.focusTable = spreadsheet.editor;
+  }
+};
 
 // SocialCalc.DoOnResize and SocialCalc.SizeSSDiv are defined in
 // socialcalcviewer.js (which overrides them at bundle time); the earlier
@@ -1316,142 +1605,145 @@ SpreadsheetControlSC.SetSpreadsheetControlObject = function(spreadsheet: any) {
 /**
  * @param {any} obj Tab name string or DOM element with an ID.
  */
-SpreadsheetControlSC.SetTab = function(obj: any) {
+SpreadsheetControlSC.SetTab = function (obj: any) {
+  /** @type {any} */
+  var newtab;
+  /** @type {any} */
+  var tname;
+  var newtabnum = 0;
+  var newview: any;
+  var i;
+  var vname;
+  /** @type {any} */
+  var ele;
+  var menutabs: any = {};
+  var tools: any = {};
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  var tabs = spreadsheet.tabs;
+  var views: any = spreadsheet.views;
 
-   /** @type {any} */
-   var newtab;
-   /** @type {any} */
-   var tname;
-   var newtabnum = 0;
-   var newview: any;
-   var i;
-   var vname;
-   /** @type {any} */
-   var ele;
-   var menutabs: any = {};
-   var tools: any = {};
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var tabs = spreadsheet.tabs;
-   var views: any = spreadsheet.views;
+  if (typeof obj == "string") {
+    newtab = obj;
+  } else {
+    newtab = obj.id.slice(spreadsheet.idPrefix.length, -3);
+  }
 
-   if (typeof obj == "string") {
-      newtab = obj;
+  if (
+    spreadsheet.editor.busy && // if busy and switching from "sheet", ignore
+    (!tabs[spreadsheet.currentTab].view || tabs[spreadsheet.currentTab].view == "sheet")
+  ) {
+    for (i = 0; i < tabs.length; i++) {
+      if (tabs[i].name == newtab && tabs[i].view && tabs[i].view != "sheet") {
+        return;
       }
-   else {
-      newtab = obj.id.slice(spreadsheet.idPrefix.length,-3);
-      }
+    }
+  }
 
-   if (spreadsheet.editor.busy && // if busy and switching from "sheet", ignore
-         (!tabs[spreadsheet.currentTab].view || tabs[spreadsheet.currentTab].view=="sheet")) {
-      for (i=0; i<tabs.length; i++) {
-         if(tabs[i].name==newtab && (tabs[i].view && tabs[i].view!="sheet")) {
-            return;
-            }
-         }
-      }
+  if (spreadsheet.tabs[spreadsheet.currentTab].onunclick) {
+    spreadsheet.tabs[spreadsheet.currentTab].onunclick(
+      spreadsheet,
+      spreadsheet.tabs[spreadsheet.currentTab].name,
+    );
+  }
 
-   if (spreadsheet.tabs[spreadsheet.currentTab].onunclick) {
-      spreadsheet.tabs[spreadsheet.currentTab].onunclick(spreadsheet, spreadsheet.tabs[spreadsheet.currentTab].name);
-      }
+  for (i = 0; i < tabs.length; i++) {
+    tname = tabs[i].name;
+    menutabs[tname] = /** @type {any} */ (
+      (document as any).getElementById(spreadsheet.idPrefix + tname + "tab")
+    );
+    tools[tname] = /** @type {any} */ (
+      (document as any).getElementById(spreadsheet.idPrefix + tname + "tools")
+    );
+    if (tname == newtab) {
+      newtabnum = i;
+      tools[tname].style.display = "block";
+      menutabs[tname].style.cssText = spreadsheet.tabselectedCSS;
+    } else {
+      tools[tname].style.display = "none";
+      menutabs[tname].style.cssText = spreadsheet.tabplainCSS;
+    }
+  }
 
-   for (i=0; i<tabs.length; i++) {
-      tname = tabs[i].name;
-      menutabs[tname] = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+tname+"tab"));
-      tools[tname] = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+tname+"tools"));
-      if (tname==newtab) {
-         newtabnum = i;
-         tools[tname].style.display = "block";
-         menutabs[tname].style.cssText = spreadsheet.tabselectedCSS;
-         }
-      else {
-         tools[tname].style.display = "none";
-         menutabs[tname].style.cssText = spreadsheet.tabplainCSS;
-         }
-      }
+  spreadsheet.currentTab = newtabnum;
 
-   spreadsheet.currentTab = newtabnum;
+  if (tabs[newtabnum].onclick) {
+    tabs[newtabnum].onclick(spreadsheet, newtab);
+  }
 
-   if (tabs[newtabnum].onclick) {
-      tabs[newtabnum].onclick(spreadsheet, newtab);
-      }
+  for (vname in views) {
+    if ((!tabs[newtabnum].view && vname == "sheet") || tabs[newtabnum].view == vname) {
+      views[vname].element.style.display = "block";
+      newview = vname;
+    } else {
+      views[vname].element.style.display = "none";
+    }
+  }
 
-   for (vname in views) {
-      if ((!tabs[newtabnum].view && vname == "sheet") || tabs[newtabnum].view == vname) {
-         views[vname].element.style.display = "block";
-         newview = vname;
-         }
-      else {
-         views[vname].element.style.display = "none";
-         }
-      }
+  if (tabs[newtabnum].onclickFocus) {
+    ele = tabs[newtabnum].onclickFocus;
+    if (typeof ele == "string") {
+      ele = /** @type {any} */ ((document as any).getElementById(spreadsheet.idPrefix + ele));
+      ele.focus();
+    }
+    SocialCalc.CmdGotFocus(ele);
+  } else {
+    SocialCalc.KeyboardFocus();
+  }
 
-   if (tabs[newtabnum].onclickFocus) {
-      ele = tabs[newtabnum].onclickFocus;
-      if (typeof ele == "string") {
-         ele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+ele));
-         ele.focus();
-         }
-      SocialCalc.CmdGotFocus(ele);
-      }
-   else {
-      SocialCalc.KeyboardFocus();
-      }
+  if (views[newview as any].needsresize && views[newview as any].onresize) {
+    views[newview as any].needsresize = false;
+    views[newview as any].onresize(spreadsheet, views[newview as any]);
+  }
 
-   if (views[(newview as any)].needsresize && views[(newview as any)].onresize) {
-      views[(newview as any)].needsresize = false;
-      views[(newview as any)].onresize(spreadsheet, views[(newview as any)]);
-      }
+  if (newview == "sheet") {
+    spreadsheet.statuslineDiv.style.display = "block";
+    spreadsheet.editor.ScheduleRender();
+  } else {
+    spreadsheet.statuslineDiv.style.display = "none";
+  }
 
-   if (newview == "sheet") {
-      spreadsheet.statuslineDiv.style.display = "block";
-      spreadsheet.editor.ScheduleRender();
-      }
-   else {
-      spreadsheet.statuslineDiv.style.display = "none";
-      }
-
-   return;
-
-   }
+  return;
+};
 
 //
 // SocialCalc.SpreadsheetControlStatuslineCallback
 //
 
 /** @param {any} editor @param {string} status @param {any} arg @param {{[k: string]: any}} params */
-SpreadsheetControlSC.SpreadsheetControlStatuslineCallback = function(editor: any, status: any, arg: any, params: any) {
+SpreadsheetControlSC.SpreadsheetControlStatuslineCallback = function (
+  editor: any,
+  status: any,
+  arg: any,
+  params: any,
+) {
+  var rele1, rele2;
 
-   var rele1, rele2;
+  var ele = /** @type {any} */ ((document as any).getElementById(params.statuslineid));
 
-   var ele = /** @type {any} */((document as any).getElementById(params.statuslineid));
+  if (ele) {
+    ele.innerHTML = editor.GetStatuslineString(status, arg, params);
+  }
 
-   if (ele) {
-      ele.innerHTML = editor.GetStatuslineString(status, arg, params);
+  switch (status) {
+    case "cmdendnorender":
+    case "calcfinished":
+    case "doneposcalc":
+      rele1 = /** @type {any} */ ((document as any).getElementById(params.recalcid1));
+      rele2 = /** @type {any} */ ((document as any).getElementById(params.recalcid2));
+      if (!rele1 || !rele2) break;
+      if (editor.context.sheetobj.attribs.needsrecalc == "yes") {
+        rele1.style.display = "inline";
+        rele2.style.display = "inline";
+      } else {
+        rele1.style.display = "none";
+        rele2.style.display = "none";
       }
+      break;
 
-   switch (status) {
-      case "cmdendnorender":
-      case "calcfinished":
-      case "doneposcalc":
-         rele1 = /** @type {any} */((document as any).getElementById(params.recalcid1));
-         rele2 = /** @type {any} */((document as any).getElementById(params.recalcid2));
-         if (!rele1 || !rele2) break;
-         if (editor.context.sheetobj.attribs.needsrecalc=="yes") {
-            rele1.style.display = "inline";
-            rele2.style.display = "inline";
-            }
-         else {
-            rele1.style.display = "none";
-            rele2.style.display = "none";
-            }
-         break;
-
-      default:
-         break;
-      }
-
-   }
-
+    default:
+      break;
+  }
+};
 
 //
 // SocialCalc.UpdateSortRangeProposal(editor)
@@ -1460,18 +1752,21 @@ SpreadsheetControlSC.SpreadsheetControlStatuslineCallback = function(editor: any
 //
 
 /** @param {any} editor */
-SpreadsheetControlSC.UpdateSortRangeProposal = function(editor: any) {
-
-   var ele = /** @type {any} */((document as any).getElementById((SocialCalc.GetSpreadsheetControlObject() as any).idPrefix+"sortlist"));
-   if (editor.range.hasrange) {
-      ele.options[0].text = SocialCalc.crToCoord(editor.range.left, editor.range.top) + ":" +
-                            SocialCalc.crToCoord(editor.range.right, editor.range.bottom);
-      }
-   else {
-      ele.options[0].text = SocialCalc.LocalizeString("[select range]");
-      }
-
-   }
+SpreadsheetControlSC.UpdateSortRangeProposal = function (editor: any) {
+  var ele = /** @type {any} */ (
+    (document as any).getElementById(
+      (SocialCalc.GetSpreadsheetControlObject() as any).idPrefix + "sortlist",
+    )
+  );
+  if (editor.range.hasrange) {
+    ele.options[0].text =
+      SocialCalc.crToCoord(editor.range.left, editor.range.top) +
+      ":" +
+      SocialCalc.crToCoord(editor.range.right, editor.range.bottom);
+  } else {
+    ele.options[0].text = SocialCalc.LocalizeString("[select range]");
+  }
+};
 
 //
 // SocialCalc.LoadColumnChoosers(spreadsheet)
@@ -1480,66 +1775,61 @@ SpreadsheetControlSC.UpdateSortRangeProposal = function(editor: any) {
 //
 
 /** @param {any} spreadsheet */
-SpreadsheetControlSC.LoadColumnChoosers = function(spreadsheet: any) {
+SpreadsheetControlSC.LoadColumnChoosers = function (spreadsheet: any) {
+  var SCLoc = SocialCalc.LocalizeString;
 
-   var SCLoc = SocialCalc.LocalizeString;
+  var sortrange, nrange, rparts, col, colname, sele, oldindex;
 
-   var sortrange, nrange, rparts, col, colname, sele, oldindex;
-
-   if (spreadsheet.sortrange && spreadsheet.sortrange.indexOf(":")==-1) { // sortrange is a named range
-      nrange = SocialCalc.Formula.LookupName(spreadsheet.sheet, spreadsheet.sortrange || "");
-      if (nrange.type == "range") {
-         rparts = nrange.value.match(/^(.*)\|(.*)\|$/);
-         sortrange = rparts[1] + ":" + rparts[2];
-         }
-      else {
-         sortrange = "A1:A1";
-         }
-      }
-   else {
-      sortrange = spreadsheet.sortrange;
-      }
-   var range = SocialCalc.ParseRange(sortrange);
-   sele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"majorsort"));
-   oldindex = sele.selectedIndex;
-   sele.options.length = 0;
-   sele.options[sele.options.length] = new Option(SCLoc("[None]"), "");
-   for (col=range.cr1.col; col<=range.cr2.col; col++) {
-      colname = SocialCalc.rcColname(col);
-      sele.options[sele.options.length] = new Option(SCLoc("Column ")+colname, colname);
-      }
-   sele.selectedIndex = oldindex > 1 && oldindex <= (range.cr2.col-range.cr1.col+1) ? oldindex : 1; // restore what was there if reasonable
-   sele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"minorsort"));
-   oldindex = sele.selectedIndex;
-   sele.options.length = 0;
-   sele.options[sele.options.length] = new Option(SCLoc("[None]"), "");
-   for (col=range.cr1.col; col<=range.cr2.col; col++) {
-      colname = SocialCalc.rcColname(col);
-      sele.options[sele.options.length] = new Option(colname, colname);
-      }
-   sele.selectedIndex = oldindex > 0 && oldindex <= (range.cr2.col-range.cr1.col+1) ? oldindex : 0; // default to [none]
-   sele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"lastsort"));
-   oldindex = sele.selectedIndex;
-   sele.options.length = 0;
-   sele.options[sele.options.length] = new Option(SCLoc("[None]"), "");
-   for (col=range.cr1.col; col<=range.cr2.col; col++) {
-      colname = SocialCalc.rcColname(col);
-      sele.options[sele.options.length] = new Option(colname, colname);
-      }
-   sele.selectedIndex = oldindex > 0 && oldindex <= (range.cr2.col-range.cr1.col+1) ? oldindex : 0; // default to [none]
-
-   }
+  if (spreadsheet.sortrange && spreadsheet.sortrange.indexOf(":") == -1) {
+    // sortrange is a named range
+    nrange = SocialCalc.Formula.LookupName(spreadsheet.sheet, spreadsheet.sortrange || "");
+    if (nrange.type == "range") {
+      rparts = nrange.value.match(/^(.*)\|(.*)\|$/);
+      sortrange = rparts[1] + ":" + rparts[2];
+    } else {
+      sortrange = "A1:A1";
+    }
+  } else {
+    sortrange = spreadsheet.sortrange;
+  }
+  var range = SocialCalc.ParseRange(sortrange);
+  sele = /** @type {any} */ ((document as any).getElementById(spreadsheet.idPrefix + "majorsort"));
+  oldindex = sele.selectedIndex;
+  sele.options.length = 0;
+  sele.options[sele.options.length] = new Option(SCLoc("[None]"), "");
+  for (col = range.cr1.col; col <= range.cr2.col; col++) {
+    colname = SocialCalc.rcColname(col);
+    sele.options[sele.options.length] = new Option(SCLoc("Column ") + colname, colname);
+  }
+  sele.selectedIndex = oldindex > 1 && oldindex <= range.cr2.col - range.cr1.col + 1 ? oldindex : 1; // restore what was there if reasonable
+  sele = /** @type {any} */ ((document as any).getElementById(spreadsheet.idPrefix + "minorsort"));
+  oldindex = sele.selectedIndex;
+  sele.options.length = 0;
+  sele.options[sele.options.length] = new Option(SCLoc("[None]"), "");
+  for (col = range.cr1.col; col <= range.cr2.col; col++) {
+    colname = SocialCalc.rcColname(col);
+    sele.options[sele.options.length] = new Option(colname, colname);
+  }
+  sele.selectedIndex = oldindex > 0 && oldindex <= range.cr2.col - range.cr1.col + 1 ? oldindex : 0; // default to [none]
+  sele = /** @type {any} */ ((document as any).getElementById(spreadsheet.idPrefix + "lastsort"));
+  oldindex = sele.selectedIndex;
+  sele.options.length = 0;
+  sele.options[sele.options.length] = new Option(SCLoc("[None]"), "");
+  for (col = range.cr1.col; col <= range.cr2.col; col++) {
+    colname = SocialCalc.rcColname(col);
+    sele.options[sele.options.length] = new Option(colname, colname);
+  }
+  sele.selectedIndex = oldindex > 0 && oldindex <= range.cr2.col - range.cr1.col + 1 ? oldindex : 0; // default to [none]
+};
 
 //
 // SocialCalc.DoButtonCmd(e, buttoninfo, bobj)
 //
 
 /** @param {any} e @param {any} buttoninfo @param {any} bobj */
-SpreadsheetControlSC.DoButtonCmd = function(e: any, buttoninfo: any, bobj: any) {
-
-   SocialCalc.DoCmd(bobj.element, bobj.functionobj.command);
-
-   }
+SpreadsheetControlSC.DoButtonCmd = function (e: any, buttoninfo: any, bobj: any) {
+  SocialCalc.DoCmd(bobj.element, bobj.functionobj.command);
+};
 
 //
 // SocialCalc.DoCmd(obj, which)
@@ -1548,247 +1838,313 @@ SpreadsheetControlSC.DoButtonCmd = function(e: any, buttoninfo: any, bobj: any) 
 //
 
 /** @param {any} obj @param {string} which */
-SpreadsheetControlSC.DoCmd = function(obj: any, which: any) {
+SpreadsheetControlSC.DoCmd = function (obj: any, which: any) {
+  var combostr,
+    sstr,
+    cl,
+    i,
+    clele,
+    slist,
+    slistele,
+    str,
+    sele,
+    rele,
+    lele,
+    ele,
+    sortrange,
+    nrange,
+    rparts;
+  var sheet, cell, color, bgcolor, defaultcolor, defaultbgcolor;
 
-   var combostr, sstr, cl, i, clele, slist, slistele, str, sele, rele, lele, ele, sortrange, nrange, rparts;
-   var sheet, cell, color, bgcolor, defaultcolor, defaultbgcolor;
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  var editor = spreadsheet.editor;
 
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var editor = spreadsheet.editor;
+  switch (which) {
+    case "undo":
+      spreadsheet.ExecuteCommand("undo", "");
+      break;
 
-   switch (which) {
-      case "undo":
-         spreadsheet.ExecuteCommand("undo", "");
-         break;
+    case "redo":
+      spreadsheet.ExecuteCommand("redo", "");
+      break;
 
-      case "redo":
-         spreadsheet.ExecuteCommand("redo", "");
-         break;
-
-      case "fill-rowcolstuff":
-      // @ts-ignore - intentional fallthrough: fill-* builds the options then runs changed-* logic with which rewritten.
-      case "fill-text":
-         cl = which.substring(5);
-         clele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+cl+"list"));
-         clele.length = 0;
-         for (i=0; i<SocialCalc.SpreadsheetCmdTable[cl].length; i++) {
-            clele.options[i] = new Option(SocialCalc.SpreadsheetCmdTable[cl][i].t);
-            }
-         which = "changed-"+cl; // fall through to changed code
-
-      case "changed-rowcolstuff":
-      case "changed-text":
-         cl = which.substring(8);
-         clele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+cl+"list"));
-         slist = SocialCalc.SpreadsheetCmdTable.slists[SocialCalc.SpreadsheetCmdTable[cl][clele.selectedIndex].s]; // get sList for this command
-         slistele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+cl+"slist"));
-         slistele.length = 0; // reset
-         for (i=0; i<(slist.length||0); i++) {
-            slistele.options[i] = new Option(slist[i].t, slist[i].s);
-            }
-         return; // nothing else to do
-
-      case "ok-rowcolstuff":
-      case "ok-text":
-         cl = which.substring(3);
-         clele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+cl+"list"));
-         slistele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+cl+"slist"));
-         combostr = SocialCalc.SpreadsheetCmdTable[cl][clele.selectedIndex].c;
-         sstr = slistele[slistele.selectedIndex].value;
-         SocialCalc.SpreadsheetControlExecuteCommand(obj, combostr, sstr);
-         break;
-
-      case "ok-setsort":
-         lele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"sortlist"));
-         if (lele.selectedIndex==0) {
-            if (editor.range.hasrange) {
-               spreadsheet.sortrange = SocialCalc.crToCoord(editor.range.left, editor.range.top) + ":" +
-                          SocialCalc.crToCoord(editor.range.right, editor.range.bottom);
-               }
-            else {
-               spreadsheet.sortrange = editor.ecell.coord+":"+editor.ecell.coord;
-               }
-            }
-         else {
-            var val = lele.options[lele.selectedIndex].value;
-            if (val == 'all') {
-                var cells = spreadsheet.sheet.cells; 
-                var min_col = -1, max_col = -1, min_row = -1, max_row = -1;
-                for (var cell_id in cells) {
-                    var cr = SocialCalc.coordToCr(cell_id);
-                    if (min_row == -1 || cr.row < min_row) {
-                        min_row = cr.row;
-                    }
-                    if (min_col == -1 || cr.col < min_col) {
-                        min_col = cr.col;
-                    }
-                    if (max_row == -1 || cr.row > max_row) {
-                        max_row = cr.row;
-                    }
-                    if (max_col == -1 || cr.col > max_col) {
-                        max_col = cr.col;
-                    }
-                } 
-                spreadsheet.sortrange = SocialCalc.crToCoord(min_col, min_row) + ":" + SocialCalc.crToCoord(max_col, max_row); 
-                lele.options[lele.selectedIndex].text += " (" + spreadsheet.sortrange + ")";
-            } else { 
-                spreadsheet.sortrange = lele.options[lele.selectedIndex].value;
-            }
-         }
-         ele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"sortbutton"));
-         ele.value = SocialCalc.LocalizeString("Sort ")+spreadsheet.sortrange;
-         ele.style.visibility = "visible";
-         SocialCalc.LoadColumnChoosers(spreadsheet);
-         if (obj && obj.blur) obj.blur();
-         SocialCalc.KeyboardFocus();   
-         return;
-
-      case "dosort":
-         if (spreadsheet.sortrange && spreadsheet.sortrange.indexOf(":")==-1) { // sortrange is a named range
-            nrange = SocialCalc.Formula.LookupName(spreadsheet.sheet, spreadsheet.sortrange || "");
-            if (nrange.type != "range") return;
-            rparts = nrange.value.match(/^(.*)\|(.*)\|$/);
-            sortrange = rparts[1] + ":" + rparts[2];
-            }
-         else {
-            sortrange = spreadsheet.sortrange;
-            }
-         if (sortrange == "A1:A1") return;
-         str = "sort "+sortrange+" ";
-         sele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"majorsort"));
-         rele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"majorsortup"));
-         str += sele.options[sele.selectedIndex].value + (rele.checked ? " up" : " down");
-         sele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"minorsort"));
-         if (sele.selectedIndex>0) {
-           rele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"minorsortup"));
-           str += " "+sele.options[sele.selectedIndex].value + (rele.checked ? " up" : " down");
-           }
-         sele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"lastsort"));
-         if (sele.selectedIndex>0) {
-           rele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"lastsortup"));
-           str += " "+sele.options[sele.selectedIndex].value + (rele.checked ? " up" : " down");
-           }
-         spreadsheet.ExecuteCommand(str, "");
-         break;
-
-      case "merge":
-         combostr = SocialCalc.SpreadsheetCmdLookup[which] || "";
-         sstr = SocialCalc.SpreadsheetCmdSLookup[which] || "";
-         spreadsheet.ExecuteCommand(combostr, sstr);
-         if (editor.range.hasrange) { // set ecell to upper left
-            editor.MoveECell(SocialCalc.crToCoord(editor.range.left, editor.range.top));
-            editor.RangeRemove();
-            }
-         break;
-
-      case "movefrom":
-         if (editor.range2.hasrange) { // toggle if already there
-            spreadsheet.context.cursorsuffix = "";
-            editor.Range2Remove();
-            spreadsheet.ExecuteCommand("redisplay", "");
-            }
-         else if (editor.range.hasrange) { // set range2 to range or one cell
-            editor.range2.top = editor.range.top;
-            editor.range2.right = editor.range.right;
-            editor.range2.bottom = editor.range.bottom;
-            editor.range2.left = editor.range.left;
-            editor.range2.hasrange = true;
-            editor.MoveECell(SocialCalc.crToCoord(editor.range.left, editor.range.top));
-            }
-         else {
-            editor.range2.top = editor.ecell.row;
-            editor.range2.right = editor.ecell.col;
-            editor.range2.bottom = editor.ecell.row;
-            editor.range2.left = editor.ecell.col;
-            editor.range2.hasrange = true;
-            }
-         str = editor.range2.hasrange ? "" : "off";
-         ele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"button_movefrom"));
-         ele.src=spreadsheet.imagePrefix+"movefrom"+str+".gif";
-         ele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"button_movepaste"));
-         ele.src=spreadsheet.imagePrefix+"movepaste"+str+".gif";
-         ele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"button_moveinsert"));
-         ele.src=spreadsheet.imagePrefix+"moveinsert"+str+".gif";
-         if (editor.range2.hasrange) editor.RangeRemove();
-         break;
-
-      case "movepaste":
-      case "moveinsert":
-         if (editor.range2.hasrange) {
-            spreadsheet.context.cursorsuffix = "";
-            combostr = which+" "+
-               SocialCalc.crToCoord(editor.range2.left, editor.range2.top) + ":" +
-               SocialCalc.crToCoord(editor.range2.right, editor.range2.bottom)
-               +" "+editor.ecell.coord;
-            spreadsheet.ExecuteCommand(combostr, "");
-            editor.Range2Remove();
-            ele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"button_movefrom"));
-            ele.src=spreadsheet.imagePrefix+"movefromoff.gif";
-            ele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"button_movepaste"));
-            ele.src=spreadsheet.imagePrefix+"movepasteoff.gif";
-            ele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"button_moveinsert"));
-            ele.src=spreadsheet.imagePrefix+"moveinsertoff.gif";
-            }
-         break;
-
-      case "swapcolors":
-         sheet = spreadsheet.sheet;
-         cell = sheet.GetAssuredCell(editor.ecell.coord);
-         defaultcolor = sheet.attribs.defaultcolor ? sheet.colors[sheet.attribs.defaultcolor] : "rgb(0,0,0)";
-         defaultbgcolor = sheet.attribs.defaultbgcolor ? sheet.colors[sheet.attribs.defaultbgcolor] : "rgb(255,255,255)";
-         color = cell.color ? sheet.colors[cell.color] : defaultcolor; // get color
-         if (color == defaultbgcolor) color = ""; // going to swap, so if same as background default, use default
-         bgcolor = cell.bgcolor ? sheet.colors[cell.bgcolor] : defaultbgcolor;
-         if (bgcolor == defaultcolor) bgcolor = ""; // going to swap, so if same as foreground default, use default
-         spreadsheet.ExecuteCommand("set %C color "+bgcolor+"%Nset %C bgcolor "+color, "");
-         break;
-
-      default:
-         combostr = SocialCalc.SpreadsheetCmdLookup[which] || "";
-         sstr = SocialCalc.SpreadsheetCmdSLookup[which] || "";
-         spreadsheet.ExecuteCommand(combostr, sstr);
-         break;
+    case "fill-rowcolstuff":
+    // @ts-ignore - intentional fallthrough: fill-* builds the options then runs changed-* logic with which rewritten.
+    case "fill-text":
+      cl = which.substring(5);
+      clele = /** @type {any} */ (
+        (document as any).getElementById(spreadsheet.idPrefix + cl + "list")
+      );
+      clele.length = 0;
+      for (i = 0; i < SocialCalc.SpreadsheetCmdTable[cl].length; i++) {
+        clele.options[i] = new Option(SocialCalc.SpreadsheetCmdTable[cl][i].t);
       }
+      which = "changed-" + cl; // fall through to changed code
 
-   if (obj && obj.blur) obj.blur();
-   SocialCalc.KeyboardFocus();   
+    case "changed-rowcolstuff":
+    case "changed-text":
+      cl = which.substring(8);
+      clele = /** @type {any} */ (
+        (document as any).getElementById(spreadsheet.idPrefix + cl + "list")
+      );
+      slist =
+        SocialCalc.SpreadsheetCmdTable.slists[
+          SocialCalc.SpreadsheetCmdTable[cl][clele.selectedIndex].s
+        ]; // get sList for this command
+      slistele = /** @type {any} */ (
+        (document as any).getElementById(spreadsheet.idPrefix + cl + "slist")
+      );
+      slistele.length = 0; // reset
+      for (i = 0; i < (slist.length || 0); i++) {
+        slistele.options[i] = new Option(slist[i].t, slist[i].s);
+      }
+      return; // nothing else to do
 
-   }
+    case "ok-rowcolstuff":
+    case "ok-text":
+      cl = which.substring(3);
+      clele = /** @type {any} */ (
+        (document as any).getElementById(spreadsheet.idPrefix + cl + "list")
+      );
+      slistele = /** @type {any} */ (
+        (document as any).getElementById(spreadsheet.idPrefix + cl + "slist")
+      );
+      combostr = SocialCalc.SpreadsheetCmdTable[cl][clele.selectedIndex].c;
+      sstr = slistele[slistele.selectedIndex].value;
+      SocialCalc.SpreadsheetControlExecuteCommand(obj, combostr, sstr);
+      break;
+
+    case "ok-setsort":
+      lele = /** @type {any} */ (
+        (document as any).getElementById(spreadsheet.idPrefix + "sortlist")
+      );
+      if (lele.selectedIndex == 0) {
+        if (editor.range.hasrange) {
+          spreadsheet.sortrange =
+            SocialCalc.crToCoord(editor.range.left, editor.range.top) +
+            ":" +
+            SocialCalc.crToCoord(editor.range.right, editor.range.bottom);
+        } else {
+          spreadsheet.sortrange = editor.ecell.coord + ":" + editor.ecell.coord;
+        }
+      } else {
+        var val = lele.options[lele.selectedIndex].value;
+        if (val == "all") {
+          var cells = spreadsheet.sheet.cells;
+          var min_col = -1,
+            max_col = -1,
+            min_row = -1,
+            max_row = -1;
+          for (var cell_id in cells) {
+            var cr = SocialCalc.coordToCr(cell_id);
+            if (min_row == -1 || cr.row < min_row) {
+              min_row = cr.row;
+            }
+            if (min_col == -1 || cr.col < min_col) {
+              min_col = cr.col;
+            }
+            if (max_row == -1 || cr.row > max_row) {
+              max_row = cr.row;
+            }
+            if (max_col == -1 || cr.col > max_col) {
+              max_col = cr.col;
+            }
+          }
+          spreadsheet.sortrange =
+            SocialCalc.crToCoord(min_col, min_row) + ":" + SocialCalc.crToCoord(max_col, max_row);
+          lele.options[lele.selectedIndex].text += " (" + spreadsheet.sortrange + ")";
+        } else {
+          spreadsheet.sortrange = lele.options[lele.selectedIndex].value;
+        }
+      }
+      ele = /** @type {any} */ (
+        (document as any).getElementById(spreadsheet.idPrefix + "sortbutton")
+      );
+      ele.value = SocialCalc.LocalizeString("Sort ") + spreadsheet.sortrange;
+      ele.style.visibility = "visible";
+      SocialCalc.LoadColumnChoosers(spreadsheet);
+      if (obj && obj.blur) obj.blur();
+      SocialCalc.KeyboardFocus();
+      return;
+
+    case "dosort":
+      if (spreadsheet.sortrange && spreadsheet.sortrange.indexOf(":") == -1) {
+        // sortrange is a named range
+        nrange = SocialCalc.Formula.LookupName(spreadsheet.sheet, spreadsheet.sortrange || "");
+        if (nrange.type != "range") return;
+        rparts = nrange.value.match(/^(.*)\|(.*)\|$/);
+        sortrange = rparts[1] + ":" + rparts[2];
+      } else {
+        sortrange = spreadsheet.sortrange;
+      }
+      if (sortrange == "A1:A1") return;
+      str = "sort " + sortrange + " ";
+      sele = /** @type {any} */ (
+        (document as any).getElementById(spreadsheet.idPrefix + "majorsort")
+      );
+      rele = /** @type {any} */ (
+        (document as any).getElementById(spreadsheet.idPrefix + "majorsortup")
+      );
+      str += sele.options[sele.selectedIndex].value + (rele.checked ? " up" : " down");
+      sele = /** @type {any} */ (
+        (document as any).getElementById(spreadsheet.idPrefix + "minorsort")
+      );
+      if (sele.selectedIndex > 0) {
+        rele = /** @type {any} */ (
+          (document as any).getElementById(spreadsheet.idPrefix + "minorsortup")
+        );
+        str += " " + sele.options[sele.selectedIndex].value + (rele.checked ? " up" : " down");
+      }
+      sele = /** @type {any} */ (
+        (document as any).getElementById(spreadsheet.idPrefix + "lastsort")
+      );
+      if (sele.selectedIndex > 0) {
+        rele = /** @type {any} */ (
+          (document as any).getElementById(spreadsheet.idPrefix + "lastsortup")
+        );
+        str += " " + sele.options[sele.selectedIndex].value + (rele.checked ? " up" : " down");
+      }
+      spreadsheet.ExecuteCommand(str, "");
+      break;
+
+    case "merge":
+      combostr = SocialCalc.SpreadsheetCmdLookup[which] || "";
+      sstr = SocialCalc.SpreadsheetCmdSLookup[which] || "";
+      spreadsheet.ExecuteCommand(combostr, sstr);
+      if (editor.range.hasrange) {
+        // set ecell to upper left
+        editor.MoveECell(SocialCalc.crToCoord(editor.range.left, editor.range.top));
+        editor.RangeRemove();
+      }
+      break;
+
+    case "movefrom":
+      if (editor.range2.hasrange) {
+        // toggle if already there
+        spreadsheet.context.cursorsuffix = "";
+        editor.Range2Remove();
+        spreadsheet.ExecuteCommand("redisplay", "");
+      } else if (editor.range.hasrange) {
+        // set range2 to range or one cell
+        editor.range2.top = editor.range.top;
+        editor.range2.right = editor.range.right;
+        editor.range2.bottom = editor.range.bottom;
+        editor.range2.left = editor.range.left;
+        editor.range2.hasrange = true;
+        editor.MoveECell(SocialCalc.crToCoord(editor.range.left, editor.range.top));
+      } else {
+        editor.range2.top = editor.ecell.row;
+        editor.range2.right = editor.ecell.col;
+        editor.range2.bottom = editor.ecell.row;
+        editor.range2.left = editor.ecell.col;
+        editor.range2.hasrange = true;
+      }
+      str = editor.range2.hasrange ? "" : "off";
+      ele = /** @type {any} */ (
+        (document as any).getElementById(spreadsheet.idPrefix + "button_movefrom")
+      );
+      ele.src = spreadsheet.imagePrefix + "movefrom" + str + ".gif";
+      ele = /** @type {any} */ (
+        (document as any).getElementById(spreadsheet.idPrefix + "button_movepaste")
+      );
+      ele.src = spreadsheet.imagePrefix + "movepaste" + str + ".gif";
+      ele = /** @type {any} */ (
+        (document as any).getElementById(spreadsheet.idPrefix + "button_moveinsert")
+      );
+      ele.src = spreadsheet.imagePrefix + "moveinsert" + str + ".gif";
+      if (editor.range2.hasrange) editor.RangeRemove();
+      break;
+
+    case "movepaste":
+    case "moveinsert":
+      if (editor.range2.hasrange) {
+        spreadsheet.context.cursorsuffix = "";
+        combostr =
+          which +
+          " " +
+          SocialCalc.crToCoord(editor.range2.left, editor.range2.top) +
+          ":" +
+          SocialCalc.crToCoord(editor.range2.right, editor.range2.bottom) +
+          " " +
+          editor.ecell.coord;
+        spreadsheet.ExecuteCommand(combostr, "");
+        editor.Range2Remove();
+        ele = /** @type {any} */ (
+          (document as any).getElementById(spreadsheet.idPrefix + "button_movefrom")
+        );
+        ele.src = spreadsheet.imagePrefix + "movefromoff.gif";
+        ele = /** @type {any} */ (
+          (document as any).getElementById(spreadsheet.idPrefix + "button_movepaste")
+        );
+        ele.src = spreadsheet.imagePrefix + "movepasteoff.gif";
+        ele = /** @type {any} */ (
+          (document as any).getElementById(spreadsheet.idPrefix + "button_moveinsert")
+        );
+        ele.src = spreadsheet.imagePrefix + "moveinsertoff.gif";
+      }
+      break;
+
+    case "swapcolors":
+      sheet = spreadsheet.sheet;
+      cell = sheet.GetAssuredCell(editor.ecell.coord);
+      defaultcolor = sheet.attribs.defaultcolor
+        ? sheet.colors[sheet.attribs.defaultcolor]
+        : "rgb(0,0,0)";
+      defaultbgcolor = sheet.attribs.defaultbgcolor
+        ? sheet.colors[sheet.attribs.defaultbgcolor]
+        : "rgb(255,255,255)";
+      color = cell.color ? sheet.colors[cell.color] : defaultcolor; // get color
+      if (color == defaultbgcolor) color = ""; // going to swap, so if same as background default, use default
+      bgcolor = cell.bgcolor ? sheet.colors[cell.bgcolor] : defaultbgcolor;
+      if (bgcolor == defaultcolor) bgcolor = ""; // going to swap, so if same as foreground default, use default
+      spreadsheet.ExecuteCommand("set %C color " + bgcolor + "%Nset %C bgcolor " + color, "");
+      break;
+
+    default:
+      combostr = SocialCalc.SpreadsheetCmdLookup[which] || "";
+      sstr = SocialCalc.SpreadsheetCmdSLookup[which] || "";
+      spreadsheet.ExecuteCommand(combostr, sstr);
+      break;
+  }
+
+  if (obj && obj.blur) obj.blur();
+  SocialCalc.KeyboardFocus();
+};
 
 SpreadsheetControlSC.SpreadsheetCmdLookup = {
- 'copy': 'copy %C all',
- 'cut': 'cut %C all',
- 'paste': 'paste %C all',
- 'pasteformats': 'paste %C formats',
- 'lock': 'set %C readonly yes',
- 'unlock': 'set %C readonly no',
- 'delete': 'erase %C formulas',
- 'filldown': 'filldown %C all',
- 'fillright': 'fillright %C all',
- 'erase': 'erase %C all',
- 'borderon': 'set %C bt %S%Nset %C br %S%Nset %C bb %S%Nset %C bl %S',
- 'borderoff': 'set %C bt %S%Nset %C br %S%Nset %C bb %S%Nset %C bl %S',
- 'merge': 'merge %C',
- 'unmerge': 'unmerge %C',
- 'align-left': 'set %C cellformat left',
- 'align-center': 'set %C cellformat center',
- 'align-right': 'set %C cellformat right',
- 'align-default': 'set %C cellformat',
- 'insertrow': 'insertrow %C',
- 'insertcol': 'insertcol %C',
- 'deleterow': 'deleterow %C',
- 'deletecol': 'deletecol %C',
- 'hiderow': 'set %H hide yes',
- 'hidecol': 'set %W hide yes',
- 'undo': 'undo',
- 'redo': 'redo',
- 'recalc': 'recalc'
- }
+  copy: "copy %C all",
+  cut: "cut %C all",
+  paste: "paste %C all",
+  pasteformats: "paste %C formats",
+  lock: "set %C readonly yes",
+  unlock: "set %C readonly no",
+  delete: "erase %C formulas",
+  filldown: "filldown %C all",
+  fillright: "fillright %C all",
+  erase: "erase %C all",
+  borderon: "set %C bt %S%Nset %C br %S%Nset %C bb %S%Nset %C bl %S",
+  borderoff: "set %C bt %S%Nset %C br %S%Nset %C bb %S%Nset %C bl %S",
+  merge: "merge %C",
+  unmerge: "unmerge %C",
+  "align-left": "set %C cellformat left",
+  "align-center": "set %C cellformat center",
+  "align-right": "set %C cellformat right",
+  "align-default": "set %C cellformat",
+  insertrow: "insertrow %C",
+  insertcol: "insertcol %C",
+  deleterow: "deleterow %C",
+  deletecol: "deletecol %C",
+  hiderow: "set %H hide yes",
+  hidecol: "set %W hide yes",
+  undo: "undo",
+  redo: "redo",
+  recalc: "recalc",
+};
 
 SpreadsheetControlSC.SpreadsheetCmdSLookup = {
- 'borderon': '1px solid rgb(0,0,0)',
- 'borderoff': ''
- }
+  borderon: "1px solid rgb(0,0,0)",
+  borderoff: "",
+};
 
 /******* NO LONGER USED
 
@@ -1964,45 +2320,46 @@ SpreadsheetControlSC.SpreadsheetCmdTable = {
 //
 
 /** @param {any} obj @param {string} combostr @param {string} [sstr] */
-SpreadsheetControlSC.SpreadsheetControlExecuteCommand = function(obj: any, combostr: any, sstr: any) {
+SpreadsheetControlSC.SpreadsheetControlExecuteCommand = function (
+  obj: any,
+  combostr: any,
+  sstr: any,
+) {
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  var eobj = spreadsheet.editor;
+  var str: any = {};
+  str.P = "%";
+  str.N = "\n";
+  if (eobj.range.hasrange) {
+    str.R =
+      SocialCalc.crToCoord(eobj.range.left, eobj.range.top) +
+      ":" +
+      SocialCalc.crToCoord(eobj.range.right, eobj.range.bottom);
+    str.C = str.R;
+    str.W = SocialCalc.rcColname(eobj.range.left) + ":" + SocialCalc.rcColname(eobj.range.right);
+    str.H = eobj.range.top + ":" + eobj.range.bottom;
+  } else if (eobj.ecell) {
+    str.C = eobj.ecell.coord;
+    str.R = eobj.ecell.coord + ":" + eobj.ecell.coord;
+    str.W = SocialCalc.rcColname(SocialCalc.coordToCr(eobj.ecell.coord).col);
+    str.H = SocialCalc.coordToCr(eobj.ecell.coord).row;
+  } else {
+    str.C = "A1";
+    str.R = "A1:A1";
+    str.W = SocialCalc.rcColname(SocialCalc.coordToCr("A1").col);
+    str.H = SocialCalc.coordToCr("A1").row;
+  }
+  str.S = sstr;
+  combostr = combostr.replace(/%C/g, str.C);
+  combostr = combostr.replace(/%R/g, str.R);
+  combostr = combostr.replace(/%N/g, str.N);
+  combostr = combostr.replace(/%S/g, str.S);
+  combostr = combostr.replace(/%W/g, str.W);
+  combostr = combostr.replace(/%H/g, str.H);
+  combostr = combostr.replace(/%P/g, str.P);
 
-   var i, commands;
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var eobj = spreadsheet.editor;
-   var str: any = {};
-   str.P = "%";
-   str.N = "\n"
-   if (eobj.range.hasrange) {
-      str.R = SocialCalc.crToCoord(eobj.range.left, eobj.range.top)+
-             ":"+SocialCalc.crToCoord(eobj.range.right, eobj.range.bottom);
-      str.C = str.R;
-      str.W = SocialCalc.rcColname(eobj.range.left) + ":" + SocialCalc.rcColname(eobj.range.right);
-      str.H = eobj.range.top + ":" + eobj.range.bottom;
-      }
-   else if (eobj.ecell) {
-      str.C = eobj.ecell.coord;
-      str.R = eobj.ecell.coord+":"+eobj.ecell.coord;
-      str.W = SocialCalc.rcColname(SocialCalc.coordToCr(eobj.ecell.coord).col);
-      str.H = SocialCalc.coordToCr(eobj.ecell.coord).row;
-      }
-   else {
-      str.C = 'A1'
-      str.R = 'A1:A1'
-      str.W = SocialCalc.rcColname(SocialCalc.coordToCr('A1').col);
-      str.H = SocialCalc.coordToCr('A1').row;
-      }
-   str.S = sstr;
-   combostr = combostr.replace(/%C/g, str.C);
-   combostr = combostr.replace(/%R/g, str.R);
-   combostr = combostr.replace(/%N/g, str.N);
-   combostr = combostr.replace(/%S/g, str.S);
-   combostr = combostr.replace(/%W/g, str.W);
-   combostr = combostr.replace(/%H/g, str.H);
-   combostr = combostr.replace(/%P/g, str.P);
-
-   eobj.EditorScheduleSheetCommands(combostr, true, false);
-
-   }
+  eobj.EditorScheduleSheetCommands(combostr, true, false);
+};
 
 //
 // result = SocialCalc.SpreadsheetControlCreateSheetHTML(spreadsheet)
@@ -2011,20 +2368,18 @@ SpreadsheetControlSC.SpreadsheetControlExecuteCommand = function(obj: any, combo
 //
 
 /** @param {any} spreadsheet */
-SpreadsheetControlSC.SpreadsheetControlCreateSheetHTML = function(spreadsheet: any) {
+SpreadsheetControlSC.SpreadsheetControlCreateSheetHTML = function (spreadsheet: any) {
+  var context, div, ele;
 
-   var context, div, ele;
+  var result = "";
 
-   var result = "";
-
-   context = new SocialCalc.RenderContext(spreadsheet.sheet);
-   div = document.createElement("div");
-   ele = context.RenderSheet(null, {type: "html"});
-   div.appendChild(ele);
-   result = div.innerHTML;
-   return result;
-
-   }
+  context = new SocialCalc.RenderContext(spreadsheet.sheet);
+  div = document.createElement("div");
+  ele = context.RenderSheet(null, { type: "html" });
+  div.appendChild(ele);
+  result = div.innerHTML;
+  return result;
+};
 
 //
 // result = SocialCalc.SpreadsheetControlCreateCellHTML(spreadsheet, coord, linkstyle)
@@ -2033,25 +2388,31 @@ SpreadsheetControlSC.SpreadsheetControlCreateSheetHTML = function(spreadsheet: a
 //
 
 /** @param {any} spreadsheet @param {string} coord @param {any} [linkstyle] */
-SpreadsheetControlSC.SpreadsheetControlCreateCellHTML = function(spreadsheet: any, coord: any, linkstyle: any) {
+SpreadsheetControlSC.SpreadsheetControlCreateCellHTML = function (
+  spreadsheet: any,
+  coord: any,
+  linkstyle: any,
+) {
+  var result = "";
+  var cell = spreadsheet.sheet.cells[coord];
 
-   var result = "";
-   var cell = spreadsheet.sheet.cells[coord];
+  if (!cell) return "";
 
-   if (!cell) return "";
+  if (cell.displaystring == undefined) {
+    result = SocialCalc.FormatValueForDisplay(
+      spreadsheet.sheet,
+      cell.datavalue,
+      coord,
+      linkstyle || spreadsheet.context.defaultHTMLlinkstyle,
+    );
+  } else {
+    result = cell.displaystring;
+  }
 
-   if (cell.displaystring == undefined) {
-      result = SocialCalc.FormatValueForDisplay(spreadsheet.sheet, cell.datavalue, coord, (linkstyle || spreadsheet.context.defaultHTMLlinkstyle));
-      }
-   else {
-      result = cell.displaystring;
-      }
+  if (result == "&nbsp;") result = "";
 
-   if (result == "&nbsp;") result = "";
-
-   return result;
-
-   }
+  return result;
+};
 
 //
 // result = SocialCalc.SpreadsheetControlCreateCellHTMLSave(spreadsheet, range, linkstyle)
@@ -2067,714 +2428,840 @@ SpreadsheetControlSC.SpreadsheetControlCreateCellHTML = function(spreadsheet: an
 //
 
 /** @param {any} spreadsheet @param {string} [range] @param {any} [linkstyle] */
-SpreadsheetControlSC.SpreadsheetControlCreateCellHTMLSave = function(spreadsheet: any, range: any, linkstyle: any) {
+SpreadsheetControlSC.SpreadsheetControlCreateCellHTMLSave = function (
+  spreadsheet: any,
+  range: any,
+  linkstyle: any,
+) {
+  var cr1, cr2, row, col, coord, cell, cellHTML;
+  var result = [];
+  var prange;
 
-   var cr1, cr2, row, col, coord, cell, cellHTML;
-   var result = [];
-   var prange;
+  if (range) {
+    prange = SocialCalc.ParseRange(range);
+  } else {
+    prange = {
+      cr1: { row: 1, col: 1 },
+      cr2: { row: spreadsheet.sheet.attribs.lastrow, col: spreadsheet.sheet.attribs.lastcol },
+    };
+  }
+  cr1 = prange.cr1;
+  cr2 = prange.cr2;
 
-   if (range) {
-      prange = SocialCalc.ParseRange(range);
+  result.push("version:1.0");
+
+  for (row = cr1.row; row <= cr2.row; row++) {
+    for (col = cr1.col; col <= cr2.col; col++) {
+      coord = SocialCalc.crToCoord(col, row);
+      cell = spreadsheet.sheet.cells[coord];
+      if (!cell) continue;
+      if (cell.displaystring == undefined) {
+        cellHTML = SocialCalc.FormatValueForDisplay(
+          spreadsheet.sheet,
+          cell.datavalue,
+          coord,
+          linkstyle || spreadsheet.context.defaultHTMLlinkstyle,
+        );
+      } else {
+        cellHTML = cell.displaystring;
       }
-   else {
-      prange = {cr1: {row: 1, col:1},
-                cr2: {row: spreadsheet.sheet.attribs.lastrow, col: spreadsheet.sheet.attribs.lastcol}};
-      }
-   cr1 = prange.cr1;
-   cr2 = prange.cr2;
+      if (cellHTML == "&nbsp;") continue;
+      result.push(coord + ":" + SocialCalc.encodeForSave(cellHTML));
+    }
+  }
 
-   result.push("version:1.0");
-
-   for (row=cr1.row; row <= cr2.row; row++) {
-      for (col=cr1.col; col <= cr2.col; col++) {
-         coord = SocialCalc.crToCoord(col, row);
-         cell=spreadsheet.sheet.cells[coord];
-         if (!cell) continue;
-         if (cell.displaystring == undefined) {
-            cellHTML = SocialCalc.FormatValueForDisplay(spreadsheet.sheet, cell.datavalue, coord, (linkstyle || spreadsheet.context.defaultHTMLlinkstyle));
-            }
-         else {
-            cellHTML = cell.displaystring;
-            }
-         if (cellHTML == "&nbsp;") continue;
-         result.push(coord+":"+SocialCalc.encodeForSave(cellHTML));
-         }
-      }
-
-   result.push(""); // one extra to get extra \n
-   return result.join("\n");
-   }
+  result.push(""); // one extra to get extra \n
+  return result.join("\n");
+};
 
 //
 // Formula Bar Button Routines
 //
 
-SpreadsheetControlSC.SpreadsheetControl.DoFunctionList = function() {
+SpreadsheetControlSC.SpreadsheetControl.DoFunctionList = function () {
+  var i, str, ele;
 
-   var i, cname, str, f, ele;
+  var scf = SocialCalc.Formula as any;
+  var scc = SocialCalc.Constants;
+  var fcl = scc.function_classlist;
 
-   var scf = SocialCalc.Formula as any;
-   var scc = SocialCalc.Constants;
-   var fcl = scc.function_classlist;
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  var idp = spreadsheet.idPrefix + "function";
 
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var idp = spreadsheet.idPrefix+"function";
+  ele = /** @type {any} */ ((document as any).getElementById(idp + "dialog"));
+  if (ele) return; // already have one
 
-   ele = /** @type {any} */((document as any).getElementById(idp+"dialog"));
-   if (ele) return; // already have one
+  scf.FillFunctionInfo();
 
-   scf.FillFunctionInfo();
+  str =
+    '<table><tr><td><span style="font-size:x-small;font-weight:bold">%loc!Category!</span><br>' +
+    '<select id="' +
+    idp +
+    'class" size="' +
+    fcl.length +
+    '" style="width:120px;" onchange="SocialCalc.SpreadsheetControl.FunctionClassChosen(this.options[this.selectedIndex].value);">';
+  for (i = 0; i < fcl.length; i++) {
+    str +=
+      '<option value="' +
+      fcl[i] +
+      '"' +
+      (i == 0 ? " selected>" : ">") +
+      SocialCalc.special_chars(scf.FunctionClasses[fcl[i]].name) +
+      "</option>";
+  }
+  str +=
+    '</select></td><td>&nbsp;&nbsp;</td><td id="' +
+    idp +
+    'list"><span style="font-size:x-small;font-weight:bold">%loc!Functions!</span><br>' +
+    '<select id="' +
+    idp +
+    'name" size="' +
+    fcl.length +
+    '" style="width:240px;" ' +
+    'onchange="SocialCalc.SpreadsheetControl.FunctionChosen(this.options[this.selectedIndex].value);" ondblclick="SocialCalc.SpreadsheetControl.DoFunctionPaste();">';
+  str += SpreadsheetControlSC.SpreadsheetControl.GetFunctionNamesStr("all");
+  str +=
+    '</td></tr><tr><td colspan="3">' +
+    '<div id="' +
+    idp +
+    'desc" style="width:380px;height:80px;overflow:auto;font-size:x-small;">' +
+    SpreadsheetControlSC.SpreadsheetControl.GetFunctionInfoStr(
+      scf.FunctionClasses[fcl[0]].items[0],
+    ) +
+    "</div>" +
+    '<div style="width:380px;text-align:right;padding-top:6px;font-size:small;">' +
+    '<input type="button" value="%loc!Paste!" style="font-size:smaller;" onclick="SocialCalc.SpreadsheetControl.DoFunctionPaste();">&nbsp;' +
+    '<input type="button" value="%loc!Cancel!" style="font-size:smaller;" onclick="SocialCalc.SpreadsheetControl.HideFunctions();"></div>' +
+    "</td></tr></table>";
 
-   str = '<table><tr><td><span style="font-size:x-small;font-weight:bold">%loc!Category!</span><br>'+
-      '<select id="'+idp+'class" size="'+fcl.length+'" style="width:120px;" onchange="SocialCalc.SpreadsheetControl.FunctionClassChosen(this.options[this.selectedIndex].value);">';
-   for (i=0; i<fcl.length; i++) {
-      str += '<option value="'+fcl[i]+'"'+(i==0?' selected>':'>')+SocialCalc.special_chars(scf.FunctionClasses[fcl[i]].name)+'</option>';
-      }
-   str += '</select></td><td>&nbsp;&nbsp;</td><td id="'+idp+'list"><span style="font-size:x-small;font-weight:bold">%loc!Functions!</span><br>'+
-      '<select id="'+idp+'name" size="'+fcl.length+'" style="width:240px;" '+
-      'onchange="SocialCalc.SpreadsheetControl.FunctionChosen(this.options[this.selectedIndex].value);" ondblclick="SocialCalc.SpreadsheetControl.DoFunctionPaste();">';
-   str += SpreadsheetControlSC.SpreadsheetControl.GetFunctionNamesStr("all");
-   str += '</td></tr><tr><td colspan="3">'+
-          '<div id="'+idp+'desc" style="width:380px;height:80px;overflow:auto;font-size:x-small;">'+SpreadsheetControlSC.SpreadsheetControl.GetFunctionInfoStr(scf.FunctionClasses[fcl[0]].items[0])+'</div>'+
-          '<div style="width:380px;text-align:right;padding-top:6px;font-size:small;">'+
-          '<input type="button" value="%loc!Paste!" style="font-size:smaller;" onclick="SocialCalc.SpreadsheetControl.DoFunctionPaste();">&nbsp;'+
-          '<input type="button" value="%loc!Cancel!" style="font-size:smaller;" onclick="SocialCalc.SpreadsheetControl.HideFunctions();"></div>'+
-          '</td></tr></table>';
+  var main = document.createElement("div");
+  main.id = idp + "dialog";
 
-   var main = document.createElement("div");
-   main.id = idp+"dialog";
+  main.style.position = "absolute";
 
-   main.style.position = "absolute";
+  var vp = SocialCalc.GetViewportInfo();
+  var pos = SocialCalc.GetElementPositionWithScroll(spreadsheet.spreadsheetDiv);
 
-   var vp = SocialCalc.GetViewportInfo();
-   var pos = SocialCalc.GetElementPositionWithScroll(spreadsheet.spreadsheetDiv);
+  main.style.top = vp.height / 3 - pos.top + "px";
+  main.style.left = vp.width / 3 - pos.left + "px";
+  main.style.zIndex = "100";
+  main.style.backgroundColor = "#FFF";
+  main.style.border = "1px solid black";
 
-   main.style.top = ((vp.height/3)-pos.top)+"px";
-   main.style.left = ((vp.width/3)-pos.left)+"px";
-   main.style.zIndex = "100";
-   main.style.backgroundColor = "#FFF";
-   main.style.border = "1px solid black";
+  main.style.width = "400px";
 
-   main.style.width = "400px";
+  str =
+    '<table cellspacing="0" cellpadding="0" style="border-bottom:1px solid black;"><tr>' +
+    '<td style="font-size:10px;cursor:default;width:100%;background-color:#999;color:#FFF;">' +
+    "&nbsp;%loc!Function List!" +
+    "</td>" +
+    '<td style="font-size:10px;cursor:default;color:#666;" onclick="SocialCalc.SpreadsheetControl.HideFunctions();">&nbsp;X&nbsp;</td></tr></table>' +
+    '<div style="background-color:#DDD;">' +
+    str +
+    "</div>";
 
-   str = '<table cellspacing="0" cellpadding="0" style="border-bottom:1px solid black;"><tr>'+
-      '<td style="font-size:10px;cursor:default;width:100%;background-color:#999;color:#FFF;">'+"&nbsp;%loc!Function List!"+'</td>'+
-      '<td style="font-size:10px;cursor:default;color:#666;" onclick="SocialCalc.SpreadsheetControl.HideFunctions();">&nbsp;X&nbsp;</td></tr></table>'+
-      '<div style="background-color:#DDD;">'+str+'</div>';
+  str = SocialCalc.LocalizeSubstrings(str);
 
-   str = SocialCalc.LocalizeSubstrings(str);
+  main.innerHTML = str;
 
-   main.innerHTML = str;
+  SocialCalc.DragRegister(
+    ((main.firstChild as any).firstChild as any).firstChild as any,
+    true,
+    true,
+    {
+      MouseDown: SocialCalc.DragFunctionStart,
+      MouseMove: SocialCalc.DragFunctionPosition,
+      MouseUp: SocialCalc.DragFunctionPosition,
+      Disabled: null,
+      positionobj: main,
+    },
+    spreadsheet.spreadsheetDiv,
+  );
 
-   SocialCalc.DragRegister(((main.firstChild as any).firstChild as any).firstChild as any, true, true,
-                 {MouseDown: SocialCalc.DragFunctionStart, 
-                  MouseMove: SocialCalc.DragFunctionPosition,
-                  MouseUp: SocialCalc.DragFunctionPosition,
-                  Disabled: null, positionobj: main},
-                  spreadsheet.spreadsheetDiv);
+  spreadsheet.spreadsheetDiv.appendChild(main);
 
-   spreadsheet.spreadsheetDiv.appendChild(main);
-
-   ele = /** @type {any} */((document as any).getElementById(idp+"name"));
-   ele.focus();
-   SocialCalc.CmdGotFocus(ele);
-//!!! need to do keyboard handling: if esc, hide; if All, letter scrolls to there
-
-   }
+  ele = /** @type {any} */ ((document as any).getElementById(idp + "name"));
+  ele.focus();
+  SocialCalc.CmdGotFocus(ele);
+  //!!! need to do keyboard handling: if esc, hide; if All, letter scrolls to there
+};
 
 /** @param {string} [cname] */
-SpreadsheetControlSC.SpreadsheetControl.GetFunctionNamesStr = function(cname: any) {
+SpreadsheetControlSC.SpreadsheetControl.GetFunctionNamesStr = function (cname: any) {
+  var i, f;
+  var scf = SocialCalc.Formula as any;
+  var str = "";
 
-   var i, f;
-   var scf = SocialCalc.Formula as any;
-   var str = "";
+  f = scf.FunctionClasses[cname || "all"];
+  for (i = 0; i < f.items.length; i++) {
+    str +=
+      '<option value="' +
+      f.items[i] +
+      '"' +
+      (i == 0 ? " selected>" : ">") +
+      f.items[i] +
+      "</option>";
+  }
 
-   f = scf.FunctionClasses[cname || "all"];
-   for (i=0; i<f.items.length; i++) {
-      str += '<option value="'+f.items[i]+'"'+(i==0?' selected>':'>')+f.items[i]+'</option>';
-      }
-
-   return str;
-
-   }
+  return str;
+};
 
 /** @param {string} cname @param {any} ele */
-SpreadsheetControlSC.SpreadsheetControl.FillFunctionNames = function(cname: any, ele: any) {
+SpreadsheetControlSC.SpreadsheetControl.FillFunctionNames = function (cname: any, ele: any) {
+  var i, f;
+  var scf = SocialCalc.Formula as any;
 
-   var i, f;
-   var scf = SocialCalc.Formula as any;
-
-   ele.length = 0;
-   f = scf.FunctionClasses[cname];
-   for (i=0; i<f.items.length; i++) {
-      ele.options[i] = new Option(f.items[i], f.items[i]);
-      if (i==0) {
-         ele.options[i].selected = true;
-         }
-      }
-   }
+  ele.length = 0;
+  f = scf.FunctionClasses[cname];
+  for (i = 0; i < f.items.length; i++) {
+    ele.options[i] = new Option(f.items[i], f.items[i]);
+    if (i == 0) {
+      ele.options[i].selected = true;
+    }
+  }
+};
 
 /** @param {string} fname */
-SpreadsheetControlSC.SpreadsheetControl.GetFunctionInfoStr = function(fname: any) {
-   
-   var scf = SocialCalc.Formula as any;
-   var f = scf.FunctionList[fname];
-   var scsc = SocialCalc.special_chars;
+SpreadsheetControlSC.SpreadsheetControl.GetFunctionInfoStr = function (fname: any) {
+  var scf = SocialCalc.Formula as any;
+  var f = scf.FunctionList[fname];
+  var scsc = SocialCalc.special_chars;
 
-   var str = "<b>"+fname+"("+scsc(scf.FunctionArgString(fname))+")</b><br>";
-   str += scsc(f[3]);
+  var str = "<b>" + fname + "(" + scsc(scf.FunctionArgString(fname)) + ")</b><br>";
+  str += scsc(f[3]);
 
-   return str;
-
-   }
+  return str;
+};
 
 /** @param {string} cname */
-SpreadsheetControlSC.SpreadsheetControl.FunctionClassChosen = function(cname: any) {
+SpreadsheetControlSC.SpreadsheetControl.FunctionClassChosen = function (cname: any) {
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  var idp = spreadsheet.idPrefix + "function";
+  var scf = SocialCalc.Formula as any;
 
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var idp = spreadsheet.idPrefix+"function";
-   var scf = SocialCalc.Formula as any;
+  SpreadsheetControlSC.SpreadsheetControl.FillFunctionNames(
+    cname,
+    /** @type {any} */ ((document as any).getElementById(idp + "name")),
+  );
 
-   SpreadsheetControlSC.SpreadsheetControl.FillFunctionNames(cname, /** @type {any} */((document as any).getElementById(idp+"name")));
-
-   SpreadsheetControlSC.SpreadsheetControl.FunctionChosen(scf.FunctionClasses[cname].items[0]);
-
-   }
+  SpreadsheetControlSC.SpreadsheetControl.FunctionChosen(scf.FunctionClasses[cname].items[0]);
+};
 
 /** @param {string} fname */
-SpreadsheetControlSC.SpreadsheetControl.FunctionChosen = function(fname: any) {
-
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var idp = spreadsheet.idPrefix+"function";
-
-   /** @type {any} */((document as any).getElementById(idp+"desc")).innerHTML = SpreadsheetControlSC.SpreadsheetControl.GetFunctionInfoStr(fname);
-
-   }
-
-SpreadsheetControlSC.SpreadsheetControl.HideFunctions = function() {
-
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-
-   var ele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"functiondialog"));
-   ele.innerHTML = "";
-
-   SocialCalc.DragUnregister(ele);
-
-   SocialCalc.KeyboardFocus();
-
-   if (ele.parentNode) {
-      ele.parentNode.removeChild(ele);
-      }
-
-   }
-
-SpreadsheetControlSC.SpreadsheetControl.DoFunctionPaste = function() {
-
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var editor = spreadsheet.editor;
-   var ele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"functionname"));
-   var mele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"multilinetextarea"));
-
-   var text = ele.value+"(";
-
-   SpreadsheetControlSC.SpreadsheetControl.HideFunctions();
-
-   if (mele) { // multi-line editing is in progress
-      mele.value += text;
-      mele.focus();
-      SocialCalc.CmdGotFocus(mele);
-      }
-   else {
-      editor.EditorAddToInput(text, "=");
-      }
-
-   }
-
-
-SpreadsheetControlSC.SpreadsheetControl.DoMultiline = function() {
-
-   var SCLocSS = SocialCalc.LocalizeSubstrings;
-
-   var str, ele, text;
-
-   var scc = SocialCalc.Constants;
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var editor = spreadsheet.editor;
-   var wval = editor.workingvalues;
-
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var idp = spreadsheet.idPrefix+"multiline";
-
-   ele = /** @type {any} */((document as any).getElementById(idp+"dialog"));
-   if (ele) return; // already have one
-
-   switch (editor.state) {
-      case "start":
-         wval.ecoord = editor.ecell.coord;
-         wval.erow = editor.ecell.row;
-         wval.ecol = editor.ecell.col;
-         editor.RangeRemove();
-         text = SocialCalc.GetCellContents(editor.context.sheetobj, wval.ecoord);
-         break;
-
-      case "input":
-      case "inputboxdirect":
-         text = editor.inputBox.GetText();
-         break;
-      }
-
-   editor.inputBox.element.disabled = true;
-
-   text = SocialCalc.special_chars(text);
-
-   str = '<textarea id="'+idp+'textarea" style="width:380px;height:120px;margin:10px 0px 0px 6px;">'+text+'</textarea>'+
-         '<div style="width:380px;text-align:right;padding:6px 0px 4px 6px;font-size:small;">'+
-         SCLocSS('<input type="button" value="%loc!Set Cell Contents!" style="font-size:smaller;" onclick="SocialCalc.SpreadsheetControl.DoMultilinePaste();">&nbsp;'+
-         '<input type="button" value="%loc!Clear!" style="font-size:smaller;" onclick="SocialCalc.SpreadsheetControl.DoMultilineClear();">&nbsp;'+
-         '<input type="button" value="%loc!Cancel!" style="font-size:smaller;" onclick="SocialCalc.SpreadsheetControl.HideMultiline();"></div>'+
-         '</div>');
-
-   var main = document.createElement("div");
-   main.id = idp+"dialog";
-
-   main.style.position = "absolute";
-
-   var vp = SocialCalc.GetViewportInfo();
-   var pos = SocialCalc.GetElementPositionWithScroll(spreadsheet.spreadsheetDiv);
-
-   main.style.top = ((vp.height/3)-pos.top)+"px";
-   main.style.left = ((vp.width/3)-pos.left)+"px";
-   main.style.zIndex = "100";
-   main.style.backgroundColor = "#FFF";
-   main.style.border = "1px solid black";
-
-   main.style.width = "400px";
-
-   main.innerHTML = '<table cellspacing="0" cellpadding="0" style="border-bottom:1px solid black;"><tr>'+
-      '<td style="font-size:10px;cursor:default;width:100%;background-color:#999;color:#FFF;">'+
-      SCLocSS("&nbsp;%loc!Multi-line Input Box!")+'</td>'+
-      '<td style="font-size:10px;cursor:default;color:#666;" onclick="SocialCalc.SpreadsheetControl.HideMultiline();">&nbsp;X&nbsp;</td></tr></table>'+
-      '<div style="background-color:#DDD;">'+str+'</div>';
-
-   SocialCalc.DragRegister(((main.firstChild as any).firstChild as any).firstChild as any, true, true, 
-                 {MouseDown: SocialCalc.DragFunctionStart, 
-                  MouseMove: SocialCalc.DragFunctionPosition,
-                  MouseUp: SocialCalc.DragFunctionPosition,
-                  Disabled: null, positionobj: main},
-                  spreadsheet.spreadsheetDiv);
-
-   spreadsheet.spreadsheetDiv.appendChild(main);
-
-   ele = /** @type {any} */((document as any).getElementById(idp+"textarea"));
-   ele.focus();
-   SocialCalc.CmdGotFocus(ele);
-//!!! need to do keyboard handling: if esc, hide?
-
-   }
-
-
-SpreadsheetControlSC.SpreadsheetControl.HideMultiline = function() {
-
-   var scc = SocialCalc.Constants;
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var editor = spreadsheet.editor;
-
-   var ele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"multilinedialog"));
-   ele.innerHTML = "";
-
-   SocialCalc.DragUnregister(ele);
-
-   SocialCalc.KeyboardFocus();
-
-   if (ele.parentNode) {
-      ele.parentNode.removeChild(ele);
-      }
-
-   switch (editor.state) {
-      case "start":
-         editor.inputBox.DisplayCellContents(null);
-         break;
-
-      case "input":
-      case "inputboxdirect":
-         editor.inputBox.element.disabled = false;
-         editor.inputBox.Focus();
-         break;
-      }
-
-   }
-
-SpreadsheetControlSC.SpreadsheetControl.DoMultilineClear = function() {
-
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-
-   var ele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"multilinetextarea"));
-
-   ele.value = "";
-   ele.focus();
-
-   }
-
-
-SpreadsheetControlSC.SpreadsheetControl.DoMultilinePaste = function() {
-
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var editor = spreadsheet.editor;
-   var wval = editor.workingvalues;
-
-   var ele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"multilinetextarea"));
-
-   var text = ele.value;
-
-   SpreadsheetControlSC.SpreadsheetControl.HideMultiline();
-
-   switch (editor.state) {
-      case "start":
-         wval.partialexpr = "";
-         wval.ecoord = editor.ecell.coord;
-         wval.erow = editor.ecell.row;
-         wval.ecol = editor.ecell.col;
-         break;
-      case "input":
-      case "inputboxdirect":
-         editor.inputBox.Blur();
-         editor.inputBox.ShowInputBox(false);
-         editor.state = "start";
-         break;
-      }
-
-   editor.EditorSaveEdit(text);
-
-   }
-
-
-SpreadsheetControlSC.SpreadsheetControl.DoLink = function() {
-
-   var SCLoc = SocialCalc.LocalizeString;
-
-   var str, ele, text, cell, setformat, popup;
-
-   var scc = SocialCalc.Constants;
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var editor = spreadsheet.editor;
-   var wval = editor.workingvalues;
-
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var idp = spreadsheet.idPrefix+"link";
-
-   ele = /** @type {any} */((document as any).getElementById(idp+"dialog"));
-   if (ele) return; // already have one
-
-   switch (editor.state) {
-      case "start":
-         wval.ecoord = editor.ecell.coord;
-         wval.erow = editor.ecell.row;
-         wval.ecol = editor.ecell.col;
-         editor.RangeRemove();
-         text = SocialCalc.GetCellContents(editor.context.sheetobj, wval.ecoord);
-         break;
-
-      case "input":
-      case "inputboxdirect":
-         text = editor.inputBox.GetText();
-         break;
-      }
-
-   editor.inputBox.element.disabled = true;
-
-   if (text.charAt(0)=="'") {
-      text = text.slice(1);
-      }
-
-   var parts = SocialCalc.ParseCellLinkText(text);
-
-   text = SocialCalc.special_chars(text);
-
-   cell = spreadsheet.sheet.cells[editor.ecell.coord];
-   // set to link format, but don't override
-   setformat = (!cell || !cell.textvalueformat) ? " checked" : "";
-
-   popup = parts.newwin ? " checked" : "";
-
-   str = '<div style="padding:6px 0px 4px 6px;">'+
-         '<span style="font-size:smaller;">'+SCLoc("Description")+'</span><br>'+
-         '<input type="text" id="'+idp+'desc" style="width:380px;" value="'+SocialCalc.special_chars(parts.desc)+'"><br>'+
-         '<span style="font-size:smaller;">'+SCLoc("URL")+'</span><br>'+
-         '<input type="text" id="'+idp+'url" style="width:380px;" value="'+SocialCalc.special_chars(parts.url)+'"><br>';
-   if (SocialCalc.Callbacks.MakePageLink) { // only show if handling pagenames here
-      str += '<span style="font-size:smaller;">'+SCLoc("Page Name")+'</span><br>'+
-             '<input type="text" id="'+idp+'pagename" style="width:380px;" value="'+SocialCalc.special_chars(parts.pagename)+'"><br>'+
-             '<span style="font-size:smaller;">'+SCLoc("Workspace")+'</span><br>'+
-             '<input type="text" id="'+idp+'workspace" style="width:380px;" value="'+SocialCalc.special_chars(parts.workspace)+'"><br>';
-      }
-   str += SocialCalc.LocalizeSubstrings('<input type="checkbox" id="'+idp+'format"'+setformat+'>&nbsp;'+
-         '<span style="font-size:smaller;">%loc!Set to Link format!</span><br>'+
-         '<input type="checkbox" id="'+idp+'popup"'+popup+'>&nbsp;'+
-         '<span style="font-size:smaller;">%loc!Show in new browser window!</span>'+
-         '</div>'+
-         '<div style="width:380px;text-align:right;padding:6px 0px 4px 6px;font-size:small;">'+
-         '<input type="button" value="%loc!Set Cell Contents!" style="font-size:smaller;" onclick="SocialCalc.SpreadsheetControl.DoLinkPaste();">&nbsp;'+
-         '<input type="button" value="%loc!Clear!" style="font-size:smaller;" onclick="SocialCalc.SpreadsheetControl.DoLinkClear();">&nbsp;'+
-         '<input type="button" value="%loc!Cancel!" style="font-size:smaller;" onclick="SocialCalc.SpreadsheetControl.HideLink();"></div>'+
-         '</div>');
-
-   var main = document.createElement("div");
-   main.id = idp+"dialog";
-
-   main.style.position = "absolute";
-
-   var vp = SocialCalc.GetViewportInfo();
-   var pos = SocialCalc.GetElementPositionWithScroll(spreadsheet.spreadsheetDiv);
-
-   main.style.top = ((vp.height/3)-pos.top)+"px";
-   main.style.left = ((vp.width/3)-pos.left)+"px";
-   main.style.zIndex = "100";
-   main.style.backgroundColor = "#FFF";
-   main.style.border = "1px solid black";
-
-   main.style.width = "400px";
-
-   main.innerHTML = '<table cellspacing="0" cellpadding="0" style="border-bottom:1px solid black;"><tr>'+
-      '<td style="font-size:10px;cursor:default;width:100%;background-color:#999;color:#FFF;">'+"&nbsp;"+SCLoc("Link Input Box")+'</td>'+
-      '<td style="font-size:10px;cursor:default;color:#666;" onclick="SocialCalc.SpreadsheetControl.HideLink();">&nbsp;X&nbsp;</td></tr></table>'+
-      '<div style="background-color:#DDD;">'+str+'</div>';
-
-   SocialCalc.DragRegister(((main.firstChild as any).firstChild as any).firstChild as any, true, true, 
-                 {MouseDown: SocialCalc.DragFunctionStart, 
-                  MouseMove: SocialCalc.DragFunctionPosition,
-                  MouseUp: SocialCalc.DragFunctionPosition,
-                  Disabled: null, positionobj: main},
-                  spreadsheet.spreadsheetDiv);
-
-   spreadsheet.spreadsheetDiv.appendChild(main);
-
-   ele = /** @type {any} */((document as any).getElementById(idp+"url"));
-   ele.focus();
-   SocialCalc.CmdGotFocus(ele);
-//!!! need to do keyboard handling: if esc, hide?
-
-   }
-
-
-SpreadsheetControlSC.SpreadsheetControl.HideLink = function() {
-
-   var scc = SocialCalc.Constants;
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var editor = spreadsheet.editor;
-
-   var ele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"linkdialog"));
-   ele.innerHTML = "";
-
-   SocialCalc.DragUnregister(ele);
-
-   SocialCalc.KeyboardFocus();
-
-   if (ele.parentNode) {
-      ele.parentNode.removeChild(ele);
-      }
-
-   switch (editor.state) {
-      case "start":
-         editor.inputBox.DisplayCellContents(null);
-         break;
-
-      case "input":
-      case "inputboxdirect":
-         editor.inputBox.element.disabled = false;
-         editor.inputBox.Focus();
-         break;
-      }
-
-   }
-
-SpreadsheetControlSC.SpreadsheetControl.DoLinkClear = function() {
-
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-
-   /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"linkdesc")).value = "";
-   /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"linkpagename")).value = "";
-   /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"linkworkspace")).value = "";
-
-   var ele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"linkurl"));
-   ele.value = "";
-   ele.focus();
-
-   }
-
-
-SpreadsheetControlSC.SpreadsheetControl.DoLinkPaste = function() {
-
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var editor = spreadsheet.editor;
-   var wval = editor.workingvalues;
-
-   var descele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"linkdesc"));
-   var urlele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"linkurl"));
-   var pagenameele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"linkpagename"));
-   var workspaceele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"linkworkspace"));
-   var formatele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"linkformat"));
-   var popupele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"linkpopup"));
-
-   var text = "";
-
-   var ltsym, gtsym, obsym, cbsym;
-
-   if (popupele.checked) {
-      ltsym = "<<"; gtsym = ">>"; obsym = "[["; cbsym = "]]";
-      }
-   else {
-      ltsym = "<"; gtsym = ">"; obsym = "["; cbsym = "]";
-      }
-
-   if (pagenameele && pagenameele.value) {
-      if (workspaceele.value) {
-         text = descele.value+"{"+workspaceele.value+obsym+pagenameele.value+cbsym+"}";
-         }
-      else {
-         text = descele.value+obsym+pagenameele.value+cbsym;
-         }
-      }
-   else {
-      text = descele.value+ltsym+urlele.value+gtsym;
-      }
-
-   SpreadsheetControlSC.SpreadsheetControl.HideLink();
-
-   switch (editor.state) {
-      case "start":
-         wval.partialexpr = "";
-         wval.ecoord = editor.ecell.coord;
-         wval.erow = editor.ecell.row;
-         wval.ecol = editor.ecell.col;
-         break;
-      case "input":
-      case "inputboxdirect":
-         editor.inputBox.Blur();
-         editor.inputBox.ShowInputBox(false);
-         editor.state = "start";
-         break;
-      }
-
-   if (formatele.checked) {
-      SocialCalc.SpreadsheetControlExecuteCommand(null, "set %C textvalueformat text-link", "");
-      }
-
-   editor.EditorSaveEdit(text);
-
-   }
-
-SpreadsheetControlSC.SpreadsheetControl.DoSum = function() {
-
-   var cmd, cell, row, col, sel, cr, foundvalue;
-
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var editor = spreadsheet.editor;
-   var sheet = editor.context.sheetobj;
-
-   if (editor.range.hasrange) {
-      sel = SocialCalc.crToCoord(editor.range.left, editor.range.top)+
-         ":"+SocialCalc.crToCoord(editor.range.right, editor.range.bottom);
-      cmd = "set "+SocialCalc.crToCoord(editor.range.right, editor.range.bottom+1)+
-         " formula sum("+sel+")";
-      }
-   else {
-      row = editor.ecell.row - 1;
-      col = editor.ecell.col;
-      if (row<=1) {
-         cmd = "set "+editor.ecell.coord+" constant e#REF! 0 #REF!";
-         }
-      else {
-         foundvalue = false;
-         while (row>0) {
-            cr = SocialCalc.crToCoord(col, row);
-            cell = sheet.GetAssuredCell(cr);
-            if (!cell.datatype || cell.datatype=="t") {
-               if (foundvalue) {
-                  row++;
-                  break;
-                  }
-               }
-            else {
-               foundvalue = true;
-               }
-            row--;
-            }
-         cmd = "set "+editor.ecell.coord+" formula sum("+
-            SocialCalc.crToCoord(col,row)+":"+SocialCalc.crToCoord(col, editor.ecell.row-1)+")";
-         }
-      }
-
-   editor.EditorScheduleSheetCommands(cmd, true, false);
-
-   }
-
-SpreadsheetControlSC.SpreadsheetControl.FindInSheet = function() {
-    var searchstatus = $("#searchstatus");
-    var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-    if (!this.value.length) {
-        searchstatus.text("");
-        spreadsheet.sheet.search_cells = [];
-        spreadsheet.sheet.selected_search_cell = undefined;
-        return;
-    }
-    var cells = spreadsheet.sheet.cells;
-    var regex = new RegExp(this.value, 'im');
-    var cell, cellvalue;
-    var search_cells = [];
-    for (var cell_id in cells) {
-        cell = cells[cell_id];
-        var cr = SocialCalc.coordToCr(cell_id);
-        if (spreadsheet.sheet.rowattribs.hide[cr.row] === 'yes' || spreadsheet.sheet.colattribs.hide[SocialCalc.rcColname(cr.col)] === 'yes') {
-            continue;
-        }
-        if (cell.datatype === 'c') {
-            cellvalue = cell.displaystring;
-        } else {
-            cellvalue = String(cell.datavalue);
-        }
-        if (cellvalue !== undefined && cellvalue.match(regex)) {
-           search_cells.push(cell_id);
-        } 
-    }
-    spreadsheet.sheet.search_cells = search_cells;
-    if (search_cells.length) {
-        spreadsheet.sheet.selected_search_cell = 0;
-        spreadsheet.editor.MoveECell(search_cells[0]);
-        searchstatus.text("1 of " + search_cells.length); 
+SpreadsheetControlSC.SpreadsheetControl.FunctionChosen = function (fname: any) {
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  var idp = spreadsheet.idPrefix + "function";
+
+  /** @type {any} */ ((document as any).getElementById(idp + "desc")).innerHTML =
+    SpreadsheetControlSC.SpreadsheetControl.GetFunctionInfoStr(fname);
+};
+
+SpreadsheetControlSC.SpreadsheetControl.HideFunctions = function () {
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+
+  var ele = /** @type {any} */ (
+    (document as any).getElementById(spreadsheet.idPrefix + "functiondialog")
+  );
+  ele.innerHTML = "";
+
+  SocialCalc.DragUnregister(ele);
+
+  SocialCalc.KeyboardFocus();
+
+  if (ele.parentNode) {
+    ele.parentNode.removeChild(ele);
+  }
+};
+
+SpreadsheetControlSC.SpreadsheetControl.DoFunctionPaste = function () {
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  var editor = spreadsheet.editor;
+  var ele = /** @type {any} */ (
+    (document as any).getElementById(spreadsheet.idPrefix + "functionname")
+  );
+  var mele = /** @type {any} */ (
+    (document as any).getElementById(spreadsheet.idPrefix + "multilinetextarea")
+  );
+
+  var text = ele.value + "(";
+
+  SpreadsheetControlSC.SpreadsheetControl.HideFunctions();
+
+  if (mele) {
+    // multi-line editing is in progress
+    mele.value += text;
+    mele.focus();
+    SocialCalc.CmdGotFocus(mele);
+  } else {
+    editor.EditorAddToInput(text, "=");
+  }
+};
+
+SpreadsheetControlSC.SpreadsheetControl.DoMultiline = function () {
+  var SCLocSS = SocialCalc.LocalizeSubstrings;
+
+  var str, ele, text;
+
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  var editor = spreadsheet.editor;
+  var wval = editor.workingvalues;
+
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  var idp = spreadsheet.idPrefix + "multiline";
+
+  ele = /** @type {any} */ ((document as any).getElementById(idp + "dialog"));
+  if (ele) return; // already have one
+
+  switch (editor.state) {
+    case "start":
+      wval.ecoord = editor.ecell.coord;
+      wval.erow = editor.ecell.row;
+      wval.ecol = editor.ecell.col;
+      editor.RangeRemove();
+      text = SocialCalc.GetCellContents(editor.context.sheetobj, wval.ecoord);
+      break;
+
+    case "input":
+    case "inputboxdirect":
+      text = editor.inputBox.GetText();
+      break;
+  }
+
+  editor.inputBox.element.disabled = true;
+
+  text = SocialCalc.special_chars(text);
+
+  str =
+    '<textarea id="' +
+    idp +
+    'textarea" style="width:380px;height:120px;margin:10px 0px 0px 6px;">' +
+    text +
+    "</textarea>" +
+    '<div style="width:380px;text-align:right;padding:6px 0px 4px 6px;font-size:small;">' +
+    SCLocSS(
+      '<input type="button" value="%loc!Set Cell Contents!" style="font-size:smaller;" onclick="SocialCalc.SpreadsheetControl.DoMultilinePaste();">&nbsp;' +
+        '<input type="button" value="%loc!Clear!" style="font-size:smaller;" onclick="SocialCalc.SpreadsheetControl.DoMultilineClear();">&nbsp;' +
+        '<input type="button" value="%loc!Cancel!" style="font-size:smaller;" onclick="SocialCalc.SpreadsheetControl.HideMultiline();"></div>' +
+        "</div>",
+    );
+
+  var main = document.createElement("div");
+  main.id = idp + "dialog";
+
+  main.style.position = "absolute";
+
+  var vp = SocialCalc.GetViewportInfo();
+  var pos = SocialCalc.GetElementPositionWithScroll(spreadsheet.spreadsheetDiv);
+
+  main.style.top = vp.height / 3 - pos.top + "px";
+  main.style.left = vp.width / 3 - pos.left + "px";
+  main.style.zIndex = "100";
+  main.style.backgroundColor = "#FFF";
+  main.style.border = "1px solid black";
+
+  main.style.width = "400px";
+
+  main.innerHTML =
+    '<table cellspacing="0" cellpadding="0" style="border-bottom:1px solid black;"><tr>' +
+    '<td style="font-size:10px;cursor:default;width:100%;background-color:#999;color:#FFF;">' +
+    SCLocSS("&nbsp;%loc!Multi-line Input Box!") +
+    "</td>" +
+    '<td style="font-size:10px;cursor:default;color:#666;" onclick="SocialCalc.SpreadsheetControl.HideMultiline();">&nbsp;X&nbsp;</td></tr></table>' +
+    '<div style="background-color:#DDD;">' +
+    str +
+    "</div>";
+
+  SocialCalc.DragRegister(
+    ((main.firstChild as any).firstChild as any).firstChild as any,
+    true,
+    true,
+    {
+      MouseDown: SocialCalc.DragFunctionStart,
+      MouseMove: SocialCalc.DragFunctionPosition,
+      MouseUp: SocialCalc.DragFunctionPosition,
+      Disabled: null,
+      positionobj: main,
+    },
+    spreadsheet.spreadsheetDiv,
+  );
+
+  spreadsheet.spreadsheetDiv.appendChild(main);
+
+  ele = /** @type {any} */ ((document as any).getElementById(idp + "textarea"));
+  ele.focus();
+  SocialCalc.CmdGotFocus(ele);
+  //!!! need to do keyboard handling: if esc, hide?
+};
+
+SpreadsheetControlSC.SpreadsheetControl.HideMultiline = function () {
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  var editor = spreadsheet.editor;
+
+  var ele = /** @type {any} */ (
+    (document as any).getElementById(spreadsheet.idPrefix + "multilinedialog")
+  );
+  ele.innerHTML = "";
+
+  SocialCalc.DragUnregister(ele);
+
+  SocialCalc.KeyboardFocus();
+
+  if (ele.parentNode) {
+    ele.parentNode.removeChild(ele);
+  }
+
+  switch (editor.state) {
+    case "start":
+      editor.inputBox.DisplayCellContents(null);
+      break;
+
+    case "input":
+    case "inputboxdirect":
+      editor.inputBox.element.disabled = false;
+      editor.inputBox.Focus();
+      break;
+  }
+};
+
+SpreadsheetControlSC.SpreadsheetControl.DoMultilineClear = function () {
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+
+  var ele = /** @type {any} */ (
+    (document as any).getElementById(spreadsheet.idPrefix + "multilinetextarea")
+  );
+
+  ele.value = "";
+  ele.focus();
+};
+
+SpreadsheetControlSC.SpreadsheetControl.DoMultilinePaste = function () {
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  var editor = spreadsheet.editor;
+  var wval = editor.workingvalues;
+
+  var ele = /** @type {any} */ (
+    (document as any).getElementById(spreadsheet.idPrefix + "multilinetextarea")
+  );
+
+  var text = ele.value;
+
+  SpreadsheetControlSC.SpreadsheetControl.HideMultiline();
+
+  switch (editor.state) {
+    case "start":
+      wval.partialexpr = "";
+      wval.ecoord = editor.ecell.coord;
+      wval.erow = editor.ecell.row;
+      wval.ecol = editor.ecell.col;
+      break;
+    case "input":
+    case "inputboxdirect":
+      editor.inputBox.Blur();
+      editor.inputBox.ShowInputBox(false);
+      editor.state = "start";
+      break;
+  }
+
+  editor.EditorSaveEdit(text);
+};
+
+SpreadsheetControlSC.SpreadsheetControl.DoLink = function () {
+  var SCLoc = SocialCalc.LocalizeString;
+
+  var str, ele, text, cell, setformat, popup;
+
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  var editor = spreadsheet.editor;
+  var wval = editor.workingvalues;
+
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  var idp = spreadsheet.idPrefix + "link";
+
+  ele = /** @type {any} */ ((document as any).getElementById(idp + "dialog"));
+  if (ele) return; // already have one
+
+  switch (editor.state) {
+    case "start":
+      wval.ecoord = editor.ecell.coord;
+      wval.erow = editor.ecell.row;
+      wval.ecol = editor.ecell.col;
+      editor.RangeRemove();
+      text = SocialCalc.GetCellContents(editor.context.sheetobj, wval.ecoord);
+      break;
+
+    case "input":
+    case "inputboxdirect":
+      text = editor.inputBox.GetText();
+      break;
+  }
+
+  editor.inputBox.element.disabled = true;
+
+  if (text.charAt(0) == "'") {
+    text = text.slice(1);
+  }
+
+  var parts = SocialCalc.ParseCellLinkText(text);
+
+  text = SocialCalc.special_chars(text);
+
+  cell = spreadsheet.sheet.cells[editor.ecell.coord];
+  // set to link format, but don't override
+  setformat = !cell || !cell.textvalueformat ? " checked" : "";
+
+  popup = parts.newwin ? " checked" : "";
+
+  str =
+    '<div style="padding:6px 0px 4px 6px;">' +
+    '<span style="font-size:smaller;">' +
+    SCLoc("Description") +
+    "</span><br>" +
+    '<input type="text" id="' +
+    idp +
+    'desc" style="width:380px;" value="' +
+    SocialCalc.special_chars(parts.desc) +
+    '"><br>' +
+    '<span style="font-size:smaller;">' +
+    SCLoc("URL") +
+    "</span><br>" +
+    '<input type="text" id="' +
+    idp +
+    'url" style="width:380px;" value="' +
+    SocialCalc.special_chars(parts.url) +
+    '"><br>';
+  if (SocialCalc.Callbacks.MakePageLink) {
+    // only show if handling pagenames here
+    str +=
+      '<span style="font-size:smaller;">' +
+      SCLoc("Page Name") +
+      "</span><br>" +
+      '<input type="text" id="' +
+      idp +
+      'pagename" style="width:380px;" value="' +
+      SocialCalc.special_chars(parts.pagename) +
+      '"><br>' +
+      '<span style="font-size:smaller;">' +
+      SCLoc("Workspace") +
+      "</span><br>" +
+      '<input type="text" id="' +
+      idp +
+      'workspace" style="width:380px;" value="' +
+      SocialCalc.special_chars(parts.workspace) +
+      '"><br>';
+  }
+  str += SocialCalc.LocalizeSubstrings(
+    '<input type="checkbox" id="' +
+      idp +
+      'format"' +
+      setformat +
+      ">&nbsp;" +
+      '<span style="font-size:smaller;">%loc!Set to Link format!</span><br>' +
+      '<input type="checkbox" id="' +
+      idp +
+      'popup"' +
+      popup +
+      ">&nbsp;" +
+      '<span style="font-size:smaller;">%loc!Show in new browser window!</span>' +
+      "</div>" +
+      '<div style="width:380px;text-align:right;padding:6px 0px 4px 6px;font-size:small;">' +
+      '<input type="button" value="%loc!Set Cell Contents!" style="font-size:smaller;" onclick="SocialCalc.SpreadsheetControl.DoLinkPaste();">&nbsp;' +
+      '<input type="button" value="%loc!Clear!" style="font-size:smaller;" onclick="SocialCalc.SpreadsheetControl.DoLinkClear();">&nbsp;' +
+      '<input type="button" value="%loc!Cancel!" style="font-size:smaller;" onclick="SocialCalc.SpreadsheetControl.HideLink();"></div>' +
+      "</div>",
+  );
+
+  var main = document.createElement("div");
+  main.id = idp + "dialog";
+
+  main.style.position = "absolute";
+
+  var vp = SocialCalc.GetViewportInfo();
+  var pos = SocialCalc.GetElementPositionWithScroll(spreadsheet.spreadsheetDiv);
+
+  main.style.top = vp.height / 3 - pos.top + "px";
+  main.style.left = vp.width / 3 - pos.left + "px";
+  main.style.zIndex = "100";
+  main.style.backgroundColor = "#FFF";
+  main.style.border = "1px solid black";
+
+  main.style.width = "400px";
+
+  main.innerHTML =
+    '<table cellspacing="0" cellpadding="0" style="border-bottom:1px solid black;"><tr>' +
+    '<td style="font-size:10px;cursor:default;width:100%;background-color:#999;color:#FFF;">' +
+    "&nbsp;" +
+    SCLoc("Link Input Box") +
+    "</td>" +
+    '<td style="font-size:10px;cursor:default;color:#666;" onclick="SocialCalc.SpreadsheetControl.HideLink();">&nbsp;X&nbsp;</td></tr></table>' +
+    '<div style="background-color:#DDD;">' +
+    str +
+    "</div>";
+
+  SocialCalc.DragRegister(
+    ((main.firstChild as any).firstChild as any).firstChild as any,
+    true,
+    true,
+    {
+      MouseDown: SocialCalc.DragFunctionStart,
+      MouseMove: SocialCalc.DragFunctionPosition,
+      MouseUp: SocialCalc.DragFunctionPosition,
+      Disabled: null,
+      positionobj: main,
+    },
+    spreadsheet.spreadsheetDiv,
+  );
+
+  spreadsheet.spreadsheetDiv.appendChild(main);
+
+  ele = /** @type {any} */ ((document as any).getElementById(idp + "url"));
+  ele.focus();
+  SocialCalc.CmdGotFocus(ele);
+  //!!! need to do keyboard handling: if esc, hide?
+};
+
+SpreadsheetControlSC.SpreadsheetControl.HideLink = function () {
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  var editor = spreadsheet.editor;
+
+  var ele = /** @type {any} */ (
+    (document as any).getElementById(spreadsheet.idPrefix + "linkdialog")
+  );
+  ele.innerHTML = "";
+
+  SocialCalc.DragUnregister(ele);
+
+  SocialCalc.KeyboardFocus();
+
+  if (ele.parentNode) {
+    ele.parentNode.removeChild(ele);
+  }
+
+  switch (editor.state) {
+    case "start":
+      editor.inputBox.DisplayCellContents(null);
+      break;
+
+    case "input":
+    case "inputboxdirect":
+      editor.inputBox.element.disabled = false;
+      editor.inputBox.Focus();
+      break;
+  }
+};
+
+SpreadsheetControlSC.SpreadsheetControl.DoLinkClear = function () {
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+
+  /** @type {any} */ ((document as any).getElementById(spreadsheet.idPrefix + "linkdesc")).value =
+    "";
+  /** @type {any} */ (
+    (document as any).getElementById(spreadsheet.idPrefix + "linkpagename")
+  ).value = "";
+  /** @type {any} */ (
+    (document as any).getElementById(spreadsheet.idPrefix + "linkworkspace")
+  ).value = "";
+
+  var ele = /** @type {any} */ ((document as any).getElementById(spreadsheet.idPrefix + "linkurl"));
+  ele.value = "";
+  ele.focus();
+};
+
+SpreadsheetControlSC.SpreadsheetControl.DoLinkPaste = function () {
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  var editor = spreadsheet.editor;
+  var wval = editor.workingvalues;
+
+  var descele = /** @type {any} */ (
+    (document as any).getElementById(spreadsheet.idPrefix + "linkdesc")
+  );
+  var urlele = /** @type {any} */ (
+    (document as any).getElementById(spreadsheet.idPrefix + "linkurl")
+  );
+  var pagenameele = /** @type {any} */ (
+    (document as any).getElementById(spreadsheet.idPrefix + "linkpagename")
+  );
+  var workspaceele = /** @type {any} */ (
+    (document as any).getElementById(spreadsheet.idPrefix + "linkworkspace")
+  );
+  var formatele = /** @type {any} */ (
+    (document as any).getElementById(spreadsheet.idPrefix + "linkformat")
+  );
+  var popupele = /** @type {any} */ (
+    (document as any).getElementById(spreadsheet.idPrefix + "linkpopup")
+  );
+
+  var text = "";
+
+  var ltsym, gtsym, obsym, cbsym;
+
+  if (popupele.checked) {
+    ltsym = "<<";
+    gtsym = ">>";
+    obsym = "[[";
+    cbsym = "]]";
+  } else {
+    ltsym = "<";
+    gtsym = ">";
+    obsym = "[";
+    cbsym = "]";
+  }
+
+  if (pagenameele && pagenameele.value) {
+    if (workspaceele.value) {
+      text = descele.value + "{" + workspaceele.value + obsym + pagenameele.value + cbsym + "}";
     } else {
-        spreadsheet.sheet.selected_search_cell = undefined;
-        searchstatus.text("No Matches");
+      text = descele.value + obsym + pagenameele.value + cbsym;
     }
-        
-}
+  } else {
+    text = descele.value + ltsym + urlele.value + gtsym;
+  }
+
+  SpreadsheetControlSC.SpreadsheetControl.HideLink();
+
+  switch (editor.state) {
+    case "start":
+      wval.partialexpr = "";
+      wval.ecoord = editor.ecell.coord;
+      wval.erow = editor.ecell.row;
+      wval.ecol = editor.ecell.col;
+      break;
+    case "input":
+    case "inputboxdirect":
+      editor.inputBox.Blur();
+      editor.inputBox.ShowInputBox(false);
+      editor.state = "start";
+      break;
+  }
+
+  if (formatele.checked) {
+    SocialCalc.SpreadsheetControlExecuteCommand(null, "set %C textvalueformat text-link", "");
+  }
+
+  editor.EditorSaveEdit(text);
+};
+
+SpreadsheetControlSC.SpreadsheetControl.DoSum = function () {
+  var cmd, cell, row, col, sel, cr, foundvalue;
+
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  var editor = spreadsheet.editor;
+  var sheet = editor.context.sheetobj;
+
+  if (editor.range.hasrange) {
+    sel =
+      SocialCalc.crToCoord(editor.range.left, editor.range.top) +
+      ":" +
+      SocialCalc.crToCoord(editor.range.right, editor.range.bottom);
+    cmd =
+      "set " +
+      SocialCalc.crToCoord(editor.range.right, editor.range.bottom + 1) +
+      " formula sum(" +
+      sel +
+      ")";
+  } else {
+    row = editor.ecell.row - 1;
+    col = editor.ecell.col;
+    if (row <= 1) {
+      cmd = "set " + editor.ecell.coord + " constant e#REF! 0 #REF!";
+    } else {
+      foundvalue = false;
+      while (row > 0) {
+        cr = SocialCalc.crToCoord(col, row);
+        cell = sheet.GetAssuredCell(cr);
+        if (!cell.datatype || cell.datatype == "t") {
+          if (foundvalue) {
+            row++;
+            break;
+          }
+        } else {
+          foundvalue = true;
+        }
+        row--;
+      }
+      cmd =
+        "set " +
+        editor.ecell.coord +
+        " formula sum(" +
+        SocialCalc.crToCoord(col, row) +
+        ":" +
+        SocialCalc.crToCoord(col, editor.ecell.row - 1) +
+        ")";
+    }
+  }
+
+  editor.EditorScheduleSheetCommands(cmd, true, false);
+};
+
+SpreadsheetControlSC.SpreadsheetControl.FindInSheet = function () {
+  var searchstatus = $("#searchstatus");
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  if (!this.value.length) {
+    searchstatus.text("");
+    spreadsheet.sheet.search_cells = [];
+    spreadsheet.sheet.selected_search_cell = undefined;
+    return;
+  }
+  var cells = spreadsheet.sheet.cells;
+  var regex = new RegExp(this.value, "im");
+  var cell, cellvalue;
+  var search_cells = [];
+  for (var cell_id in cells) {
+    cell = cells[cell_id];
+    var cr = SocialCalc.coordToCr(cell_id);
+    if (
+      spreadsheet.sheet.rowattribs.hide[cr.row] === "yes" ||
+      spreadsheet.sheet.colattribs.hide[SocialCalc.rcColname(cr.col)] === "yes"
+    ) {
+      continue;
+    }
+    if (cell.datatype === "c") {
+      cellvalue = cell.displaystring;
+    } else {
+      cellvalue = String(cell.datavalue);
+    }
+    if (cellvalue !== undefined && cellvalue.match(regex)) {
+      search_cells.push(cell_id);
+    }
+  }
+  spreadsheet.sheet.search_cells = search_cells;
+  if (search_cells.length) {
+    spreadsheet.sheet.selected_search_cell = 0;
+    spreadsheet.editor.MoveECell(search_cells[0]);
+    searchstatus.text("1 of " + search_cells.length);
+  } else {
+    spreadsheet.sheet.selected_search_cell = undefined;
+    searchstatus.text("No Matches");
+  }
+};
 
 /** @param {0|1} direction */
-SpreadsheetControlSC.SpreadsheetControl.SearchSheet = function(direction: any) {
-    var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-    var sheet = spreadsheet.sheet;
-    var cells = sheet.search_cells;
-    if (!cells.length) {
-        return;
-    }
-    var selected_cell = sheet.selected_search_cell;
-    if (selected_cell === (direction === 0 ? 0 : cells.length-1)) {
-        selected_cell = (direction === 0 ? cells.length-1 : 0);
-    } else {
-        selected_cell += (direction === 0 ? -1 : 1);
-    }
-    var new_cell = cells[selected_cell];
-    sheet.selected_search_cell = selected_cell; 
-    spreadsheet.editor.MoveECell(new_cell);
-    /** @type {any} */((document as any).getElementById("searchstatus")).textContent = String(selected_cell+1) + " of " + cells.length;
-}
- 
-SpreadsheetControlSC.SpreadsheetControl.SearchUp = function() {
-    SpreadsheetControlSC.SpreadsheetControl.SearchSheet(0);    
-}
+SpreadsheetControlSC.SpreadsheetControl.SearchSheet = function (direction: any) {
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  var sheet = spreadsheet.sheet;
+  var cells = sheet.search_cells;
+  if (!cells.length) {
+    return;
+  }
+  var selected_cell = sheet.selected_search_cell;
+  if (selected_cell === (direction === 0 ? 0 : cells.length - 1)) {
+    selected_cell = direction === 0 ? cells.length - 1 : 0;
+  } else {
+    selected_cell += direction === 0 ? -1 : 1;
+  }
+  var new_cell = cells[selected_cell];
+  sheet.selected_search_cell = selected_cell;
+  spreadsheet.editor.MoveECell(new_cell);
+  /** @type {any} */ ((document as any).getElementById("searchstatus")).textContent =
+    String(selected_cell + 1) + " of " + cells.length;
+};
 
-SpreadsheetControlSC.SpreadsheetControl.SearchDown = function() {
-    SpreadsheetControlSC.SpreadsheetControl.SearchSheet(1);
-}
+SpreadsheetControlSC.SpreadsheetControl.SearchUp = function () {
+  SpreadsheetControlSC.SpreadsheetControl.SearchSheet(0);
+};
+
+SpreadsheetControlSC.SpreadsheetControl.SearchDown = function () {
+  SpreadsheetControlSC.SpreadsheetControl.SearchSheet(1);
+};
 
 //
 // TAB Routines
@@ -2782,383 +3269,457 @@ SpreadsheetControlSC.SpreadsheetControl.SearchDown = function() {
 
 // Sort
 
-/** @param {any} s @param {any} t */
-SpreadsheetControlSC.SpreadsheetControlSortOnclick = function(s: any, t: any) {
+/** @param {any} s @param {any} _t */
+SpreadsheetControlSC.SpreadsheetControlSortOnclick = function (s: any, _t: any) {
+  var name, i;
+  var namelist = [];
+  var nl = /** @type {any} */ ((document as any).getElementById(s.idPrefix + "sortlist"));
+  SocialCalc.LoadColumnChoosers(s);
+  s.editor.RangeChangeCallback.sort = SocialCalc.UpdateSortRangeProposal;
 
-   var name, i;
-   var namelist = [];
-   var nl = /** @type {any} */((document as any).getElementById(s.idPrefix+"sortlist"));
-   SocialCalc.LoadColumnChoosers(s);
-   s.editor.RangeChangeCallback.sort = SocialCalc.UpdateSortRangeProposal;
+  for (name in s.sheet.names) {
+    namelist.push(name);
+  }
+  namelist.sort();
+  nl.length = 0;
+  nl.options[0] = new Option(SocialCalc.LocalizeString("[select range]"));
+  nl.options[1] = new Option(SocialCalc.LocalizeString("Sort All"), "all");
+  var n_options = nl.options.length;
 
-   for (name in s.sheet.names) {
-      namelist.push(name);
-      }
-   namelist.sort();
-   nl.length = 0;
-   nl.options[0] = new Option(SocialCalc.LocalizeString("[select range]"));
-   nl.options[1] = new Option(SocialCalc.LocalizeString("Sort All"), "all");
-   var n_options = nl.options.length;
+  for (i = 0; i < namelist.length; i++) {
+    name = namelist[i];
+    nl.options[i + n_options] = new Option(name, name);
+    if (name == s.sortrange) {
+      nl.options[i + n_options].selected = true;
+    }
+  }
+  if (s.sortrange == "") {
+    nl.options[0].selected = true;
+  }
 
-   for (i=0; i<namelist.length; i++) {
-      name = namelist[i];
-      nl.options[i+n_options] = new Option(name, name);
-      if (name == s.sortrange) {
-         nl.options[i+n_options].selected = true;
-         }
-      }
-   if (s.sortrange == "") {
-      nl.options[0].selected = true;
-      }
+  SocialCalc.UpdateSortRangeProposal(s.editor);
+  SocialCalc.KeyboardFocus();
+  return;
+};
 
-   SocialCalc.UpdateSortRangeProposal(s.editor);
-   SocialCalc.KeyboardFocus();
-   return;
+/** @param {any} _editor @param {any} _setting */
+SpreadsheetControlSC.SpreadsheetControlSortSave = function (_editor: any, _setting: any) {
+  // Format is:
+  //    sort:sortrange:major:up/down:minor:up/down:last:up/down
 
-   }
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  var str, sele, rele;
 
-/** @param {any} editor @param {any} setting */
-SpreadsheetControlSC.SpreadsheetControlSortSave = function(editor: any, setting: any) {
-   // Format is:
-   //    sort:sortrange:major:up/down:minor:up/down:last:up/down
+  str = "sort:" + SocialCalc.encodeForSave(spreadsheet.sortrange) + ":";
+  sele = /** @type {any} */ ((document as any).getElementById(spreadsheet.idPrefix + "majorsort"));
+  rele = /** @type {any} */ (
+    (document as any).getElementById(spreadsheet.idPrefix + "majorsortup")
+  );
+  str += sele.selectedIndex + (rele.checked ? ":up" : ":down");
+  sele = /** @type {any} */ ((document as any).getElementById(spreadsheet.idPrefix + "minorsort"));
+  if (sele.selectedIndex > 0) {
+    rele = /** @type {any} */ (
+      (document as any).getElementById(spreadsheet.idPrefix + "minorsortup")
+    );
+    str += ":" + sele.selectedIndex + (rele.checked ? ":up" : ":down");
+  } else {
+    str += "::";
+  }
+  sele = /** @type {any} */ ((document as any).getElementById(spreadsheet.idPrefix + "lastsort"));
+  if (sele.selectedIndex > 0) {
+    rele = /** @type {any} */ (
+      (document as any).getElementById(spreadsheet.idPrefix + "lastsortup")
+    );
+    str += ":" + sele.selectedIndex + (rele.checked ? ":up" : ":down");
+  } else {
+    str += "::";
+  }
+  return str + "\n";
+};
 
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var str, sele, rele;
+/** @param {any} _editor @param {any} _setting @param {string} line @param {any} _flags */
+SpreadsheetControlSC.SpreadsheetControlSortLoad = function (
+  _editor: any,
+  _setting: any,
+  line: any,
+  _flags: any,
+) {
+  /** @type {any} */
+  var parts;
+  /** @type {any} */
+  var ele;
+  /** @type {any} */
+  var sele;
 
-   str = "sort:"+SocialCalc.encodeForSave(spreadsheet.sortrange)+":";
-   sele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"majorsort"));
-   rele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"majorsortup"));
-   str += sele.selectedIndex + (rele.checked ? ":up" : ":down");
-   sele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"minorsort"));
-   if (sele.selectedIndex>0) {
-      rele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"minorsortup"));
-      str += ":"+sele.selectedIndex + (rele.checked ? ":up" : ":down");
-      }
-   else {
-      str += "::";
-      }
-   sele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"lastsort"));
-   if (sele.selectedIndex>0) {
-      rele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"lastsortup"));
-      str += ":"+sele.selectedIndex + (rele.checked ? ":up" : ":down");
-      }
-    else {
-      str += "::";
-      }
-   return str+"\n";
-   }
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
 
-/** @param {any} editor @param {any} setting @param {string} line @param {any} flags */
-SpreadsheetControlSC.SpreadsheetControlSortLoad = function(editor: any, setting: any, line: any, flags: any) {
-   /** @type {any} */
-   var parts;
-   /** @type {any} */
-   var ele;
-   /** @type {any} */
-   var sele;
+  parts = line.split(":");
+  spreadsheet.sortrange = SocialCalc.decodeFromSave(parts[1]);
+  ele = /** @type {any} */ ((document as any).getElementById(spreadsheet.idPrefix + "sortbutton"));
+  if (spreadsheet.sortrange) {
+    ele.value = SocialCalc.LocalizeString("Sort ") + spreadsheet.sortrange;
+    ele.style.visibility = "visible";
+  } else {
+    ele.style.visibility = "hidden";
+  }
+  SocialCalc.LoadColumnChoosers(spreadsheet);
 
-   var spreadsheet = (SocialCalc.GetSpreadsheetControlObject() as any);
+  sele = /** @type {any} */ ((document as any).getElementById(spreadsheet.idPrefix + "majorsort"));
+  sele.selectedIndex = parts[2] - 0;
+  /** @type {any} */ (
+    (document as any).getElementById(spreadsheet.idPrefix + "majorsort" + parts[3])
+  ).checked = true;
+  sele = /** @type {any} */ ((document as any).getElementById(spreadsheet.idPrefix + "minorsort"));
+  if (parts[4]) {
+    sele.selectedIndex = parts[4] - 0;
+    /** @type {any} */ (
+      (document as any).getElementById(spreadsheet.idPrefix + "minorsort" + parts[5])
+    ).checked = true;
+  } else {
+    sele.selectedIndex = 0;
+    /** @type {any} */ (
+      (document as any).getElementById(spreadsheet.idPrefix + "minorsortup")
+    ).checked = true;
+  }
+  sele = /** @type {any} */ ((document as any).getElementById(spreadsheet.idPrefix + "lastsort"));
+  if (parts[6]) {
+    sele.selectedIndex = parts[6] - 0;
+    /** @type {any} */ (
+      (document as any).getElementById(spreadsheet.idPrefix + "lastsort" + parts[7])
+    ).checked = true;
+  } else {
+    sele.selectedIndex = 0;
+    /** @type {any} */ (
+      (document as any).getElementById(spreadsheet.idPrefix + "lastsortup")
+    ).checked = true;
+  }
 
-   parts = line.split(":");
-   spreadsheet.sortrange = SocialCalc.decodeFromSave(parts[1]);
-   ele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"sortbutton"));
-   if (spreadsheet.sortrange) {
-      ele.value = SocialCalc.LocalizeString("Sort ")+spreadsheet.sortrange;
-      ele.style.visibility = "visible";
-      }
-   else {
-      ele.style.visibility = "hidden";
-      }
-   SocialCalc.LoadColumnChoosers(spreadsheet);
-
-   sele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"majorsort"));
-   sele.selectedIndex = parts[2]-0;
-   /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"majorsort"+parts[3])).checked = true;
-   sele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"minorsort"));
-   if (parts[4]) {
-      sele.selectedIndex = parts[4]-0;
-      /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"minorsort"+parts[5])).checked = true;
-      }
-   else {
-      sele.selectedIndex = 0;
-      /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"minorsortup")).checked = true;
-      }
-   sele = /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"lastsort"));
-   if (parts[6]) {
-      sele.selectedIndex = parts[6]-0;
-      /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"lastsort"+parts[7])).checked = true;
-      }
-    else {
-      sele.selectedIndex = 0;
-      /** @type {any} */((document as any).getElementById(spreadsheet.idPrefix+"lastsortup")).checked = true;
-      }
-
-   return true;
-   }
+  return true;
+};
 
 // Comment
 
 /** @param {any} s @param {any} t */
-SpreadsheetControlSC.SpreadsheetControlCommentOnclick = function(s: any, t: any) {
-   s.editor.MoveECellCallback.comment = SocialCalc.SpreadsheetControlCommentMoveECell;
-   SocialCalc.SpreadsheetControlCommentDisplay(s, t);
-   SocialCalc.KeyboardFocus();
-   return;
-   }
+SpreadsheetControlSC.SpreadsheetControlCommentOnclick = function (s: any, t: any) {
+  s.editor.MoveECellCallback.comment = SocialCalc.SpreadsheetControlCommentMoveECell;
+  SocialCalc.SpreadsheetControlCommentDisplay(s, t);
+  SocialCalc.KeyboardFocus();
+  return;
+};
 
-/** @param {any} s @param {any} t */
-SpreadsheetControlSC.SpreadsheetControlCommentDisplay = function(s: any, t: any) {
-   var c = "";
-   if (s.editor.ecell && s.editor.ecell.coord && s.sheet.cells[s.editor.ecell.coord]) {
-      c = s.sheet.cells[s.editor.ecell.coord].comment || "";
-      }
-   /** @type {any} */((document as any).getElementById(s.idPrefix+"commenttext")).value = c;
-   }
+/** @param {any} s @param {any} _t */
+SpreadsheetControlSC.SpreadsheetControlCommentDisplay = function (s: any, _t: any) {
+  var c = "";
+  if (s.editor.ecell && s.editor.ecell.coord && s.sheet.cells[s.editor.ecell.coord]) {
+    c = s.sheet.cells[s.editor.ecell.coord].comment || "";
+  }
+  /** @type {any} */ ((document as any).getElementById(s.idPrefix + "commenttext")).value = c;
+};
 
-/** @param {any} editor */
-SpreadsheetControlSC.SpreadsheetControlCommentMoveECell = function(editor: any) {
-   SocialCalc.SpreadsheetControlCommentDisplay((SocialCalc.GetSpreadsheetControlObject() as any), "comment");
-   }
+/** @param {any} _editor */
+SpreadsheetControlSC.SpreadsheetControlCommentMoveECell = function (_editor: any) {
+  SocialCalc.SpreadsheetControlCommentDisplay(
+    SocialCalc.GetSpreadsheetControlObject() as any,
+    "comment",
+  );
+};
 
-SpreadsheetControlSC.SpreadsheetControlCommentSet = function() {
-   var s=(SocialCalc.GetSpreadsheetControlObject() as any);
-   s.ExecuteCommand("set %C comment "+SocialCalc.encodeForSave(/** @type {any} */((document as any).getElementById(s.idPrefix+"commenttext")).value));
-   var cell=SocialCalc.GetEditorCellElement(s.editor, s.editor.ecell.row, s.editor.ecell.col) as any;
-   if (!s.editor.ECellReadonly()) {
-      cell.element.title = /** @type {any} */((document as any).getElementById(s.idPrefix+"commenttext")).value;
-      s.editor.UpdateCellCSS(cell, s.editor.ecell.row, s.editor.ecell.col);
-      }
-   SocialCalc.KeyboardFocus();
-   }
+SpreadsheetControlSC.SpreadsheetControlCommentSet = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  s.ExecuteCommand(
+    "set %C comment " +
+      SocialCalc.encodeForSave(
+        /** @type {any} */ ((document as any).getElementById(s.idPrefix + "commenttext")).value,
+      ),
+  );
+  var cell = SocialCalc.GetEditorCellElement(
+    s.editor,
+    s.editor.ecell.row,
+    s.editor.ecell.col,
+  ) as any;
+  if (!s.editor.ECellReadonly()) {
+    cell.element.title = /** @type {any} */ (
+      (document as any).getElementById(s.idPrefix + "commenttext")
+    ).value;
+    s.editor.UpdateCellCSS(cell, s.editor.ecell.row, s.editor.ecell.col);
+  }
+  SocialCalc.KeyboardFocus();
+};
 
-/** @param {any} s @param {any} t */
-SpreadsheetControlSC.SpreadsheetControlCommentOnunclick = function(s: any, t: any) {
-   delete s.editor.MoveECellCallback.comment;
-   }
+/** @param {any} s @param {any} _t */
+SpreadsheetControlSC.SpreadsheetControlCommentOnunclick = function (s: any, _t: any) {
+  delete s.editor.MoveECellCallback.comment;
+};
 
 // Names
 
-/** @param {any} s @param {any} t */
-SpreadsheetControlSC.SpreadsheetControlNamesOnclick = function(s: any, t: any) {
-   /** @type {any} */((document as any).getElementById(s.idPrefix+"namesname")).value = "";
-   /** @type {any} */((document as any).getElementById(s.idPrefix+"namesdesc")).value = "";
-   /** @type {any} */((document as any).getElementById(s.idPrefix+"namesvalue")).value = "";
-   s.editor.RangeChangeCallback.names = SocialCalc.SpreadsheetControlNamesRangeChange;
-   s.editor.MoveECellCallback.names = SocialCalc.SpreadsheetControlNamesRangeChange;
-   SocialCalc.SpreadsheetControlNamesRangeChange(s.editor);
-   SocialCalc.SpreadsheetControlNamesFillNameList();
-   SocialCalc.SpreadsheetControlNamesChangedName();
-   }
+/** @param {any} s @param {any} _t */
+SpreadsheetControlSC.SpreadsheetControlNamesOnclick = function (s: any, _t: any) {
+  /** @type {any} */ ((document as any).getElementById(s.idPrefix + "namesname")).value = "";
+  /** @type {any} */ ((document as any).getElementById(s.idPrefix + "namesdesc")).value = "";
+  /** @type {any} */ ((document as any).getElementById(s.idPrefix + "namesvalue")).value = "";
+  s.editor.RangeChangeCallback.names = SocialCalc.SpreadsheetControlNamesRangeChange;
+  s.editor.MoveECellCallback.names = SocialCalc.SpreadsheetControlNamesRangeChange;
+  SocialCalc.SpreadsheetControlNamesRangeChange(s.editor);
+  SocialCalc.SpreadsheetControlNamesFillNameList();
+  SocialCalc.SpreadsheetControlNamesChangedName();
+};
 
-SpreadsheetControlSC.SpreadsheetControlNamesFillNameList = function() {
-   var SCLoc = SocialCalc.LocalizeString;
-   var name, i;
-   var namelist = [];
-   var s=(SocialCalc.GetSpreadsheetControlObject() as any);
-   var nl = /** @type {any} */((document as any).getElementById(s.idPrefix+"nameslist"));
-   var currentname = /** @type {any} */((document as any).getElementById(s.idPrefix+"namesname")).value.toUpperCase().replace(/[^A-Z0-9_\.]/g, "");
-   for (name in s.sheet.names) {
-      namelist.push(name);
-      }
-   namelist.sort();
-   nl.length = 0;
-   if (namelist.length > 0) {
-      nl.options[0] = new Option(SCLoc("[New]"));
-      }
-   else {
-      nl.options[0] = new Option(SCLoc("[None]"));
-      }
-   for (i=0; i<namelist.length; i++) {
-      name = namelist[i];
-      nl.options[i+1] = new Option(name, name);
-      if (name == currentname) {
-         nl.options[i+1].selected = true;
-         }
-      }
-   if (currentname == "") {
-      nl.options[0].selected = true;
-      }
-   }
+SpreadsheetControlSC.SpreadsheetControlNamesFillNameList = function () {
+  var SCLoc = SocialCalc.LocalizeString;
+  var name, i;
+  var namelist = [];
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var nl = /** @type {any} */ ((document as any).getElementById(s.idPrefix + "nameslist"));
+  var currentname = /** @type {any} */ (
+    (document as any).getElementById(s.idPrefix + "namesname")
+  ).value
+    .toUpperCase()
+    .replace(/[^A-Z0-9_.]/g, "");
+  for (name in s.sheet.names) {
+    namelist.push(name);
+  }
+  namelist.sort();
+  nl.length = 0;
+  if (namelist.length > 0) {
+    nl.options[0] = new Option(SCLoc("[New]"));
+  } else {
+    nl.options[0] = new Option(SCLoc("[None]"));
+  }
+  for (i = 0; i < namelist.length; i++) {
+    name = namelist[i];
+    nl.options[i + 1] = new Option(name, name);
+    if (name == currentname) {
+      nl.options[i + 1].selected = true;
+    }
+  }
+  if (currentname == "") {
+    nl.options[0].selected = true;
+  }
+};
 
-SpreadsheetControlSC.SpreadsheetControlNamesChangedName = function() {
-   var s=(SocialCalc.GetSpreadsheetControlObject() as any);
-   var nl = /** @type {any} */((document as any).getElementById(s.idPrefix+"nameslist"));
-   var name = nl.options[nl.selectedIndex].value;
-   if (s.sheet.names[name]) {
-      /** @type {any} */((document as any).getElementById(s.idPrefix+"namesname")).value = name;
-      /** @type {any} */((document as any).getElementById(s.idPrefix+"namesdesc")).value = s.sheet.names[name].desc || "";
-      /** @type {any} */((document as any).getElementById(s.idPrefix+"namesvalue")).value = s.sheet.names[name].definition || "";
-      }
-   else {
-      /** @type {any} */((document as any).getElementById(s.idPrefix+"namesname")).value = "";
-      /** @type {any} */((document as any).getElementById(s.idPrefix+"namesdesc")).value = "";
-      /** @type {any} */((document as any).getElementById(s.idPrefix+"namesvalue")).value = "";
-      }
-   }
+SpreadsheetControlSC.SpreadsheetControlNamesChangedName = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var nl = /** @type {any} */ ((document as any).getElementById(s.idPrefix + "nameslist"));
+  var name = nl.options[nl.selectedIndex].value;
+  if (s.sheet.names[name]) {
+    /** @type {any} */ ((document as any).getElementById(s.idPrefix + "namesname")).value = name;
+    /** @type {any} */ ((document as any).getElementById(s.idPrefix + "namesdesc")).value =
+      s.sheet.names[name].desc || "";
+    /** @type {any} */ ((document as any).getElementById(s.idPrefix + "namesvalue")).value =
+      s.sheet.names[name].definition || "";
+  } else {
+    /** @type {any} */ ((document as any).getElementById(s.idPrefix + "namesname")).value = "";
+    /** @type {any} */ ((document as any).getElementById(s.idPrefix + "namesdesc")).value = "";
+    /** @type {any} */ ((document as any).getElementById(s.idPrefix + "namesvalue")).value = "";
+  }
+};
 
 /** @param {any} editor */
-SpreadsheetControlSC.SpreadsheetControlNamesRangeChange = function(editor: any) {
-   var s = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var ele = /** @type {any} */((document as any).getElementById(s.idPrefix+"namesrangeproposal"));
-   if (editor.range.hasrange) {
-      ele.value = SocialCalc.crToCoord(editor.range.left, editor.range.top) + ":" +
-                            SocialCalc.crToCoord(editor.range.right, editor.range.bottom);
-      }
-   else {
-      ele.value = editor.ecell.coord;
-      }
-   }
+SpreadsheetControlSC.SpreadsheetControlNamesRangeChange = function (editor: any) {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var ele = /** @type {any} */ (
+    (document as any).getElementById(s.idPrefix + "namesrangeproposal")
+  );
+  if (editor.range.hasrange) {
+    ele.value =
+      SocialCalc.crToCoord(editor.range.left, editor.range.top) +
+      ":" +
+      SocialCalc.crToCoord(editor.range.right, editor.range.bottom);
+  } else {
+    ele.value = editor.ecell.coord;
+  }
+};
 
-/** @param {any} s @param {any} t */
-SpreadsheetControlSC.SpreadsheetControlNamesOnunclick = function(s: any, t: any) {
-   delete s.editor.RangeChangeCallback.names;
-   delete s.editor.MoveECellCallback.names;
-   }
+/** @param {any} s @param {any} _t */
+SpreadsheetControlSC.SpreadsheetControlNamesOnunclick = function (s: any, _t: any) {
+  delete s.editor.RangeChangeCallback.names;
+  delete s.editor.MoveECellCallback.names;
+};
 
-SpreadsheetControlSC.SpreadsheetControlNamesSetValue = function() {
-   var s = (SocialCalc.GetSpreadsheetControlObject() as any);
-   /** @type {any} */((document as any).getElementById(s.idPrefix+"namesvalue")).value = /** @type {any} */((document as any).getElementById(s.idPrefix+"namesrangeproposal")).value;
-   SocialCalc.KeyboardFocus();
-   }
+SpreadsheetControlSC.SpreadsheetControlNamesSetValue = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  /** @type {any} */ ((document as any).getElementById(s.idPrefix + "namesvalue")).value =
+    /** @type {any} */ ((document as any).getElementById(s.idPrefix + "namesrangeproposal")).value;
+  SocialCalc.KeyboardFocus();
+};
 
-SpreadsheetControlSC.SpreadsheetControlNamesSave = function() {
-   var s = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var name = /** @type {any} */((document as any).getElementById(s.idPrefix+"namesname")).value;
-   SocialCalc.SetTab(s.tabs[0].name); // return to first tab
-   SocialCalc.KeyboardFocus();
-   if (name != "") {
-      s.ExecuteCommand("name define "+name+" "+/** @type {any} */((document as any).getElementById(s.idPrefix+"namesvalue")).value+"\n"+
-         "name desc "+name+" "+/** @type {any} */((document as any).getElementById(s.idPrefix+"namesdesc")).value);
-      }
-   }
+SpreadsheetControlSC.SpreadsheetControlNamesSave = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var name = /** @type {any} */ ((document as any).getElementById(s.idPrefix + "namesname")).value;
+  SocialCalc.SetTab(s.tabs[0].name); // return to first tab
+  SocialCalc.KeyboardFocus();
+  if (name != "") {
+    s.ExecuteCommand(
+      "name define " +
+        name +
+        " " +
+        /** @type {any} */ ((document as any).getElementById(s.idPrefix + "namesvalue")).value +
+        "\n" +
+        "name desc " +
+        name +
+        " " +
+        /** @type {any} */ ((document as any).getElementById(s.idPrefix + "namesdesc")).value,
+    );
+  }
+};
 
-SpreadsheetControlSC.SpreadsheetControlNamesDelete = function() {
-   var s = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var name = /** @type {any} */((document as any).getElementById(s.idPrefix+"namesname")).value;
-   SocialCalc.SetTab(s.tabs[0].name); // return to first tab
-   SocialCalc.KeyboardFocus();
-   if (name != "") {
-      s.ExecuteCommand("name delete "+name);
-//      /** @type {any} */((document as any).getElementById(s.idPrefix+"namesname")).value = "";
-//      /** @type {any} */((document as any).getElementById(s.idPrefix+"namesvalue")).value = "";
-//      /** @type {any} */((document as any).getElementById(s.idPrefix+"namesdesc")).value = "";
-//      SocialCalc.SpreadsheetControlNamesFillNameList();
-      }
-   SocialCalc.KeyboardFocus();
-   }
+SpreadsheetControlSC.SpreadsheetControlNamesDelete = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var name = /** @type {any} */ ((document as any).getElementById(s.idPrefix + "namesname")).value;
+  SocialCalc.SetTab(s.tabs[0].name); // return to first tab
+  SocialCalc.KeyboardFocus();
+  if (name != "") {
+    s.ExecuteCommand("name delete " + name);
+    //      /** @type {any} */((document as any).getElementById(s.idPrefix+"namesname")).value = "";
+    //      /** @type {any} */((document as any).getElementById(s.idPrefix+"namesvalue")).value = "";
+    //      /** @type {any} */((document as any).getElementById(s.idPrefix+"namesdesc")).value = "";
+    //      SocialCalc.SpreadsheetControlNamesFillNameList();
+  }
+  SocialCalc.KeyboardFocus();
+};
 
 // Clipboard
 
-/** @param {any} s @param {any} t */
-SpreadsheetControlSC.SpreadsheetControlClipboardOnclick = function(s: any, t: any) {
-   s = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var clipele = /** @type {any} */((document as any).getElementById(s.idPrefix+"clipboardtext"));
-   /** @type {any} */((document as any).getElementById(s.idPrefix+"clipboardformat-tab")).checked = true;
+/** @param {any} s @param {any} _t */
+SpreadsheetControlSC.SpreadsheetControlClipboardOnclick = function (s: any, _t: any) {
+  s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var clipele = /** @type {any} */ ((document as any).getElementById(s.idPrefix + "clipboardtext"));
+  /** @type {any} */ (
+    (document as any).getElementById(s.idPrefix + "clipboardformat-tab")
+  ).checked = true;
 
-   try {
-      clipele.value = SocialCalc.ConvertSaveToOtherFormat(SpreadsheetControlSC.Clipboard.clipboard, "tab");
-   } catch (err) {
-      console.error(err);
-   }
+  try {
+    clipele.value = SocialCalc.ConvertSaveToOtherFormat(
+      SpreadsheetControlSC.Clipboard.clipboard,
+      "tab",
+    );
+  } catch (err) {
+    console.error(err);
+  }
 
-   return;
-   }
+  return;
+};
 
 /** @param {string} which */
-SpreadsheetControlSC.SpreadsheetControlClipboardFormat = function(which: any) {
-   var s = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var clipele = /** @type {any} */((document as any).getElementById(s.idPrefix+"clipboardtext"));
-   clipele.value = SocialCalc.ConvertSaveToOtherFormat(SpreadsheetControlSC.Clipboard.clipboard, which);
-   }
+SpreadsheetControlSC.SpreadsheetControlClipboardFormat = function (which: any) {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var clipele = /** @type {any} */ ((document as any).getElementById(s.idPrefix + "clipboardtext"));
+  clipele.value = SocialCalc.ConvertSaveToOtherFormat(
+    SpreadsheetControlSC.Clipboard.clipboard,
+    which,
+  );
+};
 
-SpreadsheetControlSC.SpreadsheetControlClipboardLoad = function() {
-   var s = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var savetype = "tab";
-   SocialCalc.SetTab(s.tabs[0].name); // return to first tab
-   SocialCalc.KeyboardFocus();
-   if (/** @type {any} */((document as any).getElementById(s.idPrefix+"clipboardformat-csv")).checked) {
-      savetype = "csv";
-      }
-   else if (/** @type {any} */((document as any).getElementById(s.idPrefix+"clipboardformat-scsave")).checked) {
-      savetype = "scsave";
-      }
-   // control+v ignores ignore windows clipboard - see ctrlkeyFunction(editor, charname)
-   s.editor.pastescclipboard = true;
-   s.editor.EditorScheduleSheetCommands("loadclipboard "+
+SpreadsheetControlSC.SpreadsheetControlClipboardLoad = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var savetype = "tab";
+  SocialCalc.SetTab(s.tabs[0].name); // return to first tab
+  SocialCalc.KeyboardFocus();
+  if (
+    /** @type {any} */ ((document as any).getElementById(s.idPrefix + "clipboardformat-csv"))
+      .checked
+  ) {
+    savetype = "csv";
+  } else if (
+    /** @type {any} */ ((document as any).getElementById(s.idPrefix + "clipboardformat-scsave"))
+      .checked
+  ) {
+    savetype = "scsave";
+  }
+  // control+v ignores ignore windows clipboard - see ctrlkeyFunction(editor, charname)
+  s.editor.pastescclipboard = true;
+  s.editor.EditorScheduleSheetCommands(
+    "loadclipboard " +
       SocialCalc.encodeForSave(
-         SocialCalc.ConvertOtherFormatToSave(/** @type {any} */((document as any).getElementById(s.idPrefix+"clipboardtext")).value, savetype)), true, false);
-   }
+        SocialCalc.ConvertOtherFormatToSave(
+          /** @type {any} */ ((document as any).getElementById(s.idPrefix + "clipboardtext")).value,
+          savetype,
+        ),
+      ),
+    true,
+    false,
+  );
+};
 
-SpreadsheetControlSC.SpreadsheetControlClipboardClear = function() {
-   var s = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var clipele = /** @type {any} */((document as any).getElementById(s.idPrefix+"clipboardtext"));
-   clipele.value = "";
-   s.editor.EditorScheduleSheetCommands("clearclipboard", true, false);
-   clipele.focus();
-   }
+SpreadsheetControlSC.SpreadsheetControlClipboardClear = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var clipele = /** @type {any} */ ((document as any).getElementById(s.idPrefix + "clipboardtext"));
+  clipele.value = "";
+  s.editor.EditorScheduleSheetCommands("clearclipboard", true, false);
+  clipele.focus();
+};
 
-SpreadsheetControlSC.SpreadsheetControlClipboardExport = function() {
-   var s = (SocialCalc.GetSpreadsheetControlObject() as any);
-   if (s.ExportCallback) {
-      s.ExportCallback(s);
-      }
-   SocialCalc.SetTab(s.tabs[0].name); // return to first tab
-   SocialCalc.KeyboardFocus();
-   }
+SpreadsheetControlSC.SpreadsheetControlClipboardExport = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  if (s.ExportCallback) {
+    s.ExportCallback(s);
+  }
+  SocialCalc.SetTab(s.tabs[0].name); // return to first tab
+  SocialCalc.KeyboardFocus();
+};
 
 // Settings
 
 /** @param {string} target */
-SpreadsheetControlSC.SpreadsheetControlSettingsSwitch = function(target: any) {
-   SocialCalc.SettingControlReset();
-   var s = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var sheettable = /** @type {any} */((document as any).getElementById(s.idPrefix+"sheetsettingstable"));
-   var celltable = /** @type {any} */((document as any).getElementById(s.idPrefix+"cellsettingstable"));
-   var sheettoolbar = /** @type {any} */((document as any).getElementById(s.idPrefix+"sheetsettingstoolbar"));
-   var celltoolbar = /** @type {any} */((document as any).getElementById(s.idPrefix+"cellsettingstoolbar"));
-   if (target=="sheet") {
-      sheettable.style.display = "block";
-      celltable.style.display = "none";
-      sheettoolbar.style.display = "block";
-      celltoolbar.style.display = "none";
-      SocialCalc.SettingsControlSetCurrentPanel(s.views.settings.values.sheetspanel);
-      }
-   else {
-      sheettable.style.display = "none";
-      celltable.style.display = "block";
-      sheettoolbar.style.display = "none";
-      celltoolbar.style.display = "block";
-      SocialCalc.SettingsControlSetCurrentPanel(s.views.settings.values.cellspanel);
-      }
-   }
+SpreadsheetControlSC.SpreadsheetControlSettingsSwitch = function (target: any) {
+  SocialCalc.SettingControlReset();
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var sheettable = /** @type {any} */ (
+    (document as any).getElementById(s.idPrefix + "sheetsettingstable")
+  );
+  var celltable = /** @type {any} */ (
+    (document as any).getElementById(s.idPrefix + "cellsettingstable")
+  );
+  var sheettoolbar = /** @type {any} */ (
+    (document as any).getElementById(s.idPrefix + "sheetsettingstoolbar")
+  );
+  var celltoolbar = /** @type {any} */ (
+    (document as any).getElementById(s.idPrefix + "cellsettingstoolbar")
+  );
+  if (target == "sheet") {
+    sheettable.style.display = "block";
+    celltable.style.display = "none";
+    sheettoolbar.style.display = "block";
+    celltoolbar.style.display = "none";
+    SocialCalc.SettingsControlSetCurrentPanel(s.views.settings.values.sheetspanel);
+  } else {
+    sheettable.style.display = "none";
+    celltable.style.display = "block";
+    sheettoolbar.style.display = "none";
+    celltoolbar.style.display = "block";
+    SocialCalc.SettingsControlSetCurrentPanel(s.views.settings.values.cellspanel);
+  }
+};
 
 /** @param {string} target */
-SpreadsheetControlSC.SettingsControlSave = function(target: any) {
-   var range, cmdstr;
-   var s = (SocialCalc.GetSpreadsheetControlObject() as any);
-   var sc = SocialCalc.SettingsControls;
-   var panelobj = sc.CurrentPanel;
-   var attribs = SocialCalc.SettingsControlUnloadPanel(panelobj);
+SpreadsheetControlSC.SettingsControlSave = function (target: any) {
+  var range, cmdstr;
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var sc = SocialCalc.SettingsControls;
+  var panelobj = sc.CurrentPanel;
+  var attribs = SocialCalc.SettingsControlUnloadPanel(panelobj);
 
-   SocialCalc.SetTab(s.tabs[0].name); // return to first tab
-   SocialCalc.KeyboardFocus();
+  SocialCalc.SetTab(s.tabs[0].name); // return to first tab
+  SocialCalc.KeyboardFocus();
 
-   if (target=="sheet") {
-      cmdstr = s.sheet.DecodeSheetAttributes(attribs);
-      }
-   else if (target=="cell") {
-      if (s.editor.range.hasrange) {
-         range = SocialCalc.crToCoord(s.editor.range.left, s.editor.range.top) + ":" +
-            SocialCalc.crToCoord(s.editor.range.right, s.editor.range.bottom);
-         }
-      cmdstr = s.sheet.DecodeCellAttributes(s.editor.ecell.coord, attribs, range);
-      }
-   else { // Cancel
-      }
-   if (cmdstr) {
-      s.editor.EditorScheduleSheetCommands(cmdstr, true, false);
-      }
-   }
+  if (target == "sheet") {
+    cmdstr = s.sheet.DecodeSheetAttributes(attribs);
+  } else if (target == "cell") {
+    if (s.editor.range.hasrange) {
+      range =
+        SocialCalc.crToCoord(s.editor.range.left, s.editor.range.top) +
+        ":" +
+        SocialCalc.crToCoord(s.editor.range.right, s.editor.range.bottom);
+    }
+    cmdstr = s.sheet.DecodeCellAttributes(s.editor.ecell.coord, attribs, range);
+  } else {
+    // Cancel
+  }
+  if (cmdstr) {
+    s.editor.EditorScheduleSheetCommands(cmdstr, true, false);
+  }
+};
 
 ///////////////////////
 //
@@ -3184,51 +3745,66 @@ SpreadsheetControlSC.SettingsControlSave = function(target: any) {
 //   partname2: "part contents - should end with \n"
 //
 
-
 /** @param {any} spreadsheet @param {{[k: string]: string}} [otherparts] */
-SpreadsheetControlSC.SpreadsheetControlCreateSpreadsheetSave = function(spreadsheet: any, otherparts: any) {
+SpreadsheetControlSC.SpreadsheetControlCreateSpreadsheetSave = function (
+  spreadsheet: any,
+  otherparts: any,
+) {
+  var result;
 
-   var result;
+  var otherpartsstr = "";
+  var otherpartsnames = "";
+  var partname, extranl;
 
-   var otherpartsstr = "";
-   var otherpartsnames = "";
-   var partname, extranl;
-
-   if (otherparts) {
-      for (partname in otherparts) {
-         // Bug fix: original `otherparts[partname]-1` coerced the string value to NaN and
-         // effectively asked for charAt(NaN), which always returned "" and forced extranl="\n".
-         // Correct check is the last character of the string.
-         if (otherparts[partname].charAt(otherparts[partname].length-1) != "\n") {
-            extranl = "\n";
-            }
-         else {
-            extranl = "";
-            }
-         otherpartsstr += "--" + spreadsheet.multipartBoundary + "\nContent-type: text/plain; charset=UTF-8\n\n" +
-            otherparts[partname] + extranl;
-         otherpartsnames += "part:"+partname + "\n";
-         }
+  if (otherparts) {
+    for (partname in otherparts) {
+      // Bug fix: original `otherparts[partname]-1` coerced the string value to NaN and
+      // effectively asked for charAt(NaN), which always returned "" and forced extranl="\n".
+      // Correct check is the last character of the string.
+      if (otherparts[partname].charAt(otherparts[partname].length - 1) != "\n") {
+        extranl = "\n";
+      } else {
+        extranl = "";
       }
+      otherpartsstr +=
+        "--" +
+        spreadsheet.multipartBoundary +
+        "\nContent-type: text/plain; charset=UTF-8\n\n" +
+        otherparts[partname] +
+        extranl;
+      otherpartsnames += "part:" + partname + "\n";
+    }
+  }
 
-   result = "socialcalc:version:1.0\n" +
-      "MIME-Version: 1.0\nContent-Type: multipart/mixed; boundary="+
-      spreadsheet.multipartBoundary + "\n" +
-      "--" + spreadsheet.multipartBoundary + "\nContent-type: text/plain; charset=UTF-8\n\n" +
-      "# SocialCalc Spreadsheet Control Save\nversion:1.0\npart:sheet\npart:edit\npart:audit\n" + otherpartsnames +
-      "--" + spreadsheet.multipartBoundary + "\nContent-type: text/plain; charset=UTF-8\n\n" +
-      spreadsheet.CreateSheetSave() +
-      "--" + spreadsheet.multipartBoundary + "\nContent-type: text/plain; charset=UTF-8\n\n" +
-      spreadsheet.editor.SaveEditorSettings() +
-      "--" + spreadsheet.multipartBoundary + "\nContent-type: text/plain; charset=UTF-8\n\n" +
-      spreadsheet.sheet.CreateAuditString() +
-      otherpartsstr +
-      "--" + spreadsheet.multipartBoundary + "--\n";
+  result =
+    "socialcalc:version:1.0\n" +
+    "MIME-Version: 1.0\nContent-Type: multipart/mixed; boundary=" +
+    spreadsheet.multipartBoundary +
+    "\n" +
+    "--" +
+    spreadsheet.multipartBoundary +
+    "\nContent-type: text/plain; charset=UTF-8\n\n" +
+    "# SocialCalc Spreadsheet Control Save\nversion:1.0\npart:sheet\npart:edit\npart:audit\n" +
+    otherpartsnames +
+    "--" +
+    spreadsheet.multipartBoundary +
+    "\nContent-type: text/plain; charset=UTF-8\n\n" +
+    spreadsheet.CreateSheetSave() +
+    "--" +
+    spreadsheet.multipartBoundary +
+    "\nContent-type: text/plain; charset=UTF-8\n\n" +
+    spreadsheet.editor.SaveEditorSettings() +
+    "--" +
+    spreadsheet.multipartBoundary +
+    "\nContent-type: text/plain; charset=UTF-8\n\n" +
+    spreadsheet.sheet.CreateAuditString() +
+    otherpartsstr +
+    "--" +
+    spreadsheet.multipartBoundary +
+    "--\n";
 
-   return result;
-
-   }
-
+  return result;
+};
 
 //
 // parts = SocialCalc.SpreadsheetControlDecodeSpreadsheetSave(spreadsheet, str)
@@ -3239,605 +3815,629 @@ SpreadsheetControlSC.SpreadsheetControlCreateSpreadsheetSave = function(spreadsh
 //
 
 /** @param {any} spreadsheet @param {string} str */
-SpreadsheetControlSC.SpreadsheetControlDecodeSpreadsheetSave = function(spreadsheet: any, str: any) {
+SpreadsheetControlSC.SpreadsheetControlDecodeSpreadsheetSave = function (
+  spreadsheet: any,
+  str: any,
+) {
+  var pos1,
+    mpregex,
+    searchinfo,
+    boundary,
+    boundaryregex,
+    blanklineregex,
+    start,
+    ending,
+    lines,
+    i,
+    line,
+    p,
+    pnum;
+  /** @type {{[k: string]: {start: number; end: number}}} */
+  var parts: any = {};
+  var partlist = [];
 
-   var pos1, mpregex, searchinfo, boundary, boundaryregex, blanklineregex, start, ending, lines, i, line, p, pnum;
-   /** @type {{[k: string]: {start: number; end: number}}} */
-   var parts: any = {};
-   var partlist = [];
+  pos1 = str.search(/^MIME-Version:\s1\.0/im);
+  if (pos1 < 0) return parts;
 
-   pos1 = str.search(/^MIME-Version:\s1\.0/mi);
-   if (pos1 < 0) return parts;
+  mpregex = /^Content-Type:\s*multipart\/mixed;\s*boundary=(\S+)/gim;
+  mpregex.lastIndex = pos1;
 
-   mpregex = /^Content-Type:\s*multipart\/mixed;\s*boundary=(\S+)/mig;
-   mpregex.lastIndex = pos1;
+  searchinfo = mpregex.exec(str);
+  // Bug fix: original checked `mpregex.lastIndex <= 0` which is the regex state, not the
+  // match result. Check `searchinfo` directly so we don't dereference a null match on miss.
+  if (!searchinfo || mpregex.lastIndex <= 0) return parts;
+  boundary = searchinfo[1];
 
-   searchinfo = mpregex.exec(str);
-   // Bug fix: original checked `mpregex.lastIndex <= 0` which is the regex state, not the
-   // match result. Check `searchinfo` directly so we don't dereference a null match on miss.
-   if (!searchinfo || mpregex.lastIndex <= 0) return parts;
-   boundary = searchinfo[1];
+  boundaryregex = new RegExp("^--" + boundary + "(?:\r\n|\n)", "mg");
+  boundaryregex.lastIndex = mpregex.lastIndex;
 
-   boundaryregex = new RegExp("^--"+boundary+"(?:\r\n|\n)", "mg");
-   boundaryregex.lastIndex = mpregex.lastIndex;
+  searchinfo = boundaryregex.exec(str); // find header top boundary
+  blanklineregex = /(?:\r\n|\n)(?:\r\n|\n)/gm;
+  blanklineregex.lastIndex = boundaryregex.lastIndex;
+  searchinfo = blanklineregex.exec(str); // skip to after blank line
+  if (!searchinfo) return parts;
+  start = blanklineregex.lastIndex;
+  boundaryregex.lastIndex = start;
+  searchinfo = boundaryregex.exec(str); // find end of header
+  if (!searchinfo) return parts;
+  ending = searchinfo.index;
 
-   searchinfo = boundaryregex.exec(str); // find header top boundary
-   blanklineregex = /(?:\r\n|\n)(?:\r\n|\n)/gm;
-   blanklineregex.lastIndex = boundaryregex.lastIndex;
-   searchinfo = blanklineregex.exec(str); // skip to after blank line
-   if (!searchinfo) return parts;
-   start = blanklineregex.lastIndex;
-   boundaryregex.lastIndex = start;
-   searchinfo = boundaryregex.exec(str); // find end of header
-   if (!searchinfo) return parts;
-   ending = searchinfo.index;
+  lines = str.substring(start, ending).split(/\r\n|\n/); // get header as lines
+  for (i = 0; i < lines.length; i++) {
+    line = lines[i];
+    p = line.split(":");
+    switch (p[0]) {
+      case "version":
+        break;
+      case "part":
+        partlist.push(p[1]);
+        break;
+    }
+  }
 
-   lines = str.substring(start, ending).split(/\r\n|\n/); // get header as lines
-   for (i=0;i<lines.length;i++) {
-      line=lines[i];
-      p = line.split(":");
-      switch (p[0]) {
-         case "version":
-            break;
-         case "part":
-            partlist.push(p[1]);
-            break;
-         }
-      }
+  for (pnum = 0; pnum < partlist.length; pnum++) {
+    // get each part
+    blanklineregex.lastIndex = ending;
+    searchinfo = blanklineregex.exec(str); // find blank line ending mime-part header
+    if (!searchinfo) return parts;
+    start = blanklineregex.lastIndex;
+    if (pnum == partlist.length - 1) {
+      // last one has different boundary
+      boundaryregex = new RegExp("^--" + boundary + "--$", "mg");
+    }
+    boundaryregex.lastIndex = start;
+    searchinfo = boundaryregex.exec(str); // find ending boundary
+    if (!searchinfo) return parts;
+    ending = searchinfo.index;
+    parts[partlist[pnum]] = { start: start, end: ending }; // return position within full string
+  }
 
-   for (pnum=0; pnum<partlist.length; pnum++) { // get each part
-      blanklineregex.lastIndex = ending;
-      searchinfo = blanklineregex.exec(str); // find blank line ending mime-part header
-      if (!searchinfo) return parts;
-      start = blanklineregex.lastIndex;
-      if (pnum==partlist.length-1) { // last one has different boundary
-         boundaryregex = new RegExp("^--"+boundary+"--$", "mg");
-         }
-      boundaryregex.lastIndex = start;
-      searchinfo = boundaryregex.exec(str); // find ending boundary
-      if (!searchinfo) return parts;
-      ending = searchinfo.index;
-      parts[partlist[pnum]] = {start: start, end: ending}; // return position within full string
-      }
-
-   return parts;
-
-   }
-
+  return parts;
+};
 
 /*
-* SettingsControls
-*
-* Each settings panel has an object in the following form:
-*
-*    {ctrl-name1: {setting: setting-nameA, type: ctrl-type, id: id-component},
-*     ctrl-name2: {setting: setting-nameB, type: ctrl-type, id: id-component, initialdata: optional-initialdata-override},
-*     ...}
-*
-* The ctrl-types are names that correspond to:
-*
-*    SpreadsheetControlSC.SettingsControls.Controls = {
-*       ctrl-type1: {
-*          SetValue: function(panel-obj, ctrl-name, {def: true/false, val: value}) {...;},
-*          ColorValues: if true, Onchanged converts between hex and RGB
-*          GetValue: function(panel-obj, ctrl-name) {...return {def: true/false, val: value};},
-*          Initialize: function(panel-obj, ctrl-name) {...;}, // used to fill dropdowns, etc.
-*          InitialData: control-dependent, // used by Initialize (if no panel ctrlname.initialdata)
-*          OnReset: function(ctrl-name) {...;}, // called to put down popups, etc.
-*          ChangedCallback: function(ctrl-name) {...;} // if not null, called by control when user changes value
-*       }
-*
-*/
+ * SettingsControls
+ *
+ * Each settings panel has an object in the following form:
+ *
+ *    {ctrl-name1: {setting: setting-nameA, type: ctrl-type, id: id-component},
+ *     ctrl-name2: {setting: setting-nameB, type: ctrl-type, id: id-component, initialdata: optional-initialdata-override},
+ *     ...}
+ *
+ * The ctrl-types are names that correspond to:
+ *
+ *    SpreadsheetControlSC.SettingsControls.Controls = {
+ *       ctrl-type1: {
+ *          SetValue: function(panel-obj, ctrl-name, {def: true/false, val: value}) {...;},
+ *          ColorValues: if true, Onchanged converts between hex and RGB
+ *          GetValue: function(panel-obj, ctrl-name) {...return {def: true/false, val: value};},
+ *          Initialize: function(panel-obj, ctrl-name) {...;}, // used to fill dropdowns, etc.
+ *          InitialData: control-dependent, // used by Initialize (if no panel ctrlname.initialdata)
+ *          OnReset: function(ctrl-name) {...;}, // called to put down popups, etc.
+ *          ChangedCallback: function(ctrl-name) {...;} // if not null, called by control when user changes value
+ *       }
+ *
+ */
 
 SpreadsheetControlSC.SettingsControls = {
-   Controls: {},
-   CurrentPanel: null // panel object to search on events
-   };
+  Controls: {},
+  CurrentPanel: null, // panel object to search on events
+};
 
 //
 // SocialCalc.SettingsControlSetCurrentPanel(panel-object)
 //
 
 /** @param {any} panelobj */
-SpreadsheetControlSC.SettingsControlSetCurrentPanel = function(panelobj: any) {
+SpreadsheetControlSC.SettingsControlSetCurrentPanel = function (panelobj: any) {
+  SpreadsheetControlSC.SettingsControls.CurrentPanel = panelobj;
 
-   SpreadsheetControlSC.SettingsControls.CurrentPanel = panelobj;
-
-   SpreadsheetControlSC.SettingsControls.PopupChangeCallback({panelobj: panelobj}, "", null);
-
-   }
-
+  SpreadsheetControlSC.SettingsControls.PopupChangeCallback({ panelobj: panelobj }, "", null);
+};
 
 //
 // SocialCalc.SettingsControlInitializePanel(panel-object)
 //
 
 /** @param {any} panelobj */
-SpreadsheetControlSC.SettingsControlInitializePanel = function(panelobj: any) {
+SpreadsheetControlSC.SettingsControlInitializePanel = function (panelobj: any) {
+  var ctrlname, ctrl;
+  var sc = SocialCalc.SettingsControls;
 
-   var ctrlname, ctrl;
-   var sc = SocialCalc.SettingsControls;
-
-   for (ctrlname in panelobj) {
-      if (ctrlname=="name") continue;
-      ctrl = sc.Controls[panelobj[ctrlname].type];
-      if (ctrl && ctrl.Initialize) ctrl.Initialize(panelobj, ctrlname);
-      }
-
-   }
-
+  for (ctrlname in panelobj) {
+    if (ctrlname == "name") continue;
+    ctrl = sc.Controls[panelobj[ctrlname].type];
+    if (ctrl && ctrl.Initialize) ctrl.Initialize(panelobj, ctrlname);
+  }
+};
 
 //
 // SocialCalc.SettingsControlLoadPanel(panel-object, attribs)
 //
 
 /** @param {any} panelobj @param {{[k: string]: any}} attribs */
-SpreadsheetControlSC.SettingsControlLoadPanel = function(panelobj: any, attribs: any) {
+SpreadsheetControlSC.SettingsControlLoadPanel = function (panelobj: any, attribs: any) {
+  var ctrlname, ctrl;
+  var sc = SocialCalc.SettingsControls;
 
-   var ctrlname, ctrl;
-   var sc = SocialCalc.SettingsControls;
-
-   for (ctrlname in panelobj) {
-      if (ctrlname=="name") continue;
-      ctrl = sc.Controls[panelobj[ctrlname].type];
-      if (ctrl && ctrl.SetValue) ctrl.SetValue(panelobj, ctrlname, attribs[panelobj[ctrlname].setting]);
-      }
-
-   }
+  for (ctrlname in panelobj) {
+    if (ctrlname == "name") continue;
+    ctrl = sc.Controls[panelobj[ctrlname].type];
+    if (ctrl && ctrl.SetValue)
+      ctrl.SetValue(panelobj, ctrlname, attribs[panelobj[ctrlname].setting]);
+  }
+};
 
 //
 // attribs = SocialCalc.SettingsControlUnloadPanel(panel-object)
 //
 
 /** @param {any} panelobj */
-SpreadsheetControlSC.SettingsControlUnloadPanel = function(panelobj: any) {
+SpreadsheetControlSC.SettingsControlUnloadPanel = function (panelobj: any) {
+  var ctrlname, ctrl;
+  var sc = SocialCalc.SettingsControls;
+  var attribs: any = {};
 
-   var ctrlname, ctrl;
-   var sc = SocialCalc.SettingsControls;
-   var attribs: any = {};
+  for (ctrlname in panelobj) {
+    if (ctrlname == "name") continue;
+    ctrl = sc.Controls[panelobj[ctrlname].type];
+    if (ctrl && ctrl.GetValue)
+      attribs[panelobj[ctrlname].setting] = ctrl.GetValue(panelobj, ctrlname);
+  }
 
-   for (ctrlname in panelobj) {
-      if (ctrlname=="name") continue;
-      ctrl = sc.Controls[panelobj[ctrlname].type];
-      if (ctrl && ctrl.GetValue) attribs[panelobj[ctrlname].setting] = ctrl.GetValue(panelobj, ctrlname);
-      }
-
-   return attribs;
-
-   }
+  return attribs;
+};
 
 //
 // SpreadsheetControlSC.SettingsControls.PopupChangeCallback
 //
 
-/** @param {any} attribs @param {any} id @param {any} value */
-SpreadsheetControlSC.SettingsControls.PopupChangeCallback = function(attribs: any, id: any, value: any) {
+/** @param {any} attribs @param {any} _id @param {any} _value */
+SpreadsheetControlSC.SettingsControls.PopupChangeCallback = function (
+  attribs: any,
+  _id: any,
+  _value: any,
+) {
+  var sc = SocialCalc.Constants;
 
-   var sc = SocialCalc.Constants;
+  var ele = /** @type {any} */ ((document as any).getElementById("sample-text"));
 
-   var ele = /** @type {any} */((document as any).getElementById("sample-text"));
+  if (!ele || !attribs || !attribs.panelobj) return;
 
-   if (!ele || !attribs || !attribs.panelobj) return;
+  var idPrefix = (SocialCalc.CurrentSpreadsheetControlObject as any).idPrefix;
 
-   var idPrefix = (SocialCalc.CurrentSpreadsheetControlObject as any).idPrefix;
+  var c = attribs.panelobj.name == "cell" ? "c" : "";
 
-   var c = attribs.panelobj.name == "cell" ? "c" : "";
+  var v, a, parts, str1, str2;
 
-   var v, a, parts, str1, str2, i;
+  parts =
+    sc.defaultCellLayout.match(/^padding.(\S+) (\S+) (\S+) (\S+).vertical.align.(\S+);$/) || [];
+  var cv: any = {
+    color: ["textcolor"],
+    backgroundColor: ["bgcolor", "#FFF"],
+    fontSize: ["fontsize", sc.defaultCellFontSize],
+    fontFamily: ["fontfamily"],
+    paddingTop: ["padtop", parts[1]],
+    paddingRight: ["padright", parts[2]],
+    paddingBottom: ["padbottom", parts[3]],
+    paddingLeft: ["padleft", parts[4]],
+    verticalAlign: ["alignvert", parts[5]],
+  };
 
-   parts = sc.defaultCellLayout.match(/^padding.(\S+) (\S+) (\S+) (\S+).vertical.align.(\S+);$/) || [];
-   var cv: any = {color: ["textcolor"], backgroundColor: ["bgcolor", "#FFF"],
-             fontSize: ["fontsize", sc.defaultCellFontSize], fontFamily: ["fontfamily"],
-             paddingTop: ["padtop", parts[1]], paddingRight: ["padright", parts[2]],
-             paddingBottom: ["padbottom", parts[3]], paddingLeft: ["padleft", parts[4]],
-             verticalAlign: ["alignvert", parts[5]]};
+  for (a in cv) {
+    v = SpreadsheetControlSC.Popup.GetValue(idPrefix + c + cv[a][0]) || cv[a][1] || "";
+    ele.style[a] = v;
+  }
 
-   for (a in cv) {
-      v = SpreadsheetControlSC.Popup.GetValue(idPrefix+c+cv[a][0]) || cv[a][1] || "";
-      ele.style[a] = v;
-      }
+  if (c == "c") {
+    cv = { borderTop: "cbt", borderRight: "cbr", borderBottom: "cbb", borderLeft: "cbl" };
+    for (a in cv) {
+      v = SpreadsheetControlSC.SettingsControls.BorderSideGetValue(attribs.panelobj, cv[a]);
+      ele.style[a] = v ? v.val || "" : "";
+    }
+    v = SpreadsheetControlSC.Popup.GetValue(idPrefix + "calignhoriz");
+    ele.style.textAlign = v || "left";
+    ele.childNodes[1].style.textAlign = v || "right";
+  } else {
+    ele.style.border = "";
+    v = SpreadsheetControlSC.Popup.GetValue(idPrefix + "textalignhoriz");
+    ele.style.textAlign = v || "left";
+    v = SpreadsheetControlSC.Popup.GetValue(idPrefix + "numberalignhoriz");
+    ele.childNodes[1].style.textAlign = v || "right";
+  }
 
-   if (c=="c") {
-      cv = {borderTop: "cbt", borderRight: "cbr", borderBottom: "cbb", borderLeft: "cbl"};
-      for (a in cv) {
-         v = SpreadsheetControlSC.SettingsControls.BorderSideGetValue(attribs.panelobj, cv[a]);
-         ele.style[a] = v ? (v.val || "") : "";
-         }
-      v = SpreadsheetControlSC.Popup.GetValue(idPrefix+"calignhoriz");
-      ele.style.textAlign = v || "left";
-      ele.childNodes[1].style.textAlign = v || "right";
-      }
-   else {
-      ele.style.border = "";
-      v = SpreadsheetControlSC.Popup.GetValue(idPrefix+"textalignhoriz");
-      ele.style.textAlign = v || "left";
-      v = SpreadsheetControlSC.Popup.GetValue(idPrefix+"numberalignhoriz");
-      ele.childNodes[1].style.textAlign = v || "right";
-      }
+  v = SpreadsheetControlSC.Popup.GetValue(idPrefix + c + "fontlook");
+  parts = v ? v.match(/^(\S+) (\S+)$/) || [] : [];
+  ele.style.fontStyle = parts[1] || "";
+  ele.style.fontWeight = parts[2] || "";
 
-   v = SpreadsheetControlSC.Popup.GetValue(idPrefix+c+"fontlook");
-   parts = v ? (v.match(/^(\S+) (\S+)$/) || []) : [];
-   ele.style.fontStyle = parts[1] || "";
-   ele.style.fontWeight = parts[2] || "";
+  v = SpreadsheetControlSC.Popup.GetValue(idPrefix + c + "formatnumber") || "General";
+  str1 = SocialCalc.FormatNumber.formatNumberWithFormat(9.8765, v, "");
+  str2 = SocialCalc.FormatNumber.formatNumberWithFormat(-1234.5, v, "");
+  if (str2 != "??-???-??&nbsp;??:??:??") {
+    // not bad date from negative number
+    str1 += "<br>" + str2;
+  }
 
-   v = SpreadsheetControlSC.Popup.GetValue(idPrefix+c+"formatnumber") || "General";
-   str1 = SocialCalc.FormatNumber.formatNumberWithFormat(9.8765, v, "");
-   str2 = SocialCalc.FormatNumber.formatNumberWithFormat(-1234.5, v, "");
-   if (str2 != "??-???-??&nbsp;??:??:??") { // not bad date from negative number
-      str1 += "<br>"+str2;
-      }
-      
-   ele.childNodes[1].innerHTML = str1;
-
-   }
+  ele.childNodes[1].innerHTML = str1;
+};
 
 //
 // PopupList Control
 //
 
 /** @param {any} panelobj @param {string} ctrlname @param {any} value */
-SpreadsheetControlSC.SettingsControls.PopupListSetValue = function(panelobj: any, ctrlname: any, value: any) {
+SpreadsheetControlSC.SettingsControls.PopupListSetValue = function (
+  panelobj: any,
+  ctrlname: any,
+  value: any,
+) {
+  if (!value) {
+    alert(ctrlname + " no value");
+    return;
+  }
 
-   if (!value) {alert(ctrlname+" no value"); return;}
+  var sp = SocialCalc.Popup;
 
-   var sp = SocialCalc.Popup;
-
-   if (!value.def) {
-      sp.SetValue(panelobj[ctrlname].id, value.val);
-      }
-   else {
-      sp.SetValue(panelobj[ctrlname].id, "");
-      }
-
-   }
+  if (!value.def) {
+    sp.SetValue(panelobj[ctrlname].id, value.val);
+  } else {
+    sp.SetValue(panelobj[ctrlname].id, "");
+  }
+};
 
 //
 // SpreadsheetControlSC.SettingsControls.PopupListGetValue
 //
 
 /** @param {any} panelobj @param {string} ctrlname */
-SpreadsheetControlSC.SettingsControls.PopupListGetValue = function(panelobj: any, ctrlname: any) {
+SpreadsheetControlSC.SettingsControls.PopupListGetValue = function (panelobj: any, ctrlname: any) {
+  var ctl = panelobj[ctrlname];
+  if (!ctl) return null;
 
-   var ctl = panelobj[ctrlname];
-   if (!ctl) return null;
-
-   var value = SpreadsheetControlSC.Popup.GetValue(ctl.id);
-   if (value) {
-      return {def: false, val: value};
-      }
-   else {
-      return {def: true, val: 0};
-      }
-
-   }
+  var value = SpreadsheetControlSC.Popup.GetValue(ctl.id);
+  if (value) {
+    return { def: false, val: value };
+  } else {
+    return { def: true, val: 0 };
+  }
+};
 
 //
 // SpreadsheetControlSC.SettingsControls.PopupListInitialize
 //
 
 /** @param {any} panelobj @param {string} ctrlname */
-SpreadsheetControlSC.SettingsControls.PopupListInitialize = function(panelobj: any, ctrlname: any) {
+SpreadsheetControlSC.SettingsControls.PopupListInitialize = function (
+  panelobj: any,
+  ctrlname: any,
+) {
+  var i, val, pos, otext;
+  var sc = SocialCalc.SettingsControls;
+  var initialdata =
+    panelobj[ctrlname].initialdata || sc.Controls[panelobj[ctrlname].type].InitialData || "";
+  initialdata = SocialCalc.LocalizeSubstrings(initialdata);
+  var optionvals = initialdata.split(/\|/);
 
-   var i, val, pos, otext;
-   var sc = SocialCalc.SettingsControls;
-   var initialdata = panelobj[ctrlname].initialdata || sc.Controls[panelobj[ctrlname].type].InitialData || "";
-   initialdata = SocialCalc.LocalizeSubstrings(initialdata);
-   var optionvals = initialdata.split(/\|/);
+  var options = [];
 
-   var options = [];
+  for (i = 0; i < (optionvals.length || 0); i++) {
+    val = optionvals[i];
+    pos = val.indexOf(":");
+    otext = val.substring(0, pos);
+    if (otext.indexOf("\\") != -1) {
+      // escape any colons
+      otext = otext.replace(/\\c/g, ":");
+      otext = otext.replace(/\\b/g, "\\");
+    }
+    otext = SocialCalc.special_chars(otext);
+    if (otext == "[custom]") {
+      options[i] = {
+        o: SocialCalc.Constants.s_PopupListCustom,
+        v: val.substring(pos + 1),
+        a: { custom: true },
+      };
+    } else if (otext == "[cancel]") {
+      options[i] = { o: SocialCalc.Constants.s_PopupListCancel, v: "", a: { cancel: true } };
+    } else if (otext == "[break]") {
+      options[i] = { o: "-----", v: "", a: { skip: true } };
+    } else if (otext == "[newcol]") {
+      options[i] = { o: "", v: "", a: { newcol: true } };
+    } else {
+      options[i] = { o: otext, v: val.substring(pos + 1) };
+    }
+  }
 
-   for (i=0; i<(optionvals.length||0); i++) {
-      val = optionvals[i];
-      pos = val.indexOf(":");
-      otext = val.substring(0, pos);
-      if (otext.indexOf("\\")!=-1) { // escape any colons
-         otext = otext.replace(/\\c/g,":");
-         otext = otext.replace(/\\b/g,"\\");
-
-         }
-      otext = SocialCalc.special_chars(otext);
-      if (otext == "[custom]") {
-         options[i] = {o: SocialCalc.Constants.s_PopupListCustom, v: val.substring(pos+1), a:{custom: true}};
-         }
-      else if (otext == "[cancel]") {
-         options[i] = {o: SocialCalc.Constants.s_PopupListCancel, v: "", a:{cancel: true}};
-         }
-      else if (otext == "[break]") {
-         options[i] = {o: "-----", v: "", a:{skip: true}};
-         }
-      else if (otext == "[newcol]") {
-         options[i] = {o: "", v: "", a:{newcol: true}};
-         }
-      else {
-         options[i] = {o: otext, v: val.substring(pos+1)};
-         }
-      }
-
-   SpreadsheetControlSC.Popup.Create("List", panelobj[ctrlname].id, {});
-   SpreadsheetControlSC.Popup.Initialize(panelobj[ctrlname].id, 
-      {options: options, 
-       attribs:{changedcallback: SpreadsheetControlSC.SettingsControls.PopupChangeCallback, panelobj: panelobj}});
-
-   }
-
+  SpreadsheetControlSC.Popup.Create("List", panelobj[ctrlname].id, {});
+  SpreadsheetControlSC.Popup.Initialize(panelobj[ctrlname].id, {
+    options: options,
+    attribs: {
+      changedcallback: SpreadsheetControlSC.SettingsControls.PopupChangeCallback,
+      panelobj: panelobj,
+    },
+  });
+};
 
 //
 // SpreadsheetControlSC.SettingsControls.PopupListReset
 //
 
-/** @param {string} ctrlname */
-SpreadsheetControlSC.SettingsControls.PopupListReset = function(ctrlname: any) {
-
-   SpreadsheetControlSC.Popup.Reset("List");
-
-   }
+/** @param {string} _ctrlname */
+SpreadsheetControlSC.SettingsControls.PopupListReset = function (_ctrlname: any) {
+  SpreadsheetControlSC.Popup.Reset("List");
+};
 
 SpreadsheetControlSC.SettingsControls.Controls.PopupList = {
-   SetValue: SpreadsheetControlSC.SettingsControls.PopupListSetValue,
-   GetValue: SpreadsheetControlSC.SettingsControls.PopupListGetValue,
-   Initialize: SpreadsheetControlSC.SettingsControls.PopupListInitialize,
-   OnReset: SpreadsheetControlSC.SettingsControls.PopupListReset,
-   ChangedCallback: null
-   }
+  SetValue: SpreadsheetControlSC.SettingsControls.PopupListSetValue,
+  GetValue: SpreadsheetControlSC.SettingsControls.PopupListGetValue,
+  Initialize: SpreadsheetControlSC.SettingsControls.PopupListInitialize,
+  OnReset: SpreadsheetControlSC.SettingsControls.PopupListReset,
+  ChangedCallback: null,
+};
 
 //
 // ColorChooser Control
 //
 
 /** @param {any} panelobj @param {string} ctrlname @param {any} value */
-SpreadsheetControlSC.SettingsControls.ColorChooserSetValue = function(panelobj: any, ctrlname: any, value: any) {
+SpreadsheetControlSC.SettingsControls.ColorChooserSetValue = function (
+  panelobj: any,
+  ctrlname: any,
+  value: any,
+) {
+  if (!value) {
+    alert(ctrlname + " no value");
+    return;
+  }
 
-   if (!value) {alert(ctrlname+" no value"); return;}
+  var sp = SocialCalc.Popup;
 
-   var sp = SocialCalc.Popup;
-
-   if (!value.def) {
-      sp.SetValue(panelobj[ctrlname].id, value.val);
-      }
-   else {
-      sp.SetValue(panelobj[ctrlname].id, "");
-      }
-
-   }
+  if (!value.def) {
+    sp.SetValue(panelobj[ctrlname].id, value.val);
+  } else {
+    sp.SetValue(panelobj[ctrlname].id, "");
+  }
+};
 
 //
 // SpreadsheetControlSC.SettingsControls.ColorChooserGetValue
 //
 
 /** @param {any} panelobj @param {string} ctrlname */
-SpreadsheetControlSC.SettingsControls.ColorChooserGetValue = function(panelobj: any, ctrlname: any) {
-
-   var value = SpreadsheetControlSC.Popup.GetValue(panelobj[ctrlname].id);
-   if (value) {
-      return {def: false, val: value};
-      }
-   else {
-      return {def: true, val: 0};
-      }
-
-   }
+SpreadsheetControlSC.SettingsControls.ColorChooserGetValue = function (
+  panelobj: any,
+  ctrlname: any,
+) {
+  var value = SpreadsheetControlSC.Popup.GetValue(panelobj[ctrlname].id);
+  if (value) {
+    return { def: false, val: value };
+  } else {
+    return { def: true, val: 0 };
+  }
+};
 
 //
 // SpreadsheetControlSC.SettingsControls.ColorChooserInitialize
 //
 
 /** @param {any} panelobj @param {string} ctrlname */
-SpreadsheetControlSC.SettingsControls.ColorChooserInitialize = function(panelobj: any, ctrlname: any) {
-
-   var i, val, pos, otext;
-   var sc = SocialCalc.SettingsControls;
-
-   SpreadsheetControlSC.Popup.Create("ColorChooser", panelobj[ctrlname].id, {});
-   SpreadsheetControlSC.Popup.Initialize(panelobj[ctrlname].id,
-      {attribs:{title: "&nbsp;", moveable: true, width: "106px",
-                changedcallback: SpreadsheetControlSC.SettingsControls.PopupChangeCallback, panelobj: panelobj}});
-
-   }
-
+SpreadsheetControlSC.SettingsControls.ColorChooserInitialize = function (
+  panelobj: any,
+  ctrlname: any,
+) {
+  SpreadsheetControlSC.Popup.Create("ColorChooser", panelobj[ctrlname].id, {});
+  SpreadsheetControlSC.Popup.Initialize(panelobj[ctrlname].id, {
+    attribs: {
+      title: "&nbsp;",
+      moveable: true,
+      width: "106px",
+      changedcallback: SpreadsheetControlSC.SettingsControls.PopupChangeCallback,
+      panelobj: panelobj,
+    },
+  });
+};
 
 //
 // SpreadsheetControlSC.SettingsControls.ColorChooserReset
 //
 
-/** @param {string} ctrlname */
-SpreadsheetControlSC.SettingsControls.ColorChooserReset = function(ctrlname: any) {
-
-   SpreadsheetControlSC.Popup.Reset("ColorChooser");
-
-   }
+/** @param {string} _ctrlname */
+SpreadsheetControlSC.SettingsControls.ColorChooserReset = function (_ctrlname: any) {
+  SpreadsheetControlSC.Popup.Reset("ColorChooser");
+};
 
 SpreadsheetControlSC.SettingsControls.Controls.ColorChooser = {
-   SetValue: SpreadsheetControlSC.SettingsControls.ColorChooserSetValue,
-   GetValue: SpreadsheetControlSC.SettingsControls.ColorChooserGetValue,
-   Initialize: SpreadsheetControlSC.SettingsControls.ColorChooserInitialize,
-   OnReset: SpreadsheetControlSC.SettingsControls.ColorChooserReset,
-   ChangedCallback: null
-   }
-
+  SetValue: SpreadsheetControlSC.SettingsControls.ColorChooserSetValue,
+  GetValue: SpreadsheetControlSC.SettingsControls.ColorChooserGetValue,
+  Initialize: SpreadsheetControlSC.SettingsControls.ColorChooserInitialize,
+  OnReset: SpreadsheetControlSC.SettingsControls.ColorChooserReset,
+  ChangedCallback: null,
+};
 
 //
 // SpreadsheetControlSC.SettingsControls.BorderSideSetValue
 //
 
 /** @param {any} panelobj @param {string} ctrlname @param {any} value */
-SpreadsheetControlSC.SettingsControls.BorderSideSetValue = function(panelobj: any, ctrlname: any, value: any) {
+SpreadsheetControlSC.SettingsControls.BorderSideSetValue = function (
+  panelobj: any,
+  ctrlname: any,
+  value: any,
+) {
+  var ele, idname, parts;
+  var idstart = panelobj[ctrlname].id;
 
-   var sc = SocialCalc.SettingsControls;
-   var ele, found, idname, parts;
-   var idstart = panelobj[ctrlname].id;
+  if (!value) {
+    alert(ctrlname + " no value");
+    return;
+  }
 
-   if (!value) {alert(ctrlname+" no value"); return;}
+  ele = /** @type {any} */ ((document as any).getElementById(idstart + "-onoff-bcb")); // border checkbox
+  if (!ele) return;
 
-   ele = /** @type {any} */((document as any).getElementById(idstart+"-onoff-bcb")); // border checkbox
-   if (!ele) return;
-
-   if (value.val) { // border does not use default: it looks only to the value currently
-      ele.checked = true;
-      ele.value = value.val;
-      parts = value.val.match(/(\S+)\s+(\S+)\s+(\S.+)/);
-      idname = idstart+"-color";
-      SpreadsheetControlSC.Popup.SetValue(idname, parts[3]);
-      SpreadsheetControlSC.Popup.SetDisabled(idname, false);
-      }
-   else {
-      ele.checked = false;
-      ele.value = value.val;
-      idname = idstart+"-color";
-      SpreadsheetControlSC.Popup.SetValue(idname, "");
-      SpreadsheetControlSC.Popup.SetDisabled(idname, true);
-      }
-
-   }
+  if (value.val) {
+    // border does not use default: it looks only to the value currently
+    ele.checked = true;
+    ele.value = value.val;
+    parts = value.val.match(/(\S+)\s+(\S+)\s+(\S.+)/);
+    idname = idstart + "-color";
+    SpreadsheetControlSC.Popup.SetValue(idname, parts[3]);
+    SpreadsheetControlSC.Popup.SetDisabled(idname, false);
+  } else {
+    ele.checked = false;
+    ele.value = value.val;
+    idname = idstart + "-color";
+    SpreadsheetControlSC.Popup.SetValue(idname, "");
+    SpreadsheetControlSC.Popup.SetDisabled(idname, true);
+  }
+};
 
 //
 // SpreadsheetControlSC.SettingsControls.BorderSideGetValue
 //
 
 /** @param {any} panelobj @param {string} ctrlname */
-SpreadsheetControlSC.SettingsControls.BorderSideGetValue = function(panelobj: any, ctrlname: any) {
+SpreadsheetControlSC.SettingsControls.BorderSideGetValue = function (panelobj: any, ctrlname: any) {
+  var ele, value;
+  var idstart = panelobj[ctrlname].id;
 
-   var sc = SocialCalc.SettingsControls;
-   var ele, value;
-   var idstart = panelobj[ctrlname].id;
+  ele = /** @type {any} */ ((document as any).getElementById(idstart + "-onoff-bcb")); // border checkbox
+  if (!ele) return;
 
-   ele = /** @type {any} */((document as any).getElementById(idstart+"-onoff-bcb")); // border checkbox
-   if (!ele) return;
-
-
-   if (ele.checked) { // on
-      value = SpreadsheetControlSC.Popup.GetValue(idstart+"-color");
-      value = "1px solid " + (value || "rgb(0,0,0)");
-      return {def: false, val: value};
-      }
-   else { // off
-      return {def: false, val: ""};
-      }
-
-   }
+  if (ele.checked) {
+    // on
+    value = SpreadsheetControlSC.Popup.GetValue(idstart + "-color");
+    value = "1px solid " + (value || "rgb(0,0,0)");
+    return { def: false, val: value };
+  } else {
+    // off
+    return { def: false, val: "" };
+  }
+};
 
 //
 // SpreadsheetControlSC.SettingsControls.BorderSideInitialize
 //
 
 /** @param {any} panelobj @param {string} ctrlname */
-SpreadsheetControlSC.SettingsControls.BorderSideInitialize = function(panelobj: any, ctrlname: any) {
+SpreadsheetControlSC.SettingsControls.BorderSideInitialize = function (
+  panelobj: any,
+  ctrlname: any,
+) {
+  var idstart = panelobj[ctrlname].id;
 
-   var sc = SocialCalc.SettingsControls;
-   var idstart = panelobj[ctrlname].id;
-
-   SpreadsheetControlSC.Popup.Create("ColorChooser", idstart+"-color", {});
-   SpreadsheetControlSC.Popup.Initialize(idstart+"-color",
-      {attribs:{title: "&nbsp;", width: "106px", moveable: true,
-                changedcallback: SpreadsheetControlSC.SettingsControls.PopupChangeCallback, panelobj: panelobj}});
-
-   }
-
+  SpreadsheetControlSC.Popup.Create("ColorChooser", idstart + "-color", {});
+  SpreadsheetControlSC.Popup.Initialize(idstart + "-color", {
+    attribs: {
+      title: "&nbsp;",
+      width: "106px",
+      moveable: true,
+      changedcallback: SpreadsheetControlSC.SettingsControls.PopupChangeCallback,
+      panelobj: panelobj,
+    },
+  });
+};
 
 //
 // SocialCalc.SettingsControlOnchangeBorder = function(ele)
 //
 
 /** @param {any} ele */
-SpreadsheetControlSC.SettingsControlOnchangeBorder = function(ele: any) {
+SpreadsheetControlSC.SettingsControlOnchangeBorder = function (ele: any) {
+  var sc = SocialCalc.SettingsControls;
+  var panelobj = sc.CurrentPanel;
 
-   var idname, value, found, ele2;
-   var sc = SocialCalc.SettingsControls;
-   var panelobj = sc.CurrentPanel;
+  var nameparts = ele.id.match(/(^.*-)(\w+)-(\w+)-(\w+)$/);
+  if (!nameparts) return;
+  var ctrlname = nameparts[2];
+  var ctrlidsuffix = nameparts[4];
+  var ctrltype = panelobj[ctrlname].type;
 
-   var nameparts = ele.id.match(/(^.*\-)(\w+)\-(\w+)\-(\w+)$/);
-   if (!nameparts) return;
-   var prefix = nameparts[1];
-   var ctrlname = nameparts[2];
-   var ctrlsubid = nameparts[3]
-   var ctrlidsuffix = nameparts[4];
-   var ctrltype = panelobj[ctrlname].type;
-
-   switch (ctrlidsuffix) {
-      case "bcb": // border checkbox
-         if (ele.checked) {
-            sc.Controls[ctrltype].SetValue(sc.CurrentPanel, ctrlname, {def: false, val: ele.value || "1px solid rgb(0,0,0)"});
-            }
-         else {
-            sc.Controls[ctrltype].SetValue(sc.CurrentPanel, ctrlname, {def: false, val: ""});
-            }
-         break;
+  switch (ctrlidsuffix) {
+    case "bcb": // border checkbox
+      if (ele.checked) {
+        sc.Controls[ctrltype].SetValue(sc.CurrentPanel, ctrlname, {
+          def: false,
+          val: ele.value || "1px solid rgb(0,0,0)",
+        });
+      } else {
+        sc.Controls[ctrltype].SetValue(sc.CurrentPanel, ctrlname, { def: false, val: "" });
       }
-
-   }
-
+      break;
+  }
+};
 
 SpreadsheetControlSC.SettingsControls.Controls.BorderSide = {
-   SetValue: SpreadsheetControlSC.SettingsControls.BorderSideSetValue,
-   GetValue: SpreadsheetControlSC.SettingsControls.BorderSideGetValue,
-   OnClick: SpreadsheetControlSC.SettingsControls.ColorComboOnClick,
-   Initialize: SpreadsheetControlSC.SettingsControls.BorderSideInitialize,
-   InitialData: {thickness: "1 pixel:1px", style: "Solid:solid"},
-   ChangedCallback: null
-   }
+  SetValue: SpreadsheetControlSC.SettingsControls.BorderSideSetValue,
+  GetValue: SpreadsheetControlSC.SettingsControls.BorderSideGetValue,
+  OnClick: SpreadsheetControlSC.SettingsControls.ColorComboOnClick,
+  Initialize: SpreadsheetControlSC.SettingsControls.BorderSideInitialize,
+  InitialData: { thickness: "1 pixel:1px", style: "Solid:solid" },
+  ChangedCallback: null,
+};
 
+SpreadsheetControlSC.SettingControlReset = function () {
+  var sc = SocialCalc.SettingsControls;
+  var ctrlname;
 
-SpreadsheetControlSC.SettingControlReset = function() {
-
-   var sc = SocialCalc.SettingsControls;
-   var ctrlname;
-
-   for (ctrlname in sc.Controls) {
-      if (sc.Controls[ctrlname].OnReset) sc.Controls[ctrlname].OnReset(ctrlname);
-      }
-   }
-
+  for (ctrlname in sc.Controls) {
+    if (sc.Controls[ctrlname].OnReset) sc.Controls[ctrlname].OnReset(ctrlname);
+  }
+};
 
 /**********************
-*
-* CtrlSEditor implementation for editing SocialCalc.OtherSaveParts
-*
-*/
+ *
+ * CtrlSEditor implementation for editing SocialCalc.OtherSaveParts
+ *
+ */
 
 // OtherSaveParts init via mutable bridge (see above)
 
 /** @param {string} whichpart */
-SpreadsheetControlSC.CtrlSEditor = function(whichpart: any) {
+SpreadsheetControlSC.CtrlSEditor = function (whichpart: any) {
+  var strtoedit, partname;
+  if (whichpart.length > 0) {
+    strtoedit = SocialCalc.special_chars(SocialCalc.OtherSaveParts[whichpart] || "");
+  } else {
+    strtoedit = "Listing of Parts\n";
+    for (partname in SocialCalc.OtherSaveParts) {
+      strtoedit += SocialCalc.special_chars(
+        "\nPart: " + partname + "\n=====\n" + SocialCalc.OtherSaveParts[partname] + "\n",
+      );
+    }
+  }
+  var editbox = document.createElement("div");
+  editbox.style.cssText =
+    "position:absolute;z-index:500;width:300px;height:300px;left:100px;top:200px;border:1px solid black;background-color:#EEE;text-align:center;";
+  editbox.id = "socialcalc-editbox";
+  editbox.innerHTML =
+    whichpart +
+    '<br><br><textarea id="socialcalc-editbox-textarea" style="width:250px;height:200px;">' +
+    strtoedit +
+    "</textarea><br><br><input type=button " +
+    "onclick=\"SocialCalc.CtrlSEditorDone ('socialcalc-editbox', '" +
+    whichpart +
+    '\');" value="OK">';
+  document.body.appendChild(editbox);
 
-   var strtoedit, partname;
-   if (whichpart.length > 0) {
-      strtoedit = SocialCalc.special_chars(SocialCalc.OtherSaveParts[whichpart] || "");
-      }
-   else {
-      strtoedit = "Listing of Parts\n";
-      for (partname in SocialCalc.OtherSaveParts) {
-         strtoedit += SocialCalc.special_chars("\nPart: "+partname+"\n=====\n"+SocialCalc.OtherSaveParts[partname]+"\n");
-         }
-      }
-   var editbox = document.createElement("div");
-   editbox.style.cssText = "position:absolute;z-index:500;width:300px;height:300px;left:100px;top:200px;border:1px solid black;background-color:#EEE;text-align:center;";
-   editbox.id = "socialcalc-editbox";
-   editbox.innerHTML = whichpart+'<br><br><textarea id="socialcalc-editbox-textarea" style="width:250px;height:200px;">'+
-      strtoedit + '</textarea><br><br><input type=button ' +
-      'onclick="SocialCalc.CtrlSEditorDone (\'socialcalc-editbox\', \''+whichpart+'\');" value="OK">';
-   document.body.appendChild(editbox);
-
-   var ebta = /** @type {any} */((document as any).getElementById("socialcalc-editbox-textarea"));
-   ebta.focus();
-   SocialCalc.CmdGotFocus(ebta);
-
-   }
+  var ebta = /** @type {any} */ ((document as any).getElementById("socialcalc-editbox-textarea"));
+  ebta.focus();
+  SocialCalc.CmdGotFocus(ebta);
+};
 
 /** @param {string} idprefix @param {string} whichpart */
-SpreadsheetControlSC.CtrlSEditorDone = function(idprefix: any, whichpart: any) {
+SpreadsheetControlSC.CtrlSEditorDone = function (idprefix: any, whichpart: any) {
+  var edittextarea = /** @type {any} */ ((document as any).getElementById(idprefix + "-textarea"));
+  var text = edittextarea.value;
+  if (whichpart.length > 0) {
+    if (text.length > 0) {
+      SocialCalc.OtherSaveParts[whichpart] = text;
+    } else {
+      delete SocialCalc.OtherSaveParts[whichpart];
+    }
+  }
 
-   var edittextarea = /** @type {any} */((document as any).getElementById(idprefix+"-textarea"));
-   var text = edittextarea.value;
-   if (whichpart.length > 0) {
-      if (text.length > 0) {
-         SocialCalc.OtherSaveParts[whichpart] = text;
-         }
-      else {
-         delete SocialCalc.OtherSaveParts[whichpart];
-         }
-      }
-
-   var editbox = /** @type {any} */((document as any).getElementById(idprefix));
-   SocialCalc.KeyboardFocus();
-   editbox.parentNode.removeChild(editbox);
-
-   }
+  var editbox = /** @type {any} */ ((document as any).getElementById(idprefix));
+  SocialCalc.KeyboardFocus();
+  editbox.parentNode.removeChild(editbox);
+};

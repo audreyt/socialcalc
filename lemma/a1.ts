@@ -12,8 +12,32 @@
  */
 
 const LETTERS = [
-  "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
-  "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
+  "A",
+  "B",
+  "C",
+  "D",
+  "E",
+  "F",
+  "G",
+  "H",
+  "I",
+  "J",
+  "K",
+  "L",
+  "M",
+  "N",
+  "O",
+  "P",
+  "Q",
+  "R",
+  "S",
+  "T",
+  "U",
+  "V",
+  "W",
+  "X",
+  "Y",
+  "Z",
 ] as const;
 
 /** SocialCalc max column ZZ = 702. */
@@ -26,7 +50,7 @@ export function rcColname(c: number): string {
   //@ verify
   //@ ensures \result.length >= 1
   //@ ensures \result.length <= 2
-  // length ≤ 2 already excludes the length-5 token "#REF!"; Bun locks alphabet.
+  // length ≤ 2 already excludes the length-5 token "#REF!"; runtime tests lock alphabet.
   let col = c;
   if (col > 702) col = 702;
   if (col < 1) col = 1;
@@ -187,7 +211,7 @@ export function offsetRelativeA1(
   //@ verify
   //@ ensures \result.length >= 2
   //@ ensures wouldOffsetRef(col, row, coloffset, rowoffset) === true ==> \result === "#REF!"
-  // Converse locked by Bun (crToCoord is a method in Dafny, not usable in ensures).
+  // Converse locked by runtime tests (crToCoord is a method in Dafny, not usable in ensures).
   const c = offsetCol(col, coloffset);
   const r = offsetRow(row, rowoffset);
   if (c === -1 || r === -1) return "#REF!";
@@ -245,12 +269,7 @@ export function wouldOffsetA1Ref(
 /**
  * Format A1 with optional $ markers; invalid parts → "#REF!".
  */
-export function formatA1Parts(
-  col: number,
-  row: number,
-  absCol: boolean,
-  absRow: boolean,
-): string {
+export function formatA1Parts(col: number, row: number, absCol: boolean, absRow: boolean): string {
   //@ verify
   //@ ensures \result.length >= 2
   //@ ensures isColInBounds(col) === false || isRowInBounds(row) === false ==> \result === "#REF!"
@@ -276,7 +295,7 @@ export function offsetA1(
 ): string {
   //@ verify
   //@ ensures \result.length >= 2
-  // wouldOffsetA1Ref ==> #REF! is Bun-locked; pure wouldOffsetA1Ref is Dafny/Lean-checked.
+  // wouldOffsetA1Ref ==> #REF! is runtime-locked; pure wouldOffsetA1Ref is Dafny/Lean-checked.
   const p = offsetA1Parts(col, row, absCol, absRow, coloffset, rowoffset);
   if (p.col === -1 || p.row === -1) return "#REF!";
   return formatA1Parts(p.col, p.row, absCol, absRow);
@@ -293,12 +312,7 @@ export function offsetA1(
  * Delete band (delta < 0): values in [start, start - delta) become -1 (#REF!).
  * Then values >= start shift by delta. Final out-of-band → -1.
  */
-export function adjustAxis(
-  value: number,
-  start: number,
-  delta: number,
-  isCol: boolean,
-): number {
+export function adjustAxis(value: number, start: number, delta: number, isCol: boolean): number {
   //@ verify
   //@ ensures \result === -1 || (isCol === true && \result >= 1 && \result <= 702) || (isCol === false && \result >= 1)
   //@ ensures delta === 0 ==> (\result === value || \result === -1)
@@ -387,7 +401,7 @@ export function colToRcRanks(c: number): { colhigh: number; collow: number } {
   //@ verify
   //@ ensures \result.collow >= 0 && \result.collow <= 25
   //@ ensures \result.colhigh >= 0 && \result.colhigh <= 26
-  // Round-trip with colFromRcRanks locked by Bun (Dafny pure algebra later).
+  // Round-trip with colFromRcRanks locked by runtime tests (Dafny pure algebra later).
   const col = clampCol(c);
   const collow = (col - 1) % 26;
   const colhigh = Math.floor((col - 1) / 26);

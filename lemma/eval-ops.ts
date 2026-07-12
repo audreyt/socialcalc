@@ -12,7 +12,7 @@
  *   div: error lattice first (left error wins, else right), then zero → DIV0
  *   concat: either-side error propagates; left wins if both
  *
- * Bun tests cross-check against shipping evaluate_parsed_formula.
+ * Vite+ tests cross-check against shipping evaluate_parsed_formula.
  * Does not replace formula-coverage on the real evaluator.
  */
 
@@ -91,7 +91,7 @@ export function concatType(a: number, b: number): number {
 }
 
 /**
- * Map SocialCalc valuetype string to lattice type code (Bun cross-check only).
+ * Map SocialCalc valuetype string to lattice type code (runtime cross-check only).
  */
 export function fromValueType(vt: string): number {
   if (vt.charAt(0) === "e") {

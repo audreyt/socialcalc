@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vite-plus/test";
 
 import {
   incorrectRowError,
@@ -26,12 +26,8 @@ describe("lemma/lookup-result pure core (Dafny/Lean surface)", () => {
     expect(typeChar0("")).toBe("");
     expect(wildcardKey("n%")).toBe("n*");
     expect(wildcardKey("")).toBe("*");
-    expect(missingRowError("x")).toBe(
-      "e#VALUE! (internal error, missing LookupResultType x*)",
-    );
-    expect(missingRowError("")).toBe(
-      "e#VALUE! (internal error, missing LookupResultType *)",
-    );
+    expect(missingRowError("x")).toBe("e#VALUE! (internal error, missing LookupResultType x*)");
+    expect(missingRowError("")).toBe("e#VALUE! (internal error, missing LookupResultType *)");
     expect(incorrectRowError("|n:1")).toContain("incorrect LookupResultType");
   });
 
@@ -48,8 +44,7 @@ describe("lemma/lookup-result pure core (Dafny/Lean surface)", () => {
   });
 
   test("lookupInRow exact then family wildcard", () => {
-    const plusN =
-      "|n%:n|nd:nd|nt:nt|ndt:ndt|n$:n$|n:n|n*:n|b:n|e*:2|t*:e#VALUE!|";
+    const plusN = "|n%:n|nd:nd|nt:nt|ndt:ndt|n$:n$|n:n|n*:n|b:n|e*:2|t*:e#VALUE!|";
     expect(lookupInRow("n", "n", plusN)).toBe("n");
     expect(lookupInRow("n", "e#REF!", plusN)).toBe("e#REF!");
     expect(lookupInRow("n", "t", plusN)).toBe("e#VALUE!");
@@ -65,23 +60,14 @@ describe("lemma/lookup-result vs shipping LookupResultType", () => {
   async function shippingLookup(
     type1: string,
     type2: string,
-    tableName:
-      | "plus"
-      | "concat"
-      | "twoargnumeric"
-      | "propagateerror"
-      | "unaryminus",
+    tableName: "plus" | "concat" | "twoargnumeric" | "propagateerror" | "unaryminus",
   ): Promise<string> {
     const SC = await loadSocialCalc();
     const table = SC.Formula.TypeLookupTable[tableName];
     return SC.Formula.LookupResultType(type1, type2, table);
   }
 
-  function facadeLookup(
-    type1: string,
-    type2: string,
-    table: Record<string, string>,
-  ): string {
+  function facadeLookup(type1: string, type2: string, table: Record<string, string>): string {
     return lookupResultType(type1, type2, table);
   }
 
@@ -125,27 +111,16 @@ describe("lemma/lookup-result vs shipping LookupResultType", () => {
       ["n", "t"], // n falls to missing row on concat
     ];
     for (const [a, b] of pairs) {
-      expect(facadeLookup(a, b, concat)).toBe(
-        await shippingLookup(a, b, "concat"),
-      );
+      expect(facadeLookup(a, b, concat)).toBe(await shippingLookup(a, b, "concat"));
     }
   });
 
   test("twoargnumeric / propagateerror / unaryminus", async () => {
     const SC = await loadSocialCalc();
     const tables = {
-      twoargnumeric: SC.Formula.TypeLookupTable.twoargnumeric as Record<
-        string,
-        string
-      >,
-      propagateerror: SC.Formula.TypeLookupTable.propagateerror as Record<
-        string,
-        string
-      >,
-      unaryminus: SC.Formula.TypeLookupTable.unaryminus as Record<
-        string,
-        string
-      >,
+      twoargnumeric: SC.Formula.TypeLookupTable.twoargnumeric as Record<string, string>,
+      propagateerror: SC.Formula.TypeLookupTable.propagateerror as Record<string, string>,
+      unaryminus: SC.Formula.TypeLookupTable.unaryminus as Record<string, string>,
     } as const;
 
     const cases: Array<{
@@ -168,9 +143,7 @@ describe("lemma/lookup-result vs shipping LookupResultType", () => {
     ];
 
     for (const c of cases) {
-      expect(facadeLookup(c.a, c.b, tables[c.table])).toBe(
-        await shippingLookup(c.a, c.b, c.table),
-      );
+      expect(facadeLookup(c.a, c.b, tables[c.table])).toBe(await shippingLookup(c.a, c.b, c.table));
     }
   });
 });

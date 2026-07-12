@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vite-plus/test";
 
 import {
   MAX_COL,
@@ -326,9 +326,9 @@ describe("lemma/a1 facade vs shipping SocialCalc oracle", () => {
       const cr = SC.coordToCr(coord);
       const absCol = coord.charAt(0) === "$";
       const absRow = coord.indexOf("$", 1) !== -1;
-      expect(
-        adjustA1(cr.col, cr.row, absCol, absRow, startCol, dCol, startRow, dRow),
-      ).toBe(SC.AdjustFormulaCoords(coord, startCol, dCol, startRow, dRow));
+      expect(adjustA1(cr.col, cr.row, absCol, absRow, startCol, dCol, startRow, dRow)).toBe(
+        SC.AdjustFormulaCoords(coord, startCol, dCol, startRow, dRow),
+      );
     }
   });
 

@@ -925,13 +925,8 @@ FormatNumberMut.parse_format_string = function (
     if (ampmstr) {
       ampmstr += ch;
       part = ampmstr.toLowerCase();
-      if (part != "am/pm".substring(0, part.length) && part != "a/p".substring(0, part.length)) {
-        // @ts-expect-error: intentional no-op assignment to a discarded global.
-        // Clearing `ampmstr` here would change behavior (incomplete AM/PM runs
-        // would stop swallowing subsequent characters); see format-coverage
-        // test "partial AM/PM run ... is discarded".
-        ampstr = "";
-      } else if (part == "am/pm" || part == "a/p") {
+      // Partial and invalid tokens stay non-empty so remaining characters are swallowed.
+      if (part == "am/pm" || part == "a/p") {
         thisformat.operators.push(scfn.commands.date);
         thisformat.operands.push(ampmstr);
         ampmstr = "";

@@ -95,88 +95,86 @@ const umdWrapperBottom = `// Closing half of a UMD IIFE. Inlined in build.ts —
 
 // Core sources only (no UMD halves). Prefer sibling `.ts` when listed as `.js`.
 const coreFiles = [
-    "socialcalcconstants.js",
-    "socialcalc-3.js",
-    "socialcalctableeditor.js",
-    "formatnumber2.js",
-    "formula1.js",
-    "formula-parse.ts",
-    "formula-operand.ts",
-    "formula-ref.ts",
-    "socialcalcpopup.js",
-    "socialcalcspreadsheetcontrol.js",
-    "socialcalcviewer.js",
+  "socialcalcconstants.js",
+  "socialcalc-3.js",
+  "socialcalctableeditor.js",
+  "formatnumber2.js",
+  "formula1.js",
+  "formula-parse.ts",
+  "formula-operand.ts",
+  "formula-ref.ts",
+  "socialcalcpopup.js",
+  "socialcalcspreadsheetcontrol.js",
+  "socialcalcviewer.js",
 ];
 
 const cssFiles = ["socialcalc.css"];
 
 const tsTranspiler = new Bun.Transpiler({
-    loader: "ts",
-    target: "browser",
+  loader: "ts",
+  target: "browser",
 });
 
 // Bun.Transpiler drops comments. Reattach the leading // and /* */ preamble
 // (copyright / Artistic License / module banner) so dist keeps legal headers.
 function leadingCommentPreamble(source: string): string {
-    let i = 0;
-    const n = source.length;
-    while (i < n) {
-        const ch = source[i]!;
-        if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
-            i += 1;
-            continue;
-        }
-        if (source.startsWith("//", i)) {
-            const eol = source.indexOf("\n", i);
-            i = eol === -1 ? n : eol + 1;
-            continue;
-        }
-        if (source.startsWith("/*", i)) {
-            const end = source.indexOf("*/", i + 2);
-            i = end === -1 ? n : end + 2;
-            continue;
-        }
-        break;
+  let i = 0;
+  const n = source.length;
+  while (i < n) {
+    const ch = source[i]!;
+    if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
+      i += 1;
+      continue;
     }
-    if (i === 0) return "";
-    return `${source.slice(0, i).replace(/\s+$/u, "")}\n\n`;
+    if (source.startsWith("//", i)) {
+      const eol = source.indexOf("\n", i);
+      i = eol === -1 ? n : eol + 1;
+      continue;
+    }
+    if (source.startsWith("/*", i)) {
+      const end = source.indexOf("*/", i + 2);
+      i = end === -1 ? n : end + 2;
+      continue;
+    }
+    break;
+  }
+  if (i === 0) return "";
+  return `${source.slice(0, i).replace(/\s+$/u, "")}\n\n`;
 }
 
 function resolveJsSource(name: string): string {
-    if (name.endsWith(".js")) {
-        const tsName = `${name.slice(0, -3)}.ts`;
-        if (existsSync(join(jsDir, tsName))) {
-            return tsName;
-        }
+  if (name.endsWith(".js")) {
+    const tsName = `${name.slice(0, -3)}.ts`;
+    if (existsSync(join(jsDir, tsName))) {
+      return tsName;
     }
-    if (name.endsWith(".ts") && !existsSync(join(jsDir, name))) {
-        const jsName = `${name.slice(0, -3)}.js`;
-        if (existsSync(join(jsDir, jsName))) {
-            return jsName;
-        }
+  }
+  if (name.endsWith(".ts") && !existsSync(join(jsDir, name))) {
+    const jsName = `${name.slice(0, -3)}.js`;
+    if (existsSync(join(jsDir, jsName))) {
+      return jsName;
     }
-    return name;
+  }
+  return name;
 }
 
 async function readJsSource(name: string): Promise<string> {
-    const resolved = resolveJsSource(name);
-    const text = await readFile(join(jsDir, resolved), "utf8");
-    if (resolved.endsWith(".ts")) {
-        return leadingCommentPreamble(text) + tsTranspiler.transformSync(text);
-    }
-    return text;
+  const resolved = resolveJsSource(name);
+  const text = await readFile(join(jsDir, resolved), "utf8");
+  if (resolved.endsWith(".ts")) {
+    return leadingCommentPreamble(text) + tsTranspiler.transformSync(text);
+  }
+  return text;
 }
 
 async function concatCore(files: readonly string[]): Promise<string> {
-    const parts = await Promise.all(files.map((name) => readJsSource(name)));
-    return parts.join("\n");
+  const parts = await Promise.all(files.map((name) => readJsSource(name)));
+  return parts.join("\n");
 }
 
 async function concatCss(dir: string, files: readonly string[]): Promise<string> {
-    const parts = await Promise.all(
-        files.map((name) => readFile(join(dir, name), "utf8")),
-    );
-    return parts.join("\n");
+  const parts = await Promise.all(files.map((name) => readFile(join(dir, name), "utf8")));
+  return parts.join("\n");
 }
 
 await mkdir(distDir, { recursive: true });
@@ -191,18 +189,18 @@ await writeFile(join(distDir, "socialcalc.css"), css);
 // Optional minified variant — emitted only when `--minify` is passed so local
 // development stays fast.
 if (process.argv.includes("--minify")) {
-    const out = await Bun.build({
-        entrypoints: [join(distDir, "SocialCalc.js")],
-        minify: true,
-        target: "browser",
-        format: "iife",
-        outdir: distDir,
-        naming: "SocialCalc.min.js",
-    });
-    if (!out.success) {
-        console.error(out.logs);
-        process.exit(1);
-    }
+  const out = await Bun.build({
+    entrypoints: [join(distDir, "SocialCalc.js")],
+    minify: true,
+    target: "browser",
+    format: "iife",
+    outdir: distDir,
+    naming: "SocialCalc.min.js",
+  });
+  if (!out.success) {
+    console.error(out.logs);
+    process.exit(1);
+  }
 }
 
 console.log(`wrote ${join(distDir, "SocialCalc.js")} (${js.length} bytes)`);

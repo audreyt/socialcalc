@@ -250,10 +250,7 @@
     },
     {
       "name": "paste offsets local ref but leaves whole column and string literal",
-      "setup": [
-        "set A1 value n 1",
-        "set B1 formula A1+SUM(N:N)+\"A1\""
-      ],
+      "setup": ["set A1 value n 1", "set B1 formula A1+SUM(N:N)+\"A1\""],
       "commands": ["copy B1", "paste D3 formulas"],
       "expectedCells": [
         {
@@ -265,11 +262,7 @@
     },
     {
       "name": "deletecol updates formula through AdjustFormulaCoords",
-      "setup": [
-        "set A1 value n 1",
-        "set B1 value n 2",
-        "set C1 formula B1+C1"
-      ],
+      "setup": ["set A1 value n 1", "set B1 value n 2", "set C1 formula B1+C1"],
       "commands": ["deletecol B1"],
       "expectedCells": [
         {

@@ -8,8 +8,8 @@
  * Layers:
  * 1. resolveToken — //@ verify (1/2/literal token resolution)
  * 2. chooseLookupResult — //@ verify (exact-before-wildcard-before-miss precedence)
- * 3. findExact / hasExact — Bun-locked linear scan (not verified)
- * 4. Entry scan / pipe-string parse / Record select — Bun-locked bridge to shipping
+ * 3. findExact / hasExact — runtime-locked linear scan (not verified)
+ * 4. Entry scan / pipe-string parse / Record select — runtime-locked bridge to shipping
  * 1. select row: table[type1] else table[type1.charAt(0)+'*'] else missing-internal
  * 2. find exact "|type2:" entry in pipe-table row
  * 3. else find "|type2.charAt(0)*:" wildcard entry
@@ -39,7 +39,7 @@ export function resolveToken(type1: string, type2: string, token: string): strin
 
 /**
  * Leading type character ("" when type is empty).
- * Bun helper — not verified (charAt unsupported on Lean).
+ * Runtime helper — not verified (charAt unsupported on Lean).
  */
 export function typeChar0(type: string): string {
   if (type.length === 0) return "";
@@ -48,7 +48,7 @@ export function typeChar0(type: string): string {
 
 /**
  * Wildcard key used for type-family rows/entries: char0 + "*".
- * Bun helper — not verified (depends on typeChar0).
+ * Runtime helper — not verified (depends on typeChar0).
  */
 export function wildcardKey(type: string): string {
   return typeChar0(type) + "*";
@@ -71,7 +71,7 @@ export function incorrectRowError(row: string): string {
 /**
  * Linear search for an exact key in an entry list.
  * Returns the value, or "" if not found (shipping tokens are never empty).
- * Bun-locked scan — not verified (loop termination trivial).
+ * Runtime-locked scan — not verified (loop termination trivial).
  */
 export function findExact(entries: TableEntry[], needle: string): string {
   let i = 0;
@@ -87,7 +87,7 @@ export function findExact(entries: TableEntry[], needle: string): string {
 
 /**
  * Whether an exact key is present (avoids ""-value ambiguity for ensures).
- * Bun-locked scan — not verified (loop termination trivial).
+ * Runtime-locked scan — not verified (loop termination trivial).
  */
 export function hasExact(entries: TableEntry[], needle: string): boolean {
   let i = 0;
@@ -148,14 +148,10 @@ export function chooseLookupResult(
 /**
  * Lookup type2 in an entry list with shipping precedence:
  * exact key first, then family wildcard (char0 + "*"), else e#VALUE!.
- * Scan correctness is Bun-locked; the precedence *choice* is verified via
+ * Scan correctness is runtime-locked; the precedence *choice* is verified via
  * chooseLookupResult (exact-wins / wildcard / miss VCs).
  */
-export function lookupInEntries(
-  type1: string,
-  type2: string,
-  entries: TableEntry[],
-): string {
+export function lookupInEntries(type1: string, type2: string, entries: TableEntry[]): string {
   const hasE = hasExact(entries, type2);
   const wild = wildcardKey(type2);
   const hasW = hasExact(entries, wild);
@@ -172,12 +168,9 @@ export function lookupInEntries(
 /**
  * Select the pipe-table row for type1 from a TypeLookupTable sub-map.
  * Exact key first, then type-family wildcard key, else null.
- * (Record index — Bun / shipping bridge; not verified.)
+ * (Record index — runtime / shipping bridge; not verified.)
  */
-export function selectRow(
-  type1: string,
-  table: Record<string, string>,
-): string | null {
+export function selectRow(type1: string, table: Record<string, string>): string | null {
   const exact = table[type1];
   if (exact !== undefined) return exact;
   const wild = table[wildcardKey(type1)];
@@ -188,7 +181,7 @@ export function selectRow(
 /**
  * Parse a shipping pipe-table row into TableEntry[].
  * Format: "|key:val|key2:val2|..." (leading | required for first entry).
- * Malformed segments are skipped; Bun-locked (string scan).
+ * Malformed segments are skipped; runtime-locked (string scan).
  */
 export function parsePipeRow(row: string): TableEntry[] {
   const entries: TableEntry[] = [];
@@ -255,12 +248,8 @@ export function lookupResultType(
 
 /**
  * Entry-list form of full lookup when the caller already selected a row.
- * Bun-facing test entry point; precedence choice is verified via chooseLookupResult.
+ * Runtime-facing test entry point; precedence choice is verified via chooseLookupResult.
  */
-export function lookupResultInEntries(
-  type1: string,
-  type2: string,
-  entries: TableEntry[],
-): string {
+export function lookupResultInEntries(type1: string, type2: string, entries: TableEntry[]): string {
   return lookupInEntries(type1, type2, entries);
 }

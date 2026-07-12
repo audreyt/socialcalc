@@ -2,8 +2,29 @@
   "name": "socialcalc",
   "version": "3.0.8",
   "description": "Collaborative spreadsheet editor",
-  "main": "dist/SocialCalc.js",
-  "types": "dist/SocialCalc.d.ts",
+  "keywords": [
+    "calc",
+    "cells",
+    "editor",
+    "ethercalc",
+    "excel",
+    "grid",
+    "office",
+    "socialcalc",
+    "spreadsheet",
+    "spreadsheets",
+    "table"
+  ],
+  "homepage": "https://github.com/audreyt/socialcalc#readme",
+  "bugs": {
+    "url": "https://github.com/audreyt/socialcalc/issues"
+  },
+  "license": "(CPAL-1.0 AND Artistic-2.0 AND MPL-2.0)",
+  "author": "Dan Bricklin",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/audreyt/socialcalc.git"
+  },
   "files": [
     "dist/SocialCalc.js",
     "dist/SocialCalc.d.ts",
@@ -14,13 +35,15 @@
     "LEGAL.txt",
     "README.md"
   ],
+  "main": "dist/SocialCalc.js",
+  "types": "dist/SocialCalc.d.ts",
   "scripts": {
     "build": "bun run build.ts",
     "build:min": "bun run build.ts --minify",
     "typecheck": "tsc --noEmit",
     "typecheck:strict": "tsc --noEmit -p tsconfig.strict.json",
-    "test": "bun run build.ts && bun test --parallel",
-    "test:coverage": "bun run build.ts && bun test --coverage --coverage-reporter=text --coverage-reporter=lcov",
+    "test": "bun run build.ts && vp test",
+    "test:coverage": "bun run build.ts && vp test --coverage",
     "mutate": "bunx stryker run",
     "mutate:file": "bun run stryker-file.mjs",
     "mutate:format": "bun run stryker-file.mjs js/formatnumber2.ts",
@@ -35,33 +58,19 @@
     "verify:lean:build": "lake build",
     "verify:both": "bun run verify:dafny && bun run verify:lean"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/audreyt/socialcalc.git"
-  },
-  "keywords": [
-    "spreadsheet",
-    "socialcalc",
-    "ethercalc",
-    "excel",
-    "calc",
-    "table",
-    "grid",
-    "cells",
-    "office",
-    "spreadsheets",
-    "editor"
-  ],
-  "author": "Dan Bricklin",
-  "license": "(CPAL-1.0 AND Artistic-2.0 AND MPL-2.0)",
-  "bugs": {
-    "url": "https://github.com/audreyt/socialcalc/issues"
-  },
-  "homepage": "https://github.com/audreyt/socialcalc#readme",
   "devDependencies": {
     "@stryker-mutator/core": "^9.6.1",
     "@types/bun": "latest",
+    "@vitest/coverage-v8": "4.1.10",
     "lemmascript": "0.5.13",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vite-plus": "^0.2.4"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "bun",
+      "version": "1.3.14",
+      "onFail": "download"
+    }
   }
 }

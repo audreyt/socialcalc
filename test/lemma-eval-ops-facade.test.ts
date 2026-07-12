@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vite-plus/test";
 
 import {
   ERR_DIV0,
@@ -82,11 +82,7 @@ describe("lemma/eval-ops vs shipping EvaluatePolish", () => {
       } else {
         expect(fromValueType(r.type)).toBe(expected);
         expect(toValueType(expected)).toBe(
-          expected === ERR_REF
-            ? "e#REF!"
-            : expected === ERR_DIV0
-              ? "e#DIV/0!"
-              : "e#VALUE!",
+          expected === ERR_REF ? "e#REF!" : expected === ERR_DIV0 ? "e#DIV/0!" : "e#VALUE!",
         );
       }
     }

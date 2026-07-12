@@ -6,6 +6,23 @@ with the original 2007–2010 development log preserved verbatim at the bottom.
 
 
 ==============================================================================
+Unreleased — 2026-07-12
+==============================================================================
+
+Toolchain and testing
+- Switched the JavaScript test regime from `bun test` to Vite+ (`vp test`) and
+  its `vite-plus/test` Vitest API, including package scripts, mutation runs,
+  coverage reporting, and CI.
+- The test harness now compiles the UMD bundle once per isolated test worker,
+  preserves host global descriptors around the browser shim, and reuses the
+  SocialCalc instance within a file. This avoids query-expanded bundle copies
+  and keeps the full suite fast and memory-bounded.
+- Removed an undeclared no-op assignment in partial AM/PM format parsing that
+  throws under strict Node execution while preserving the existing token
+  swallowing behavior.
+
+
+==============================================================================
 v3.0.6 — 2026-07-09
 ==============================================================================
 

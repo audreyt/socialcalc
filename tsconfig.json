@@ -26,15 +26,6 @@
 
     "types": ["bun"]
   },
-  "include": [
-    "build.ts",
-    "js/**/*.js",
-    "js/**/*.ts",
-    "test/**/*.ts",
-    "dist/SocialCalc.d.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "include": ["build.ts", "js/**/*.js", "js/**/*.ts", "test/**/*.ts", "dist/SocialCalc.d.ts"],
+  "exclude": ["node_modules", "dist"]
 }
