@@ -4,25 +4,36 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
   pull_request:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel a tag-triggered run (a release build in flight): only
+  # branch/PR runs get superseded by a newer push to the same ref.
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 jobs:
   dafny:
     name: lsc check (Dafny)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      # actions/checkout v4.3.0
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
 
-      - uses: voidzero-dev/setup-vp@v1
+      # voidzero-dev/setup-vp v1.1.0
+      - uses: voidzero-dev/setup-vp@e1609b468742ba9232ce5e12b3a77bdf14495277
         with:
           cache: true
 
+      # dafny-lang/setup-dafny-action v1.9.1
       - name: Setup Dafny
-        uses: dafny-lang/setup-dafny-action@v1
+        uses: dafny-lang/setup-dafny-action@be023fc606339d46ed6b077dcb8614d0279ded31
         with:
           dafny-version: "4.9.0"
 
@@ -35,10 +46,13 @@ jobs:
   lean-gen:
     name: lsc gen (Lean)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      # actions/checkout v4.3.0
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
 
-      - uses: voidzero-dev/setup-vp@v1
+      # voidzero-dev/setup-vp v1.1.0
+      - uses: voidzero-dev/setup-vp@e1609b468742ba9232ce5e12b3a77bdf14495277
         with:
           cache: true
 
@@ -53,6 +67,7 @@ jobs:
       - name: Assert Lean artifacts non-empty
         shell: bash
         run: |
+          set -euo pipefail
           test -s lemma/a1.types.lean
           test -s lemma/a1.def.lean
           test -s lemma/a1.proof.lean
