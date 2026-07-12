@@ -140,8 +140,8 @@ export const testsByFile = {
   // ConstantsSetImagePrefix). Set = every test file that reads/writes
   // `SC.Constants` (grep -rl "Constants" test/*.test.ts); sheet-coverage-a
   // and types.smoke call the two functions directly. Includes the
-  // 2026-07-12 mutation-survivor regression file (see
-  // stryker-mutation-disposition.json).
+  // 2026-07-12 mutation-survivor and oracle-parity regression files
+  // (see stryker-mutation-disposition.json).
   "socialcalcconstants.ts": [
     "test/editor-coverage-a.test.ts",
     "test/editor-coverage-b.test.ts",
@@ -153,6 +153,7 @@ export const testsByFile = {
     "test/sheet-coverage-a.test.ts",
     "test/types.smoke.test.ts",
     "test/socialcalcconstants-mutation-survivors.test.ts",
+    "test/socialcalcconstants-oracle-parity.test.ts",
   ],
 
   // Concatenated into one logical "Formula" bag in build.ts's `coreFiles`
