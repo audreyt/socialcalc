@@ -1,0 +1,505 @@
+{
+  "$description": "Machine-readable disposition of Stryker mutation-testing survivors in the critical-scope modules (js/formula-parse.ts, js/formula-operand.ts, js/formula-ref.ts, js/socialcalcconstants.ts) that were reviewed and determined to be behaviorally EQUIVALENT mutants (no possible test can ever distinguish the mutant from the original for any reachable input) rather than genuine test-coverage gaps. This file is documentation only — it is NOT read by stryker.config.mjs and does NOT suppress, exclude, or hide these mutants from Stryker's own run; they still appear and count as 'Survived' in reports/mutation/<scope>/mutation.json and in the measured mutation score used to set thresholds.break. Do not add an entry here to make a score look better — every entry needs a concrete, checkable argument for why NO possible test could ever kill that mutant. See undispositionedSurvivors below for the current, honestly-counted gap this file does NOT paper over.",
+  "$schema_note": "entries[].location uses Stryker's own 1-based line/column mutant location format. Stryker reassigns numeric mutant `id`s per run, so entries[].id is NOT stable across runs and must not be used to cross-reference a fresh mutation.json — match on (file, mutatorName, location, replacement) instead, which is stable for as long as the source line doesn't move.",
+  "reviewedAt": "2026-07-12",
+  "reviewedAgainst": {
+    "mutationJson": "reports/mutation/critical/mutation.json (not checked in; regenerate via `MUTATE_SCOPE=critical bun run mutate`)",
+    "measuredCriticalScope": {
+      "note": "Fresh full rerun 2026-07-12, no mutator exclusions, 4-file critical scope, 31-file deterministic test subset (see stryker.config.mjs's measurement comment for the full per-file breakdown).",
+      "total": 2119,
+      "killed": 1405,
+      "timeout": 95,
+      "survived": 619,
+      "score": "70.79%"
+    },
+    "entriesInThisFile": 28,
+    "entriesStillSurvivedInFreshRun": 26,
+    "entriesNowKilledInFreshRun": 2,
+    "note": "All 28 entries below are confined to js/formula-parse.ts, js/formula-operand.ts, and js/formula-ref.ts. 26 still show Survived in the fresh run (expected: equivalence means no test CAN kill them). 2 now show Killed — an incidental kill from a broader test addition elsewhere; their equivalence reasoning is unaffected, they're simply no longer counted as survivors either way. A prior draft of this file claimed 33 total survivors with '5 more addressed with tests after the rerun' (id=417/830/305/1364/1365/1368) whose kills were 'not yet observed in a fresh run' — that claim was never actually re-verified against a fresh run and is retracted here; do not cite it."
+  },
+  "undispositionedSurvivors": {
+    "note": "Real, currently-measured coverage gaps that are NOT reviewed for equivalence and NOT excluded from scoring. js/socialcalcconstants.ts's 548 are all StringLiteral default-value/CSS-class literals in a large data table — genuinely under-tested, not yet reviewed one by one. The critical break threshold (stryker.config.mjs's CRITICAL_BREAK_THRESHOLD) is set to the honest measured floor that includes all of these, rather than hiding them behind an exclusion or an unverified claim.",
+    "js/formula-parse.ts": 8,
+    "js/formula-operand.ts": 20,
+    "js/formula-ref.ts": 17,
+    "js/socialcalcconstants.ts": 548
+  },
+  "entries": [
+    {
+      "id": 462,
+      "mutatorName": "ConditionalExpression",
+      "location": {
+        "start": {
+          "line": 117,
+          "column": 18
+        },
+        "end": {
+          "line": 117,
+          "column": 45
+        }
+      },
+      "replacement": "true",
+      "justification": "Every `if (state == X)` block in ParseFormulaIntoTokens is a bare `if`, not `else if`, so a state change made here lets the SAME character cascade into the coord-state block within the same loop iteration. Forcing this incoord check to always transition to `state = coord` (instead of only for the literal '$' char) is unobservable because: (1) `str` accumulated while in the alpha state can never contain a digit (a digit transitions out of alpha before being appended), so `coordregex` (which requires a trailing digit) can never match, meaning the coord-state handler's op/numstart/space/eof branch always falls back to pushing the same `name` token the alpha branch would have pushed directly; and (2) the coord-state error branch pushes the identical `s_parseerrchar` text the alpha branch's error branch would have pushed. An exhaustive differential test of every printable-ASCII 2-char suffix after 'A' and '$', comparing the real function against a mutated clone, found zero distinguishing input.",
+      "file": "js/formula-parse.ts"
+    },
+    {
+      "id": 476,
+      "mutatorName": "EqualityOperator",
+      "location": {
+        "start": {
+          "line": 121,
+          "column": 9
+        },
+        "end": {
+          "line": 121,
+          "column": 37
+        }
+      },
+      "replacement": "cclass != charclass.numstart",
+      "justification": "charclass.numstart (2) is assigned to exactly one character in CharClassTable: '.'. The alpha state's own second branch (`cclass == charclass.alpha || ch == \".\"`) already intercepts every '.' character before this terminator group is ever reached, so `cclass == charclass.numstart` can never be observed true (nor can flipping it to != ever be observed false in a way that changes control flow) at this program point. The clause is provably dead code given the fixed CharClassTable content.",
+      "file": "js/formula-parse.ts"
+    },
+    {
+      "id": 659,
+      "mutatorName": "BlockStatement",
+      "location": {
+        "start": {
+          "line": 248,
+          "column": 16
+        },
+        "end": {
+          "line": 251,
+          "column": 10
+        }
+      },
+      "replacement": "{}",
+      "justification": "This else-block (`last_token_type = charclass.eof; last_token_text = \"EOF\";`) only executes when `parseinfo.length == 0`. The only subsequent read of these two variables is the unary-operator check `parseinfo.length == 0 || (last_token_type == charclass.op && ...)`, whose left operand is already true in this exact case, so `||` short-circuits and the right-hand operand (the only place these variables are read) is never evaluated. Emptying the block's body therefore has zero observable effect on any token stream.",
+      "file": "js/formula-parse.ts"
+    },
+    {
+      "id": 770,
+      "mutatorName": "BlockStatement",
+      "location": {
+        "start": {
+          "line": 340,
+          "column": 42
+        },
+        "end": {
+          "line": 343,
+          "column": 6
+        }
+      },
+      "replacement": "{}",
+      "justification": "The space branch's body (`{ continue; }`) is the LAST statement inside the for-loop body in ConvertInfixToPolish (nothing follows the if/else-if chain before the loop's closing brace), so replacing it with an empty block is behaviorally identical: falling off the end of the loop body reaches the next iteration exactly the way `continue` does. Verified by feeding a hand-built `[num, space, num]` token array through the real function and a mutated clone: both return the identical `[0, 2]`.",
+      "file": "js/formula-parse.ts"
+    },
+    {
+      "id": 843,
+      "mutatorName": "EqualityOperator",
+      "location": {
+        "start": {
+          "line": 384,
+          "column": 13
+        },
+        "end": {
+          "line": 384,
+          "column": 29
+        }
+      },
+      "replacement": "tprecedence > 0",
+      "justification": "SC.Formula.TokenPrecedence's full value set is {1,2,-3,4,5,6,7,8,9} — no opcode ever has precedence exactly 0, and an opcode lookup miss yields `undefined`, for which `>= 0` and `> 0` are both `false`. So `tprecedence >= 0` and `tprecedence > 0` can only ever disagree at exactly 0, which is unreachable for any real opcode drawn from that fixed, hardcoded table. An 8000-formula randomized differential fuzz against a hand-transcribed reference implementation of ConvertInfixToPolish found zero disagreements.",
+      "file": "js/formula-parse.ts"
+    },
+    {
+      "id": 850,
+      "mutatorName": "EqualityOperator",
+      "location": {
+        "start": {
+          "line": 385,
+          "column": 13
+        },
+        "end": {
+          "line": 385,
+          "column": 28
+        }
+      },
+      "replacement": "tprecedence <= 0",
+      "justification": "Same reasoning as id=843: tprecedence is drawn from the fixed TokenPrecedence table {1,2,-3,4,5,6,7,8,9} (or is `undefined` on a miss), which never contains exactly 0, so `< 0` and `<= 0` are provably identical for every reachable value. Confirmed with the same 8000-formula differential fuzz.",
+      "file": "js/formula-parse.ts"
+    },
+    {
+      "id": 856,
+      "mutatorName": "EqualityOperator",
+      "location": {
+        "start": {
+          "line": 387,
+          "column": 15
+        },
+        "end": {
+          "line": 387,
+          "column": 35
+        }
+      },
+      "replacement": "tstackprecedence <= 0",
+      "justification": "Identical reasoning to id=850, applied to tstackprecedence instead of tprecedence — both are values looked up from the same fixed, zero-free TokenPrecedence table, so `< 0` and `<= 0` are indistinguishable for every reachable input. Confirmed with the same 8000-formula differential fuzz.",
+      "file": "js/formula-parse.ts"
+    },
+    {
+      "id": 863,
+      "mutatorName": "ConditionalExpression",
+      "location": {
+        "start": {
+          "line": 393,
+          "column": 16
+        },
+        "end": {
+          "line": 393,
+          "column": 40
+        }
+      },
+      "replacement": "true",
+      "justification": "FormulaTokenTypeCode is a closed TypeScript union `1|2|3|4|5|6|7` (num/coord/op/name/error/string/space). In the ttype/ttext if-else-if chain this condition terminates, every other legal value is already consumed by an earlier branch: num/coord/string by the first branch, name by the second, space by the third, and the ttext-based comma/'('/')' checks plus the generic `ttype == tokentype.op` branch cover every op-typed token. By the time this final `else if` is reached, `ttype` can only legally be `tokentype.error` (5) given the type system, so the condition can never be false there — forcing it to `true` changes nothing observable.",
+      "file": "js/formula-parse.ts"
+    },
+    {
+      "id": 905,
+      "mutatorName": "EqualityOperator",
+      "location": {
+        "start": {
+          "line": 433,
+          "column": 9
+        },
+        "end": {
+          "line": 433,
+          "column": 17
+        }
+      },
+      "replacement": "pos2 <= 0",
+      "justification": "`pos2 = table1.indexOf(\"|\", pos1 + 1)` always searches starting at `pos1 + 1`, and this line is only reached inside `if (pos1 >= 0)`, so the search's fromIndex is always >= 1. String.indexOf can never return exactly 0 when searching from an index >= 1, so a found pos2 is always >= 1, and a miss is always -1 — 0 is unreachable. `pos2 < 0` and `pos2 <= 0` are therefore provably identical for every value this variable can hold.",
+      "file": "js/formula-parse.ts"
+    },
+    {
+      "id": 932,
+      "mutatorName": "EqualityOperator",
+      "location": {
+        "start": {
+          "line": 442,
+          "column": 9
+        },
+        "end": {
+          "line": 442,
+          "column": 17
+        }
+      },
+      "replacement": "pos2 <= 0",
+      "justification": "Identical reasoning to id=905, applied to the second (wildcard type2) lookup block, which is likewise only reached inside `if (pos1 >= 0)` with the same `table1.indexOf(\"|\", pos1 + 1)` fromIndex >= 1 guarantee — pos2 can never be exactly 0.",
+      "file": "js/formula-parse.ts"
+    },
+    {
+      "id": 129,
+      "mutatorName": "BlockStatement",
+      "location": {
+        "start": {
+          "line": 184,
+          "column": 12
+        },
+        "end": {
+          "line": 186,
+          "column": 6
+        }
+      },
+      "replacement": "{}",
+      "justification": "OperandValueAndType L184-186 else branch assigns cellvtype='b' when the coord's cell is missing. The very next read of cellvtype is L187 `result.type = cellvtype || 'b'`. When the else runs, cellvtype is undefined (else block emptied) OR 'b' (original); `undefined || 'b'` === `'b' || 'b'` === 'b'. The `||` fallback masks the difference for every reachable input (cell missing => cellvtype unassigned; cell present => else not entered). No test can observe a difference.",
+      "file": "js/formula-operand.ts"
+    },
+    {
+      "id": 145,
+      "mutatorName": "ObjectLiteral",
+      "location": {
+        "start": {
+          "line": 222,
+          "column": 47
+        },
+        "end": {
+          "line": 222,
+          "column": 70
+        }
+      },
+      "replacement": "{}",
+      "justification": "OperandAsType `var result = { type: '', value: '' }` at L222. Every return path either (a) fully overwrites result.type and result.value before returning (empty-stacklen path L228-229, non-empty path L234-235, type-mismatch path L244-245), or (b) replaces `result` entirely via `result = LookupName(...)` at L238 then overwrites on the subsequent branches. No path reads result.type/result.value before assignment. Mutating the initial literal to {} is unobservable.",
+      "file": "js/formula-operand.ts"
+    },
+    {
+      "id": 168,
+      "mutatorName": "ObjectLiteral",
+      "location": {
+        "start": {
+          "line": 257,
+          "column": 47
+        },
+        "end": {
+          "line": 257,
+          "column": 70
+        }
+      },
+      "replacement": "{}",
+      "justification": "OperandsAsCoordOnSheet `var value1 = { type: '', value: '' }` at L257. L262-263 unconditionally assign value1.value and value1.type from operand[stacklen-1] before any read or return. The initial literal's type/value fields are dead; {} vs {type:'',value:''} is unobservable.",
+      "file": "js/formula-operand.ts"
+    },
+    {
+      "id": 171,
+      "mutatorName": "ObjectLiteral",
+      "location": {
+        "start": {
+          "line": 258,
+          "column": 47
+        },
+        "end": {
+          "line": 258,
+          "column": 70
+        }
+      },
+      "replacement": "{}",
+      "justification": "OperandsAsCoordOnSheet `var result = { type: '', value: '' }` at L258. Every return path fully overwrites result.type and result.value (L271-272 / L274-275 / L285-287 / L294 then L297/L304/L306/L309-310) or sets result.error only alongside an already-set type/value. No path returns result with the initial empty-string fields still in place. Mutating to {} is unobservable.",
+      "file": "js/formula-operand.ts"
+    },
+    {
+      "id": 235,
+      "mutatorName": "ObjectLiteral",
+      "location": {
+        "start": {
+          "line": 323,
+          "column": 47
+        },
+        "end": {
+          "line": 323,
+          "column": 70
+        }
+      },
+      "replacement": "{}",
+      "justification": "OperandsAsRangeOnSheet `var value2 = { type: '', value: '' }` at L323. L328-329 unconditionally assign value2.value and value2.type from operand[stacklen-1] before any return. Initial literal fields are dead; {} is unobservable.",
+      "file": "js/formula-operand.ts"
+    },
+    {
+      "id": 257,
+      "mutatorName": "EqualityOperator",
+      "location": {
+        "start": {
+          "line": 344,
+          "column": 9
+        },
+        "end": {
+          "line": 344,
+          "column": 17
+        }
+      },
+      "replacement": "pos2 <= 0",
+      "justification": "OperandsAsRangeOnSheet L343 `pos2 = leftCoord.indexOf('|', pos1 + 1)`. This line is only reached when `pos1 != -1` (L341), so pos1 >= 0 and the indexOf search starts at pos1+1 >= 1. String.prototype.indexOf can only return 0 when searching from a start index of 0; searching from >= 1 can never find a match at index 0. Therefore pos2 is either -1 (no match) or >= 1 (match found). `pos2 < 0` and `pos2 <= 0` are identical over the reachable set {-1} ∪ [1, ∞); the value 0 is unreachable. The mutants are behaviorally identical.",
+      "file": "js/formula-operand.ts"
+    },
+    {
+      "id": 289,
+      "mutatorName": "ObjectLiteral",
+      "location": {
+        "start": {
+          "line": 381,
+          "column": 47
+        },
+        "end": {
+          "line": 381,
+          "column": 70
+        }
+      },
+      "replacement": "{}",
+      "justification": "OperandAsSheetName `var result = { type: '', value: '' }` at L381. L385-386 unconditionally assign result.value and result.type from operand[stacklen-1] before any return or read. Initial literal fields are dead; {} is unobservable.",
+      "file": "js/formula-operand.ts"
+    },
+    {
+      "id": 976,
+      "mutatorName": "EqualityOperator",
+      "location": {
+        "start": {
+          "line": 66,
+          "column": 7
+        },
+        "end": {
+          "line": 66,
+          "column": 14
+        }
+      },
+      "replacement": "c >= 702",
+      "justification": "rcColname's clamp `if (c > 702) c = 702` and the mutant `if (c >= 702) c = 702` produce an identical resulting `c` for every input: for c<702 neither fires (same c); for c>702 both fire and clamp to 702 (same c); at exactly c=702 the original doesn't fire (c stays 702) while the mutant fires but assigns c=702 to a variable already equal to 702 — a no-op. The clamp target equals the comparison threshold, so strict vs non-strict inequality is unobservable for all inputs.",
+      "file": "js/formula-ref.ts"
+    },
+    {
+      "id": 980,
+      "mutatorName": "EqualityOperator",
+      "location": {
+        "start": {
+          "line": 67,
+          "column": 7
+        },
+        "end": {
+          "line": 67,
+          "column": 12
+        }
+      },
+      "replacement": "c <= 1",
+      "justification": "Same clamp fixed-point argument as id=976, mirrored at the lower bound: `if (c < 1) c = 1` vs `if (c <= 1) c = 1` are identical for all c because clamping c=1 to 1 is a no-op.",
+      "file": "js/formula-ref.ts"
+    },
+    {
+      "id": 1022,
+      "mutatorName": "EqualityOperator",
+      "location": {
+        "start": {
+          "line": 109,
+          "column": 7
+        },
+        "end": {
+          "line": 109,
+          "column": 12
+        }
+      },
+      "replacement": "c <= 1",
+      "justification": "crToCoord's column lower-bound clamp; identical fixed-point argument as id=980 (clamp target 1 equals threshold 1).",
+      "file": "js/formula-ref.ts"
+    },
+    {
+      "id": 1026,
+      "mutatorName": "EqualityOperator",
+      "location": {
+        "start": {
+          "line": 110,
+          "column": 7
+        },
+        "end": {
+          "line": 110,
+          "column": 14
+        }
+      },
+      "replacement": "c >= 702",
+      "justification": "crToCoord's column upper-bound clamp; identical fixed-point argument as id=976 (clamp target 702 equals threshold 702).",
+      "file": "js/formula-ref.ts"
+    },
+    {
+      "id": 1030,
+      "mutatorName": "EqualityOperator",
+      "location": {
+        "start": {
+          "line": 111,
+          "column": 7
+        },
+        "end": {
+          "line": 111,
+          "column": 12
+        }
+      },
+      "replacement": "r <= 1",
+      "justification": "crToCoord's row lower-bound clamp; identical fixed-point argument as id=980, applied to r instead of c.",
+      "file": "js/formula-ref.ts"
+    },
+    {
+      "id": 1049,
+      "mutatorName": "EqualityOperator",
+      "location": {
+        "start": {
+          "line": 136,
+          "column": 19
+        },
+        "end": {
+          "line": 136,
+          "column": 32
+        }
+      },
+      "replacement": "i <= cr.length",
+      "justification": "The mutated loop runs one extra iteration at i===cr.length. String.charCodeAt(len) is spec-guaranteed to return NaN for any string. Every comparison in the loop body (ch===36, ch<=57, ch>=97, ch>=65) is false for NaN by IEEE-754 semantics, so none of the four branches execute and neither `c` nor `r` changes. The extra iteration is a provable no-op for every possible input string, including the empty string.",
+      "file": "js/formula-ref.ts"
+    },
+    {
+      "id": 1297,
+      "mutatorName": "ConditionalExpression",
+      "location": {
+        "start": {
+          "line": 342,
+          "column": 10
+        },
+        "end": {
+          "line": 342,
+          "column": 23
+        }
+      },
+      "replacement": "true",
+      "justification": "AdjustFormulaCoords deleted-band check `(coloffset<0 && cr.col>=col && cr.col<col-coloffset)`. Forcing the first conjunct to `true` reduces it to `cr.col>=col && cr.col<col-coloffset`. When coloffset>=0, col-coloffset<=col, so the interval [col, col-coloffset) is always empty (upper bound never exceeds the lower bound) — the reduced expression is provably false for every cr.col, matching the original (which is also false whenever coloffset>=0 via its own first conjunct). When coloffset<0, the original's first conjunct is already true, so both expressions reduce identically. The two are behaviorally identical for all (coloffset, col, cr.col).",
+      "file": "js/formula-ref.ts"
+    },
+    {
+      "id": 1298,
+      "mutatorName": "EqualityOperator",
+      "location": {
+        "start": {
+          "line": 342,
+          "column": 10
+        },
+        "end": {
+          "line": 342,
+          "column": 23
+        }
+      },
+      "replacement": "coloffset <= 0",
+      "justification": "Same range-emptiness argument as id=1297, extended to the coloffset===0 boundary: at coloffset=0, col-coloffset=col, so the interval [col,col) is empty regardless of the conjunct's truth value. The threshold shift from < to <= is therefore unobservable for every input.",
+      "file": "js/formula-ref.ts"
+    },
+    {
+      "id": 1311,
+      "mutatorName": "ConditionalExpression",
+      "location": {
+        "start": {
+          "line": 343,
+          "column": 10
+        },
+        "end": {
+          "line": 343,
+          "column": 23
+        }
+      },
+      "replacement": "true",
+      "justification": "Row-clause mirror of id=1297: `(rowoffset<0 && cr.row>=row && cr.row<row-rowoffset)` — identical range-emptiness argument applied to row/rowoffset instead of col/coloffset.",
+      "file": "js/formula-ref.ts"
+    },
+    {
+      "id": 1312,
+      "mutatorName": "EqualityOperator",
+      "location": {
+        "start": {
+          "line": 343,
+          "column": 10
+        },
+        "end": {
+          "line": 343,
+          "column": 23
+        }
+      },
+      "replacement": "rowoffset <= 0",
+      "justification": "Row-clause mirror of id=1298: identical boundary-emptiness argument at rowoffset===0.",
+      "file": "js/formula-ref.ts"
+    },
+    {
+      "id": 475,
+      "mutatorName": "ConditionalExpression",
+      "location": {
+        "start": {
+          "line": 121,
+          "column": 9
+        },
+        "end": {
+          "line": 121,
+          "column": 37
+        }
+      },
+      "replacement": "false",
+      "justification": "Identical reasoning to id=476: charclass.numstart (2) is assigned to exactly one character in CharClassTable: '.'. The alpha state's own second branch (`cclass == charclass.alpha || ch == \".\"`) already intercepts every '.' character before this terminator group is ever reached, so `cclass == charclass.numstart` can never be observed true at this program point. Forcing it to `false` (removing the clause from the OR group) changes nothing for any reachable input.",
+      "file": "js/formula-parse.ts"
+    }
+  ]
+}

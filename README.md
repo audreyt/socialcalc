@@ -253,35 +253,93 @@ full Lake build. The manifest is `LemmaScript-files.txt`.
 
 Line coverage is a floor, not a ceiling. We use [Stryker](https://stryker-mutator.io)
 to check that the tests meaningfully pin behaviour — every mutant that
-survives is a behavior the tests do not actually exercise.
+survives is a behavior the tests do not actually exercise. No mutator
+exclusions: StringLiteral/Regex mutants are real, observable behaviour (a
+default CSS class or format string silently going empty is exactly the kind
+of regression this gate exists to catch), so nothing is filtered out of
+scoring.
 
 `stryker.config.mjs` drives Stryker through a generic `command` runner
 (`vp build && vp test`) so no runner-specific Stryker plugin is needed.
-Two modes:
+Four modes (see the file's own header comment for the full rationale):
 
-- **Fast per-file iteration** — `vp run mutate:file js/<source>.js|.ts [startLine-endLine]`
-  flips Stryker to in-place mode and filters the test command to only the
-  test files that exercise that module (see `stryker-file.mjs`). Also available:
+- **Critical PR gate** — `MUTATE_SCOPE=critical bun run mutate` mutates the
+  4 release-critical modules (`formula-parse.ts`, `formula-operand.ts`,
+  `formula-ref.ts`, `socialcalcconstants.ts`) against a deterministic
+  31-file test subset. Small and fast enough to block a PR; `break: 70` is
+  a real, measured floor (see below), not a guess.
+- **Full per-module matrix** — `MUTATE_TARGET=js/<source>.ts bun run mutate`
+  mutates exactly one of the 11 shipping modules against the full test
+  subset `stryker-file.mjs`'s `testsByFile` maps to it. CI's `mutate-full`
+  job runs this as a GitHub Actions matrix, one leg per module in parallel.
+  Each module's break threshold comes from `stryker-mutation-baseline.json`:
+  a module with no recorded, actually-measured baseline runs **report-only**
+  (`break: null`) — Stryker still scores it, it just can't fail the build on
+  a number nobody measured. `vp run mutate:all` walks the same 11 modules
+  sequentially for local use, one Stryker process per module.
+- **Fast per-file iteration** — `vp run mutate:file js/<source>.ts
+  [startLine-endLine]` flips Stryker to in-place mode and filters the test
+  command to only the test files that exercise that module. Also available:
   `vp run mutate:format`, `vp run mutate:sheet`, `vp run mutate:formula`.
-- **Full sandbox run** — `vp run mutate` copies the project into parallel
-  sandboxes and mutates every source in the `mutate` list. Slower but
-  useful before tagging a release.
+- **Legacy full-sandbox run** — `vp exec stryker run` with no
+  `MUTATE_SCOPE`/`MUTATE_TARGET` set mutates all 11 modules in one sandboxed
+  process against the whole suite per mutant, report-only (an 11-module
+  combined run can't honestly map to any single module's registered floor).
+  Superseded by the matrix above for CI; kept for an occasional manual
+  all-at-once run.
 
-Reports are emitted to `reports/mutation/index.html` (Stryker's interactive
-viewer) and `reports/mutation/mutation.json` (the raw data). Incremental
-mode is enabled, so iterating after adding killing tests only re-checks the
-previously-surviving mutants.
+**Release gate.** `bun run mutate:release-gate`
+(`scripts/mutate-release-gate.mjs`) refuses to pass unless *every* module in
+`ALL_MUTATE_FILES` has both a fresh report from this run and a
+`stryker-mutation-baseline.json` entry that is actually `measured: true`
+with a passing score — an unmeasured module blocks a release exactly like a
+regressed one. This workflow has no `push: tags: v*` trigger of its own —
+it's a `workflow_call` reusable workflow (inputs: `scope`,
+`enforce_release`), invoked by `release.yml` with `scope: full,
+enforce_release: true` so mutation evidence and the release pipeline share
+one run's DAG instead of racing as two independent workflows; `release.yml`
+wires its earliest pack/draft/publish job's `needs:` onto that call (see
+`.github/workflows/mutation.yml`'s header comment for the exact job block —
+`release.yml` lives on a sibling branch and hasn't picked this up yet). CI's
+`release-gate` job runs only when called with `enforce_release: true`, after
+downloading all 11 of `mutate-full`'s per-module reports; the workflow's
+`cancel-in-progress: false` concurrency setting keeps a run that a release
+is waiting on from being silently cancelled. Today every registry entry is
+`measured: false` (no module has an individual `MUTATE_TARGET` run backing
+a number yet), so this gate correctly fails any enforce_release-true call
+until each module gets a real run and the registry is ratcheted with its
+honest floor — 80, or any other number, is never treated as evidence
+without a fresh run behind it.
+
+Reports are emitted per scope to `reports/mutation/<scope>/index.html`
+(Stryker's interactive viewer) and `reports/mutation/<scope>/mutation.json`
+(the raw data) — `<scope>` is `critical`, `full` (legacy mode), or the
+target module's basename (e.g. `formula1`, `socialcalcconstants`).
+Incremental mode is enabled per scope, so iterating after adding killing
+tests only re-checks that scope's previously-surviving mutants.
 
 Current mutation scores:
 
-| Module                                       | Score  | Status                                                  |
-| -------------------------------------------- | ------ | ------------------------------------------------------- |
-| `formatnumber2.ts`                           | 95.20% | Remaining 54 survivors classified as equivalent mutants |
-| `formula1.ts`                                | —      | Typechecked; mutation not measured                      |
-| `socialcalc-3.ts`                            | —      | Typechecked; mutation not measured                      |
-| `socialcalcspreadsheetcontrol.ts`            | —      | Typechecked; mutation not measured                      |
-| `socialcalctableeditor.ts`                   | —      | Typechecked; mutation not measured                      |
-| `socialcalcviewer.ts` / `socialcalcpopup.ts` | —      | Typechecked; mutation not measured                      |
+| Module                    | Scope    | Score  | Status                                                                              |
+| -------------------------- | -------- | ------ | -------------------------------------------------------------------------------------- |
+| `formula-parse.ts`         | critical | 97.33% | 17 survived: 9 documented equivalent, 8 undispositioned                                |
+| `formula-operand.ts`       | critical | 91.99% | 27 survived: 7 documented equivalent, 20 undispositioned                               |
+| `formula-ref.ts`           | critical | 94.22% | 27 survived: 10 documented equivalent, 17 undispositioned                              |
+| `socialcalcconstants.ts`   | critical | 19.29% | 548 survived, all StringLiteral default-value literals — real, undispositioned gap     |
+| `formatnumber2.ts`         | full     | —      | Not yet run under the per-module matrix (a prior 95.20% figure used a since-removed StringLiteral/Regex exclusion and is not comparable) |
+| `formula1.ts`               | full     | —      | Not yet run under the per-module matrix                                                |
+| `socialcalc-3.ts`           | full     | —      | Not yet run under the per-module matrix                                                |
+| `socialcalcspreadsheetcontrol.ts` | full | —    | Not yet run under the per-module matrix                                                |
+| `socialcalctableeditor.ts` | full     | —      | Not yet run under the per-module matrix                                                |
+| `socialcalcviewer.ts` / `socialcalcpopup.ts` | full | — | Not yet run under the per-module matrix                                                |
+
+Critical-scope break threshold: 70 (the measured integer floor of the
+70.79% overall score above — `socialcalcconstants.ts`'s 548 undispositioned
+survivors cap what's achievable until those get real value-assertion
+tests). Full/per-module break thresholds are set individually per module in
+`stryker-mutation-baseline.json` only once each has an actual measured run
+backing it; see `stryker-mutation-disposition.json` for the critical
+scope's full equivalent-mutant accounting.
 
 ## Licensing
 

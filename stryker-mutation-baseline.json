@@ -1,0 +1,16 @@
+{
+  "$description": "Per-module measured mutation-score baseline registry for the full/per-file gate (stryker.config.mjs's MUTATE_TARGET mode, .github/workflows/mutation.yml's mutate-full matrix, scripts/mutate-release-gate.mjs). A module stays { \"measured\": false } — report-only, no break gate in stryker.config.mjs, and a hard release-gate failure in CI — until an actual `MUTATE_TARGET=js/<module>.ts bun run mutate` run (or `bun run mutate:all`, which runs every module) establishes its floor; only then does an entry get { \"measured\": true, \"break\": <int>, \"measuredAt\": \"<date>\", \"score\": \"<percent at measurement>\" } with a real, ratcheted number. Never hand-set \"break\" without a fresh run backing it — that is exactly the 'unmeasured placeholder called a gate' this registry exists to prevent. The module key set here MUST exactly equal stryker-file.mjs's ALL_MUTATE_FILES (scripts/mutate-release-gate.mjs enforces this on every run) so a module can never be silently dropped from — or silently added to without evidence — the release gate.",
+  "modules": {
+    "js/formatnumber2.ts": { "measured": false },
+    "js/socialcalcconstants.ts": { "measured": false },
+    "js/formula1.ts": { "measured": false },
+    "js/formula-parse.ts": { "measured": false },
+    "js/formula-operand.ts": { "measured": false },
+    "js/formula-ref.ts": { "measured": false },
+    "js/socialcalc-3.ts": { "measured": false },
+    "js/socialcalctableeditor.ts": { "measured": false },
+    "js/socialcalcpopup.ts": { "measured": false },
+    "js/socialcalcspreadsheetcontrol.ts": { "measured": false },
+    "js/socialcalcviewer.ts": { "measured": false }
+  }
+}

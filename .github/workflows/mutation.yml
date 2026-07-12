@@ -1,0 +1,264 @@
+name: Mutation
+
+# Two mutation-testing gates (see stryker.config.mjs for the full design
+# rationale):
+#
+# - critical (MUTATE_SCOPE=critical): 4 release-critical modules
+#   (formula-parse.ts, formula-operand.ts, formula-ref.ts,
+#   socialcalcconstants.ts) against a deterministic ~31-file test subset, in
+#   one process. Small and fast enough to gate a PR; thresholds.break is a
+#   real number measured from an actual run (see stryker.config.mjs's
+#   CRITICAL_BREAK_THRESHOLD comment), not guessed.
+# - full (MUTATE_TARGET set per leg): all 11 shipping modules, gated
+#   individually as a GitHub Actions matrix — one job per module, each
+#   mutating only that module against the exact test subset
+#   stryker-file.mjs's `testsByFile` maps to it, not the whole suite. This
+#   is comprehensive (every module gated) and far more attributable and
+#   parallel than one multi-hour process mutating all 11 against the full
+#   suite per mutant. `mutate-discover` derives the matrix directly from
+#   stryker-file.mjs's ALL_MUTATE_FILES (never hand-duplicated here, so a
+#   module can't be silently dropped from the gate); `mutate-full` runs
+#   each leg with fail-fast disabled so every module's report uploads
+#   regardless of any other module's outcome. Each leg's break threshold
+#   comes from stryker-mutation-baseline.json: a module with no measured
+#   baseline yet runs report-only (thresholds.break: null — Stryker can't
+#   fail a build on a number nobody measured, and 80 is never used as a
+#   stand-in for evidence).
+#
+# There is deliberately NO `push: tags: v*` trigger here. This workflow does
+# not run standalone against a release tag — it is invoked by release.yml
+# (see "Required release.yml wiring" below) as a `workflow_call` reusable
+# workflow with `enforce_release: true`, so mutation evidence and the
+# release pipeline share one run instead of racing as two independent
+# workflows (a standalone tag-push job here could pass or still be running
+# while release.yml's publish job proceeds on its own schedule — invoking
+# this workflow as a required job of release.yml's own DAG is the only way
+# to make `needs:` actually block publish on it).
+#
+# `release-gate` runs after the matrix, only when this workflow is CALLED
+# with `enforce_release: true` (i.e. from release.yml's release path, never
+# from a bare PR/schedule/manual-dispatch run of this workflow). It
+# downloads every module's fresh report and hard-fails unless ALL 11
+# modules have both a fresh report AND a stryker-mutation-baseline.json
+# entry that's actually `measured: true` with a passing score —
+# scripts/mutate-release-gate.mjs is the same check `bun run
+# mutate:release-gate` runs locally. Right now every module in the registry
+# is `measured: false`, so release-gate correctly fails any
+# enforce_release-true call until each module gets its first real per-file
+# run and the registry is ratcheted with an honest floor.
+#
+# Required release.yml wiring (not yet applied — release.yml lives on a
+# sibling branch not present here; this is the exact job block to add
+# there):
+#
+#   jobs:
+#     mutation:
+#       name: Mutation (full scope, release gate)
+#       uses: ./.github/workflows/mutation.yml
+#       with:
+#         scope: full
+#         enforce_release: true
+#       permissions:
+#         contents: read
+#
+#     publish:  # (or whatever the earliest pack/draft/publish job is named)
+#       needs: [existing-needs-here, mutation]  # additive — keep the rest
+#       ...
+#
+# A local (`./`-prefixed) reusable-workflow reference always resolves to the
+# calling run's own commit, so it needs no SHA/tag pin (unlike the
+# third-party actions below, which are pinned as usual).
+on:
+  pull_request:
+  schedule:
+    # 09:00 UTC daily — full all-11-module gate.
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "Mutation scope to run"
+        type: choice
+        options:
+          - full
+          - critical
+        default: full
+  workflow_call:
+    inputs:
+      scope:
+        description: "Mutation scope to run: full or critical"
+        type: string
+        default: full
+      enforce_release:
+        description: "Run release-gate: hard-fail unless all 11 modules have a measured, passing baseline"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Never cancel a run that might be the evidence a release's publish job is
+  # waiting on (or a nightly/PR run someone is about to read the report
+  # from) — a cancelled run is neither "measured" nor "unmeasured", it's
+  # just missing, and release-gate/mutate-release-gate would report that
+  # honestly as a failure rather than silently skip it. False globally
+  # rather than only for called/release runs, for simplicity.
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Deterministic, focused, PR-blocking gate. Only the 4 release-critical
+  # modules, only the tests that actually exercise them (stryker-file.mjs's
+  # testsByFile) — same inputs every run, no full-suite noise.
+  critical:
+    name: mutation (critical scope, PR gate)
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.scope == 'critical') ||
+      (github.event_name == 'workflow_call' && inputs.scope == 'critical')
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@e1609b468742ba9232ce5e12b3a77bdf14495277 # v1.1.0
+        with:
+          cache: true
+
+      - name: Install dependencies
+        run: vp install --frozen-lockfile
+
+      - name: Build
+        run: vp build
+
+      - name: Mutation test (critical scope)
+        env:
+          MUTATE_SCOPE: critical
+        run: bun run mutate
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mutation-report-critical
+          path: reports/mutation/critical/
+          retention-days: 14
+          if-no-files-found: warn
+
+  # Derives the full-scope matrix from stryker-file.mjs's ALL_MUTATE_FILES
+  # (itself derived from testsByFile's own keys) so the matrix and the
+  # test-ownership mapping can never drift apart — every module Stryker
+  # knows how to test gets its own gated leg below, none silently dropped.
+  mutate-discover:
+    name: mutation (full scope, discover modules)
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.scope != 'critical') ||
+      (github.event_name == 'workflow_call' && inputs.scope != 'critical')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      files: ${{ steps.list.outputs.files }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+
+      - name: List mutation targets
+        id: list
+        run: |
+          FILES=$(node -e '
+            import("./stryker-file.mjs").then((m) => {
+              process.stdout.write(JSON.stringify(m.ALL_MUTATE_FILES));
+            });
+          ')
+          echo "files=$FILES" >> "$GITHUB_OUTPUT"
+
+  # Comprehensive, per-module gate: one job per shipping module, each
+  # mutating only that module against its own testsByFile subset (see
+  # stryker.config.mjs's MUTATE_TARGET mode). fail-fast disabled so every
+  # module runs and uploads a report regardless of any other module's
+  # outcome; the job (and so the workflow's required check) still reports
+  # failure overall if ANY module is below its break threshold.
+  mutate-full:
+    name: mutation (full scope, ${{ matrix.file }})
+    needs: mutate-discover
+    strategy:
+      fail-fast: false
+      matrix:
+        file: ${{ fromJson(needs.mutate-discover.outputs.files) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@e1609b468742ba9232ce5e12b3a77bdf14495277 # v1.1.0
+        with:
+          cache: true
+
+      - name: Install dependencies
+        run: vp install --frozen-lockfile
+
+      - name: Build
+        run: vp build
+
+      - name: Compute report slug
+        id: meta
+        run: echo "slug=$(basename "${{ matrix.file }}" .ts)" >> "$GITHUB_OUTPUT"
+
+      - name: Mutation test (${{ matrix.file }})
+        env:
+          MUTATE_TARGET: ${{ matrix.file }}
+        run: bun run mutate
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mutation-report-${{ steps.meta.outputs.slug }}
+          path: reports/mutation/${{ steps.meta.outputs.slug }}/
+          retention-days: 30
+          if-no-files-found: warn
+
+  # Refuses to pass unless EVERY module in ALL_MUTATE_FILES has both a fresh
+  # report from this run's mutate-full matrix AND a registry entry in
+  # stryker-mutation-baseline.json that is actually `measured: true` with a
+  # passing score (scripts/mutate-release-gate.mjs). Runs after the matrix
+  # regardless of any individual leg's outcome (if: always()) so it always
+  # gives the full, honest picture of what's missing/measured/regressed —
+  # but ONLY when this workflow was called with `enforce_release: true`
+  # (i.e. from release.yml's release path — see the header comment's
+  # "Required release.yml wiring"), never on a bare PR/schedule/manual run.
+  # Right now every module in the registry is `measured: false`, so this
+  # job correctly fails any enforce_release-true call until each module
+  # gets its first real per-file run and the registry is ratcheted with an
+  # honest floor.
+  release-gate:
+    name: mutation (release gate — all 11 modules measured?)
+    needs: mutate-full
+    if: always() && github.event_name == 'workflow_call' && inputs.enforce_release == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@e1609b468742ba9232ce5e12b3a77bdf14495277 # v1.1.0
+        with:
+          cache: true
+
+      - name: Install dependencies
+        run: vp install --frozen-lockfile
+
+      - name: Download all mutation reports
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: mutation-report-*
+          path: artifacts
+
+      - name: Verify every shipping module has a measured, passing baseline
+        run: bun run mutate:release-gate

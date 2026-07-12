@@ -57,6 +57,8 @@
     "mutate:format": "vp node stryker-file.mjs js/formatnumber2.ts",
     "mutate:sheet": "vp node stryker-file.mjs js/socialcalc-3.ts",
     "mutate:formula": "vp node stryker-file.mjs js/formula1.ts",
+    "mutate:all": "vp node scripts/mutate-all.mjs",
+    "mutate:release-gate": "vp node scripts/mutate-release-gate.mjs",
     "verify": "lsc check --backend=dafny",
     "verify:dafny": "lsc check --backend=dafny",
     "verify:dafny:gen": "lsc gen --backend=dafny",
