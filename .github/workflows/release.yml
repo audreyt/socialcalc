@@ -189,7 +189,7 @@ jobs:
     name: source-attributed coverage
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Checkout tag commit (exact SHA, no mutable ref)
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
@@ -202,15 +202,26 @@ jobs:
         with:
           cache: true
 
+      # actions/setup-node v4.4.0 — release coverage invokes the Chromium
+      # Playwright gate and e2e/server.ts's Node strip-types loader. Pin Node
+      # 24 explicitly rather than inheriting the runner image default.
+      - name: Setup Node 24 (release coverage runtime)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+
       - name: Install dependencies (frozen lockfile)
         run: vp install --frozen-lockfile
+
+      - name: Install Chromium for merged coverage
+        run: vp exec playwright install --with-deps chromium
 
       - name: Duplicate-bundle coverage attribution regression
         run: vp run check:coverage-attribution
       - name: Source-attributed coverage (per-file + global floors)
         run: |
           set -euo pipefail
-          vp run test:coverage 2>&1 | tee coverage-output.log
+          vp run test:coverage:merged 2>&1 | tee coverage-output.log
 
       # Runs even when the step above failed a threshold: the report files
       # are written to disk by the coverage run itself before the
@@ -235,8 +246,8 @@ jobs:
         with:
           name: coverage-report-${{ github.ref_name }}-${{ github.sha }}
           path: |
-            coverage/lcov-report/
-            coverage/lcov.info
+            coverage-merged/lcov-report/
+            coverage-merged/lcov.info
             coverage-output.log
           if-no-files-found: error
           retention-days: 90

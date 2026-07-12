@@ -11,7 +11,22 @@
 
 import { expect, test as base } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import process from "node:process";
 
+// Chromium-only JS coverage directory. The Playwright `coverage`
+// auto-fixture (below) writes one raw V8 `stopJSCoverage()` result per spec
+// here when `SOCIALCALC_BROWSER_COVERAGE=1`; scripts/merge-browser-coverage.mjs
+// converts + merges these with Vitest's Istanbul coverage-final.json. Pin the
+// path here (not in the merge script) so it's the one definition both sides
+// read from the same source: the fixture writes, the merge script reads.
+export const browserCoverageDir = join(process.cwd(), "coverage-browser-v8");
+
+// Bundle URL substring the merge script filters on. Centralized here so any
+// change to e2e/server.ts's bundle path doesn't silently make every coverage
+// file empty: this exact file serves `/dist/SocialCalc.js` from dist/.
+export const browserCoverageBundleUrlSuffix = "/dist/SocialCalc.js";
 export type BundleName = "normal" | "minified";
 
 export const BUNDLE_PATHS: Record<BundleName, string> = {
@@ -25,7 +40,7 @@ interface PageIssues {
   pageErrors: string[];
 }
 
-export const test = base.extend<{ issues: PageIssues }>({
+export const test = base.extend<{ issues: PageIssues; coverage: void }>({
   // `auto: true` makes this fixture apply to every test that imports `test`
   // from this module — not something an individual spec can opt out of by
   // omitting `issues` from its parameter list.
@@ -62,7 +77,66 @@ export const test = base.extend<{ issues: PageIssues }>({
     },
     { auto: true },
   ],
+
+  // Chromium V8 JS coverage auto-fixture, opt-in via
+  // `SOCIALCALC_BROWSER_COVERAGE=1`. Idempotent no-op otherwise so plain
+  // `vp run test:browser` (firefox/webkit still behavioral) is byte-identical
+  // to the pre-coverage path: no fixture state, no per-page mutation.
+  //
+  // `resetOnNavigation: false` accumulates V8 coverage across every page
+  // navigation within one spec (most specs only navigate once anyway), and
+  // `reportAnonymousScripts: false` keeps eval'd init scripts out of the
+  // report — only the loaded `<script src=...>` bundles are reported, so
+  // the merge filter on `browserCoverageBundleUrlSuffix` cannot admit page
+  // prose.
+  //
+  // One `.json` per spec, named by Playwright's stable per-test id (sanitized
+  // to FS-safe) — never the spec's title (which can contain `/`, spaces,
+  // quotes). This keeps the merge input deterministic across CI reruns.
+  coverage: [
+    async ({ page }, use, testInfo) => {
+      if (process.env.SOCIALCALC_BROWSER_COVERAGE !== "1") {
+        await use();
+        return;
+      }
+      if (!existsSync(browserCoverageDir)) mkdirSync(browserCoverageDir, { recursive: true });
+      await page.coverage.startJSCoverage({
+        resetOnNavigation: false,
+        reportAnonymousScripts: false,
+      });
+      try {
+        await use();
+      } finally {
+        const entries = await page.coverage.stopJSCoverage();
+        const bundle = entries.filter((e) =>
+          e.url.endsWith(browserCoverageBundleUrlSuffix),
+        );
+        const outPath = join(browserCoverageDir, `${sanitizeTestId(testInfo.testId)}.json`);
+        writeFileSync(
+          outPath,
+          // The merge script needs at least this much per entry:
+          //   url — to filter to the SocialCalc bundle (drop jQuery);
+          //   functions — V8 Profiler.ScriptCoverage.functions[] for
+          //     ast-v8-to-istanbul.convert();
+          //   source — the final raw bundle bytes (used as a sanity check
+          //     against the on-disk dist/SocialCalc.js read by the merge
+          //     script — they must be byte-identical for sourcemap offsets
+          //     to be valid).
+          JSON.stringify({ testTitle: testInfo.title, testId: testInfo.testId, entries: bundle, source: bundle[0]?.source }),
+          "utf8",
+        );
+      }
+    },
+    { auto: true, scope: "test" },
+  ],
 });
+
+// Filesystem-safe form of a Playwright `testInfo.testId` (an opaque string
+// like `_-123-456-...`). Defensive: keeps any future shape of that field
+// from breaking the writer; the only requirement is "stable across reruns".
+function sanitizeTestId(testId: string): string {
+  return testId.replace(/[^a-zA-Z0-9_.-]/g, "_");
+}
 
 export { expect };
 

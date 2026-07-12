@@ -64,7 +64,9 @@
     "verify:lean:gen": "lsc gen --backend=lean lemma/a1.ts && lsc gen --backend=lean lemma/eval-ops.ts && lsc gen --backend=lean lemma/lookup-result.ts",
     "verify:lean": "vp run verify:lean:gen && test -s lemma/a1.types.lean && test -s lemma/a1.def.lean && test -s lemma/a1.proof.lean && test -s lemma/eval-ops.types.lean && test -s lemma/eval-ops.def.lean && test -s lemma/eval-ops.proof.lean && test -s lemma/lookup-result.types.lean && test -s lemma/lookup-result.def.lean && test -s lemma/lookup-result.proof.lean",
     "verify:lean:build": "lake build",
-    "verify:both": "vp run verify:dafny && vp run verify:lean"
+    "verify:both": "vp run verify:dafny && vp run verify:lean",
+    "test:coverage:merged": "rm -rf coverage-browser-v8 coverage-merged && SOCIALCALC_COVERAGE=1 vp build --minify && SOCIALCALC_COVERAGE=1 vp test --coverage && SOCIALCALC_BROWSER_COVERAGE_TEST=1 vp test test/browser-coverage-mapping.test.ts test/merge-browser-coverage-guard.test.ts --run && SOCIALCALC_BROWSER_COVERAGE=1 vp exec playwright test && node scripts/merge-browser-coverage.mjs",
+    "test:browser:coverage": "SOCIALCALC_BROWSER_COVERAGE=1 vp exec playwright test"
   },
   "devDependencies": {
     "@jridgewell/gen-mapping": "0.3.13",
@@ -76,7 +78,8 @@
     "jquery": "^4.0.0",
     "lemmascript": "0.5.13",
     "typescript": "^7.0.2",
-    "vite-plus": "^0.2.4"
+    "vite-plus": "^0.2.4",
+    "@babel/parser": "7.29.2"
   },
   "overrides": {
     "@babel/core": "7.29.7",

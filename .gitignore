@@ -3,6 +3,8 @@
 /dist/SocialCalc.min.js
 /dist/SocialCalc.js.map
 /coverage/
+/coverage-browser-v8/
+/coverage-merged/
 /reports/
 /.stryker-tmp/
 /playwright-report/

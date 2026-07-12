@@ -29,6 +29,14 @@ jobs:
         with:
           cache: true
 
+      # actions/setup-node v4.4.0 — e2e/server.ts uses Node's strip-types
+      # loader, supported on the declared Node >=22 floor; pin Node 24 so
+      # runner image defaults cannot silently change browser behavior.
+      - name: Setup Node 24 (browser runtime)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+
       - name: Install dependencies
         run: vp install --frozen-lockfile
 

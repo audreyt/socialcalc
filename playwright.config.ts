@@ -4,11 +4,23 @@
 // in `e2e/server.ts`, which serves `dist/`, `images/`, and `css/` as a real
 // host page would. Run with `vp run test:browser`; see
 // .github/workflows/browser.yml for the CI invocation (build, then test).
+//
+// `SOCIALCALC_BROWSER_COVERAGE=1` selects a Chromium-only coverage run: every
+// page (via e2e/fixtures/editor.ts's `coverage` auto-fixture) starts Chromium
+// JS coverage before the spec navigates, stops it after the spec, and writes
+// its raw V8 `stopJSCoverage()` entries to `coverage-browser-v8/<test-id>.json`.
+// Firefox/WebKit are skipped on a coverage run because the Playwright/V8
+// coverage API is Chromium-only; the merged gate (scripts/merge-browser-coverage.mjs)
+// reads those files and merges with Vitest's Istanbul coverage-final.json.
+//
+// Firefox/WebKit remain behavioral on plain `vp run test:browser` (env unset):
+// the same spec files still run against all three engines, exactly as before.
 
 import { defineConfig, devices } from "@playwright/test";
 import process from "node:process";
 
 const port = 4173;
+const coverageMode = process.env.SOCIALCALC_BROWSER_COVERAGE === "1";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -37,13 +49,21 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
-    { name: "firefox", use: { ...devices["Desktop Firefox"] } },
-    { name: "webkit", use: { ...devices["Desktop Safari"] } },
-  ],
+  // Coverage-mode runs filter to Chromium only — Playwright/V8 JS coverage
+  // is a Chromium-specific API. Naming the project `chromium-coverage`
+  // (not just `chromium`) so a stray `-g chromium` filter from CI wouldn't
+  // double-drive the same spec under both the behavioral and coverage
+  // projects. The non-coverage path preserves the original three-project
+  // behavioral suite exactly (chromium + firefox + webkit).
+  projects: coverageMode
+    ? [{ name: "chromium-coverage", use: { ...devices["Desktop Chrome"] } }]
+    : [
+        { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+        { name: "firefox", use: { ...devices["Desktop Firefox"] } },
+        { name: "webkit", use: { ...devices["Desktop Safari"] } },
+      ],
   webServer: {
-    command: `node e2e/server.ts`,
+    command: `node --experimental-strip-types e2e/server.ts`,
     url: `http://127.0.0.1:${port}/normal.html`,
     reuseExistingServer: !process.env.CI,
     timeout: 20_000,

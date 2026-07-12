@@ -51,7 +51,7 @@ jobs:
   coverage:
     name: source-attributed coverage
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
@@ -61,14 +61,34 @@ jobs:
         with:
           cache: true
 
+      # actions/setup-node v4.4.0 — pin the supported browser coverage
+      # runtime rather than inheriting the runner image default.
+      - name: Setup Node 24 (coverage runtime)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+
       - name: Install dependencies
         run: vp install --frozen-lockfile
+
+      - name: Install Chromium for merged coverage
+        run: vp exec playwright install --with-deps chromium
 
       - name: Duplicate-bundle coverage attribution regression
         run: vp run check:coverage-attribution
 
       - name: Source-attributed coverage (per-file + global floors)
-        run: vp run test:coverage
+        run: vp run test:coverage:merged
+
+      - name: Upload merged coverage report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: coverage-merged-${{ github.sha }}
+          path: |
+            coverage-merged/
+          if-no-files-found: error
+          retention-days: 30
 
   node-compat:
     name: Node.js runtime compatibility (${{ matrix.node-version }})
