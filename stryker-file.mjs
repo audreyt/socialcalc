@@ -56,7 +56,11 @@ const sheetCoreTests = ["test/core.test.ts", "test/sheet-coverage-a.test.ts", "t
 // non-shipping LemmaScript mirror in lemma/a1.ts (see its header comment),
 // not the shipping js/formula-ref.ts this config mutates. Includes the
 // 2026-07-12 mutation-survivor regression files added while closing the
-// critical-scope Stryker gap (see stryker-mutation-disposition.json).
+// critical-scope Stryker gap (see stryker-mutation-disposition.json), the
+// semantic-audit-hardened branch-coverage file (direct SC.Formula.* calls
+// across EvaluatePolish/ConvertInfixToPolish/DecodeRangeParts/FreshnessInfo/
+// FunctionClasses/etc.), and the NaN-vs-overflow numeric-error-message
+// regression (drives EvaluatePolish via a full sheet recalc).
 const formulaOnlyTests = [
   "test/formula-coverage.test.ts",
   "test/formula.test.ts",
@@ -68,11 +72,54 @@ const formulaOnlyTests = [
   "test/formula-parse-mutation-survivors.test.ts",
   "test/formula-operand-mutation-survivors.test.ts",
   "test/formula-ref-mutation-survivors.test.ts",
+  "test/hardening-formula-branches.test.ts",
+  "test/formula-numeric-error-classification-regressions.test.ts",
+];
+
+// Differential/adversarial corpus (test/differential/**, test/adversarial/**):
+// every file constructs a real `new SC.Sheet()` and drives it through
+// scheduleCommands/recalcSheet, so — like commandRegressionTests/
+// sheetCoreTests above — each file exercises both the socialcalc-3.ts
+// command/cache engine AND whichever formula machinery the commands under
+// test invoke (parse/evaluate/rewrite). Verified by grep: every file
+// constructs `new SC.Sheet`; save-load-export.test.ts and
+// malformed-saves.test.ts additionally call SC.CreateSheetSave/
+// SC.ParseSheetSave directly, and save-load-export.test.ts calls
+// SC.Formula.ParseFormulaIntoTokens/evaluate_parsed_formula directly.
+// Shared, not split by individual file, for the same reason
+// commandRegressionTests isn't split: a corpus built to catch real
+// behavioural drift against the socialcalc@3.0.8 oracle is exactly the
+// kind of broad regression net a mutation gate should credit against
+// every module it touches, not just the one its filename suggests.
+const differentialTests = [
+  "test/differential/command-execution.test.ts",
+  "test/differential/copy-paste-fill-move.test.ts",
+  "test/differential/formula-tokenization-evaluation.test.ts",
+  "test/differential/headless-initialization.test.ts",
+  "test/differential/insert-delete-undo-redo.test.ts",
+  "test/differential/known-intended-differences.test.ts",
+  "test/differential/named-ranges.test.ts",
+  "test/differential/number-date-formatting.test.ts",
+  "test/differential/reference-rewriting.test.ts",
+  "test/differential/save-load-export.test.ts",
+];
+const adversarialTests = [
+  "test/adversarial/circular-references.test.ts",
+  "test/adversarial/deep-formulas.test.ts",
+  "test/adversarial/extreme-ranges.test.ts",
+  "test/adversarial/malformed-saves.test.ts",
+  "test/adversarial/prototype-like-names.test.ts",
+  "test/adversarial/save-load-recalc-invariants.test.ts",
 ];
 
 // TableEditor/SpreadsheetControl UI surface, verified by grep for
 // `new SC.TableEditor`, `control.editor.*`, and `SC.SpreadsheetControl.*`
 // call sites (all six files construct or drive an editor/control instance).
+// Includes the two hardening interaction/command-dispatch files (direct
+// editor.EditorScheduleSheetCommands/CalculateEditorPositions/MoveECell/
+// RangeAnchor/RangeExtend/ScrollRelative/EditorProcessKey/DoRenderStep
+// call sites, incl. the setemailparameters busy/deferred-cycle fix
+// regressions).
 const editorTests = [
   "test/ui-coverage.test.ts",
   "test/control-coverage.test.ts",
@@ -80,6 +127,8 @@ const editorTests = [
   "test/editor-coverage-b.test.ts",
   "test/editor-dom-coverage.test.ts",
   "test/page-scroll.test.ts",
+  "test/hardening-tableeditor-commands.test.ts",
+  "test/hardening-tableeditor-interactions.test.ts",
 ];
 
 // Tests that exercise each source module. Keep in sync with the coverage
@@ -111,22 +160,37 @@ export const testsByFile = {
   // formula-ref.ts) — a mutant in any of the four can only be killed by
   // tests that exercise the shared SocialCalc.Formula object, so all four
   // share the identical test set.
-  "formula1.ts": [...formulaOnlyTests, ...commandRegressionTests, ...sheetCoreTests],
-  "formula-parse.ts": [...formulaOnlyTests, ...commandRegressionTests, ...sheetCoreTests],
-  "formula-operand.ts": [...formulaOnlyTests, ...commandRegressionTests, ...sheetCoreTests],
-  "formula-ref.ts": [...formulaOnlyTests, ...commandRegressionTests, ...sheetCoreTests],
+  "formula1.ts": [...formulaOnlyTests, ...commandRegressionTests, ...sheetCoreTests, ...differentialTests, ...adversarialTests],
+  "formula-parse.ts": [...formulaOnlyTests, ...commandRegressionTests, ...sheetCoreTests, ...differentialTests, ...adversarialTests],
+  "formula-operand.ts": [...formulaOnlyTests, ...commandRegressionTests, ...sheetCoreTests, ...differentialTests, ...adversarialTests],
+  "formula-ref.ts": [...formulaOnlyTests, ...commandRegressionTests, ...sheetCoreTests, ...differentialTests, ...adversarialTests],
 
+  // socialcalc-3.ts also owns SafeUrlForRender/EscapeUntrustedHtml (the
+  // untrusted-content render-security policy, see socialcalc-3.d.ts) and
+  // the Sheet class's cache/recalc plumbing — hardening-sheet-core-
+  // branches.test.ts, render-security-policy.test.ts, and
+  // sheet-cache-load-regressions.test.ts (direct SC.Formula.SheetCache /
+  // `new SC.Sheet` call sites) all drive that surface directly.
   "socialcalc-3.ts": [
     ...sheetCoreTests,
     ...commandRegressionTests,
+    ...differentialTests,
+    ...adversarialTests,
     "test/filldown-persistence.test.ts",
     "test/formula-quote-escaping.test.ts",
+    "test/hardening-sheet-core-branches.test.ts",
+    "test/render-security-policy.test.ts",
+    "test/sheet-cache-load-regressions.test.ts",
   ],
 
   "socialcalctableeditor.ts": editorTests,
-  "socialcalcpopup.ts": ["test/ui-coverage.test.ts", "test/popup-viewer-coverage.test.ts"],
-  "socialcalcspreadsheetcontrol.ts": editorTests,
-  "socialcalcviewer.ts": ["test/popup-viewer-coverage.test.ts"],
+  "socialcalcpopup.ts": [
+    "test/ui-coverage.test.ts",
+    "test/popup-viewer-coverage.test.ts",
+    "test/hardening-popup-behavior.test.ts",
+  ],
+  "socialcalcspreadsheetcontrol.ts": [...editorTests, "test/hardening-control-viewer.test.ts"],
+  "socialcalcviewer.ts": ["test/popup-viewer-coverage.test.ts", "test/hardening-control-viewer.test.ts"],
 };
 
 // Every shipping module Stryker knows how to mutate — derived from

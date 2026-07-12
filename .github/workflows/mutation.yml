@@ -50,23 +50,19 @@ name: Mutation
 # enforce_release-true call until each module gets its first real per-file
 # run and the registry is ratcheted with an honest floor.
 #
-# Required release.yml wiring (not yet applied — release.yml lives on a
-# sibling branch not present here; this is the exact job block to add
-# there):
+# release.yml wiring: applied. release.yml's own `mutation` job (same job
+# name, so `package`/`publish`'s existing `needs: [..., mutation, ...]`
+# lists required no change) calls this file as a local reusable workflow:
 #
-#   jobs:
-#     mutation:
-#       name: Mutation (full scope, release gate)
-#       uses: ./.github/workflows/mutation.yml
-#       with:
-#         scope: full
-#         enforce_release: true
-#       permissions:
-#         contents: read
-#
-#     publish:  # (or whatever the earliest pack/draft/publish job is named)
-#       needs: [existing-needs-here, mutation]  # additive — keep the rest
-#       ...
+#   mutation:
+#     name: full mutation testing
+#     if: github.ref_type == 'tag'
+#     uses: ./.github/workflows/mutation.yml
+#     with:
+#       scope: full
+#       enforce_release: true
+#     permissions:
+#       contents: read
 #
 # A local (`./`-prefixed) reusable-workflow reference always resolves to the
 # calling run's own commit, so it needs no SHA/tag pin (unlike the

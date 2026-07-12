@@ -255,42 +255,12 @@ jobs:
   mutation:
     name: full mutation testing
     if: github.ref_type == 'tag'
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - name: Checkout tag commit (exact SHA, no mutable ref)
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-
-      - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@e1609b468742ba9232ce5e12b3a77bdf14495277 # v1.1.0
-        with:
-          cache: true
-
-      - name: Install dependencies (frozen lockfile)
-        run: vp install --frozen-lockfile
-
-      - name: Full mutation run
-        run: vp run mutate
-
-      # Uploaded unconditionally (if: always()) so a red mutation score —
-      # which fails the step above and therefore this job, blocking
-      # `package`/`publish` downstream — still leaves its HTML/JSON report
-      # inspectable instead of silently disappearing with the failed run.
-      # if-no-files-found: error (not warn): the ONLY way the report is
-      # genuinely absent is Stryker itself crashing before writing
-      # anything, which is its own distinct failure worth surfacing loudly
-      # here, not swallowing as a soft warning.
-      - name: Upload mutation reports (even on red)
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: mutation-report-${{ github.ref_name }}
-          path: reports/mutation/
-          if-no-files-found: error
-          retention-days: 90
+    uses: ./.github/workflows/mutation.yml
+    with:
+      scope: full
+      enforce_release: true
+    permissions:
+      contents: read
 
   playwright:
     name: browser matrix (Chromium/Firefox/WebKit)
