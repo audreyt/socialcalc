@@ -49,6 +49,7 @@
     "test:coverage": "SOCIALCALC_COVERAGE=1 vp build && vp test --coverage",
     "test:package-contract": "node scripts/verify-package-contract.mjs",
     "check:test-credibility": "node scripts/check-test-credibility.mjs",
+    "test:ethercalc-canary": "node scripts/verify-ethercalc-canary.mjs",
     "mutate": "vp exec stryker run",
     "mutate:file": "vp node stryker-file.mjs",
     "mutate:format": "vp node stryker-file.mjs js/formatnumber2.ts",
