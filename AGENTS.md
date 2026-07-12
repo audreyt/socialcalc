@@ -43,7 +43,7 @@ source diagnostic.
 `vm.Script` and shares one SocialCalc instance within each isolated Vitest file
 worker. Install per-file state in that file's hooks. Do not restore
 cache-busting dynamic imports: Vite transforms each query as a separate copy of
-the 760 KB bundle and exhausts worker memory.
+the ~720 KB bundle and exhausts worker memory.
 
 ## LemmaScript operations
 
