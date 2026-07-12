@@ -10,13 +10,21 @@
 // schema validation or cast is needed to read it safely.
 import { describe, expect, test } from "vite-plus/test";
 
-import { loadPair } from "../helpers/differential";
+import { createOracleSocialCalc } from "../helpers/oracle";
+import { loadSocialCalc } from "../helpers/socialcalc";
 import knownDiffs from "../fixtures/differential-known-diffs.json";
 
 describe("known intended differences", () => {
   for (const entry of knownDiffs.entries) {
     test(`${entry.id}: ${entry.summary}`, async () => {
-      const { candidate, oracle } = await loadPair();
+      const candidate = await loadSocialCalc();
+      // Fresh, uncached oracle instance per probe — see
+      // createOracleSocialCalc()'s doc comment: the shared per-worker
+      // oracle singleton is unsafe here because two crash probes in the
+      // same file would otherwise share a vm sandbox that V8 coverage
+      // instrumentation can leave in a state where the second probe's
+      // undeclared-variable read silently stops throwing.
+      const oracle = createOracleSocialCalc();
 
       if (entry.api !== "FormatNumber.formatNumberWithFormat") {
         throw new Error(`known-intended-differences.test.ts has no runner for api "${entry.api}"`);

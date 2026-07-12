@@ -38,21 +38,22 @@ function isSocialCalcRuntime(value: unknown): value is SocialCalcRuntime {
 }
 
 /**
- * Returns the singleton oracle SocialCalc instance for this Vitest worker,
- * compiling+running the pinned 3.0.8 bundle in an isolated vm context on
- * first use. Mirrors loadSocialCalc()'s per-worker singleton shape so the
- * two instances can be held side by side without re-running either bundle.
+ * Compiles+runs the pinned 3.0.8 bundle in a brand-new, isolated vm
+ * context every call — no caching. Reserved for callers (see
+ * test/differential/known-intended-differences.test.ts) that deliberately
+ * exercise a code path known to read an undeclared variable and rely on
+ * that specific call throwing: reusing the shared per-worker singleton
+ * across repeated crash probes is unsafe under `NODE_V8_COVERAGE`/V8
+ * precise-coverage instrumentation, which was empirically confirmed (via a
+ * standalone Node repro, independent of Vitest) to make a *second* read of
+ * the same still-undeclared identifier in the same vm sandbox silently
+ * resolve instead of throwing — a V8-coverage/vm-context interaction, not
+ * a change in the oracle's own source. A fresh sandbox per probe sidesteps
+ * it entirely and is also the more correct test anyway: each probe should
+ * prove a *virgin* oracle instance crashes on its specific malformed
+ * input, not depend on what a previous probe in the same file already ran.
  */
-export function loadOracleSocialCalc(): SocialCalcRuntime {
-  if (oracleInstance) {
-    return oracleInstance;
-  }
-
-  // Minimal headless host surface — the same subset the candidate bundle
-  // runs against in non-browser mode (see loadSocialCalc({ browser: false })
-  // in test/helpers/socialcalc.ts, which every headless test already relies
-  // on). No document/window: only Sheet/Formula/command-level behavior is
-  // exercised through this loader.
+export function createOracleSocialCalc(): SocialCalcRuntime {
   const sandbox: Record<string, unknown> = {
     clearInterval,
     clearTimeout,
@@ -69,6 +70,23 @@ export function loadOracleSocialCalc(): SocialCalcRuntime {
       `oracle SocialCalc@${ORACLE_VERSION} bundle did not initialize its global export`,
     );
   }
-  oracleInstance = exported;
+  return exported;
+}
+
+/**
+ * Returns the singleton oracle SocialCalc instance for this Vitest worker,
+ * compiling+running the pinned 3.0.8 bundle in an isolated vm context on
+ * first use. Mirrors loadSocialCalc()'s per-worker singleton shape so the
+ * two instances can be held side by side without re-running either bundle.
+ * Safe for parity comparisons (the overwhelming majority of differential
+ * tests), which never depend on the oracle's undeclared-variable-crash
+ * behavior surviving more than one call — see createOracleSocialCalc()
+ * above for the one case that does.
+ */
+export function loadOracleSocialCalc(): SocialCalcRuntime {
+  if (oracleInstance) {
+    return oracleInstance;
+  }
+  oracleInstance = createOracleSocialCalc();
   return oracleInstance;
 }
