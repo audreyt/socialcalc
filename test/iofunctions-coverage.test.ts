@@ -84,7 +84,7 @@ async function freshApp(SC: any, idSuffix: string): Promise<CtrlBundle> {
 
 test("TriggerIoAction.Button dispatches COPYVALUE to editor", async () => {
   const SC = await loadSC();
-  const { sheet } = await freshApp(SC, "btn-copyvalue");
+  const { sheet, editor } = await freshApp(SC, "btn-copyvalue");
 
   // Seed source cells directly.
   await scheduleCommands(SC, sheet, [
@@ -104,11 +104,13 @@ test("TriggerIoAction.Button dispatches COPYVALUE to editor", async () => {
   params.function_name = "COPYVALUE";
   sheet.ioParameterList = { action1: params };
 
+  const spy = spyScheduled(sheet);
+  editor.busy = false;
   SC.TriggerIoAction.Button("A1");
-  // We don't assert on the scheduled cell content because
-  // EditorScheduleSheetCommands is async via the editor. Simply exercising
-  // the path adds coverage.
-  expect(sheet.ioParameterList.action1.function_name).toBe("COPYVALUE");
+  // CopyValueToRange(C1 -> B1) copies C1's numeric value verbatim into a
+  // "set B1 value n 99" command, scheduled synchronously while idle.
+  expect(spy.calls).toEqual(["set B1 value n 99"]);
+  spy.restore();
 });
 
 test("TriggerIoAction.Button dispatches COPYFORMULA with range", async () => {
@@ -430,9 +432,9 @@ test("TriggerIoAction.Email with EMAIL formula sends one message", async () => {
   sheet.ioParameterList = { E1: params };
 
   const out = SC.TriggerIoAction.Email("E1");
-  // Some early-return paths yield undefined; the positive case returns an
-  // array. Either is acceptable evidence that the handler executed.
-  expect(out === undefined || Array.isArray(out)).toBe(true);
+  // Single EMAIL send: to@example.com unchanged (no spaces), subject/body
+  // text params get space->%20 encoding.
+  expect(out).toEqual([["to@example.com", "subject%20line", "body%20text"]]);
 });
 
 test("TriggerIoAction.Email EMAILIF skips rows where condition is false", async () => {
@@ -462,7 +464,9 @@ test("TriggerIoAction.Email EMAILIF skips rows where condition is false", async 
   sheet.ioParameterList = { E1: params };
 
   const out = SC.TriggerIoAction.Email("E1");
-  expect(out === undefined || Array.isArray(out)).toBe(true);
+  // Row2's condition (A2=0, coerced to the string "0") is loosely-equal to
+  // false, so it's skipped; only row1 (A1=1, truthy) is sent.
+  expect(out).toEqual([["to1@example.com", "subj1", "body1"]]);
 });
 
 test("TriggerIoAction.Email with coord and text parameters", async () => {
@@ -850,7 +854,8 @@ test("TriggerIoAction.AddAutocomplete wires jQuery UI autocomplete", async () =>
     expect(typeof acJq.ui.autocomplete.filter).toBe("function");
     // Exercise the filter itself: matches "b" from "bravo"
     const result = acJq.ui.autocomplete.filter(["bravo", "charlie"], "br");
-    expect(Array.isArray(result)).toBe(true);
+    // Case-insensitive \b-anchored match on "br" -> only "bravo" matches.
+    expect(result).toEqual(["bravo"]);
   } finally {
     (globalThis as any).$ = origJq;
   }
@@ -1097,11 +1102,25 @@ test("RecalcTimerRoutine handles waitingForLoading start_wait/done_wait", async 
     scri.sheet = sheet;
     scri.currentState = scri.state.start_wait;
     scri.LoadSheet = null;
-    // Calling RecalcTimerRoutine now will hit the "start_wait" block,
-    // fall through (no LoadSheet), then call RecalcLoadedSheet(null, "", false).
-    try {
-      SC.RecalcTimerRoutine();
-    } catch {}
+    // start_wait falls through (no LoadSheet) to
+    // RecalcLoadedSheet(null, "", false). Passing a null sheetname *and* a
+    // null SheetCache.waitingForLoading exposes a genuine production bug in
+    // AddSheetToCache/NormalizeSheetName (null.toLowerCase() throws) that
+    // is being fixed separately (see js/socialcalc-3.ts RecalcLoadedSheet,
+    // owned elsewhere) - we must NOT depend on that crash as "expected"
+    // behavior here. Seed a valid pending sheet name instead so this test
+    // exercises the intended start_wait -> done_wait transition without
+    // relying on the bug.
+    if (SC.Formula?.SheetCache) {
+      SC.Formula.SheetCache.waitingForLoading = "otherbook";
+    }
+    expect(() => SC.RecalcTimerRoutine()).not.toThrow();
+    // RecalcLoadedSheet("otherbook", "", false) registers the pending
+    // sheet name in SheetCache and reschedules — currentState transitions
+    // to done_wait synchronously and a new timer is armed.
+    expect(scri.currentState).toBe(scri.state.done_wait);
+    expect(scri.recalctimer).toBeTruthy();
+    expect(SC.Formula.SheetCache.sheets).toHaveProperty("otherbook");
     clearTimer();
 
     // Trigger done_wait branch.
@@ -1266,8 +1285,13 @@ test("TriggerIoAction.Email EMAIL with ranges, coord, text: full body", async ()
   sheet.ioParameterList = { E1: params };
 
   const out = SC.TriggerIoAction.Email("E1");
-  expect(Array.isArray(out)).toBe(true);
-  expect(out.length).toBeGreaterThan(0);
+  // EMAIL with 2-cell ranges sends one message per row, iterated from the
+  // LAST row down to the first (rangeIndex counts down), so row2 appears
+  // before row1 in the result.
+  expect(out).toEqual([
+    ["to2@example.com", "subject2", "body%20two"],
+    ["to1@example.com", "subject1", "body%20one"],
+  ]);
 });
 
 test("TriggerIoAction.Email EMAILIF with conditions (skip + send)", async () => {
@@ -1326,7 +1350,9 @@ test("TriggerIoAction.Email EMAILAT hits the EMAILAT switch branch", async () =>
   sheet.ioParameterList = { E1: params };
 
   const out = SC.TriggerIoAction.Email("E1");
-  expect(Array.isArray(out)).toBe(true);
+  // EMAILAT has toAddressParamOffset=1 (datetime_value at index 0 is
+  // consumed but not part of the sent content) -> single message sent.
+  expect(out).toEqual([["to@example.com", "subj", "body"]]);
 });
 
 test("TriggerIoAction.Email EMAILATIF covers condition-indexed branch", async () => {
@@ -1354,8 +1380,9 @@ test("TriggerIoAction.Email EMAILATIF covers condition-indexed branch", async ()
   sheet.ioParameterList = { E1: params };
 
   const out = SC.TriggerIoAction.Email("E1");
-  expect(Array.isArray(out)).toBe(true);
-  expect(out.length).toBe(1);
+  // EMAILATIF: conditionIndex=1 (C1=1, truthy) -> single message sent with
+  // B1/D1/F1's contents.
+  expect(out).toEqual([["to@example.com", "subj", "body"]]);
 });
 
 test("TriggerIoAction.Email EMAILONEDIT with trigger match clears trigger", async () => {
@@ -1382,9 +1409,10 @@ test("TriggerIoAction.Email EMAILONEDIT with trigger match clears trigger", asyn
   sheet.ioParameterList = { E1: params };
 
   const out = SC.TriggerIoAction.Email("E1", "A1");
-  expect(Array.isArray(out)).toBe(true);
-  // Because trigger matched, parameterValues[0] was cleared - message sent.
-  expect(out.length).toBeGreaterThanOrEqual(0);
+  // parameters[0] (editRange) is type "coord" matching optionalTriggerCellId
+  // "A1" -> the trigger-clearing check fires and nulls the trigger, so the
+  // message is sent unconditionally with B1/C1/D1's contents.
+  expect(out).toEqual([["to@example.com", "subj", "body"]]);
 });
 
 test("TriggerIoAction.Email EMAILONEDIT with trigger mismatch skips", async () => {
@@ -1415,8 +1443,9 @@ test("TriggerIoAction.Email EMAILONEDIT with trigger mismatch skips", async () =
 
   // Only A1 triggered - only the row matching A1 should send.
   const out = SC.TriggerIoAction.Email("E1", "A1");
-  expect(Array.isArray(out)).toBe(true);
-  expect(out.length).toBe(1);
+  // Only row1 (A1 matches optionalTriggerCellId) sends; row2 (A2) is
+  // skipped entirely.
+  expect(out).toEqual([["to1@example.com", "s1", "b1"]]);
 });
 
 test("TriggerIoAction.Email sheet.ioParameterList undefined returns early", async () => {
@@ -1448,10 +1477,16 @@ test("TriggerIoAction.Email with text-typed parameters covers replace-%20", asyn
   sheet.ioParameterList = { E1: params };
 
   const out = SC.TriggerIoAction.Email("E1");
-  expect(Array.isArray(out)).toBe(true);
-  expect(out.length).toBeGreaterThan(0);
-  // Check %20 substitution happened in assembled emailContentsList entries.
-  expect(out[0].some((s: string) => s.includes("%20"))).toBe(true);
+  // All-text params: every value's spaces are %20-encoded, including the
+  // "to" address itself (unlike range/coord types, "t"-typed params don't
+  // skip the address field).
+  expect(out).toEqual([
+    [
+      "to%20with%20spaces@example.com",
+      "subject%20with%20spaces",
+      "body%20text%20with%20multiple%20spaces",
+    ],
+  ]);
 });
 
 // --------------------------------------------------------------------------
@@ -1588,18 +1623,22 @@ test("TriggerIoAction.AddAutocomplete select + change callbacks execute", async 
     expect(captured).not.toBeNull();
     expect(typeof captured.select).toBe("function");
     expect(typeof captured.change).toBe("function");
+    // source is the standardized A1:A2 list, in document order.
+    expect(captured.source).toEqual(["alpha", "beta"]);
 
-    // Invoke select (covers lines 21068-21070).
+    // select: $(this).val(ui.item.label) writes the chosen label verbatim.
     captured.select.call(widget, {}, { item: { label: "beta" } });
+    expect((widget as any).value).toBe("beta");
 
-    // Invoke change with ui.item !== null (else branch).
+    // change with ui.item !== null skips the val("") branch entirely, so
+    // the widget's value from the prior select call is left untouched.
     captured.change.call(widget, {}, { item: { label: "alpha" } });
+    expect((widget as any).value).toBe("beta");
 
-    // Invoke change with ui.item === null (covers lines 21073-21074).
+    // change with ui.item === null clears the widget via val("").
     captured.change.call(widget, {}, { item: null });
+    expect((widget as any).value).toBe("");
   } finally {
     (globalThis as any).$ = origJq;
   }
-
-  expect(captured.source).toBeDefined();
 });

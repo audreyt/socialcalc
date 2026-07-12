@@ -1204,6 +1204,7 @@ SpreadsheetControlSC.InitializeSpreadsheetControl = function (
 
   if (node == null) {
     alert("SocialCalc.SpreadsheetControl not given parent node.");
+    return;
   }
 
   spreadsheet.parentNode = node;
