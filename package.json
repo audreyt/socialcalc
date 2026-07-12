@@ -46,7 +46,7 @@
     "typecheck": "tsc --noEmit",
     "typecheck:strict": "tsc --noEmit -p tsconfig.strict.json",
     "test": "vp build && vp test",
-    "test:coverage": "SOCIALCALC_COVERAGE=1 vp build && vp test --coverage",
+    "test:coverage": "SOCIALCALC_COVERAGE=1 vp build && SOCIALCALC_COVERAGE=1 vp test --coverage",
     "check:coverage-attribution": "node scripts/verify-coverage-attribution.mjs",
     "test:package-contract": "node scripts/verify-package-contract.mjs",
     "check:test-credibility": "node scripts/check-test-credibility.mjs",

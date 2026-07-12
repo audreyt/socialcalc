@@ -4,24 +4,34 @@
 // the js/*.ts source that produced it (not just "somewhere in the right
 // file" — the exact original line/column).
 //
-// The sourcemap is coverage-tooling-only (see build.ts's `coverageMode`),
-// so `beforeAll` invokes the coverage build itself rather than assuming
-// the ambient dist/ output already has it — that assumption only holds
-// when running via `vp test --coverage` (test:coverage prefixes the build
-// with `SOCIALCALC_COVERAGE=1`), not plain `vp test`.
+// Gated behind `SOCIALCALC_COVERAGE === "1"` (same contract as
+// test/browser-coverage-mapping.test.ts and
+// test/merge-browser-coverage-guard.test.ts): this suite only has teeth
+// as part of a coverage-mode run (`test:coverage`/`test:coverage:merged`,
+// both of which now set the flag for their own `vp test --coverage` step,
+// not just the preceding build). Without this gate, merely including this
+// file in ANY `vp test` invocation (e.g. plain `vp test run`) would
+// unconditionally rebuild dist/SocialCalc.js in coverage mode as a side
+// effect via `beforeAll` below — silently mutating a git-tracked build
+// artifact, and racing any other worker/test file concurrently loading
+// dist/SocialCalc.js from disk — even though every test in this file is
+// then skipped. `describe.skip` alone does not stop this: `beforeAll` is
+// registered at file (root-suite) scope, not nested inside the describe
+// block, so Vitest still invokes it regardless of which nested tests are
+// skipped — the early return inside `beforeAll` is the actual guard.
 //
-// Deliberately idempotent, never destructive: when the ambient
-// dist/SocialCalc.js + .map are already coverage-mode (the normal case
-// under `vp test --coverage`, since test:coverage's prefix already built
-// them before any test file started), this is a pure read — no rebuild,
-// no write. It only actually invokes `vp build` when the ambient state
-// isn't already correct (e.g. this file run standalone). This file must
-// NEVER rebuild dist/SocialCalc.js *away* from coverage mode mid-suite:
-// coverage-v8 re-reads it from disk at report time to remap every other
-// test file's coverage too, and other test files/workers load it
-// concurrently — a mid-suite plain rebuild would race and could silently
-// collapse the whole run's per-file attribution back to one dist blob
-// (reproduced empirically while developing this test; removed that
+// Deliberately idempotent, never destructive, when the flag IS set: when
+// the ambient dist/SocialCalc.js + .map are already coverage-mode (the
+// normal case under `vp test --coverage`, since test:coverage's prefix
+// already built them before any test file started), this is a pure read —
+// no rebuild, no write. It only actually invokes `vp build` when the
+// ambient state isn't already correct (e.g. this file run standalone).
+// This file must NEVER rebuild dist/SocialCalc.js *away* from coverage
+// mode mid-suite: coverage-v8 re-reads it from disk at report time to
+// remap every other test file's coverage too, and other test files/workers
+// load it concurrently — a mid-suite plain rebuild would race and could
+// silently collapse the whole run's per-file attribution back to one dist
+// blob (reproduced empirically while developing this test; removed that
 // destructive check from the automated suite for exactly this reason —
 // "plain build emits no comment and removes a stale map" is instead
 // verified manually, see the coverage-gate hardening report).
@@ -29,8 +39,11 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import process from "node:process";
 import { originalPositionFor, TraceMap } from "@jridgewell/trace-mapping";
 import { beforeAll, describe, expect, test } from "vite-plus/test";
+
+const sourcemapTestEnabled = process.env.SOCIALCALC_COVERAGE === "1";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const distDir = resolve(repoRoot, "dist");
@@ -44,6 +57,9 @@ let map: { version: number; file: string; sources: string[] };
 let trace: TraceMap;
 
 beforeAll(() => {
+  // No-op unless the opt-in flag is set — see the file-header comment.
+  if (!sourcemapTestEnabled) return;
+
   const alreadyCoverageBuilt =
     existsSync(mapPath) && readFileSync(bundlePath, "utf8").includes("sourceMappingURL");
   if (!alreadyCoverageBuilt) {
@@ -92,7 +108,8 @@ function expectRoundTrip(needle: string, expectedRelativeSource: string) {
   expect(sourceLines[original.line! - 1]).toContain(needle);
 }
 
-describe("SOCIALCALC_COVERAGE=1 vp build: dist/SocialCalc.js sourcemap", () => {
+const sourcemapDescribe = sourcemapTestEnabled ? describe : describe.skip;
+sourcemapDescribe("SOCIALCALC_COVERAGE=1 vp build: dist/SocialCalc.js sourcemap", () => {
   test("bundle ships a sourceMappingURL pointing at SocialCalc.js.map, appended after the UMD close", () => {
     expect(bundleText.endsWith("//# sourceMappingURL=SocialCalc.js.map\n")).toBe(true);
     expect(bundleText).toContain("return SocialCalc;\n}));\n//# sourceMappingURL=SocialCalc.js.map\n");
