@@ -1,6 +1,7 @@
 {
   "name": "socialcalc",
   "version": "3.1.0",
+  "type": "commonjs",
   "description": "Collaborative spreadsheet editor",
   "keywords": [
     "calc",
@@ -46,6 +47,7 @@
     "typecheck:strict": "tsc --noEmit -p tsconfig.strict.json",
     "test": "vp build && vp test",
     "test:coverage": "vp build && vp test --coverage",
+    "test:package-contract": "vp node scripts/verify-package-contract.mjs",
     "mutate": "vp exec stryker run",
     "mutate:file": "vp node stryker-file.mjs",
     "mutate:format": "vp node stryker-file.mjs js/formatnumber2.ts",
