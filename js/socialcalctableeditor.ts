@@ -1285,7 +1285,15 @@ TableEditorSC.EditorGetStatuslineString = function (
         scc.s_statusline_calculating + Math.floor((100 * arg.count) / (arg.total || 1)) + "%";
       break;
     case "calcloading":
-      progress = scc.s_statusline_calculatingls + ": " + arg.sheetname;
+      // arg.sheetname originates from a cross-sheet formula reference
+      // ('SheetName'!A1) in sheet-authored content, so it is escaped before
+      // reaching the statusline's innerHTML sink when untrusted.
+      progress =
+        scc.s_statusline_calculatingls +
+        ": " +
+        (SocialCalc.Callbacks.untrustedContent
+          ? SocialCalc.special_chars(arg.sheetname + "")
+          : arg.sheetname);
       break;
     case "calcserverfunc":
       progress =

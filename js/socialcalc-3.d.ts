@@ -6,6 +6,23 @@ declare namespace SocialCalc {
   }
   type AttribSet = { [name: string]: AttribValue };
 
+  // Opt-in policy consulted by rendering code only when
+  // SocialCalc.Callbacks.untrustedContent is true. See socialcalc-3.ts
+  // SafeUrlForRender / EscapeUntrustedHtml for how each field is used.
+  interface RenderSecurityPolicy {
+    // Sanitizer applied to raw HTML content (the "text-html" format and the
+    // "@r" placeholder of "text-custom:" formats) instead of the default of
+    // HTML-escaping it as inert text. Should return safe HTML.
+    sanitizeHtml: ((html: string) => string) | null;
+    // URL schemes (including the trailing ":") allowed for link/image
+    // targets ("text-url", "text-image", "text-link", and the "@u"
+    // placeholder). Compared case-insensitively.
+    allowedUrlSchemes: string[];
+    // "data:" URLs are rejected unless their MIME type (the part between
+    // "data:" and the first "," or ";") is listed here, e.g. ["image/png"].
+    allowedDataMimeTypes: string[];
+  }
+
   const Callbacks: {
     expand_wiki:
       | ((displayvalue: string, sheetobj: Sheet, linkstyle: unknown, valueformat: string) => string)
@@ -20,6 +37,11 @@ declare namespace SocialCalc {
         ) => string)
       | null;
     NormalizeSheetName: ((name: string) => string) | null;
+    // Opt-in: renders sheets in "untrusted" mode (raw HTML escaped, link/
+    // image URL schemes allowlisted). Default false preserves legacy output.
+    untrustedContent: boolean;
+    // Consulted only when untrustedContent is true.
+    securityPolicy: RenderSecurityPolicy;
     [key: string]: any;
   };
 
@@ -504,6 +526,14 @@ declare namespace SocialCalc {
   function decodeFromAjax(s: string): string;
   function encodeForSave(s: string): string;
   function special_chars(string: string): string;
+
+  // Validates rawurl against securityPolicy.allowedUrlSchemes (and, for
+  // "data:" URLs, allowedDataMimeTypes). Returns an encoded safe URL, or
+  // null if rawurl must not be rendered as an active link/image target.
+  function SafeUrlForRender(rawurl: string, policy?: RenderSecurityPolicy): string | null;
+  // Renders raw HTML safely under the untrusted-content policy: applies
+  // policy.sanitizeHtml if configured, otherwise HTML-escapes the value.
+  function EscapeUntrustedHtml(html: string, policy?: RenderSecurityPolicy): string;
 
   function Lookup(value: number, list: number[]): number | null;
   function setStyles(element: HTMLElement, cssText: string): void;

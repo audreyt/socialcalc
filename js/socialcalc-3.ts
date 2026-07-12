@@ -111,6 +111,19 @@ const SC = SocialCalc as any;
 
 // Callbacks
 
+// Opt-in policy for rendering untrusted/third-party sheets. Default output
+// (used when SocialCalc.Callbacks.untrustedContent is false, the default)
+// is unaffected by this policy and matches the original, legacy behavior
+// exactly: raw HTML passes through untouched and link/image URLs are not
+// scheme-checked. Host applications that display sheets they did not author
+// should set untrustedContent to true (and may override fields below)
+// before rendering.
+const defaultSecurityPolicy: SocialCalc.RenderSecurityPolicy = {
+  sanitizeHtml: null,
+  allowedUrlSchemes: ["http:", "https:", "mailto:"],
+  allowedDataMimeTypes: [],
+};
+
 SC.Callbacks = {
   // The next two are used by SocialCalc.format_text_for_display
 
@@ -134,6 +147,11 @@ SC.Callbacks = {
   // NormalizeSheetName is used to make different variations of sheetnames use the same cache slot
 
   NormalizeSheetName: null, // use default - lowercase
+
+  // Opt-in: see defaultSecurityPolicy above and SocialCalc.SafeUrlForRender
+  // / SocialCalc.EscapeUntrustedHtml.
+  untrustedContent: false,
+  securityPolicy: defaultSecurityPolicy,
 };
 
 // Shared flags
@@ -3949,17 +3967,22 @@ SC.RecalcLoadedSheet = function (sheetname: any, str: any, recalcneeded: any, li
   var scri = SocialCalc.RecalcInfo;
   var scf = SocialCalc.Formula;
 
-  sheet = SocialCalc.Formula.AddSheetToCache(
-    sheetname || scf.SheetCache.waitingForLoading,
-    str,
-    live,
-  );
+  // sheetname (or the cached waitingForLoading name) may legitimately be
+  // absent - e.g. a start_wait tick firing with no host LoadSheet callback
+  // and nothing actually queued. Do not coerce a missing name into "" and
+  // hand it to NormalizeSheetName/AddSheetToCache (that would either throw
+  // on null or silently cache a bogus ""-named sheet); just skip loading.
+  var effectiveSheetName = sheetname || scf.SheetCache.waitingForLoading;
 
-  if (recalcneeded && sheet && sheet.attribs.recalc != "off") {
-    // if recalcneeded, and not manual sheet, chain in this new sheet to recalc loop
-    sheet.previousrecalcsheet = scri.sheet;
-    scri.sheet = sheet;
-    scri.currentState = scri.state.start_calc;
+  if (effectiveSheetName) {
+    sheet = SocialCalc.Formula.AddSheetToCache(effectiveSheetName, str, live);
+
+    if (recalcneeded && sheet && sheet.attribs.recalc != "off") {
+      // if recalcneeded, and not manual sheet, chain in this new sheet to recalc loop
+      sheet.previousrecalcsheet = scri.sheet;
+      scri.sheet = sheet;
+      scri.currentState = scri.state.start_calc;
+    }
   }
   scf.SheetCache.waitingForLoading = null;
 
@@ -5666,6 +5689,87 @@ SC.encodeForSave = function (s: any) {
 //
 // Returns estring where &, <, >, " are HTML escaped
 //
+//
+// result = SocialCalc.SafeUrlForRender(rawurl, policy)
+//
+// Validates rawurl against an allowlist of URL schemes (and, for "data:"
+// URLs, an allowlist of MIME types) before it is used as an href/src
+// attribute value. Returns an encoded, safe URL, or null if rawurl must not
+// be rendered as an active link/image target.
+//
+// Only consulted by rendering code when SocialCalc.Callbacks.untrustedContent
+// is true; see SocialCalc.Callbacks.securityPolicy for the default policy.
+//
+// Lookup tables are built on null-prototype objects so a scheme/mime value
+// like "__proto__" or "constructor" is just an ordinary rejected key, never
+// a prototype-chain mutation.
+//
+
+SC.SafeUrlForRender = function (
+  rawurl: string,
+  policy: SocialCalc.RenderSecurityPolicy = SocialCalc.Callbacks.securityPolicy,
+): string | null {
+  const allowedSchemes: Record<string, true> = Object.create(null);
+  for (const scheme of policy.allowedUrlSchemes) allowedSchemes[scheme.toLowerCase()] = true;
+
+  const allowedDataMimeTypes: Record<string, true> = Object.create(null);
+  for (const mime of policy.allowedDataMimeTypes) allowedDataMimeTypes[mime.toLowerCase()] = true;
+
+  // Mirror the browser URL parser: strip ASCII tab/newline/CR from anywhere,
+  // then leading/trailing C0 controls and spaces, before looking for a
+  // scheme. Closes bypasses like "java\tscript:alert(1)". Validation and
+  // the returned value both operate on this normalized form, so they can
+  // never diverge (e.g. a leading space stripped for scheme-sniffing but
+  // left in an emitted href).
+  const noTabsOrNewlines = rawurl.replace(/[\t\n\r]/g, "");
+  let start = 0;
+  let end = noTabsOrNewlines.length;
+  while (start < end && noTabsOrNewlines.charCodeAt(start) <= 0x20) start++;
+  while (end > start && noTabsOrNewlines.charCodeAt(end - 1) <= 0x20) end--;
+  const stripped = noTabsOrNewlines.slice(start, end);
+
+  let encoded: string;
+  try {
+    encoded = encodeURI(stripped);
+  } catch {
+    return null; // malformed encoding (e.g., an unpaired surrogate) - fail closed
+  }
+
+  const schemeMatch = stripped.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/);
+  if (!schemeMatch) {
+    return encoded; // no scheme: relative/path-only URL, cannot invoke a scheme handler
+  }
+
+  const scheme = schemeMatch[1].toLowerCase() + ":";
+
+  if (scheme === "data:") {
+    const afterScheme = stripped.slice(schemeMatch[0].length);
+    const mimeMatch = afterScheme.match(/^([^,;]*)/);
+    const mime = mimeMatch ? mimeMatch[1].toLowerCase() : "";
+    return mime && allowedDataMimeTypes[mime] === true ? encoded : null;
+  }
+
+  return allowedSchemes[scheme] === true ? encoded : null;
+};
+
+//
+// result = SocialCalc.EscapeUntrustedHtml(html, policy)
+//
+// Renders raw HTML safely under the untrusted-content policy: applies the
+// host's sanitizeHtml callback if one is configured, otherwise HTML-escapes
+// the value so it displays as inert text instead of being parsed as markup.
+//
+
+SC.EscapeUntrustedHtml = function (
+  html: string,
+  policy: SocialCalc.RenderSecurityPolicy = SocialCalc.Callbacks.securityPolicy,
+): string {
+  if (typeof policy.sanitizeHtml === "function") {
+    return policy.sanitizeHtml(html);
+  }
+  return SocialCalc.special_chars(html);
+};
+
 /** @param {any} string */
 SC.special_chars = function (string: any) {
   if (/[&<>"]/.test(string)) {
@@ -5929,6 +6033,7 @@ SC.FormatCellForExport = function (sheet: any, cell: any, _cr: any) {
 SC.FormatValueForDisplay = function (sheetobj: any, value: any, cr: any, linkstyle: any) {
   var valueformat, valuetype, valuesubtype;
   var displayvalue, valueinputwidget;
+  var untrusted = Boolean(SocialCalc.Callbacks.untrustedContent);
 
   var sheetattribs = sheetobj.attribs;
 
@@ -6023,7 +6128,12 @@ SC.FormatValueForDisplay = function (sheetobj: any, value: any, cr: any, linksty
   }
 
   // eddy display cell HTML {
-  if (valueinputwidget == "i" && html_display_value != null && html_formated_value != null) {
+  if (
+    !untrusted &&
+    valueinputwidget == "i" &&
+    html_display_value != null &&
+    html_formated_value != null
+  ) {
     var parameters = sheetobj.ioParameterList[cr];
 
     var formula_details = SocialCalc.Formula.FunctionList[formula_name];
@@ -6092,6 +6202,7 @@ SC.format_text_for_display = function (
   var valuesubtype, dvsc, dvue;
   var textval: any;
   var displayvalue;
+  var untrusted = Boolean(SocialCalc.Callbacks.untrustedContent);
 
   valuesubtype = valuetype.substring(1);
 
@@ -6107,46 +6218,109 @@ SC.format_text_for_display = function (
     if (!valuesubtype) valueformat = "text-plain";
   }
   if (valueformat == "text-html") {
-    // HTML - output as it as is
+    // HTML - output as is (legacy trusted mode); escaped or sanitized when
+    // rendering untrusted content (SocialCalc.Callbacks.untrustedContent).
+    if (untrusted) {
+      displayvalue = SocialCalc.EscapeUntrustedHtml(displayvalue);
+    }
   } else if (SocialCalc.Callbacks.expand_wiki && valueformat.startsWith("text-wiki")) {
     // do general wiki markup
     displayvalue = SocialCalc.Callbacks.expand_wiki(displayvalue, sheetobj, linkstyle, valueformat);
+    if (untrusted) {
+      // The host's expand_wiki is not assumed to be XSS-safe by default;
+      // neutralize its output the same way raw text-html is neutralized.
+      displayvalue = SocialCalc.EscapeUntrustedHtml(displayvalue);
+    }
   } else if (valueformat == "text-wiki") {
     // wiki text
     displayvalue =
       (SocialCalc.Callbacks.expand_markup &&
         SocialCalc.Callbacks.expand_markup(displayvalue, sheetobj, linkstyle)) || // do old wiki markup
       SocialCalc.special_chars("wiki-text:" + displayvalue);
+    if (untrusted) {
+      // Same rationale as expand_wiki above: an overridden expand_markup
+      // callback is not assumed to be XSS-safe by default.
+      displayvalue = SocialCalc.EscapeUntrustedHtml(displayvalue);
+    }
   } else if (valueformat == "text-url") {
     // text is a URL for a link
     dvsc = SocialCalc.special_chars(displayvalue);
-    dvue = encodeURI(displayvalue);
-    displayvalue = '<a href="' + dvue + '">' + dvsc + "</a>";
+    if (untrusted) {
+      dvue = SocialCalc.SafeUrlForRender(displayvalue);
+      displayvalue = dvue == null ? dvsc : '<a href="' + dvue + '">' + dvsc + "</a>";
+    } else {
+      dvue = encodeURI(displayvalue);
+      displayvalue = '<a href="' + dvue + '">' + dvsc + "</a>";
+    }
   } else if (valueformat == "text-link") {
     // more extensive link capabilities for regular web links
     displayvalue = SocialCalc.expand_text_link(displayvalue, sheetobj, linkstyle, valueformat);
   } else if (valueformat == "text-image") {
     // text is a URL for an image
-    dvue = encodeURI(displayvalue);
-    displayvalue = '<img src="' + dvue + '">';
+    if (untrusted) {
+      dvue = SocialCalc.SafeUrlForRender(displayvalue);
+      displayvalue =
+        dvue == null ? SocialCalc.special_chars(displayvalue) : '<img src="' + dvue + '">';
+    } else {
+      dvue = encodeURI(displayvalue);
+      displayvalue = '<img src="' + dvue + '">';
+    }
   } else if (valueformat.substring(0, 12) == "text-custom:") {
-    // construct a custom text format: @r = text raw, @s = special chars, @u = url encoded
+    // construct a custom text format: @r = text raw, @s = special chars,
+    // @u = url encoded. The template itself (valueformat) is sheet-authored
+    // data too - a "valueformat:" entry parsed from the save file - so in
+    // untrusted mode its literal markup cannot be trusted any more than the
+    // cell's raw value can.
     dvsc = SocialCalc.special_chars(displayvalue); // do special chars
     dvsc = dvsc.replace(/  /g, "&nbsp; "); // keep multiple spaces
     dvsc = dvsc.replace(/\n/g, "<br>"); // keep line breaks
-    dvue = encodeURI(displayvalue);
+    var customTemplate = valueformat.substring(12); // remove "text-custom:"
     /** @type {any} */
     textval = {};
-    textval.r = displayvalue;
-    textval.s = dvsc;
-    textval.u = dvue;
-    displayvalue = valueformat.substring(12); // remove "text-custom:"
-    displayvalue = displayvalue.replace(
-      /@(r|s|u)/g,
-      /** @param {any} a @param {any} c */ function (a: any, c: any) {
-        return textval[c];
-      },
-    ); // replace placeholders
+    if (untrusted && typeof SocialCalc.Callbacks.securityPolicy.sanitizeHtml === "function") {
+      // Host has an explicit sanitizer: expand with the template author's
+      // intended (trusted-mode) semantics, then sanitize the fully
+      // expanded HTML - template markup and substituted values together -
+      // in one pass.
+      textval.r = displayvalue;
+      textval.u = encodeURI(displayvalue);
+      textval.s = dvsc;
+      displayvalue = SocialCalc.EscapeUntrustedHtml(
+        customTemplate.replace(
+          /@(r|s|u)/g,
+          /** @param {any} a @param {any} c */ function (a: any, c: any) {
+            return textval[c];
+          },
+        ),
+      );
+    } else if (untrusted) {
+      // No sanitizer configured: the template's own literal markup is just
+      // as unverified as raw cell HTML, so it is escaped segment by
+      // segment. Only the @r/@s/@u placeholder values keep their
+      // established untrusted-mode substitution (raw text escaped/
+      // sanitized, url scheme-checked).
+      textval.r = SocialCalc.EscapeUntrustedHtml(displayvalue);
+      textval.u = SocialCalc.SafeUrlForRender(displayvalue) || "";
+      textval.s = dvsc;
+      displayvalue = customTemplate
+        .split(/(@[rsu])/g)
+        .map(function (part: string) {
+          return part === "@r" || part === "@s" || part === "@u"
+            ? textval[part.charAt(1)]
+            : SocialCalc.special_chars(part);
+        })
+        .join("");
+    } else {
+      textval.r = displayvalue;
+      textval.u = encodeURI(displayvalue);
+      textval.s = dvsc;
+      displayvalue = customTemplate.replace(
+        /@(r|s|u)/g,
+        /** @param {any} a @param {any} c */ function (a: any, c: any) {
+          return textval[c];
+        },
+      ); // replace placeholders
+    }
   } else if (valueformat.substring(0, 6) == "custom") {
     // custom
     displayvalue = SocialCalc.special_chars(displayvalue); // do special chars
@@ -6473,6 +6647,18 @@ SC.expand_text_link = function (
         linkstyle,
         valueformat,
       );
+      if (SocialCalc.Callbacks.untrustedContent) {
+        // parts.pagename/workspacename are sheet-authored (parsed from the
+        // cell's [pagename]/{workspace [pagename]} link syntax);
+        // MakePageLink is a host callback and is not assumed to return an
+        // XSS-safe URL by default, so its result is validated the same
+        // way any other untrusted URL is.
+        var safePageUrl = SocialCalc.SafeUrlForRender(url);
+        if (safePageUrl == null) {
+          return desc; // unsafe scheme/encoding: no active link, show text only
+        }
+        url = safePageUrl;
+      }
     }
     //      else if (parts.workspace) {
     //         url = "/" + encodeURI(parts.workspace) + "/" + encodeURI(parts.pagename);
@@ -6480,6 +6666,12 @@ SC.expand_text_link = function (
     //      else {
     //         url = parts.pagename;
     //         }
+  } else if (SocialCalc.Callbacks.untrustedContent) {
+    var safeUrl = SocialCalc.SafeUrlForRender(parts.url);
+    if (safeUrl == null) {
+      return desc; // unsafe scheme/encoding: no active link, show text only
+    }
+    url = safeUrl;
   } else {
     url = encodeURI(parts.url);
   }
