@@ -196,4 +196,56 @@ guardDescribe("scripts/merge-browser-coverage.mjs: fail-open guards (focused too
       "all thresholds met",
     );
   });
+
+  test("a browser-coverage entry for the bundle URL with no \"source\" field fails the merge instead of silently trusting unverifiable V8 ranges", () => {
+    if (!unitCoverageAvailable()) {
+      test.skip("coverage/coverage-final.json is unavailable");
+      return;
+    }
+    // A truncated/forged collector payload — or a future Playwright version
+    // that stops always populating `source` — can match the bundle URL and
+    // report real-looking executed ranges while omitting the one field the
+    // merge script uses to prove those ranges belong to the on-disk bundle.
+    // Without `source`, the byte-identity check has nothing to compare
+    // against; the merge must refuse rather than silently skip the check
+    // and accept unverifiable ranges as real browser signal.
+    const fixture = {
+      testTitle: "missing-source probe (guard test)",
+      testId: "guard-no-source-1",
+      entries: [
+        {
+          url: "http://127.0.0.1:9999/dist/SocialCalc.js",
+          scriptId: "1",
+          // `source` deliberately omitted.
+          functions: [
+            { functionName: "fake", isBlockCoverage: true, ranges: [{ startOffset: 0, endOffset: 10, count: 5 }] },
+          ],
+        },
+      ],
+    };
+    writeFileSync(
+      join(tempDir!, "no-source-guard-fixture.json"),
+      JSON.stringify(fixture),
+      "utf8",
+    );
+
+    const result = runMergeScript();
+
+    expect(
+      result.status,
+      "merge script must exit nonzero when a bundle-URL entry has no source field",
+    ).not.toBe(0);
+    expect(result.stderr, "error must name the offending file").toContain(
+      "no-source-guard-fixture.json",
+    );
+    expect(result.stderr, "error must say the source field is missing").toMatch(
+      /missing its "source" field/,
+    );
+    expect(result.stdout, "must never print the per-file report on this failure").not.toContain(
+      "per-file merged result",
+    );
+    expect(result.stdout, "must never claim thresholds were met").not.toContain(
+      "all thresholds met",
+    );
+  });
 });

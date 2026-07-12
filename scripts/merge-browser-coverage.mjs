@@ -203,7 +203,18 @@ for (const fname of browserFiles) {
   // if they do, every byte offset V8 reported would map through stale
   // sourcemap segments to the wrong js/*.ts line. (Happens if the page served
   // an older bundle — e.g. a `normal.html` left over from before a rebuild.)
-  if (entry.source != null && entry.source !== bundleCode) {
+  // A MISSING `source` is refused too, not silently skipped: without it there
+  // is no way to prove the reported ranges belong to the on-disk bundle, so a
+  // truncated/forged collector payload could otherwise inject fabricated
+  // ranges that convert "successfully" against unrelated byte offsets.
+  if (entry.source == null) {
+    fail(
+      `browser coverage entry for the bundle URL is missing its "source" field — cannot verify ` +
+        `it matches on-disk dist/SocialCalc.js, so its V8 ranges cannot be trusted. ` +
+        `(test=${payload.testTitle ?? fname}, file=${fname})`,
+    );
+  }
+  if (entry.source !== bundleCode) {
     fail(
       `page bundle bytes differ from on-disk dist/SocialCalc.js — this would silently ` +
         `mis-attribute every V8 range. Rebuild (\`SOCIALCALC_COVERAGE=1 vp build\`) and ` +
