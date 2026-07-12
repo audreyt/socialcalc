@@ -1,6 +1,6 @@
 {
   "name": "socialcalc",
-  "version": "3.0.8",
+  "version": "3.1.0",
   "description": "Collaborative spreadsheet editor",
   "keywords": [
     "calc",
@@ -27,6 +27,7 @@
   },
   "files": [
     "dist/SocialCalc.js",
+    "dist/SocialCalc.min.js",
     "dist/SocialCalc.d.ts",
     "dist/socialcalc.css",
     "js/*.d.ts",
@@ -40,6 +41,7 @@
   "scripts": {
     "build": "vp build",
     "build:min": "vp build --minify",
+    "prepack": "vp build --minify",
     "typecheck": "tsc --noEmit",
     "typecheck:strict": "tsc --noEmit -p tsconfig.strict.json",
     "test": "vp build && vp test",

@@ -37,22 +37,30 @@ This package also works in Node.js. You do not need to call `InitializeSpreadshe
 
 ### Commands
 
-| Command                   | Purpose and outputs                                                            |
-| ------------------------- | ------------------------------------------------------------------------------ |
-| `vp install`              | Install the locked dependencies with the Bun version declared in `devEngines`. |
-| `vp build`                | Run the SocialCalc Vite plugin; emit the ordered UMD bundle and CSS.           |
-| `vp build --minify`       | Emit the normal bundle plus `dist/SocialCalc.min.js`.                          |
-| `vp run typecheck`        | Run `tsc --noEmit` with `tsconfig.json`; this is the ordinary compiler check.  |
-| `vp run typecheck:strict` | Run the narrower `tsconfig.strict.json` compiler check.                        |
-| `vp lint`                 | Run the warning-free type-aware lint and full typecheck; `dist/**` is ignored. |
-| `vp test`                 | Run all `test/**/*.test.ts` files once with Vitest.                            |
-| `vp run test`             | Build first, then run `vp test`.                                               |
-| `vp run test:coverage`    | Build, test with coverage, and write text/LCOV reports under `coverage/`.      |
+| Command                   | Purpose and outputs                                                                 |
+| ------------------------- | ----------------------------------------------------------------------------------- |
+| `vp install`              | Install the locked dependencies with the Bun version declared in `devEngines`.      |
+| `vp build`                | Run the SocialCalc Vite plugin; emit the ordered UMD bundle and CSS.                |
+| `vp build --minify`       | Emit the normal bundle plus `dist/SocialCalc.min.js`.                               |
+| `vp pm pack --out <file>` | Run `prepack`, regenerate both bundles, and create the publishable package archive. |
+| `vp run typecheck`        | Run `tsc --noEmit` with `tsconfig.json`; this is the ordinary compiler check.       |
+| `vp run typecheck:strict` | Run the narrower `tsconfig.strict.json` compiler check.                             |
+| `vp lint`                 | Run the warning-free type-aware lint and full typecheck; `dist/**` is ignored.      |
+| `vp test`                 | Run all `test/**/*.test.ts` files once with Vitest.                                 |
+| `vp run test`             | Build first, then run `vp test`.                                                    |
+| `vp run test:coverage`    | Build, test with coverage, and write text/LCOV reports under `coverage/`.           |
 
 The bundle is a browser-ready UMD artifact: `build.ts` inlines the wrapper, exports
 the browser global `SocialCalc` and CommonJS `module.exports`, and deliberately
 does not provide an AMD branch. Build output is generated; edit the ordered
 sources and `css/socialcalc.css`, not `dist/`.
+
+The published package includes both `dist/SocialCalc.js` and
+`dist/SocialCalc.min.js`. Direct-browser consumers can load the minified UMD as
+`socialcalc/dist/SocialCalc.min.js`; it exposes the same `SocialCalc` global and
+CommonJS value. The `prepack` lifecycle always runs `vp build --minify`, so the
+archive never depends on a developer's existing `dist/` contents. The minified
+file is generated and gitignored rather than checked in.
 
 ### TypeScript sources (global scripts)
 

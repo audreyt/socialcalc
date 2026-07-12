@@ -6,8 +6,9 @@ SocialCalc's shipping implementation is assembled from global-script TypeScript,
 not ES modules. `build.ts` exports the Vite plugin configured by
 `vite.config.ts`; it owns the ordered source list, prefers sibling `.ts`
 implementations, strips types with Oxc, and emits `dist/SocialCalc.js` plus
-`dist/socialcalc.css`. Its UMD wrappers are inline strings because they are not
-standalone modules. Edit `js/` and `css/` sources, never generated `dist/` output.
+`dist/socialcalc.css`; `vp build --minify` additionally emits
+`dist/SocialCalc.min.js`. Its UMD wrappers are inline strings because they are
+not standalone modules. Edit `js/` and `css/` sources, never generated `dist/`.
 
 Normal source-only changes use this matrix:
 
@@ -24,6 +25,11 @@ Normal source-only changes use this matrix:
 Use `vp install`, `vp add`, `vp remove`, and `vp update` as the package-management
 surface. Vite+ delegates to the Bun version pinned in `devEngines`; direct
 `bun install`/`bun add` commands are not the project workflow.
+
+The package ships both normal and minified UMD bundles. `prepack` always runs
+`vp build --minify`; `dist/SocialCalc.min.js` is gitignored and must never be
+hand-maintained. Before a package release, run `vp pm pack --out <temporary.tgz>`
+and verify the archive contains `package/dist/SocialCalc.min.js`.
 
 `vp lint` is the Vite+ lint/type-aware gate. `vite.config.ts` enables
 `typeAware`, `typeCheck`, and `denyWarnings`, so the bare command performs full

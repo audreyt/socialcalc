@@ -6,7 +6,7 @@ with the original 2007–2010 development log preserved verbatim at the bottom.
 
 
 ==============================================================================
-Unreleased — 2026-07-12
+v3.1.0 — Unreleased — 2026-07-12
 ==============================================================================
 
 Toolchain and testing
@@ -17,6 +17,10 @@ Toolchain and testing
   Vite plugin that uses Oxc for TypeScript erasure, preserves each source's
   leading license preamble, emits CSS, and optionally emits
   `SocialCalc.min.js` for `vp build --minify`.
+- Added `dist/SocialCalc.min.js` to the published package as an additive browser
+  distribution artifact. `prepack` regenerates it with `vp build --minify`;
+  package CI verifies the tarball member. This new distribution surface is a
+  minor-version change.
 - Standardized dependency and script entry points on Vite+: `vp install`,
   `vp run`, `vp exec`, and `vp node` now drive local development, mutation
   testing, and both CI workflows. Bun remains the package manager pinned and

@@ -37,3 +37,8 @@ jobs:
 
       - name: Test
         run: vp test
+
+      - name: Verify package artifact
+        run: |
+          vp pm pack --out /tmp/socialcalc.tgz
+          tar -tzf /tmp/socialcalc.tgz package/dist/SocialCalc.min.js
