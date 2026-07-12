@@ -1,6 +1,6 @@
 # SocialCalc 3.1.0 Hardening Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Each Task below is an independently mergeable stream: it owns a disjoint file set, has its own TDD command sequence, and can land on `main` in any order relative to the others (only Task 4's lint-CI wiring should land after Task 3's tautology/catch fixes land, or `denyWarnings`/the new guard step will fail on stream 3's yet-unfixed files — see Task 4 Global Constraints).
+> **For agentic workers:** **Correction (2026-07-12):** the `superpowers` skill referenced by the original draft (`superpowers:subagent-driven-development` / `superpowers:executing-plans`) is not available in this harness — do not require or wait on it. Implement this plan by following its explicit TDD steps directly: for each task, work the checkbox (`- [ ]`) items in order (write/run the failing check, implement the minimum fix, re-run green, commit exactly that task's file list) — the same discipline the unavailable skill would have enforced. Each Task below is an independently mergeable stream: it owns a disjoint file set, has its own TDD command sequence, and can land on `main` in any order relative to the others (only Task 4's lint-CI wiring should land after Task 3's tautology/catch fixes land, or `denyWarnings`/the new guard step will fail on stream 3's yet-unfixed files — see Task 4 Global Constraints).
 
 **Goal:** Take SocialCalc from "mechanically publishable at `fd6e61d`" to a package whose consumer contract, docs, test suite, coverage/mutation gates, sheet-rendering trust boundary, release gates, and dependency/supply-chain posture are all deliberately verified rather than assumed. Distinguish the minimum changes an ordinary 3.1.0 release needs from the larger hardening backlog, but plan and implement all nine requested streams.
 
@@ -8,7 +8,7 @@
 
 - `package.json` has no `type`, `exports`, or `engines` field; the UMD bundle is CJS-shaped (`module.exports` when present, `root.SocialCalc` global otherwise) but nothing pins or tests that contract for CJS `require`, native-ESM `import`, or strict-TS `moduleResolution: "nodenext"` consumers.
 - `.github/workflows/ci.yml` runs `typecheck`, `typecheck:strict`, `build`, `test`, and `vp pm pack --out /tmp/socialcalc.tgz && tar -tzf ... package/dist/SocialCalc.min.js` — a member-existence check only, not a load/require/import smoke test. It never runs `vp lint`.
-- `Changes.txt` has zero occurrences of `3.0.7` or `3.0.8` even though both are real annotated tags (`git log v3.0.6..v3.0.7`: `4c38e27`, `90f321c`; `git log v3.0.7..v3.0.8`: `1f7a914`, `952d703`) and were npm-published; the v3.1.0 section is otherwise present and current.
+- `Changes.txt` has zero occurrences of `3.0.7` or `3.0.8` even though both are real annotated tags (`git log v3.0.6..v3.0.7`: `4c38e27`, `90f321c`; `git log v3.0.7..v3.0.8`: `1f7a914`, `952d703`). **Correction:** only `v3.0.8` was published to npm; `v3.0.7` is a GitHub-only annotated tag that was never pushed to the npm registry — do not describe it as npm-published in this plan, `Changes.txt`, or any advisory/release doc that cites it. The v3.1.0 section is otherwise present and current.
 - `README.md` documents the LemmaScript Dafny/Lean trust boundary in detail (`### Trust boundary and verified surfaces`, lines 109-134) but has no equivalent section for the *rendering* trust boundary — no mention that SocialCalc writes raw HTML from sheet cell/comment/hyperlink content. `js/{socialcalc-3,socialcalcpopup,socialcalcspreadsheetcontrol,socialcalctableeditor,socialcalcviewer}.ts` contain 57 `innerHTML =` assignment sites combined.
 - `test/control-coverage.test.ts` and `test/iofunctions-coverage.test.ts` hold 31 of the repo's 35 `expect(true).toBe(true)` tautologies (30 in iofunctions, 1 in control) plus a chunk of the empty-catch total; `test/editor-dom-coverage.test.ts` holds the remaining 4 tautologies, and `test/editor-coverage-a.test.ts` / `test/editor-coverage-b.test.ts` / `test/ui-coverage.test.ts` hold the bulk of the remaining empty `catch {}` swallows (~1,022 empty-catch sites tracked in the current baseline audit across `test/**`). None of these files run through `vp lint` today because CI never invokes it.
 - `vite.config.ts` → `test.coverage` sets `exclude: ["test/**"]` and `reporter: ["text", "lcov"]` only — no `include` allow-list restricted to shipping `js/**/*.ts` sources, no `thresholds`, and CI does not run `vp run test:coverage` or read the report at all.
@@ -32,108 +32,46 @@
 
 ---
 
-### Task 1 — Tarball / minified / CJS / native-ESM / strict-TS consumer contract `[3.1 BLOCKER]`
+### Task 1 — Explicit CommonJS type + tarball-first consumer contract gate `[3.1 BLOCKER]` — landed as `4371ad5`
+
+**Correction (2026-07-12):** the original draft below assumed `package.json` needed a `"exports"` map and an `"engines"` floor, and assumed native-ESM `import` resolution was broken pre-fix. Neither holds. What actually shipped in `4371ad5`:
 
 **Files:**
-- Modify: `package.json` (add `"engines"`, explicit `"type": "commonjs"`, `"exports"` map)
-- Modify: `.github/workflows/ci.yml` (add a "Verify consumer contract" step after the existing pack step)
-- Create: `test/fixtures/consumer/require-consumer.cjs`
-- Create: `test/fixtures/consumer/import-consumer.mjs`
-- Create: `test/fixtures/consumer/strict-consumer.ts`
-- Create: `test/fixtures/consumer/tsconfig.json` (extends root `tsconfig.json`, `moduleResolution: "nodenext"`, `strict: true`)
-- Create: `test/package-consumer-contract.test.ts`
+- Modify: `package.json` — add explicit `"type": "commonjs"` only. No `"engines"` field: nothing in this repo's actual toolchain/CI evidence requires pinning a Node floor, and adding one absent a real compatibility failure is speculative. No `"exports"` map: absent evidence that today's consumers need conditional exports, an `"exports"` map only *narrows* resolution (e.g. blocking deep imports outside the map that may already be relied on) for zero measured benefit — this package branch intentionally keeps the contract at explicit `"type": "commonjs"` and nothing more.
+- Modify: `package.json` — add `"test:package-contract": "vp node scripts/verify-package-contract.mjs"`.
+- Create: `scripts/verify-package-contract.mjs` (not the originally-drafted `test/fixtures/consumer/**` + `test/package-consumer-contract.test.ts` — superseded; do not recreate the fixture-based approach).
 
 **Interfaces:**
-- Consumes: `vp pm pack --out <tmp>.tgz` output tarball; Node's `child_process` to run each fixture consumer against the packed+extracted `package/` directory.
-- Produces: a Vitest test asserting (1) `require("socialcalc")` in `.cjs` resolves `SC.SpreadsheetControl`, (2) `import SC from "socialcalc"` in `.mjs` resolves the same default export via CJS interop, (3) `tsc --noEmit -p test/fixtures/consumer/tsconfig.json` against `strict-consumer.ts` (importing `SC.Sheet`/`SC.SpreadsheetControl` types) exits 0, (4) the tarball still contains `package/dist/SocialCalc.min.js`.
+- Consumes: `vp pm pack` (its existing `prepack` hook already runs `vp build --minify`), extracted into a scratch `node_modules/socialcalc` consumer directory so `require`/`import` resolve by package specifier, not by file path.
+- Produces: `vp run test:package-contract`, a standalone Node script (deliberately outside `test/**/*.test.ts` / `vp test`, since `vp pm pack` rebuilding on every invocation would add pack/extract/tsc overhead and a prepack-recursion risk to the ordinary test run) asserting: tar member allowlist derived from `package.json`'s own `"files"`; packed artifact sizes + sha256 for tarball/normal/minified (reported, never pinned); root CJS `require("socialcalc")`; deep CJS `require("socialcalc/dist/SocialCalc.min.js")`; native static ESM `import SocialCalc from "socialcalc"` run in a real child process; VM browser-global execution of both bundles; top-level key/typeof shape parity across all five delivery paths; representative command/formula/save-load exercise on all four runtime instances; a strict external `tsc --noEmit` compile against the packed `.d.ts`; a best-effort, non-gating are-the-types-wrong report.
 
-- [ ] **Step 1: Write the failing consumer-contract test**
+**Correction — the baseline was already working:** the original Step 2 below claimed the pre-fix tree would fail native-ESM/strict-TS resolution because `package.json` had no `"type"`/`"exports"` field. That's false: Node already resolved the extensionless, `"type"`-less bundle as CommonJS by default (no ambiguity existed to trigger fallback sniffing), and native ESM's `import(...).default` already worked before this change — verified empirically by running the full check matrix against the pre-fix tree: only the explicit-`"type"` field-presence assertion failed; every require/import/VM/tsc check already passed. `"type": "commonjs"` is an honesty/explicitness fix with zero resolution-behavior change, not a fix for a broken resolver.
 
-  Create the four fixture files under `test/fixtures/consumer/` (a `.cjs` requiring `"socialcalc"` and touching `SocialCalc.SpreadsheetControl`, a `.mjs` doing the default-import equivalent, a `.ts` doing a typed import + strict-mode use of `SC.Formula`, and a fixture-local `tsconfig.json`). Write `test/package-consumer-contract.test.ts`: it runs `vp pm pack --out <tmpdir>/socialcalc.tgz`, extracts it, runs `node require-consumer.cjs`, `node import-consumer.mjs`, and `tsc --noEmit -p tsconfig.json` against the extracted `package/` via `child_process.execFileSync`, resolving `require`/`import` specifiers against the extracted `package/` directory (e.g. `NODE_PATH` or a scratch `node_modules/socialcalc` symlink to the extracted folder).
-
-- [ ] **Step 2: Run targeted test to verify red**
-
-  Run: `vp build --minify && vp test run test/package-consumer-contract.test.ts`
-
-  Expected: fails at the `.mjs` (or `.ts` strict) step because `package.json` has no `"exports"`/`"type"` field, so Node's ESM resolver either falls back to file-extension sniffing (works today only by accident) or `tsc --noEmit` under `nodenext` resolution cannot find declared exports. Confirm the failure is specifically a resolution/typing failure, not a fixture bug.
-
-- [ ] **Step 3: Add the consumer contract to `package.json`**
-
-  Add `"type": "commonjs"` (matches the UMD wrapper's actual `module.exports` branch — do not use `"module"`, the bundle is not native ESM), `"engines": { "node": ">=18" }` (matches the Node baseline `vite-plus`/Vitest 4 require), and an `"exports"` map:
-  ```json
-  "exports": {
-    ".": {
-      "types": "./dist/SocialCalc.d.ts",
-      "default": "./dist/SocialCalc.js"
-    },
-    "./dist/SocialCalc.min.js": "./dist/SocialCalc.min.js",
-    "./css/socialcalc.css": "./css/socialcalc.css",
-    "./package.json": "./package.json"
-  }
-  ```
-  Keep `"main"`/`"types"` as-is for older resolvers that ignore `"exports"`. Use `"default"` (not separate `"require"`/`"import"` conditions) because there is exactly one file for both — Node's ESM loader treats a CJS file with `module.exports` under a `"default"` condition correctly via its CJS-named-exports interop for the default binding.
-
-- [ ] **Step 4: Run targeted test to verify green**
-
-  Run: `vp build --minify && vp test run test/package-consumer-contract.test.ts`
-
-  Expected: all four consumer assertions pass.
-
-- [ ] **Step 5: Run full task-scoped matrix**
-
-  Run: `vp run typecheck && vp run typecheck:strict && vp build && vp test run test/package-consumer-contract.test.ts test/bundle-loader.test.ts test/types.smoke.test.ts`
-
-  Expected: no regressions in the existing bundle-loader/type-smoke tests.
-
-- [ ] **Step 6: Wire CI**
-
-  Add a step to `.github/workflows/ci.yml` after "Verify package artifact": `vp test run test/package-consumer-contract.test.ts` (or fold the tarball-member check into the same Vitest file and drop the old `tar -tzf` shell step — prefer keeping both: the tar step is a fast, zero-dependency floor and the new test is the deep check).
-
-- [ ] **Step 7: Commit**
-
-  Run: `git add package.json test/fixtures/consumer test/package-consumer-contract.test.ts .github/workflows/ci.yml && git commit -m "test(pkg): pin and verify CJS/ESM/strict-TS consumer contract"`
+- [x] **Step 1: Write `scripts/verify-package-contract.mjs`** covering every check listed above.
+- [x] **Step 2: Confirm the explicit-`"type"` assertion is the only genuinely red check** against the pre-fix tree — everything else already passes (see correction note above).
+- [x] **Step 3: Add `"type": "commonjs"` and the `test:package-contract` script to `package.json`** — no `"engines"`, no `"exports"` map.
+- [x] **Step 4: Run `vp run test:package-contract` to verify all checks green.**
+- [x] **Step 5: Commit** — landed as `package: declare explicit CommonJS type + tarball-first contract gate` (`4371ad5`). Note: no `.github/workflows/ci.yml` step was added for this task; CI wiring remains genuinely open for a future stream, not silently dropped.
 
 ---
 
 ### Task 2 — Changelog / import docs / rendering trust-boundary docs `[3.1 BLOCKER]`
 
 **Files:**
-- Modify: `Changes.txt` (insert `v3.0.7` and `v3.0.8` sections between the current `v3.1.0` and `v3.0.6` headers)
-- Modify: `README.md` (extend `## Usage` with the CJS/ESM/browser-global import forms from Task 1's `"exports"` map; add a new `## Rendering trust boundary` section, placed after `## Formula-reference rewrite coverage` and before `## LemmaScript verification`)
+- Modify: `Changes.txt` (insert `v3.0.7` — GitHub tag only, never published to npm — and `v3.0.8` — published to npm — sections between the current `v3.1.0` and `v3.0.6` headers)
+- Modify: `README.md` (extend `## Usage` with the CJS/native-ESM-default/browser-global import forms; add `## Trust boundary and host security` directly after `## Usage`, before `## Build and quality gates`)
 
 **Interfaces:**
-- Consumes: `git log v3.0.6..v3.0.7 --stat` / `git log v3.0.7..v3.0.8 --stat` for accurate per-release commit summaries; Task 1's finalized `"exports"` map for the import-forms doc.
-- Produces: a changelog with no version gaps and a README section a downstream embedder (e.g. EtherCalc) can point to when deciding whether to sandbox/sanitize sheet content before rendering it.
+- Consumes: `git log v3.0.6..v3.0.7 --stat` / `git log v3.0.7..v3.0.8 --stat` for accurate per-release commit summaries; the three import forms `scripts/verify-package-contract.mjs` (Task 1) actually exercises (root CJS require, deep CJS require, native ESM default import) for the import-forms doc.
+- Produces: a changelog with no version gaps and correct npm-publication status per version, and a README trust-boundary section a downstream embedder (e.g. EtherCalc) can point to when deciding whether to sanitize sheet content before rendering it.
 
-- [ ] **Step 1: Write the failing doc-completeness check**
+- [x] **Step 1 (reconciled): landed directly, no dedicated doc-completeness test.** `test/docs-contract.test.ts` from the original draft was never created; `Changes.txt`/`README.md` were corrected directly and verified by manual review against `git log v3.0.6..v3.0.7`/`v3.0.7..v3.0.8`, not by a committed heading-presence assertion. A future machine-checked doc-completeness gate must target the real heading text (`## Trust boundary and host security`, not `## Rendering trust boundary`) and the real per-version npm-publication wording below.
 
-  Add a small assertion to a docs-linting test (or extend `test/package-consumer-contract.test.ts` if a dedicated docs test feels like overkill for two checks — prefer a new `test/docs-contract.test.ts` to keep Task 1's file ownership clean) that reads `Changes.txt` and fails if it does not contain both `v3.0.7` and `v3.0.8` headers, and reads `README.md` and fails if it does not contain a heading matching `/^## Rendering trust boundary/m`.
+- [x] **Step 2: Reconcile Changes.txt** — inserted `v3.0.8 — 2026-07-09` (published to npm as `socialcalc@3.0.8`) and `v3.0.7 — 2026-07-09 (GitHub tag only; not published to npm)` between the existing `v3.1.0` and `v3.0.6` headers. **Correction:** the original baseline claimed both `3.0.7` and `3.0.8` "were npm-published" — false for `3.0.7`, which is a GitHub-only annotated tag; only `3.0.8` reached the npm registry.
 
-  **Files (add to this task):** Create `test/docs-contract.test.ts`.
+- [x] **Step 3: Document the import forms and trust boundary in README** — `## Usage` documents `require("socialcalc")`, `import SocialCalc from "socialcalc"` (native ESM default import — this path already worked pre-`4371ad5`, see Task 1's correction note; documenting it is not documenting a new fix), and the browser `<script>` global form. The trust-boundary section landed as `## Trust boundary and host security` (not `## Rendering trust boundary` as originally drafted, and placed directly after `## Usage` rather than after `## Formula-reference rewrite coverage`) — any future edit (e.g. Task 7 wiring in an opt-in sanitizer) must target that actual heading/location. The landed README does not yet cross-reference `vp run test:package-contract` as the enforcement point; that cross-reference remains open, not something to assume is already there.
 
-- [ ] **Step 2: Run targeted test to verify red**
-
-  Run: `vp test run test/docs-contract.test.ts`
-
-  Expected: fails on both assertions against the current `Changes.txt`/`README.md`.
-
-- [ ] **Step 3: Reconcile Changes.txt**
-
-  Using `git log v3.0.6..v3.0.7 --stat` (`4c38e27` fix range-endpoint name handling for `N:T`-style refs; `90f321c` version bump) and `git log v3.0.7..v3.0.8 --stat` (`1f7a914` expose CJS exports from the package entrypoint; `952d703` version bump), insert accurate `v3.0.7` and `v3.0.8` sections between the existing `v3.1.0` and `v3.0.6` headers, matching the file's existing per-release prose style (short bullet list per release, newest first).
-
-- [ ] **Step 4: Document the import forms and rendering trust boundary in README**
-
-  In `## Usage`, add the three import forms Task 1's `"exports"` map now guarantees: `require("socialcalc")` (CommonJS/Node), `import SC from "socialcalc"` (native-ESM via CJS interop), and the existing browser `<script>` global form — cross-reference `test/package-consumer-contract.test.ts` as the enforcement point.
-
-  Add `## Rendering trust boundary` documenting, in the same factual register as the existing LemmaScript trust-boundary section: SocialCalc's UI modules (`socialcalc-3.ts`, `socialcalcpopup.ts`, `socialcalcspreadsheetcontrol.ts`, `socialcalctableeditor.ts`, `socialcalcviewer.ts`) write cell text, comments, and hyperlink targets into the DOM via `innerHTML`, and SocialCalc performs **no HTML sanitization** on sheet content by default. An embedder that renders a sheet sourced from an untrusted party (a shared/collaborative document, an uploaded file, an API response) is responsible for either sanitizing cell/comment/hyperlink text before it reaches SocialCalc or enabling Task 7's opt-in sanitized-rendering mode once that ships. Link this section from Task 7's own docs once that task lands (Task 7's step includes updating this same heading — a second edit, not a new heading).
-
-- [ ] **Step 5: Run targeted test to verify green**
-
-  Run: `vp test run test/docs-contract.test.ts`
-
-- [ ] **Step 6: Commit**
-
-  Run: `git add Changes.txt README.md test/docs-contract.test.ts && git commit -m "docs: reconcile 3.0.7/3.0.8 changelog and document rendering trust boundary"`
+- [x] **Step 4: Commit** — landed as `docs: clarify releases and trust boundary` (`28ef026`).
 
 ---
 
@@ -146,6 +84,7 @@
 **Interfaces:**
 - Consumes: the existing `loadSocialCalc()` / `scheduleCommands` test helpers already used by both files.
 - Produces: the same test names, each now asserting a real, specific post-condition (returned value, thrown error, DOM/state mutation, or explicit "no side effect occurred" check on a concrete field) instead of `expect(true).toBe(true)`, and no bare `catch {}` swallowing an assertion failure.
+- **Scope correction:** tautology/empty-catch cleanup (this task and Task 4) applies to every git-tracked `test/**/*.test.ts` file — the six files named explicitly across Tasks 3–4 (`test/control-coverage.test.ts`, `test/iofunctions-coverage.test.ts`, `test/editor-dom-coverage.test.ts`, `test/editor-coverage-a.test.ts`, `test/editor-coverage-b.test.ts`, `test/ui-coverage.test.ts`) plus any other git-tracked test file discovered to hold the same anti-patterns. It does **not** apply to untracked/scratch exploratory test files or coverage-report directories that may exist locally in a contributor's working tree (e.g. ad hoc `*-coverage-gaps-*.test.ts` variants, `coverage-*/` output dirs) — those are out of this plan's scope and must not be picked up or committed by this cleanup. Task 4's guard script must enumerate `git ls-files 'test/**/*.test.ts'`, not a raw filesystem glob, so it never fails on someone's uncommitted local file.
 
 - [ ] **Step 1: Inventory current tautologies/empty catches in these two files**
 
@@ -186,11 +125,11 @@
 
 **Interfaces:**
 - Consumes: same test helpers as Task 3.
-- Produces: same as Task 3 for the remaining files, plus a new guard script that scans `test/**/*.test.ts` (excluding nothing — the fixed files must now pass it) and exits non-zero on any tautology/empty-catch match, wired into CI as a fast pre-lint gate.
+- Produces: same as Task 3 for the remaining files, plus a new guard script that scans every git-tracked `test/**/*.test.ts` file (via `git ls-files`, not a raw filesystem glob — see Task 3's scope correction: uncommitted/scratch test files are out of scope and must not fail this guard) and exits non-zero on any tautology/empty-catch match, wired into CI as a fast pre-lint gate.
 
 - [ ] **Step 1: Write the failing guard script first**
 
-  Create `scripts/check-test-credibility.mjs`: walk `test/**/*.test.ts`, regex-match `expect(true).toBe(true)` and `catch\s*(\([^)]*\))?\s*\{\s*(//[^\n]*)?\s*\}` (empty or comment-only catch body), print offending `file:line`, exit 1 if any match. Add the npm script. Run `vp run check:test-credibility` — expect it to fail loudly against the current tree (both this task's target files and, if Task 3 hasn't merged yet, its files too).
+  Create `scripts/check-test-credibility.mjs`: enumerate `git ls-files 'test/**/*.test.ts'` (git-tracked files only — never a raw filesystem glob, per Task 3's scope correction), regex-match `expect(true).toBe(true)` and `catch\s*(\([^)]*\))?\s*\{\s*(//[^\n]*)?\s*\}` (empty or comment-only catch body), print offending `file:line`, exit 1 if any match. Add the npm script. Run `vp run check:test-credibility` — expect it to fail loudly against the current tree (both this task's target files and, if Task 3 hasn't merged yet, its files too).
 
 - [ ] **Step 2: Fix `test/editor-dom-coverage.test.ts` tautologies and the UI files' empty catches**
 
@@ -232,7 +171,7 @@
 
 - [ ] **Step 1: Write the failing CI expectation**
 
-  Add a step to `.github/workflows/ci.yml` running `vp run test:coverage`, immediately after "Test". Since `vite.config.ts` currently has no `thresholds`, this step cannot fail on a floor yet — the "red" here is: run `vp run test:coverage` locally first and record the actual current per-metric numbers (statements/branches/functions/lines) as the evidence for Step 2's threshold choice, then add a placeholder threshold *above* what a broken build would produce but *at* today's real numbers (thresholds must reflect an honest current baseline, not an aspirational one this task doesn't reach).
+  Add a step to `.github/workflows/ci.yml` running `vp run test:coverage`, immediately after "Test". Since `vite.config.ts` currently has no `thresholds`, this step cannot fail on a floor yet — the "red" here is: run `vp run test:coverage` locally first and record the actual current per-metric numbers (statements/branches/functions/lines) as the evidence for Step 2's threshold choice, then add a placeholder threshold *above* what a broken build would produce but *at* today's real numbers (thresholds must reflect an honest current baseline, not an aspirational one this task doesn't reach). **Correction:** before trusting any per-file number, confirm the report is actually attributing coverage to `js/**/*.ts` source lines rather than to the built `dist/SocialCalc.js` bundle the test helpers load — neither `vite.config.ts` nor `build.ts` currently configures source maps anywhere in this repo (verified: no `sourcemap`/`sourceMap` key exists in `build.ts`, `vite.config.ts`, or `tsconfig.json`). Scoping coverage with `include: ["js/**/*.ts"]` alone (Step 2) is necessary but not sufficient: without a valid source-map chain from the executed code back to `js/**/*.ts`, the V8 coverage provider cannot correctly attribute hits to those source lines, and the scoped report may come back empty or misleading rather than reflecting real per-file coverage. Wire and verify the source-map chain (e.g. `build: { sourcemap: true }` in the rolldown build options, confirmed by inspecting the coverage report's actual per-file line hits against `js/**/*.ts`, not just its summary percentages) before treating Step 2's numbers as trustworthy.
 
 - [ ] **Step 2: Scope coverage to shipping sources and set thresholds**
 
@@ -244,9 +183,9 @@
 
   Expected: exits 0; report shows only `js/**/*.ts` files (no `test/**`, no `dist/**`, no `lemma/**`).
 
-- [ ] **Step 4: Confirm CI floor actually fails on regression**
+- [ ] **Step 4: Confirm CI floor actually fails on regression, then commit the real (not a placeholder) threshold**
 
-  Temporarily lower one threshold value by 5 points, rerun `vp run test:coverage`, confirm it now fails; revert. (Manual verification step, not a committed test — proves the gate is load-bearing before shipping it.)
+  Temporarily lower one threshold value by 5 points, rerun `vp run test:coverage`, confirm it now fails — this proves the gate is load-bearing. **Correction:** do not simply revert to Step 2's rounded-down placeholder afterward. This regression proof is the evidence that licenses setting the *committed* threshold at the real measured baseline (Step 1's honest current numbers, rounded down only to the nearest whole percent for run-to-run noise — not further discounted as a defensive placeholder): having shown the floor genuinely catches a real drop, raise each threshold to the highest value the current tree still passes, then rerun `vp run test:coverage` once more to confirm it's green at that raised number before committing. A threshold nobody has proven can fail, or one set conservatively below what's actually achieved, is not a real floor.
 
 - [ ] **Step 5: Commit**
 
@@ -298,7 +237,7 @@
 **Files:**
 - Modify: `js/socialcalcconstants.ts` (add a new namespaced option, e.g. `SocialCalc.Constants.SanitizeUntrustedContent` default `false`, or an instantiation-time option threaded through `SpreadsheetControl`/`TableEditor`/`Viewer` constructors — pick the narrowest surface that already has a per-instance options object; do not introduce a new global mutable flag if an existing options bag covers it)
 - Modify: `js/socialcalc-3.ts`, `js/socialcalcpopup.ts`, `js/socialcalcspreadsheetcontrol.ts`, `js/socialcalctableeditor.ts`, `js/socialcalcviewer.ts` (gate the highest-risk `innerHTML` sinks — cell text/comment/hyperlink rendering, not internal chrome markup — behind the option; when enabled, escape/strip HTML from sheet-sourced strings before they reach `innerHTML`)
-- Modify: `README.md` (`## Rendering trust boundary`, from Task 2 — document how to enable the option)
+- Modify: `README.md` (`## Trust boundary and host security`, landed in Task 2 as `28ef026` — document how to enable the option)
 - Create: `test/secure-rendering.test.ts`
 
 **Interfaces:**
@@ -337,7 +276,7 @@
 
 - [ ] **Step 7: Document the option in README**
 
-  Update `## Rendering trust boundary` (added in Task 2) with the exact option name, default, and an example enabling it, closing the loop Task 2 opened.
+  Update `## Trust boundary and host security` (landed in Task 2 as `28ef026`, corrected from this draft's original `## Rendering trust boundary` working title) with the exact option name, default, and an example enabling it, closing the loop Task 2 opened.
 
 - [ ] **Step 8: Commit**
 
