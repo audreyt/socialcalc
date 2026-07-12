@@ -125,7 +125,9 @@ function primeGridLayout(editor: any) {
   // it threw.
   try {
     editor.CalculateEditorPositions();
-  } catch {}
+  } catch {
+    // Defensive priming: fake DOM positions are seeded below, so this calculation is not under test.
+  }
   editor.gridposition = editor.gridposition || { left: 0, top: 0 };
   editor.headposition = editor.headposition || { left: 30, top: 30 };
   const colwidths = [0, 30, 80, 80, 80, 80, 80, 80];

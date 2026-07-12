@@ -15,14 +15,9 @@
 // not a Vitest test: behavior tests must assert observable behavior, not
 // incidental source text of sibling test files.
 //
-// Usage: node scripts/check-test-credibility.mjs [--allow-known-debt]
-//   --allow-known-debt  Exit 0 even if violations are found, but still
-//                        print the full report. Intended only for this
-//                        repo's pre-merge multi-branch remediation window,
-//                        where files owned by a sibling branch may still
-//                        contain unremediated catches; it does NOT
-//                        allowlist specific files or catches, it only
-//                        changes the exit code.
+// Usage: node scripts/check-test-credibility.mjs
+// The guard always exits nonzero when violations are found; remediation must
+// land in the tracked test sources rather than being bypassed at invocation.
 
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -43,9 +38,10 @@ const TAUTOLOGY_RE = /\bexpect\(\s*true\s*\)\.toBe\(\s*true\s*\)/g;
  */
 function findCatchBlocks(src) {
   const blocks = [];
+  const code = maskNonCode(src);
   const catchHeaderRe = /\bcatch\b\s*(\([^)]*\))?\s*\{/g;
   let m;
-  while ((m = catchHeaderRe.exec(src))) {
+  while ((m = catchHeaderRe.exec(code))) {
     const bodyStart = m.index + m[0].length;
     const bodyEnd = findMatchingBrace(src, bodyStart);
     if (bodyEnd === -1) continue; // unbalanced; ignore rather than false-positive
@@ -190,6 +186,49 @@ function splitCodeAndComments(body) {
   return { code, commentText };
 }
 
+/**
+ * Return a same-length source skeleton with comments and literals masked.
+ * Keeping offsets intact lets diagnostics continue to point at the original
+ * source while keyword/tautology matching cannot see fixture prose.
+ */
+function maskNonCode(src) {
+  const out = src.split("");
+  const mask = (start, end) => {
+    for (let i = start; i < end; i++) {
+      if (src[i] !== "\n") out[i] = " ";
+    }
+  };
+  let i = 0;
+  while (i < src.length) {
+    const ch = src[i];
+    const next = src[i + 1];
+    if (ch === "/" && next === "/") {
+      const end = src.indexOf("\n", i);
+      const stop = end === -1 ? src.length : end;
+      mask(i, stop);
+      i = stop;
+    } else if (ch === "/" && next === "*") {
+      const end = src.indexOf("*/", i + 2);
+      const stop = end === -1 ? src.length : end + 2;
+      mask(i, stop);
+      i = stop;
+    } else if (ch === "'" || ch === '"') {
+      const end = skipStringLiteral(src, i, ch);
+      const stop = end === -1 ? src.length : end;
+      mask(i, stop);
+      i = stop;
+    } else if (ch === "`") {
+      const end = skipTemplateLiteral(src, i);
+      const stop = end === -1 ? src.length : end;
+      mask(i, stop);
+      i = stop;
+    } else {
+      i++;
+    }
+  }
+  return out.join("");
+}
+
 export function listTrackedTestFiles() {
   // `:(glob)` pathspec magic makes `**` match across directory boundaries
   // (plain git pathspecs treat `**` as a literal double-star otherwise).
@@ -222,7 +261,8 @@ export function checkFile(relPath) {
   const violations = [];
   const cleanupCatches = [];
 
-  for (const m of src.matchAll(TAUTOLOGY_RE)) {
+  const code = maskNonCode(src);
+  for (const m of code.matchAll(TAUTOLOGY_RE)) {
     violations.push({
       file: relPath,
       line: lineOf(src, m.index),
@@ -255,7 +295,6 @@ export function checkFile(relPath) {
 }
 
 function main() {
-  const allowKnownDebt = process.argv.includes("--allow-known-debt");
   const files = listTrackedTestFiles();
   let allViolations = [];
   let allCleanup = [];
@@ -284,10 +323,6 @@ function main() {
     }
     console.log("");
     console.log(`FAIL: ${allViolations.length} violation(s) found.`);
-    if (allowKnownDebt) {
-      console.log("--allow-known-debt set: exiting 0 despite violations above.");
-      process.exit(0);
-    }
     process.exit(1);
   }
 

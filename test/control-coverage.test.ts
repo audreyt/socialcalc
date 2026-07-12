@@ -22,26 +22,15 @@ const __origSetInterval = (globalThis as any).setInterval;
 
 afterEach(() => {
   for (const id of __liveIntervals) {
-    // Cleanup-only: this runs after EVERY test in this file to clear
-    // intervals leaked by SocialCalc's internal timers (not the operation
-    // under test here). clearInterval on an invalid/already-cleared id is
-    // a documented no-op in Node/Bun, but guard anyway since `id` may
-    // reference a timer from a torn-down module instance between test
-    // files where clearInterval's behavior on a foreign id isn't
-    // guaranteed.
-    try {
-      clearInterval(id);
-    } catch {}
+    // SocialCalc's timers are always host timer handles; clearInterval is a
+    // no-op for handles already cleared by the code under test.
+    clearInterval(id);
   }
   __liveIntervals.clear();
-  // Cleanup-only: best-effort reset of a global heartbeat flag left by a
-  // previous test (not the operation under test here); SC or SC.Keyboard
-  // may legitimately be undefined between test files, and touching it is
-  // pure teardown with no assertion value either way.
-  try {
-    const SC = (globalThis as any).SocialCalc;
-    if (SC && SC.Keyboard) SC.Keyboard.focusTable = null;
-  } catch {}
+  // Reset the heartbeat flag left by the prior test; optional chaining keeps
+  // teardown safe when another test has not installed SocialCalc yet.
+  const SC = (globalThis as typeof globalThis & { SocialCalc?: { Keyboard?: { focusTable?: unknown } } }).SocialCalc;
+  if (SC?.Keyboard) SC.Keyboard.focusTable = null;
 });
 
 beforeEach(() => {
