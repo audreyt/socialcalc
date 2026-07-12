@@ -16,6 +16,18 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { loadSocialCalc } from "./helpers/socialcalc";
 
+// Stable parser token codes are part of the public token-stream contract.
+// Keep expected values independent from the mutable SocialCalc bundle.
+const TOKEN_TYPE = {
+  num: 1,
+  coord: 2,
+  op: 3,
+  name: 4,
+  error: 5,
+  string: 6,
+  space: 7,
+} as const;
+
 // --------------------------------------------------------------------------
 // ParseFormulaIntoTokens: numexp1 sign-accumulation guard (id=417)
 // --------------------------------------------------------------------------
@@ -31,18 +43,18 @@ describe("id=417: numexp1 sign-accumulation condition", () => {
     const SC = await loadSocialCalc();
     const tokens = SC.Formula.ParseFormulaIntoTokens("1EX");
     expect(tokens).toEqual([
-      { text: SC.Constants.s_parseerrexponent, type: SC.Formula.TokenType.error, opcode: 0 },
-      { text: "X", type: SC.Formula.TokenType.name, opcode: 0 },
+      { text: "Improperly formed number exponent", type: TOKEN_TYPE.error, opcode: 0 },
+      { text: "X", type: TOKEN_TYPE.name, opcode: 0 },
     ]);
   });
 
   test("signed exponent '1E+5' and '1E-5' still parse as single number tokens", async () => {
     const SC = await loadSocialCalc();
     expect(SC.Formula.ParseFormulaIntoTokens("1E+5")).toEqual([
-      { text: "1E+5", type: SC.Formula.TokenType.num, opcode: 0 },
+      { text: "1E+5", type: TOKEN_TYPE.num, opcode: 0 },
     ]);
     expect(SC.Formula.ParseFormulaIntoTokens("1E-5")).toEqual([
-      { text: "1E-5", type: SC.Formula.TokenType.num, opcode: 0 },
+      { text: "1E-5", type: TOKEN_TYPE.num, opcode: 0 },
     ]);
   });
 });
@@ -77,8 +89,8 @@ describe("id=466: alpha-state op/numstart/space/eof terminator group", () => {
     // A quote right after an alpha run is none of op/numstart/space/eof, so
     // it must hit the error branch, not the (mutated-to-always-true) name-push.
     expect(SC.Formula.ParseFormulaIntoTokens('A"')).toEqual([
-      { text: SC.Constants.s_parseerrchar, type: SC.Formula.TokenType.error, opcode: 0 },
-      { text: SC.Constants.s_parseerrstring, type: SC.Formula.TokenType.error, opcode: 0 },
+      { text: "Unexpected character in formula", type: TOKEN_TYPE.error, opcode: 0 },
+      { text: "Improperly formed string", type: TOKEN_TYPE.error, opcode: 0 },
     ]);
   });
 });
@@ -99,8 +111,8 @@ describe("id=502: coord-state op/numstart/eof/space terminator group", () => {
   test("coord token followed by an unexpected char (quote) errors", async () => {
     const SC = await loadSocialCalc();
     expect(SC.Formula.ParseFormulaIntoTokens('A1"')).toEqual([
-      { text: SC.Constants.s_parseerrchar, type: SC.Formula.TokenType.error, opcode: 0 },
-      { text: SC.Constants.s_parseerrstring, type: SC.Formula.TokenType.error, opcode: 0 },
+      { text: "Unexpected character in formula", type: TOKEN_TYPE.error, opcode: 0 },
+      { text: "Improperly formed string", type: TOKEN_TYPE.error, opcode: 0 },
     ]);
   });
 });
@@ -112,8 +124,8 @@ describe("id=537: alphanumeric-state op/numstart/space/eof terminator group", ()
   test("alphanumeric token (letter-digit-letter) followed by an unexpected char errors", async () => {
     const SC = await loadSocialCalc();
     expect(SC.Formula.ParseFormulaIntoTokens('A1B"')).toEqual([
-      { text: SC.Constants.s_parseerrchar, type: SC.Formula.TokenType.error, opcode: 0 },
-      { text: SC.Constants.s_parseerrstring, type: SC.Formula.TokenType.error, opcode: 0 },
+      { text: "Unexpected character in formula", type: TOKEN_TYPE.error, opcode: 0 },
+      { text: "Improperly formed string", type: TOKEN_TYPE.error, opcode: 0 },
     ]);
   });
 });
@@ -135,14 +147,14 @@ describe("id=586/588/589: specialvalue completion via trailing '!'", () => {
     // id=588 compares str ("#!") itself to "!" -> false -> same wrong error;
     // id=589 reads charAt(length) === "" -> also false -> same wrong error).
     expect(SC.Formula.ParseFormulaIntoTokens("#!")).toEqual([
-      { text: "#!", type: SC.Formula.TokenType.name, opcode: 0 },
+      { text: "#!", type: TOKEN_TYPE.name, opcode: 0 },
     ]);
   });
 
   test("'#REF!' (a real SpecialConstants entry) still completes as a name", async () => {
     const SC = await loadSocialCalc();
     const tokens = SC.Formula.ParseFormulaIntoTokens("#REF!");
-    expect(tokens).toEqual([{ text: "#REF!", type: SC.Formula.TokenType.name, opcode: 0 }]);
+    expect(tokens).toEqual([{ text: "#REF!", type: TOKEN_TYPE.name, opcode: 0 }]);
   });
 });
 
@@ -162,9 +174,9 @@ describe("id=637: two-char op merge requires the previous token to actually be a
     const SC = await loadSocialCalc();
     const tokens = SC.Formula.ParseFormulaIntoTokens('"<"=1');
     expect(tokens).toEqual([
-      { text: "<", type: SC.Formula.TokenType.string, opcode: 0 },
-      { text: "=", type: SC.Formula.TokenType.op, opcode: "=" },
-      { text: "1", type: SC.Formula.TokenType.num, opcode: 0 },
+      { text: "<", type: TOKEN_TYPE.string, opcode: 0 },
+      { text: "=", type: TOKEN_TYPE.op, opcode: "=" },
+      { text: "1", type: TOKEN_TYPE.num, opcode: 0 },
     ]);
   });
 
@@ -196,16 +208,16 @@ describe("id=696: unary-position guard for ')' immediately after '('", () => {
     // "(!" : "!" is in unary position (right after "("), is not -, +, or ")",
     // and str != "(" -> must hit the two-ops error, not be silently accepted.
     expect(SC.Formula.ParseFormulaIntoTokens("(!")).toEqual([
-      { text: "(", type: SC.Formula.TokenType.op, opcode: "(" },
-      { text: SC.Constants.s_parseerrtwoops, type: SC.Formula.TokenType.error, opcode: "!" },
+      { text: "(", type: TOKEN_TYPE.op, opcode: "(" },
+      { text: "Error in formula (two operators inappropriately in a row)", type: TOKEN_TYPE.error, opcode: "!" },
     ]);
   });
 
   test("'()' (a genuine null arg list) is accepted without error", async () => {
     const SC = await loadSocialCalc();
     expect(SC.Formula.ParseFormulaIntoTokens("()")).toEqual([
-      { text: "(", type: SC.Formula.TokenType.op, opcode: "(" },
-      { text: ")", type: SC.Formula.TokenType.op, opcode: ")" },
+      { text: "(", type: TOKEN_TYPE.op, opcode: "(" },
+      { text: ")", type: TOKEN_TYPE.op, opcode: ")" },
     ]);
   });
 });
@@ -220,7 +232,7 @@ describe("id=696: unary-position guard for ')' immediately after '('", () => {
 describe("id=768: ConvertInfixToPolish ignores space-type tokens even when their text collides with punctuation", () => {
   test("a space-type token whose text is ',' is ignored, not treated as a real comma", async () => {
     const SC = await loadSocialCalc();
-    const spaceToken = { text: ",", type: SC.Formula.TokenType.space, opcode: 0 };
+    const spaceToken = { text: ",", type: TOKEN_TYPE.space, opcode: 0 };
     // Original: `ttype == tokentype.space` is checked BEFORE the `ttext ==
     // ","` branch, so this must be silently skipped (empty RPN, no error).
     // Mutant (id=768, condition -> false): falls through to the comma
@@ -423,18 +435,18 @@ describe("id=417: numexp1 rejects a second sign after the first", () => {
     //   "1E++", then "5" enters numexp2, final token is num "1E++5".
     //   Tokens: [num "1E++5"]
     expect(SC.Formula.ParseFormulaIntoTokens("1E++5")).toEqual([
-      { text: SC.Constants.s_parseerrexponent, type: SC.Formula.TokenType.error, opcode: 0 },
-      { text: "+", type: SC.Formula.TokenType.op, opcode: "+" },
-      { text: "5", type: SC.Formula.TokenType.num, opcode: 0 },
+      { text: "Improperly formed number exponent", type: TOKEN_TYPE.error, opcode: 0 },
+      { text: "+", type: TOKEN_TYPE.op, opcode: "+" },
+      { text: "5", type: TOKEN_TYPE.num, opcode: 0 },
     ]);
   });
 
   test("'1E--5' errors on the second '-' instead of swallowing it", async () => {
     const SC = await loadSocialCalc();
     expect(SC.Formula.ParseFormulaIntoTokens("1E--5")).toEqual([
-      { text: SC.Constants.s_parseerrexponent, type: SC.Formula.TokenType.error, opcode: 0 },
-      { text: "-", type: SC.Formula.TokenType.op, opcode: "-" },
-      { text: "5", type: SC.Formula.TokenType.num, opcode: 0 },
+      { text: "Improperly formed number exponent", type: TOKEN_TYPE.error, opcode: 0 },
+      { text: "-", type: TOKEN_TYPE.op, opcode: "-" },
+      { text: "5", type: TOKEN_TYPE.num, opcode: 0 },
     ]);
   });
 });
@@ -474,7 +486,7 @@ describe("fresh parse survivors", () => {
     // Full-string anchoring (trailing `$`) means a full coordregex match
     // fails, so this pushes a "name" token, never "coord" — the mutant
     // (dropped `$` end anchor) accepts the "A1" prefix and pushes "coord".
-    expect(tokens).toEqual([{ text: "A1$", type: SC.Formula.TokenType.name, opcode: 0 }]);
+    expect(tokens).toEqual([{ text: "A1$", type: TOKEN_TYPE.name, opcode: 0 }]);
   });
 
   test("fresh id718/id725/id728: comparison operators carry their canonical opcode, not just token text", async () => {

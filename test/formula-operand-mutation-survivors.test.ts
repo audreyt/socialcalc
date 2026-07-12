@@ -107,7 +107,7 @@ test("id123/id124: coord unknown-sheet error uses substring(pos+1), not full coo
   const op: SocialCalc.FormulaOperand[] = [{ type: "coord", value: "A1!NOSUCHSHEET" }];
   const r = SC.Formula.OperandValueAndType(sheet, op);
   expect(r.type).toBe("e#REF!");
-  expect(r.error).toBe(SC.Constants.s_sheetunavailable + " NOSUCHSHEET");
+  expect(r.error).toBe("Sheet unavailable:" + " NOSUCHSHEET");
   expect(r.error).not.toContain("A1!");
   expect(r.value).toBe(0);
 });
@@ -148,7 +148,7 @@ test("id184/id190/id193/id194: sheetname with error+non-e type routes to e#REF! 
   const r = SC.Formula.OperandsAsCoordOnSheet(sheet, op);
   expect(r.type).toBe("e#REF!");
   expect(r.value).toBe(0);
-  expect(r.error).toBe(SC.Constants.s_calcerrsheetnamemissing);
+  expect(r.error).toBe("Sheet name missing when expected.");
 });
 
 // ---------------------------------------------------------------------------
@@ -168,7 +168,7 @@ test("id254: indexOf('|', pos1+1) vs pos1-1 changes sheet-name substring", async
   ];
   const r = SC.Formula.OperandsAsRangeOnSheet(sheet, op);
   expect(r.type).toBe("e#REF!");
-  expect(r.error).toBe(SC.Constants.s_sheetunavailable + " X");
+  expect(r.error).toBe("Sheet unavailable:" + " X");
 });
 
 test("id255/id268/id269: '|' after sheet name keeps pos2, substring(pos1+1,pos2) is sheet only", async () => {
@@ -183,7 +183,7 @@ test("id255/id268/id269: '|' after sheet name keeps pos2, substring(pos1+1,pos2)
   ];
   const r = SC.Formula.OperandsAsRangeOnSheet(sheet, op);
   expect(r.type).toBe("e#REF!");
-  expect(r.error).toBe(SC.Constants.s_sheetunavailable + " X");
+  expect(r.error).toBe("Sheet unavailable:" + " X");
 });
 
 // ---------------------------------------------------------------------------
@@ -238,7 +238,7 @@ test("id326: coord to missing cell yields type 'b' before final else", async () 
   const r = SC.Formula.OperandAsSheetName(sheet, op);
   expect(r.type).toBe("b");
   expect(r.value).toBe("");
-  expect(r.error).toBe(SC.Constants.s_calcerrsheetnamemissing);
+  expect(r.error).toBe("Sheet name missing when expected.");
 });
 
 test("id332: text subtype 'th' passes via charAt(0), not exact type match", async () => {
@@ -269,7 +269,7 @@ test("id305: circular name reference returns e#NAME? error, not bare name", asyn
   const r = SC.Formula.OperandAsSheetName(sheet, op);
   expect(r.type).toBe("e#NAME?");
   expect(r.type).not.toBe("name");
-  expect(r.error).toBeTruthy();
+  expect(r.error).toBe('Circular name reference to name "CIRC".');
 });
 
 
@@ -281,14 +281,14 @@ test("fresh id3/id8: empty TopOfStackValueAndType preserves blank type/value and
   const { SC, sheet } = await fresh();
   const r = SC.Formula.TopOfStackValueAndType(sheet, []);
   expect(r).toMatchObject({ type: "", value: "" });
-  expect(r.error).toBe(`${SC.Constants.s_InternalError}no operand on stack`);
+  expect(r.error).toBe(`${"Internal SocialCalc error (probably an internal bug): "}no operand on stack`);
 });
 
 test("fresh id86/id91: empty OperandValueAndType preserves blank type/value and error text", async () => {
   const { SC, sheet } = await fresh();
   const r = SC.Formula.OperandValueAndType(sheet, []);
   expect(r).toMatchObject({ type: "", value: "" });
-  expect(r.error).toBe(`${SC.Constants.s_InternalError}no operand on stack`);
+  expect(r.error).toBe(`${"Internal SocialCalc error (probably an internal bug): "}no operand on stack`);
 });
 
 test("fresh id65: numeric OperandAsText fallback stringifies when formatter is absent", async () => {
@@ -337,5 +337,5 @@ test("fresh id200: unavailable sheet error includes the sheet name separator", a
     { type: "coord", value: "A1" },
   ]);
   expect(r.type).toBe("e#REF!");
-  expect(r.error).toBe(`${SC.Constants.s_sheetunavailable} MISSING`);
+  expect(r.error).toBe(`${"Sheet unavailable:"} MISSING`);
 });

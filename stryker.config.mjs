@@ -40,11 +40,13 @@
 //    the measurement note, never a guess). Reports go to
 //    `reports/mutation/critical/`.
 //
-// 3. In-place single-file iteration (`vp run mutate:file <path>`) — the
-//    stryker-file.mjs helper sets MUTATE_TESTS to the subset of test files
-//    that exercise the target module, flips Stryker to inPlace mode, and
-//    uses concurrency=1. This is the fast loop you run during development;
-//    no break threshold (dev loop, not a gate).
+// 3. Per-file sandboxed iteration (`vp run mutate:file <path>`) — stryker-file.mjs
+//    sets MUTATE_TESTS to the subset that exercises the target module. The
+//    sandbox is intentional: source mutations must never touch the caller's
+//    working tree or leak between test processes.
+//
+//    No inPlace mode is supported. In-place mutation is unsafe for this
+//    concatenated global-script build and is prohibited by the mutation gate.
 //
 // 4. Legacy full-sandbox run (`bun run mutate`, no MUTATE_SCOPE/
 //    MUTATE_TARGET) — mutates every file in ALL_MUTATE_FILES in one
@@ -59,9 +61,8 @@
 //    matrix, but still faster than this legacy mode since each module only
 //    pays for its own test subset, not the whole suite.
 //
-// Speed math: a filtered test run is milliseconds vs ~7 s for the full suite.
-// With a ~30 ms Vite+ rebuild per mutant, inPlace iteration keeps feedback
-// tight even for a 50-line slice.
+// Filtered test subsets keep sandboxed per-file runs attributable without
+// weakening the isolation guarantee.
 
 import { readFileSync } from "node:fs";
 import { basename, dirname } from "node:path";
@@ -122,7 +123,6 @@ const testsFilter =
   process.env.MUTATE_TESTS?.trim() ??
   (isCriticalScope ? criticalTests.join(" ") : target ? targetTests.join(" ") : undefined);
 
-const inPlace = process.env.MUTATE_IN_PLACE === "1";
 
 const testCommand = testsFilter ? `vp test run ${testsFilter}` : "vp test";
 
@@ -177,25 +177,18 @@ export default {
 
   // Stryker's sandbox preprocessor calls the removed
   // `ts.parseConfigFileTextToJson` API against whatever `tsconfigFile`
-  // resolves to (default "tsconfig.json") on every non-inPlace run, which
+  // resolves to (default "tsconfig.json") on every sandboxed run, which
   // crashes under typescript@7 (see js/formula1.ts-era note: the whole TS7
   // programmatic API was dropped, only `tsc` CLI ships now). We don't use
   // the `@stryker-mutator/typescript-checker` plugin (coverageAnalysis is
   // "off" and there's no `checkers` entry below), so nothing else reads
   // this option — point it at a file that doesn't exist so the sandbox
   // preprocessor's existence guard (`project.files.get(...)`) short-circuits
-  // and skips the broken rewrite entirely, in both sandboxed and inPlace
-  // (which already returns before touching this) modes.
+  // and skips the broken rewrite entirely.
   tsconfigFile: "tsconfig.stryker-disabled.json",
 
-  // inPlace mode skips the per-mutant sandbox copy (node_modules + all
-  // assets). Required for fast iteration. Safe because the helper reverts
-  // source files after each mutant and we don't leak state across test
-  // processes.
-  inPlace,
-
-  // With inPlace there's only one working copy, so concurrency must be 1.
-  concurrency: inPlace ? 1 : 4,
+  // Always use isolated sandboxes; never mutate the caller's working tree.
+  concurrency: 4,
 
   reporters: ["clear-text", "progress", "html", "json"],
   htmlReporter: { fileName: `reports/mutation/${scopeLabel}/index.html` },

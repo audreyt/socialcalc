@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Run Stryker against a single source file in fast in-place mode.
+// Run Stryker against a single source file in an isolated sandbox.
 //
 // Usage: vp run mutate:file <path/to/source.ts> [startLine-endLine]
 //
@@ -253,7 +253,6 @@ if (isMain) {
       stdio: "inherit",
       env: {
         ...process.env,
-        MUTATE_IN_PLACE: "1",
         MUTATE_TESTS: tests.join(" "),
       },
     },

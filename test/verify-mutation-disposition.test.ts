@@ -15,7 +15,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { extractSurvivors, findUndispositioned, stableKey } from "../scripts/verify-mutation-disposition.mjs";
+import {
+  extractSurvivors,
+  findStaleEntries,
+  findUndispositioned,
+  normalizeFilePath,
+  stableKey,
+  validateDisposition,
+  validateReport,
+} from "../scripts/verify-mutation-disposition.mjs";
 
 interface MutantLocation {
   start: { line: number; column: number };
@@ -100,6 +108,12 @@ describe("stableKey", () => {
     const b = { file: "js/x.ts", mutatorName: "EqualityOperator", location: loc(42, 3, 9), replacement: "true", id: "999" };
     expect(stableKey(a)).toBe(stableKey(b));
   });
+  test("normalizes redundant relative prefixes and Windows separators", () => {
+    expect(normalizeFilePath("./js\\x.ts")).toBe("js/x.ts");
+    expect(stableKey({ ...entry({ file: "./js\\x.ts" }), location: loc(42) })).toBe(
+      stableKey({ ...entry({ file: "js/x.ts" }), location: loc(42) }),
+    );
+  });
 
   test("differs when mutatorName differs", () => {
     const a = entry({ mutatorName: "EqualityOperator" });
@@ -146,6 +160,14 @@ describe("extractSurvivors", () => {
     expect(extractSurvivors(report({}))).toEqual([]);
   });
 });
+describe("schema validation", () => {
+  test("fails closed on malformed report/disposition schemas", () => {
+    expect(() => validateReport({ files: { "js/a.ts": {} } } as unknown as StrykerReport)).toThrow(
+      /mutants array/,
+    );
+    expect(() => validateDisposition({} as unknown as DispositionRegistry)).toThrow(/entries array/);
+  });
+});
 
 describe("findUndispositioned", () => {
   test("is empty when every Survived mutant has a matching disposition entry", () => {
@@ -175,6 +197,23 @@ describe("findUndispositioned", () => {
       "js/a.ts": [mutant({ id: "1", status: "Killed", location: loc(5) }), mutant({ id: "2", status: "Timeout", location: loc(6) })],
     });
     expect(findUndispositioned(r, registry([]))).toEqual([]);
+  });
+});
+describe("findStaleEntries", () => {
+  test("finds stale entries but retains entries for mutants now Killed", () => {
+    const d = registry([entry({ file: "js/a.ts", location: loc(5) }), entry({ file: "js/a.ts", location: loc(6) })]);
+    const r = report({
+      "js/a.ts": [
+        mutant({ id: "1", status: "Killed", location: loc(5) }),
+      ],
+    });
+    expect(findStaleEntries(r, d).map((e: DispositionEntry) => e.location.start.line)).toEqual([6]);
+    expect(findStaleEntries(r, registry([entry({ file: "js/a.ts", location: loc(5) })]))).toEqual([]);
+  });
+
+  test("rejects duplicate disposition tuple keys", () => {
+    const e = entry({ file: "js/a.ts", location: loc(5) });
+    expect(() => validateDisposition(registry([e, { ...e, id: 2 }]))).toThrow(/duplicate disposition key/);
   });
 });
 

@@ -277,10 +277,12 @@ Four modes (see the file's own header comment for the full rationale):
   (`break: null`) — Stryker still scores it, it just can't fail the build on
   a number nobody measured. `vp run mutate:all` walks the same 11 modules
   sequentially for local use, one Stryker process per module.
-- **Fast per-file iteration** — `vp run mutate:file js/<source>.ts
-  [startLine-endLine]` flips Stryker to in-place mode and filters the test
-  command to only the test files that exercise that module. Also available:
-  `vp run mutate:format`, `vp run mutate:sheet`, `vp run mutate:formula`.
+- **Per-file sandboxed iteration** — `vp run mutate:file js/<source>.ts
+  [startLine-endLine]` uses an isolated Stryker sandbox and filters the test
+  command to only the test files that exercise that module. In-place mutation
+  is intentionally unsupported because it can leak source mutations.
+  Also available: `vp run mutate:format`, `vp run mutate:sheet`,
+  `vp run mutate:formula`.
 - **Legacy full-sandbox run** — `vp exec stryker run` with no
   `MUTATE_SCOPE`/`MUTATE_TARGET` set mutates all 11 modules in one sandboxed
   process against the whole suite per mutant, report-only (an 11-module

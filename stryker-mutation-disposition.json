@@ -566,7 +566,7 @@
         }
       },
       "replacement": "\"Stryker was here!\"",
-      "justification": "OperandsAsCoordOnSheet overwrites value1.value from the popped operand before reading it; the initial value literal cannot reach any return.",
+      "justification": "OperandsAsCoordOnSheet overwrites value1.type from the popped operand at L263 before any read or return; the initial type literal cannot reach any return.",
       "file": "js/formula-operand.ts"
     },
     {
@@ -583,7 +583,7 @@
         }
       },
       "replacement": "\"Stryker was here!\"",
-      "justification": "OperandsAsCoordOnSheet overwrites value1.value from the popped operand before reading it; the initial value literal cannot reach any return.",
+      "justification": "OperandsAsCoordOnSheet overwrites value1.value from the popped operand at L262 before any read or return; the initial value literal cannot reach any return.",
       "file": "js/formula-operand.ts"
     },
     {
@@ -600,7 +600,7 @@
         }
       },
       "replacement": "\"Stryker was here!\"",
-      "justification": "OperandsAsCoordOnSheet overwrites value1.type from the popped operand before reading it; the initial type literal cannot reach any return.",
+      "justification": "OperandsAsCoordOnSheet's result initializer is fully overwritten on every return path (type/value at L271-275, L285-287, L294-310); replacing the initial type literal is unobservable.",
       "file": "js/formula-operand.ts"
     },
     {
@@ -617,7 +617,7 @@
         }
       },
       "replacement": "\"Stryker was here!\"",
-      "justification": "OperandsAsCoordOnSheet overwrites value1.type from the popped operand before reading it; the initial type literal cannot reach any return.",
+      "justification": "OperandsAsCoordOnSheet's result initializer is fully overwritten on every return path (type/value at L271-275, L285-287, L294-310); replacing the initial value literal is unobservable.",
       "file": "js/formula-operand.ts"
     },
     {
@@ -634,7 +634,7 @@
         }
       },
       "replacement": "\"Stryker was here!\"",
-      "justification": "OperandsAsRangeOnSheet overwrites value2.value from the popped operand before reading it; the initial value literal cannot reach any return.",
+      "justification": "OperandsAsRangeOnSheet overwrites value2.type from the popped operand at L329 before any read or return; the initial type literal cannot reach any return.",
       "file": "js/formula-operand.ts"
     },
     {
@@ -651,7 +651,7 @@
         }
       },
       "replacement": "\"Stryker was here!\"",
-      "justification": "OperandsAsRangeOnSheet overwrites value2.type from the popped operand before reading it; the initial type literal cannot reach any return.",
+      "justification": "OperandsAsRangeOnSheet overwrites value2.value from the popped operand at L328 before any read or return; the initial value literal cannot reach any return.",
       "file": "js/formula-operand.ts"
     },
     {
@@ -668,7 +668,7 @@
         }
       },
       "replacement": "\"Stryker was here!\"",
-      "justification": "OperandAsSheetName overwrites result.value from the popped operand before any branch can observe the initializer; the initial value literal cannot reach any return.",
+      "justification": "OperandAsSheetName overwrites result.type from the popped operand at L386 before any branch can observe the initializer; the initial type literal cannot reach any return.",
       "file": "js/formula-operand.ts"
     },
     {
@@ -685,7 +685,7 @@
         }
       },
       "replacement": "\"Stryker was here!\"",
-      "justification": "OperandAsSheetName overwrites result.type from the popped operand before any branch can observe the initializer; the initial type literal cannot reach any return.",
+      "justification": "OperandAsSheetName overwrites result.value from the popped operand at L385 before any branch can observe the initializer; the initial value literal cannot reach any return.",
       "file": "js/formula-operand.ts"
     },
     {
@@ -770,7 +770,7 @@
         }
       },
       "replacement": "\"\"",
-      "justification": "The no-operand/empty-stack initializer is overwritten by the popped operand or by the fixed e#REF!/0 empty-stack return before any return can observe it.",
+      "justification": "ParseFormulaIntoTokens assigns last_token_text = \"EOF\" only when parseinfo is empty. The immediately following condition short-circuits on parseinfo.length == 0, and the only later read in the unary ')' check is false for the first operator because last_token_text is not \"(\"; replacing \"EOF\" with \"\" is therefore unobservable.",
       "file": "js/formula-parse.ts"
     }
   ]
