@@ -190,9 +190,50 @@ export async function cellValue(page: Page, coord: string, idPrefix = "SocialCal
   );
 }
 
+/**
+ * Toggle `SocialCalc.Callbacks.untrustedContent`, the opt-in policy flag
+ * from the security hardening commits this suite runs against for context
+ * (see e2e/tsconfig.json's runnable-context note). Default policy
+ * (`securityPolicy` left at its built-in defaults: `allowedUrlSchemes`
+ * `["http:", "https:", "mailto:"]`, no `sanitizeHtml`) applies whenever
+ * this is left untouched by a test.
+ */
+export async function setUntrustedContent(page: Page, enabled: boolean): Promise<void> {
+  await page.evaluate((enabled) => {
+    window.SocialCalc.Callbacks.untrustedContent = enabled;
+  }, enabled);
+}
+
+/**
+ * Fulfill every non-toolbar image request (anything outside `/images/`)
+ * with a real 1x1 PNG instead of letting it hit the network. Sheet-authored
+ * `text-image` payloads under test here resolve to harmless-but-nonexistent
+ * relative paths once neutralized (e.g. `jav&#x61;script:alert(1)` resolves
+ * against the page's base URL, not as a live `javascript:` scheme) — an
+ * unstubbed request would 404 and Chromium logs that as a `console.error`
+ * ("Failed to load resource"), which the `issues` fixture would otherwise
+ * fail on. This intercepts at the network layer so the assertions stay
+ * about the resolved URL, not about network noise from a synthetic path.
+ */
+export async function stubImageRequests(page: Page): Promise<void> {
+  const onePxPng = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+    "base64",
+  );
+  await page.route("**/*", async (route) => {
+    const request = route.request();
+    if (request.resourceType() === "image" && !request.url().includes("/images/")) {
+      await route.fulfill({ status: 200, contentType: "image/png", body: onePxPng });
+    } else {
+      await route.continue();
+    }
+  });
+}
+
 declare global {
   interface Window {
     SocialCalc: {
+      Callbacks: { untrustedContent: boolean; [key: string]: unknown };
       coordToCr(coord: string): { col: number; row: number };
       GetEditorCellElement(
         editor: unknown,

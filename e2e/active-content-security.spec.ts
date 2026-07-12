@@ -9,7 +9,17 @@
 // starts failing because markup got escaped, that is a behavior change to
 // evaluate, not a regression to "fix" back to the old assertions.
 
-import { cellLocator, createControl, expect, gotoBundle, scheduleCommand, test, waitFor } from "./fixtures/editor";
+import {
+  cellLocator,
+  createControl,
+  expect,
+  gotoBundle,
+  scheduleCommand,
+  setUntrustedContent,
+  stubImageRequests,
+  test,
+  waitFor,
+} from "./fixtures/editor";
 
 test.describe("active-content characterization (not a security guarantee)", () => {
   test("a text-html cell renders raw markup, including inline event-handler attributes, verbatim", async ({
@@ -45,6 +55,107 @@ test.describe("active-content characterization (not a security guarantee)", () =
     expect(cellHtml).toContain("onerror=");
 
     await waitFor(page, () => window.__xssCharacterization === true, "SocialCalc-");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Opt-in untrusted-content policy (SocialCalc.Callbacks.untrustedContent +
+// SafeUrlForRender/EscapeUntrustedHtml). Unlike the characterization above,
+// this section runs against a real security control and DOES assert the
+// hostile payload never reaches a live, browser-parsed active attribute —
+// checked via the actual resolved DOM property (`.href`/`.src`, or presence
+// of a live attribute), not string matching, so the browser's own HTML
+// parser is the one proving the negative. Payloads mirror
+// test/render-security-policy.test.ts's entity-decoding-bypass fixtures
+// (decimal/hex/named HTML character references smuggling a "javascript:"
+// scheme or a quote-breakout past the scheme-sniffing regex) run once each
+// at DOM level across the three URL-consuming sinks that regex covers.
+// ---------------------------------------------------------------------------
+test.describe("opt-in untrusted-content policy: entity-payload sinks stay inert in the real DOM", () => {
+  test("text-url: a decimal-entity javascript&#58; payload never resolves to a live javascript: href", async ({
+    page,
+  }) => {
+    await gotoBundle(page, "normal");
+    await createControl(page);
+    await setUntrustedContent(page, true);
+
+    await scheduleCommand(page, "set A1 text t javascript&#58;alert(1)");
+    await scheduleCommand(page, "set A1 textvalueformat text-url");
+    await waitFor(page, () => document.querySelector("#containerDiv #cell_A1 a") !== null, "SocialCalc-");
+
+    const href = await page.evaluate(
+      () => (document.querySelector("#containerDiv #cell_A1 a") as HTMLAnchorElement | null)?.href ?? null,
+    );
+    expect(href).not.toBeNull();
+    expect(href?.toLowerCase().startsWith("javascript:")).toBe(false);
+  });
+
+  test("text-image: a hex-entity jav&#x61;script: payload never resolves to a live javascript: src", async ({
+    page,
+  }) => {
+    await gotoBundle(page, "normal");
+    await stubImageRequests(page);
+    await createControl(page);
+    await setUntrustedContent(page, true);
+
+    await scheduleCommand(page, "set B1 text t jav&#x61;script:alert(1)");
+    await scheduleCommand(page, "set B1 textvalueformat text-image");
+    await waitFor(page, () => document.querySelector("#containerDiv #cell_B1 img") !== null, "SocialCalc-");
+
+    const src = await page.evaluate(
+      () => (document.querySelector("#containerDiv #cell_B1 img") as HTMLImageElement | null)?.src ?? null,
+    );
+    expect(src).not.toBeNull();
+    expect(src?.toLowerCase().startsWith("javascript:")).toBe(false);
+  });
+
+  test("text-custom @u: a named-entity quote-breakout payload injects no live onmouseover attribute", async ({
+    page,
+  }) => {
+    await gotoBundle(page, "normal");
+    await createControl(page);
+    await setUntrustedContent(page, true);
+
+    await scheduleCommand(page, 'set C1 text t x&quot;onmouseover=&quot;alert(1)');
+    await scheduleCommand(page, 'set C1 textvalueformat text-custom:<a href="@u">@s</a>');
+    await waitFor(
+      page,
+      () => document.querySelector("#containerDiv #cell_C1")?.innerHTML.includes("&lt;a") === true,
+      "SocialCalc-",
+    );
+
+    const result = await page.evaluate(() => {
+      const cell = document.querySelector("#containerDiv #cell_C1");
+      return {
+        hasAnchor: cell?.querySelector("a") != null,
+        hasOnMouseOver: cell?.querySelector("[onmouseover]") != null,
+      };
+    });
+    // No sanitizeHtml configured (default policy): the whole @u template is
+    // escaped, so there is no live anchor at all — doubly proving no
+    // attribute-breakout could have executed.
+    expect(result.hasAnchor).toBe(false);
+    expect(result.hasOnMouseOver).toBe(false);
+  });
+
+  test("text-url: a safe query string (?a=1&b=2) round-trips byte-identical through the real DOM", async ({
+    page,
+  }) => {
+    await gotoBundle(page, "normal");
+    await createControl(page);
+    await setUntrustedContent(page, true);
+
+    await scheduleCommand(page, "set D1 text t http://example.com/?a=1&b=2");
+    await scheduleCommand(page, "set D1 textvalueformat text-url");
+    await waitFor(page, () => document.querySelector("#containerDiv #cell_D1 a") !== null, "SocialCalc-");
+
+    const href = await page.evaluate(
+      () => (document.querySelector("#containerDiv #cell_D1 a") as HTMLAnchorElement | null)?.href ?? null,
+    );
+    // The DOM's resolved href — not the raw HTML-escaped attribute text —
+    // must be byte-identical to the original URL: the browser's own parser
+    // decoding "&amp;" back into "&" is the round-trip under test.
+    expect(href).toBe("http://example.com/?a=1&b=2");
   });
 });
 
