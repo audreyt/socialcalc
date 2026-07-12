@@ -193,6 +193,20 @@ export const testsByFile = {
   "socialcalcviewer.ts": ["test/popup-viewer-coverage.test.ts", "test/hardening-control-viewer.test.ts"],
 };
 
+// Fail at configuration load time if a source or mapped test was renamed or
+// removed. A missing path must never silently turn a matrix leg into an
+// empty/irrelevant test run.
+for (const [file, tests] of Object.entries(testsByFile)) {
+  const sourcePath = resolve("js", file);
+  if (!existsSync(sourcePath)) throw new Error(`mutation source mapping points to missing file: ${sourcePath}`);
+  if (!Array.isArray(tests) || tests.length === 0) {
+    throw new Error(`mutation source mapping has no tests: ${file}`);
+  }
+  for (const test of tests) {
+    if (!existsSync(resolve(test))) throw new Error(`mutation test mapping points to missing file: ${test}`);
+  }
+}
+
 // Every shipping module Stryker knows how to mutate — derived from
 // testsByFile's own keys so the full/matrix scope (stryker.config.mjs's
 // MUTATE_TARGET mode, .github/workflows/mutation.yml's mutate-discover

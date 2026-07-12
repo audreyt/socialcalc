@@ -30,13 +30,15 @@
 //
 // 2. Focused critical-baseline run (`MUTATE_SCOPE=critical bun run mutate`)
 //    — mutates only CRITICAL_FILES (the 3 modules with the tightest
-//    correctness bar: formula lexer/parser, operand-stack coercions,
-//    formula-reference rewrite algebra, and the constants/style bag every
-//    UI surface reads) against the deterministic union of their
-//    `testsByFile` subsets. Small, fast, and reproducible enough to gate a
-//    PR. Non-null break threshold (CRITICAL_BREAK_THRESHOLD below, set to
-//    the actual measured floor — see the measurement note below, not a
-//    guess). Reports go to `reports/mutation/critical/`.
+//    correctness bar: formula lexer/parser, operand-stack coercions, and
+//    formula-reference rewrite algebra) against the deterministic union of
+//    their `testsByFile` subsets. Small, fast, and reproducible enough to gate
+//    a PR. `socialcalcconstants.ts` is intentionally covered only by the full
+//    11-module matrix because its large data-table mutation profile needs a
+//    separate literal-value baseline rather than this algorithmic gate.
+//    The non-null break threshold below is the actual measured floor (see
+//    the measurement note, never a guess). Reports go to
+//    `reports/mutation/critical/`.
 //
 // 3. In-place single-file iteration (`vp run mutate:file <path>`) — the
 //    stryker-file.mjs helper sets MUTATE_TESTS to the subset of test files

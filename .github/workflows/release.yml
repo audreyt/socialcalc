@@ -13,9 +13,11 @@ name: Release
 #                     Uploads coverage/lcov-report + lcov.info even when a
 #                     threshold fails, so the enforced number stays
 #                     reviewable without a local re-run.
-#   mutation          full mutation run (`vp run mutate`); its HTML/JSON
-#                     reports are uploaded even when the job's score is red,
-#                     so a regression is inspectable without re-running.
+#   mutation          reusable `mutation.yml` full-scope workflow: discovers
+#                     all 11 shipping modules from `ALL_MUTATE_FILES`, runs
+#                     one fail-fast-disabled matrix leg per module, uploads
+#                     each JSON report, then hard-fails unless every report
+#                     and every measured/passing baseline is present.
 #   playwright        real-browser suite across Chromium/Firefox/WebKit
 #                     (e2e typecheck + credibility guard run first).
 #   ethercalc-canary  pinned, networked EtherCalc candidate-tarball canary.

@@ -140,6 +140,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@e1609b468742ba9232ce5e12b3a77bdf14495277 # v1.1.0
@@ -190,6 +193,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       - name: List mutation targets
         id: list
@@ -219,6 +225,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@e1609b468742ba9232ce5e12b3a77bdf14495277 # v1.1.0
@@ -280,6 +289,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@e1609b468742ba9232ce5e12b3a77bdf14495277 # v1.1.0
@@ -294,6 +306,9 @@ jobs:
         with:
           pattern: mutation-report-*
           path: artifacts
+          # Keep each artifact in artifacts/mutation-report-<slug>/ so the
+          # release gate can prove all 11 independently downloaded reports.
+          merge-multiple: false
 
       - name: Verify every shipping module has a measured, passing baseline
         run: bun run mutate:release-gate
