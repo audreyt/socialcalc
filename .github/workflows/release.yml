@@ -1,0 +1,268 @@
+name: Release
+
+# Tag-push release pipeline: verifies the exact tagged commit against every
+# quality gate this repo has (typecheck, strict typecheck, lint, build,
+# tests, Dafny verification, Lean generation, package-contract gate), runs
+# a non-blocking dependency audit snapshot, packs the release tarball
+# exactly once, records its SHA-256 and npm integrity hash, and uploads
+# that same tarball (plus the integrity manifest and audit snapshot) as a
+# build artifact for human review.
+#
+# This workflow never publishes to npm. A separate, manually-dispatched
+# `publish` job below is wired for npm Trusted Publishing (OIDC, no stored
+# secret) but is inert until a human:
+#   1. Registers this exact repo + workflow filename (release.yml) as a
+#      Trusted Publisher for the `socialcalc` package on npmjs.com, and
+#   2. Creates a protected `npm-publish` GitHub Environment with required
+#      reviewers (Settings -> Environments) so the gated job cannot fire
+#      without an approval, even after a successful `workflow_dispatch`.
+# Until both are done, any dispatch of the publish job will simply fail at
+# the `npm publish` step (no token exists to leak, and no third-party has
+# been granted publish trust yet).
+#
+# Both the `release` and `publish` jobs additionally require a real tag ref
+# (github.ref_type == 'tag', double-checked with a `refs/tags/v*` shell
+# guard) so a `workflow_dispatch` run against a branch that happens to be
+# named e.g. "v3.1.0" can never be mistaken for a release/publish of that
+# version.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "PUBLISH" to allow the gated npm publish job to run for the dispatched tag'
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: verify, package, and upload release artifact
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      artifact-name: ${{ steps.version.outputs.artifact-name }}
+    steps:
+      - name: Checkout tag commit (exact SHA, no mutable ref)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Resolve and validate release version
+        id: version
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF_TYPE" != "tag" || "$GITHUB_REF" != refs/tags/v* ]]; then
+            echo "::error::GITHUB_REF ($GITHUB_REF, ref_type=$GITHUB_REF_TYPE) is not a version tag (refs/tags/v*); refusing to resolve a release version"
+            exit 1
+          fi
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::tag $TAG (version $VERSION) does not match package.json version $PKG_VERSION"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "artifact-name=socialcalc-release-$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1.1.0
+        with:
+          cache: true
+
+      - name: Setup Dafny
+        uses: dafny-lang/setup-dafny-action@be023fc606339d46ed6b077dcb8614d0279ded31 # v1.0.5
+        with:
+          dafny-version: "4.9.0"
+
+      - name: Install dependencies (frozen lockfile)
+        run: vp install --frozen-lockfile
+
+      - name: Typecheck
+        run: vp run typecheck
+
+      - name: Typecheck (strict)
+        run: vp run typecheck:strict
+
+      - name: Lint
+        run: vp lint
+
+      - name: Build
+        run: vp build
+
+      - name: Test
+        run: vp test
+
+      - name: Verify Dafny models
+        run: vp run verify:dafny
+
+      - name: Generate Lean models
+        run: vp run verify:lean:gen
+
+      - name: Assert Lean artifacts non-empty
+        run: |
+          set -euo pipefail
+          for f in lemma/a1.types.lean lemma/a1.def.lean lemma/a1.proof.lean \
+                   lemma/eval-ops.types.lean lemma/eval-ops.def.lean lemma/eval-ops.proof.lean \
+                   lemma/lookup-result.types.lean lemma/lookup-result.def.lean lemma/lookup-result.proof.lean; do
+            test -s "$f"
+          done
+
+      - name: Package artifact gate (if defined)
+        run: |
+          set -euo pipefail
+          if node -e "process.exit(require('./package.json').scripts?.['test:package-contract'] ? 0 : 1)"; then
+            echo "Running package contract gate: vp run test:package-contract"
+            vp run test:package-contract
+          else
+            echo "No test:package-contract script defined yet; skipping (nothing to enforce)."
+          fi
+
+      - name: Dependency audit snapshot (recorded, non-blocking)
+        run: |
+          set -euo pipefail
+          mkdir -p dist-release
+          # `vp pm audit` exits non-zero whenever any finding is present at or
+          # above --level; this repo currently carries two documented,
+          # accepted moderate findings (see docs/security-disposition.json),
+          # so the release pipeline records the raw report for human review
+          # instead of trying to parse/allowlist specific advisory ids here.
+          vp pm audit --level low --json > dist-release/audit.json 2>dist-release/audit.log || true
+          {
+            echo "### Dependency audit (vp pm audit --level low)"
+            echo "Compare against docs/security-disposition.json for the accepted findings."
+            echo '```json'
+            cat dist-release/audit.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Pack release tarball (once)
+        id: pack
+        run: |
+          set -euo pipefail
+          mkdir -p dist-release
+          TARBALL="dist-release/socialcalc-${{ steps.version.outputs.version }}.tgz"
+          vp pm pack --out "$TARBALL"
+          for member in package/dist/SocialCalc.js package/dist/SocialCalc.min.js \
+                        package/dist/SocialCalc.d.ts package/dist/socialcalc.css; do
+            tar -tzf "$TARBALL" | grep -qx "$member" || {
+              echo "::error::packed tarball missing expected member: $member"
+              exit 1
+            }
+          done
+          echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
+
+      - name: Record SHA-256 and npm integrity hash
+        run: |
+          set -euo pipefail
+          TARBALL="${{ steps.pack.outputs.tarball }}"
+          SHA256="$(sha256sum "$TARBALL" | awk '{print $1}')"
+          INTEGRITY="sha512-$(openssl dgst -sha512 -binary "$TARBALL" | openssl base64 -A)"
+          MANIFEST="${TARBALL}.integrity.json"
+          cat > "$MANIFEST" <<EOF
+          {
+            "file": "$(basename "$TARBALL")",
+            "sha256": "$SHA256",
+            "integrity": "$INTEGRITY",
+            "tag": "${{ github.ref_name }}",
+            "commit": "${{ github.sha }}"
+          }
+          EOF
+          {
+            echo "### Release artifact"
+            echo "- tarball: \`$(basename "$TARBALL")\`"
+            echo "- sha256: \`$SHA256\`"
+            echo "- integrity: \`$INTEGRITY\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload release tarball
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.version.outputs.artifact-name }}
+          path: |
+            dist-release/*.tgz
+            dist-release/*.integrity.json
+            dist-release/audit.json
+          if-no-files-found: error
+          retention-days: 90
+
+  publish:
+    name: npm trusted publish (manual, gated — never runs on tag push)
+    needs: release
+    if: github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && inputs.confirm == 'PUBLISH'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Assert dispatch targeted a real release tag
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF_TYPE" != "tag" || "$GITHUB_REF" != refs/tags/v* ]]; then
+            echo "::error::publish must be dispatched against a real vX.Y.Z tag ref (got ref_type=$GITHUB_REF_TYPE ref=$GITHUB_REF)"
+            exit 1
+          fi
+
+      - name: Download release tarball from this run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ needs.release.outputs.artifact-name }}
+          path: dist-release
+
+      - name: Verify downloaded artifact integrity
+        id: verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          cd dist-release
+          tgz_files=(*.tgz)
+          manifest_files=(*.integrity.json)
+          if [ "${#tgz_files[@]}" -ne 1 ]; then
+            echo "::error::expected exactly one .tgz in the downloaded artifact, found ${#tgz_files[@]}"
+            exit 1
+          fi
+          if [ "${#manifest_files[@]}" -ne 1 ]; then
+            echo "::error::expected exactly one .integrity.json in the downloaded artifact, found ${#manifest_files[@]}"
+            exit 1
+          fi
+          TARBALL="${tgz_files[0]}"
+          MANIFEST="${manifest_files[0]}"
+          RECORDED_SHA256="$(node -p "require('./$MANIFEST').sha256")"
+          RECORDED_INTEGRITY="$(node -p "require('./$MANIFEST').integrity")"
+          ACTUAL_SHA256="$(sha256sum "$TARBALL" | awk '{print $1}')"
+          ACTUAL_INTEGRITY="sha512-$(openssl dgst -sha512 -binary "$TARBALL" | openssl base64 -A)"
+          if [ "$ACTUAL_SHA256" != "$RECORDED_SHA256" ]; then
+            echo "::error::sha256 mismatch for $TARBALL: recorded $RECORDED_SHA256, actual $ACTUAL_SHA256"
+            exit 1
+          fi
+          if [ "$ACTUAL_INTEGRITY" != "$RECORDED_INTEGRITY" ]; then
+            echo "::error::integrity mismatch for $TARBALL: recorded $RECORDED_INTEGRITY, actual $ACTUAL_INTEGRITY"
+            exit 1
+          fi
+          echo "Verified $TARBALL against recorded sha256 and integrity manifest."
+          echo "tarball-path=dist-release/$TARBALL" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node (npm >= 11.5.1 required for OIDC trusted publishing)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Publish exact verified tarball with provenance (OIDC, no token secret)
+        run: npm publish "${{ steps.verify.outputs.tarball-path }}" --provenance
