@@ -66,20 +66,29 @@ function resolveSource(relativeSource: string): string {
 }
 
 // Finds the (1-based line, 0-based column) of a unique substring in the
-// generated bundle, and asserts the sourcemap resolves it back to the
-// exact expected original source line, verified against the real on-disk
-// content at that line (not just "some mapping exists").
-function expectRoundTrip(needle: string, expectedRelativeSource: string, expectedOriginalLine: number) {
+// generated bundle, independently finds that same substring's (1-based)
+// line in the real on-disk original source, and asserts the sourcemap
+// resolves the bundle position back to exactly that source/line — never a
+// hardcoded line number, so the test survives unrelated line-count shifts
+// elsewhere in the same source file (e.g. another stream adding code
+// above the anchor). Both lookups require the needle to be unique in its
+// file, so a stale or duplicated anchor fails loudly instead of silently
+// picking the wrong occurrence.
+function expectRoundTrip(needle: string, expectedRelativeSource: string) {
+  const bundleMatches = bundleLines.filter((line) => line.includes(needle));
+  expect(bundleMatches, `expected exactly one "${needle}" in dist/SocialCalc.js`).toHaveLength(1);
   const lineIndex = bundleLines.findIndex((line) => line.includes(needle));
-  expect(lineIndex, `expected to find "${needle}" in dist/SocialCalc.js`).toBeGreaterThanOrEqual(0);
   const column = bundleLines[lineIndex]!.indexOf(needle);
+
+  const sourcePath = resolveSource(expectedRelativeSource);
+  const sourceLines = readFileSync(sourcePath, "utf8").split("\n");
+  const sourceMatches = sourceLines.filter((line) => line.includes(needle));
+  expect(sourceMatches, `expected exactly one "${needle}" in ${expectedRelativeSource}`).toHaveLength(1);
+  const expectedOriginalLine = sourceLines.findIndex((line) => line.includes(needle)) + 1;
 
   const original = originalPositionFor(trace, { line: lineIndex + 1, column });
   expect(original.source).toBe(expectedRelativeSource);
   expect(original.line).toBe(expectedOriginalLine);
-
-  const sourcePath = resolveSource(expectedRelativeSource);
-  const sourceLines = readFileSync(sourcePath, "utf8").split("\n");
   expect(sourceLines[original.line! - 1]).toContain(needle);
 }
 
@@ -113,14 +122,14 @@ describe("SOCIALCALC_COVERAGE=1 vp build: dist/SocialCalc.js sourcemap", () => {
   });
 
   test("attributes a socialcalc-3.ts function to its exact original line", () => {
-    expectRoundTrip("SC.CreateSheetSave = function", "../js/socialcalc-3.ts", 891);
+    expectRoundTrip("SC.CreateSheetSave = function", "../js/socialcalc-3.ts");
   });
 
   test("attributes a formula1.ts function to its exact original line", () => {
-    expectRoundTrip("SocialCalc.DebugLog = function", "../js/formula1.ts", 380);
+    expectRoundTrip("SocialCalc.DebugLog = function", "../js/formula1.ts");
   });
 
   test("attributes a formatnumber2.ts function to its exact original line", () => {
-    expectRoundTrip("SocialCalc.intFunc = function", "../js/formatnumber2.ts", 1168);
+    expectRoundTrip("SocialCalc.intFunc = function", "../js/formatnumber2.ts");
   });
 });
