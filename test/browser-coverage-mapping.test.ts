@@ -121,6 +121,14 @@ async function tryLaunchChromium(): Promise<boolean> {
 }
 
 beforeAll(async () => {
+  // No-op unless the opt-in flag is set — this suite only has teeth as part
+  // of `test:coverage:merged`'s sequenced run. Without this guard, merely
+  // including this file in ANY `vp test` invocation (e.g. plain `vp test
+  // run`) would unconditionally rebuild dist/SocialCalc.js in coverage mode
+  // as a side effect, silently dirtying a git-tracked build artifact even
+  // though every test below is skipped.
+  if (!mappingTestEnabled) return;
+
   // Ensure a coverage-mode build of dist/SocialCalc.js + .sourcemap.map
   // exists. Same idempotent pattern as test/build-sourcemap.test.ts: only
   // rebuild when the ambient state isn't already coverage-mode (which it is

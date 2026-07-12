@@ -353,7 +353,7 @@ const GLOBAL_KEY = "global threshold";
 // Global: union of every file in the filtered map.
 const globalMap = createCoverageMap();
 for (const f of filtered.files()) globalMap.addFileCoverage(filtered.fileCoverageFor(f));
-checkOne(GLOBAL_KEY, globalMap, thresholdContract.global);
+checkOne(GLOBAL_KEY, globalMap, thresholdContract.mergedGlobal);
 
 // Per-file: glob-matched per-file floors.
 for (const [globPattern, floors] of Object.entries(thresholdContract.perFile)) {
