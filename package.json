@@ -47,6 +47,7 @@
     "typecheck:strict": "tsc --noEmit -p tsconfig.strict.json",
     "test": "vp build && vp test",
     "test:coverage": "SOCIALCALC_COVERAGE=1 vp build && vp test --coverage",
+    "check:coverage-attribution": "node scripts/verify-coverage-attribution.mjs",
     "test:package-contract": "node scripts/verify-package-contract.mjs",
     "check:test-credibility": "node scripts/check-test-credibility.mjs",
     "test:ethercalc-canary": "node scripts/verify-ethercalc-canary.mjs",

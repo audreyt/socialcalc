@@ -205,6 +205,8 @@ jobs:
       - name: Install dependencies (frozen lockfile)
         run: vp install --frozen-lockfile
 
+      - name: Duplicate-bundle coverage attribution regression
+        run: vp run check:coverage-attribution
       - name: Source-attributed coverage (per-file + global floors)
         run: |
           set -euo pipefail
