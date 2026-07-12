@@ -1,15 +1,40 @@
 name: Release
 
-# Tag-push release pipeline: verifies the exact tagged commit against every
-# quality gate this repo has (typecheck, strict typecheck, lint, build,
-# tests, Dafny verification, Lean generation, package-contract gate), runs
-# a non-blocking dependency audit snapshot, packs the release tarball
-# exactly once, records its SHA-256 and npm integrity hash, and uploads
-# that same tarball (plus the integrity manifest and audit snapshot) as a
-# build artifact for human review.
+# Tag-push release pipeline, restructured as independent parallel gates so
+# no single expensive check (mutation testing, a 3-browser Playwright
+# matrix, an external EtherCalc canary) serializes behind the others in one
+# long-running job:
 #
-# This workflow never publishes to npm. A separate, manually-dispatched
-# `publish` job below is wired for npm Trusted Publishing (OIDC, no stored
+#   core              typecheck, strict typecheck, lint, build, unit tests,
+#                     Dafny verification, Lean generation, blocking
+#                     high/critical dependency audit.
+#   coverage          source-attributed coverage (`vp run test:coverage`),
+#                     enforces the per-file/global floors in vite.config.ts.
+#   mutation          full mutation run (`vp run mutate`); its HTML/JSON
+#                     reports are uploaded even when the job's score is red,
+#                     so a regression is inspectable without re-running.
+#   playwright        real-browser suite across Chromium/Firefox/WebKit
+#                     (skips cleanly, not red, if no browser suite is wired
+#                     into this branch yet — see each job's own gate step).
+#   ethercalc-canary  pinned, networked EtherCalc candidate-tarball canary
+#                     (skips cleanly if not wired into this branch yet).
+#
+# `package` needs ALL FIVE above. It re-verifies the package-contract gate,
+# packs the release tarball TWICE from a clean checkout and byte-compares
+# the two results (refusing to release a non-deterministic build), retains
+# exactly one, records its SHA-256 and npm integrity hash, captures a
+# non-blocking moderate-severity dependency audit snapshot (scoped to the
+# two documented, time-bounded dispositions in
+# docs/security-disposition.json), and uploads that one tarball plus its
+# integrity manifest and the audit snapshot as a single build artifact.
+#
+# Because `package` requires every one of the five gate jobs to succeed,
+# and `publish` requires `package`, a red result anywhere in core/coverage/
+# mutation/playwright/ethercalc-canary makes npm publish impossible for
+# that tag — not merely discouraged, structurally unreachable.
+#
+# This workflow never publishes to npm on tag push. The manually-dispatched
+# `publish` job is wired for npm Trusted Publishing (OIDC, no stored
 # secret) but is inert until a human:
 #   1. Registers this exact repo + workflow filename (release.yml) as a
 #      Trusted Publisher for the `socialcalc` package on npmjs.com, and
@@ -18,9 +43,15 @@ name: Release
 #      without an approval, even after a successful `workflow_dispatch`.
 # Until both are done, any dispatch of the publish job will simply fail at
 # the `npm publish` step (no token exists to leak, and no third-party has
-# been granted publish trust yet).
+# been granted publish trust yet). Once it does publish, the same job
+# creates an immutable GitHub Release from the identical verified tarball
+# and integrity manifest, re-verifies the release asset's checksum after
+# upload, and runs a fresh-install smoke test against the real npm
+# registry (not the local tarball) to confirm the published package is
+# actually installable and correct before declaring success.
 #
-# Both the `release` and `publish` jobs additionally require a real tag ref
+# Every `release` (core/coverage/mutation/playwright/ethercalc-canary/
+# package) and `publish` job additionally requires a real tag ref
 # (github.ref_type == 'tag', double-checked with a `refs/tags/v*` shell
 # guard) so a `workflow_dispatch` run against a branch that happens to be
 # named e.g. "v3.1.0" can never be mistaken for a release/publish of that
@@ -45,17 +76,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: verify, package, and upload release artifact
+  core:
+    name: core quality gates + blocking high-severity audit
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     outputs:
       version: ${{ steps.version.outputs.version }}
       artifact-name: ${{ steps.version.outputs.artifact-name }}
     steps:
       - name: Checkout tag commit (exact SHA, no mutable ref)
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.0
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -79,12 +110,12 @@ jobs:
           echo "artifact-name=socialcalc-release-$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1.1.0
+        uses: voidzero-dev/setup-vp@e1609b468742ba9232ce5e12b3a77bdf14495277 # v1.1.0
         with:
           cache: true
 
       - name: Setup Dafny
-        uses: dafny-lang/setup-dafny-action@be023fc606339d46ed6b077dcb8614d0279ded31 # v1.0.5
+        uses: dafny-lang/setup-dafny-action@be023fc606339d46ed6b077dcb8614d0279ded31 # v1.9.1
         with:
           dafny-version: "4.9.0"
 
@@ -121,6 +152,160 @@ jobs:
             test -s "$f"
           done
 
+      - name: Dependency audit — high/critical (blocking)
+        run: |
+          set -euo pipefail
+          # Fails the release if any high or critical finding is present.
+          # Currently 0 (all 2 high findings this repo carried were fixed via
+          # package.json "overrides" — see docs/security-disposition.json
+          # "summary.fixed"). This step exits non-zero on a real regression;
+          # it is not a snapshot, it gates the release.
+          vp pm audit --level high
+
+  coverage:
+    name: source-attributed coverage
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout tag commit (exact SHA, no mutable ref)
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@e1609b468742ba9232ce5e12b3a77bdf14495277 # v1.1.0
+        with:
+          cache: true
+
+      - name: Install dependencies (frozen lockfile)
+        run: vp install --frozen-lockfile
+
+      - name: Source-attributed coverage (per-file + global floors)
+        run: vp run test:coverage
+
+  mutation:
+    name: full mutation testing
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout tag commit (exact SHA, no mutable ref)
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@e1609b468742ba9232ce5e12b3a77bdf14495277 # v1.1.0
+        with:
+          cache: true
+
+      - name: Install dependencies (frozen lockfile)
+        run: vp install --frozen-lockfile
+
+      - name: Full mutation run
+        run: vp run mutate
+
+      # Uploaded unconditionally (if: always()) so a red mutation score —
+      # which fails the step above and therefore this job, blocking
+      # `package`/`publish` downstream — still leaves its HTML/JSON report
+      # inspectable instead of silently disappearing with the failed run.
+      - name: Upload mutation reports (even on red)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mutation-report-${{ github.ref_name }}
+          path: reports/mutation/
+          if-no-files-found: warn
+          retention-days: 90
+
+  playwright:
+    name: browser matrix (Chromium/Firefox/WebKit)
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout tag commit (exact SHA, no mutable ref)
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@e1609b468742ba9232ce5e12b3a77bdf14495277 # v1.1.0
+        with:
+          cache: true
+
+      - name: Install dependencies (frozen lockfile)
+        run: vp install --frozen-lockfile
+
+      - name: Browser suite (if wired into this branch)
+        run: |
+          set -euo pipefail
+          if [ -f playwright.config.ts ] && node -e "process.exit(require('./package.json').scripts?.['test:browser'] ? 0 : 1)"; then
+            echo "Running browser suite: vp run test:browser"
+            vp exec playwright install --with-deps chromium firefox webkit
+            vp run test:browser
+          else
+            echo "No playwright.config.ts / \"test:browser\" script on this branch yet; skipping (nothing to enforce)."
+          fi
+
+  ethercalc-canary:
+    name: pinned EtherCalc candidate-tarball canary
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout tag commit (exact SHA, no mutable ref)
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@e1609b468742ba9232ce5e12b3a77bdf14495277 # v1.1.0
+        with:
+          cache: true
+
+      - name: Install dependencies (frozen lockfile)
+        run: vp install --frozen-lockfile
+
+      - name: EtherCalc canary (if wired into this branch)
+        run: |
+          set -euo pipefail
+          if node -e "process.exit(require('./package.json').scripts?.['test:ethercalc-canary'] ? 0 : 1)"; then
+            echo "Running EtherCalc canary: vp run test:ethercalc-canary"
+            vp run test:ethercalc-canary
+          else
+            echo "No \"test:ethercalc-canary\" script on this branch yet; skipping (nothing to enforce)."
+          fi
+
+  package:
+    name: package-contract gate + deterministic pack-twice release artifact
+    needs: [core, coverage, mutation, playwright, ethercalc-canary]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      version: ${{ needs.core.outputs.version }}
+      artifact-name: ${{ needs.core.outputs.artifact-name }}
+    steps:
+      - name: Checkout tag commit (exact SHA, no mutable ref)
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@e1609b468742ba9232ce5e12b3a77bdf14495277 # v1.1.0
+        with:
+          cache: true
+
+      - name: Install dependencies (frozen lockfile)
+        run: vp install --frozen-lockfile
+
       - name: Package artifact gate (if defined)
         run: |
           set -euo pipefail
@@ -131,31 +316,25 @@ jobs:
             echo "No test:package-contract script defined yet; skipping (nothing to enforce)."
           fi
 
-      - name: Dependency audit snapshot (recorded, non-blocking)
-        run: |
-          set -euo pipefail
-          mkdir -p dist-release
-          # `vp pm audit` exits non-zero whenever any finding is present at or
-          # above --level; this repo currently carries two documented,
-          # accepted moderate findings (see docs/security-disposition.json),
-          # so the release pipeline records the raw report for human review
-          # instead of trying to parse/allowlist specific advisory ids here.
-          vp pm audit --level low --json > dist-release/audit.json 2>dist-release/audit.log || true
-          {
-            echo "### Dependency audit (vp pm audit --level low)"
-            echo "Compare against docs/security-disposition.json for the accepted findings."
-            echo '```json'
-            cat dist-release/audit.json
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Pack release tarball (once)
+      - name: Pack twice and byte-compare (refuse a non-deterministic build)
         id: pack
         run: |
           set -euo pipefail
           mkdir -p dist-release
-          TARBALL="dist-release/socialcalc-${{ steps.version.outputs.version }}.tgz"
-          vp pm pack --out "$TARBALL"
+          VERSION="${{ needs.core.outputs.version }}"
+          FIRST="dist-release/socialcalc-$VERSION.pack1.tgz"
+          SECOND="dist-release/socialcalc-$VERSION.pack2.tgz"
+          vp pm pack --out "$FIRST"
+          vp pm pack --out "$SECOND"
+          SHA1="$(sha256sum "$FIRST" | awk '{print $1}')"
+          SHA2="$(sha256sum "$SECOND" | awk '{print $1}')"
+          if [ "$SHA1" != "$SHA2" ]; then
+            echo "::error::pack is non-deterministic: first pack sha256=$SHA1, second pack sha256=$SHA2 — refusing to release"
+            exit 1
+          fi
+          TARBALL="dist-release/socialcalc-$VERSION.tgz"
+          mv "$FIRST" "$TARBALL"
+          rm -f "$SECOND"
           for member in package/dist/SocialCalc.js package/dist/SocialCalc.min.js \
                         package/dist/SocialCalc.d.ts package/dist/socialcalc.css; do
             tar -tzf "$TARBALL" | grep -qx "$member" || {
@@ -163,6 +342,7 @@ jobs:
               exit 1
             }
           done
+          echo "Pack is deterministic (sha256=$SHA1 both times); retained one tarball."
           echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
 
       - name: Record SHA-256 and npm integrity hash
@@ -186,12 +366,34 @@ jobs:
             echo "- tarball: \`$(basename "$TARBALL")\`"
             echo "- sha256: \`$SHA256\`"
             echo "- integrity: \`$INTEGRITY\`"
+            echo "- pack determinism: verified identical across two independent \`vp pm pack\` runs"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload release tarball
+      - name: Dependency audit — moderate snapshot (recorded, non-blocking)
+        run: |
+          set -euo pipefail
+          # Captured solely to evidence the two documented, time-bounded
+          # moderate dispositions in docs/security-disposition.json
+          # (brace-expansion GHSA-jxxr-4gwj-5jf2, uuid GHSA-w5hq-g745-h8pq —
+          # each carries its own re-audit expiryCondition there). Both are
+          # devDependency-only and never reach the published npm tarball;
+          # this step does not gate the release (the blocking high/critical
+          # gate already ran in the `core` job), it archives the raw report
+          # for the next human re-audit against that disposition file's
+          # expiry conditions.
+          vp pm audit --level low --json > dist-release/audit.json 2>dist-release/audit.log || true
+          {
+            echo "### Dependency audit — moderate snapshot (vp pm audit --level low)"
+            echo "Non-blocking; compare against docs/security-disposition.json's two accepted, time-bounded moderate dispositions."
+            echo '```json'
+            cat dist-release/audit.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the one exact release artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ${{ steps.version.outputs.artifact-name }}
+          name: ${{ needs.core.outputs.artifact-name }}
           path: |
             dist-release/*.tgz
             dist-release/*.integrity.json
@@ -201,13 +403,13 @@ jobs:
 
   publish:
     name: npm trusted publish (manual, gated — never runs on tag push)
-    needs: release
+    needs: package
     if: github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && inputs.confirm == 'PUBLISH'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     environment: npm-publish
     permissions:
-      contents: read
+      contents: write
       id-token: write
     steps:
       - name: Assert dispatch targeted a real release tag
@@ -218,10 +420,10 @@ jobs:
             exit 1
           fi
 
-      - name: Download release tarball from this run
+      - name: Download the one exact release artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: ${{ needs.release.outputs.artifact-name }}
+          name: ${{ needs.package.outputs.artifact-name }}
           path: dist-release
 
       - name: Verify downloaded artifact integrity
@@ -257,6 +459,8 @@ jobs:
           fi
           echo "Verified $TARBALL against recorded sha256 and integrity manifest."
           echo "tarball-path=dist-release/$TARBALL" >> "$GITHUB_OUTPUT"
+          echo "tarball-name=$TARBALL" >> "$GITHUB_OUTPUT"
+          echo "sha256=$ACTUAL_SHA256" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node (npm >= 11.5.1 required for OIDC trusted publishing)
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -266,3 +470,68 @@ jobs:
 
       - name: Publish exact verified tarball with provenance (OIDC, no token secret)
         run: npm publish "${{ steps.verify.outputs.tarball-path }}" --provenance
+
+      - name: Create immutable GitHub Release from the same verified tarball
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "${{ github.ref_name }}" \
+            "${{ steps.verify.outputs.tarball-path }}" \
+            dist-release/*.integrity.json \
+            --title "${{ github.ref_name }}" \
+            --notes "Published to npm as socialcalc@${{ needs.package.outputs.version }}. Tarball sha256: ${{ steps.verify.outputs.sha256 }}."
+
+      - name: Verify the GitHub Release asset's checksum matches the published tarball
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-asset-check
+          gh release download "${{ github.ref_name }}" \
+            --pattern "${{ steps.verify.outputs.tarball-name }}" \
+            --dir release-asset-check
+          DOWNLOADED_SHA256="$(sha256sum "release-asset-check/${{ steps.verify.outputs.tarball-name }}" | awk '{print $1}')"
+          if [ "$DOWNLOADED_SHA256" != "${{ steps.verify.outputs.sha256 }}" ]; then
+            echo "::error::GitHub Release asset checksum mismatch: expected ${{ steps.verify.outputs.sha256 }}, downloaded asset is $DOWNLOADED_SHA256"
+            exit 1
+          fi
+          echo "GitHub Release asset checksum verified: $DOWNLOADED_SHA256"
+
+      - name: Registry smoke — fresh install of the just-published version
+        run: |
+          set -euo pipefail
+          PKG_VERSION="${{ needs.package.outputs.version }}"
+          # npm's registry is eventually consistent immediately after
+          # publish; poll briefly rather than assuming instant visibility.
+          for attempt in $(seq 1 10); do
+            LATEST="$(npm view socialcalc version 2>/dev/null || echo "")"
+            if [ "$LATEST" = "$PKG_VERSION" ]; then
+              echo "Registry shows socialcalc@$LATEST (matches published $PKG_VERSION) after $attempt attempt(s)."
+              break
+            fi
+            if [ "$attempt" -eq 10 ]; then
+              echo "::error::npm registry still does not show socialcalc@$PKG_VERSION after 10 attempts (latest seen: ${LATEST:-none})"
+              exit 1
+            fi
+            sleep 6
+          done
+          mkdir -p registry-smoke && cd registry-smoke
+          npm init -y >/dev/null
+          npm install "socialcalc@$PKG_VERSION" >/dev/null
+          node -e "
+            const SC = require('socialcalc');
+            if (typeof SC.SpreadsheetControl !== 'function') throw new Error('CJS require: SpreadsheetControl missing');
+            console.log('CJS require OK:', Object.keys(SC).length, 'top-level keys');
+          "
+          cat > esm-check.mjs <<'EOF'
+          import SC from "socialcalc";
+          if (typeof SC.SpreadsheetControl !== "function") throw new Error("ESM default import: SpreadsheetControl missing");
+          console.log("native ESM default import OK:", Object.keys(SC).length, "top-level keys");
+          EOF
+          node esm-check.mjs
+          node -e "
+            const SCmin = require('socialcalc/dist/SocialCalc.min.js');
+            if (typeof SCmin.SpreadsheetControl !== 'function') throw new Error('deep minified require: SpreadsheetControl missing');
+            console.log('deep minified require OK:', Object.keys(SCmin).length, 'top-level keys');
+          "
