@@ -344,7 +344,6 @@ FormatNumberMut.formatNumberWithFormat = function (
   scaledvalue = Math.floor(value * decimalscale + 0.5);
   scaledvalue = scaledvalue / decimalscale;
 
-  if (typeof scaledvalue != "number") return "NaN";
   if (!isFinite(scaledvalue)) return "NaN";
 
   strvalue = scaledvalue + ""; // convert to string (Number.toFixed doesn't do all we need)
@@ -370,8 +369,8 @@ FormatNumberMut.formatNumberWithFormat = function (
     return rawvalue + ""; // Just return plain converted raw value
   }
 
-  strparts = strvalue.match(/^\+{0,1}(\d*)(?:\.(\d*)){0,1}$/); // get integer and fraction parts
-  if (!strparts) return "NaN"; // if not a number
+  strparts = strvalue.match(/^\+{0,1}(\d*)(?:\.(\d*)){0,1}$/)!; // get integer and fraction parts
+  // if not a number
   integervalue = strparts[1];
   if (!integervalue || integervalue == "0") integervalue = "";
   fractionvalue = strparts[2];
@@ -603,11 +602,8 @@ FormatNumberMut.formatNumberWithFormat = function (
         result += strvalue;
         continue;
       }
-      strparts = strvalue.match(/^\+{0,1}(\d*)(?:\.(\d*)){0,1}$/); // get integer and fraction parts
-      if (!strparts) {
-        result += strvalue;
-        continue;
-      } // defensive: shouldn't happen for finite non-exponential numbers
+      strparts = strvalue.match(/^\+{0,1}(\d*)(?:\.(\d*)){0,1}$/)!; // get integer and fraction parts
+      // defensive: shouldn't happen for finite non-exponential numbers
       integervalue = strparts[1];
       if (!integervalue || integervalue == "0") integervalue = "";
       fractionvalue = strparts[2];
@@ -1057,7 +1053,7 @@ FormatNumberMut.parse_format_bracket = function (
     bracketdata.operator = scfn.commands.currency;
     parts = bracketstr.match(/^\$(.+?)(-.+?){0,1}$/);
     if (parts) {
-      bracketdata.operand = parts[1] || scc.FormatNumber_defaultCurrency || "$";
+      bracketdata.operand = parts[1];
     } else {
       bracketdata.operand = bracketstr.substring(1) || scc.FormatNumber_defaultCurrency || "$";
     }

@@ -2125,7 +2125,7 @@ SC.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
 					case "lastrow":
 						if (saveundo) changes.AddUndo(undostart, attribs[attrib] - 0);
 						num = rest - 0;
-						if (typeof num == "number") attribs[attrib] = num > 0 ? num : 1;
+						attribs[attrib] = num > 0 ? num : 1;
 						break;
 					case "recalc":
 						if (saveundo) changes.AddUndo(undostart, attribs[attrib]);
@@ -2139,7 +2139,7 @@ SC.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
 					case "usermaxrow":
 						if (saveundo) changes.AddUndo(undostart, attribs[attrib] - 0);
 						num = rest - 0;
-						if (typeof num == "number") attribs[attrib] = num > 0 ? num : 0;
+						attribs[attrib] = num > 0 ? num : 0;
 						break;
 					default:
 						errortext = scc.s_escUnknownSheetCmd + cmdstr;
@@ -3076,9 +3076,6 @@ SC.ExecuteSheetCommand = function(sheet, cmd, saveundo) {
 					cell = sheet.GetAssuredCell(cr);
 					if (cell.readonly) continue;
 					if (saveundo) changes.AddUndo("set " + cr + " all", sheet.CellToString(cell));
-					if (!sheet.cells[cr]) {
-						continue;
-					}
 					movingcells[cr] = new SocialCalc.Cell(cr);
 					for (attrib in cellProperties) {
 						if (typeof cell[attrib] === "undefined") {
@@ -4368,7 +4365,7 @@ SC.RenderSpacingRow = function(context) {
 			newcol.height = context.defaultpanedividerheight;
 			if (context.classnames.panedivider) newcol.className = context.classnames.panedivider;
 			if (context.explicitStyles.panedivider) newcol.style.cssText = context.explicitStyles.panedivider;
-			if (newcol) result.appendChild(newcol);
+			result.appendChild(newcol);
 		}
 		if (colpane < context.colpanes.length - 1) {
 			newcol = document.createElement("td");
@@ -4603,12 +4600,12 @@ SC.RenderCell = function(context, rownum, colnum, rowpane, colpane, noElement, l
 		result.title = cell.comment;
 		if (context.showGrid) {
 			if (context.commentClassName) {
-				result.className = (result.className ? result.className + " " : "") + context.commentClassName;
+				result.className = context.commentClassName;
 			}
 			stylestr += context.commentCSS;
 		} else {
 			if (context.commentNoGridClassName) {
-				result.className = (result.className ? result.className + " " : "") + context.commentNoGridClassName;
+				result.className = context.commentNoGridClassName;
 			}
 			stylestr += context.commentNoGridCSS;
 		}
@@ -5320,7 +5317,7 @@ SC.ParseCellLinkText = function(str) {
 				urlend--;
 				result.newwin = true;
 			}
-		} else if (str.charAt(urlend) == "}") {
+		} else {
 			descend = lastbrace - 1;
 			pageform = true;
 			wsend = lastbrkt;
@@ -10149,7 +10146,6 @@ FormatNumberMut.formatNumberWithFormat = function(rawvalue, format_string, curre
 	}
 	scaledvalue = Math.floor(value * decimalscale + .5);
 	scaledvalue = scaledvalue / decimalscale;
-	if (typeof scaledvalue != "number") return "NaN";
 	if (!isFinite(scaledvalue)) return "NaN";
 	strvalue = scaledvalue + "";
 	if (scaledvalue == 0 && (sectioninfo.fractiondigits || sectioninfo.integerdigits)) {
@@ -10166,7 +10162,6 @@ FormatNumberMut.formatNumberWithFormat = function(rawvalue, format_string, curre
 		return rawvalue + "";
 	}
 	strparts = strvalue.match(/^\+{0,1}(\d*)(?:\.(\d*)){0,1}$/);
-	if (!strparts) return "NaN";
 	integervalue = strparts[1];
 	if (!integervalue || integervalue == "0") integervalue = "";
 	fractionvalue = strparts[2];
@@ -10351,10 +10346,6 @@ FormatNumberMut.formatNumberWithFormat = function(rawvalue, format_string, curre
 				continue;
 			}
 			strparts = strvalue.match(/^\+{0,1}(\d*)(?:\.(\d*)){0,1}$/);
-			if (!strparts) {
-				result += strvalue;
-				continue;
-			}
 			integervalue = strparts[1];
 			if (!integervalue || integervalue == "0") integervalue = "";
 			fractionvalue = strparts[2];
@@ -10718,7 +10709,7 @@ FormatNumberMut.parse_format_bracket = function(bracketstr) {
 		bracketdata.operator = scfn.commands.currency;
 		parts = bracketstr.match(/^\$(.+?)(-.+?){0,1}$/);
 		if (parts) {
-			bracketdata.operand = parts[1] || scc.FormatNumber_defaultCurrency || "$";
+			bracketdata.operand = parts[1];
 		} else {
 			bracketdata.operand = bracketstr.substring(1) || scc.FormatNumber_defaultCurrency || "$";
 		}
@@ -17591,7 +17582,7 @@ SocialCalc.Popup.Types.ColorChooser.GridMouseDown = function(e) {
 	var row = Math.floor((clientY - gpos.top - 2) / 10);
 	row = row < 0 ? 0 : row;
 	var col = Math.floor((clientX - gpos.left) / 20);
-	row = row < 0 ? 0 : row > 15 ? 15 : row;
+	row = row > 15 ? 15 : row;
 	col = col < 0 ? 0 : col > 4 ? 4 : col;
 	var color = sptc.gridToG(grid, row, col).ele.style.backgroundColor;
 	var newrgb = sp.splitRGB(color);
@@ -18701,7 +18692,7 @@ SpreadsheetControlSC.LoadColumnChoosers = function(spreadsheet) {
 	var SCLoc = SocialCalc.LocalizeString;
 	var sortrange, nrange, rparts, col, colname, sele, oldindex;
 	if (spreadsheet.sortrange && spreadsheet.sortrange.indexOf(":") == -1) {
-		nrange = SocialCalc.Formula.LookupName(spreadsheet.sheet, spreadsheet.sortrange || "");
+		nrange = SocialCalc.Formula.LookupName(spreadsheet.sheet, spreadsheet.sortrange);
 		if (nrange.type == "range") {
 			rparts = nrange.value.match(/^(.*)\|(.*)\|$/);
 			sortrange = rparts[1] + ":" + rparts[2];
@@ -18827,7 +18818,7 @@ SpreadsheetControlSC.DoCmd = function(obj, which) {
 			return;
 		case "dosort":
 			if (spreadsheet.sortrange && spreadsheet.sortrange.indexOf(":") == -1) {
-				nrange = SocialCalc.Formula.LookupName(spreadsheet.sheet, spreadsheet.sortrange || "");
+				nrange = SocialCalc.Formula.LookupName(spreadsheet.sheet, spreadsheet.sortrange);
 				if (nrange.type != "range") return;
 				rparts = nrange.value.match(/^(.*)\|(.*)\|$/);
 				sortrange = rparts[1] + ":" + rparts[2];
@@ -19986,7 +19977,7 @@ SpreadsheetControlSC.SettingsControls.PopupListInitialize = function(panelobj, c
 	initialdata = SocialCalc.LocalizeSubstrings(initialdata);
 	var optionvals = initialdata.split(/\|/);
 	var options = [];
-	for (i = 0; i < (optionvals.length || 0); i++) {
+	for (i = 0; i < optionvals.length; i++) {
 		val = optionvals[i];
 		pos = val.indexOf(":");
 		otext = val.substring(0, pos);

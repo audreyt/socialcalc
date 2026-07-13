@@ -1783,7 +1783,7 @@ SpreadsheetControlSC.LoadColumnChoosers = function (spreadsheet: any) {
 
   if (spreadsheet.sortrange && spreadsheet.sortrange.indexOf(":") == -1) {
     // sortrange is a named range
-    nrange = SocialCalc.Formula.LookupName(spreadsheet.sheet, spreadsheet.sortrange || "");
+    nrange = SocialCalc.Formula.LookupName(spreadsheet.sheet, spreadsheet.sortrange);
     if (nrange.type == "range") {
       rparts = nrange.value.match(/^(.*)\|(.*)\|$/);
       sortrange = rparts[1] + ":" + rparts[2];
@@ -1971,7 +1971,7 @@ SpreadsheetControlSC.DoCmd = function (obj: any, which: any) {
     case "dosort":
       if (spreadsheet.sortrange && spreadsheet.sortrange.indexOf(":") == -1) {
         // sortrange is a named range
-        nrange = SocialCalc.Formula.LookupName(spreadsheet.sheet, spreadsheet.sortrange || "");
+        nrange = SocialCalc.Formula.LookupName(spreadsheet.sheet, spreadsheet.sortrange);
         if (nrange.type != "range") return;
         rparts = nrange.value.match(/^(.*)\|(.*)\|$/);
         sortrange = rparts[1] + ":" + rparts[2];
@@ -4122,7 +4122,7 @@ SpreadsheetControlSC.SettingsControls.PopupListInitialize = function (
 
   var options = [];
 
-  for (i = 0; i < (optionvals.length || 0); i++) {
+  for (i = 0; i < optionvals.length; i++) {
     val = optionvals[i];
     pos = val.indexOf(":");
     otext = val.substring(0, pos);

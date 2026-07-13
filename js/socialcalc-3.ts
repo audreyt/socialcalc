@@ -2093,7 +2093,7 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
           case "lastrow":
             if (saveundo) changes.AddUndo(undostart, attribs[attrib] - 0);
             num = rest - 0;
-            if (typeof num == "number") attribs[attrib] = num > 0 ? num : 1;
+            attribs[attrib] = num > 0 ? num : 1;
             break;
           case "recalc":
             if (saveundo) changes.AddUndo(undostart, attribs[attrib]);
@@ -2108,7 +2108,7 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
           case "usermaxrow":
             if (saveundo) changes.AddUndo(undostart, attribs[attrib] - 0);
             num = rest - 0;
-            if (typeof num == "number") attribs[attrib] = num > 0 ? num : 0;
+            attribs[attrib] = num > 0 ? num : 0;
             break;
           default:
             errortext = scc.s_escUnknownSheetCmd + cmdstr;
@@ -3295,10 +3295,8 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
           if (cell.readonly) continue;
           if (saveundo) changes.AddUndo("set " + cr + " all", sheet.CellToString(cell));
 
-          if (!sheet.cells[cr]) {
-            // if had nothing
-            continue; // don't save anything
-          }
+          // if had nothing
+          // don't save anything
           movingcells[cr] = new SocialCalc.Cell(cr); // create new cell to copy
 
           for (attrib in cellProperties) {
@@ -5199,7 +5197,7 @@ SC.RenderSpacingRow = function (context: any) {
       if (context.classnames.panedivider) newcol.className = context.classnames.panedivider;
       if (context.explicitStyles.panedivider)
         newcol.style.cssText = context.explicitStyles.panedivider;
-      if (newcol) result.appendChild(newcol);
+      result.appendChild(newcol);
     }
     if (colpane < context.colpanes.length - 1) {
       newcol = document.createElement("td");
@@ -5556,14 +5554,12 @@ SC.RenderCell = function (
     result.title = cell.comment;
     if (context.showGrid) {
       if (context.commentClassName) {
-        result.className =
-          (result.className ? result.className + " " : "") + context.commentClassName;
+        result.className = context.commentClassName;
       }
       stylestr += context.commentCSS;
     } else {
       if (context.commentNoGridClassName) {
-        result.className =
-          (result.className ? result.className + " " : "") + context.commentNoGridClassName;
+        result.className = context.commentNoGridClassName;
       }
       stylestr += context.commentNoGridCSS;
     }
@@ -6787,7 +6783,7 @@ SC.ParseCellLinkText = function (str: any) {
         urlend--;
         result.newwin = true;
       }
-    } else if (str.charAt(urlend) == "}") {
+    } else {
       // page and workspace form
       descend = lastbrace - 1;
       pageform = true;
