@@ -52,9 +52,9 @@ Toolchain and testing
   break threshold 95. `MUTATE_TARGET` gates one module at a time against its
   own test subset; `.github/workflows/mutation.yml` runs this as a per-module
   CI matrix (`mutate-full`). `release-gate` (`scripts/mutate-release-gate.mjs`,
-  `bun run mutate:release-gate`) refuses to pass unless every module has a
+  `vp run mutate:release-gate`) refuses to pass unless every module has a
   fresh report and a real measured, passing baseline — no placeholder number is
-  ever treated as evidence. `bun run mutate:all` runs the full 11 sequentially
+  ever treated as evidence. `vp run mutate:all` runs the full 11 sequentially
   for local use.
 
 Security

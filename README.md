@@ -263,14 +263,14 @@ scoring.
 (`vp build && vp test`) so no runner-specific Stryker plugin is needed.
 Four modes (see the file's own header comment for the full rationale):
 
-- **Critical PR gate** — `MUTATE_SCOPE=critical bun run mutate` mutates the
+- **Critical PR gate** — `MUTATE_SCOPE=critical vp run mutate` mutates the
   3 release-critical formula modules (`formula-parse.ts`, `formula-operand.ts`,
   `formula-ref.ts`) against a deterministic 23-file test subset. Small and fast
   enough to block a PR; `break: 95` is a real, measured floor (95.00% score on
   1440 mutants, 2026-07-12), not a guess. `socialcalcconstants.ts` is
   intentionally excluded from this fast gate — its large string-table mutation
   profile is covered without exclusions by the full per-module matrix.
-- **Full per-module matrix** — `MUTATE_TARGET=js/<source>.ts bun run mutate`
+- **Full per-module matrix** — `MUTATE_TARGET=js/<source>.ts vp run mutate`
   mutates exactly one of the 11 shipping modules against the full test
   subset `stryker-file.mjs`'s `testsByFile` maps to it. CI's `mutate-full`
   job runs this as a GitHub Actions matrix, one leg per module in parallel.
@@ -292,7 +292,7 @@ Four modes (see the file's own header comment for the full rationale):
   Superseded by the matrix above for CI; kept for an occasional manual
   all-at-once run.
 
-**Release gate.** `bun run mutate:release-gate`
+**Release gate.** `vp run mutate:release-gate`
 (`scripts/mutate-release-gate.mjs`) refuses to pass unless *every* module in
 `ALL_MUTATE_FILES` has both a fresh report from this run and a
 `stryker-mutation-baseline.json` entry that is actually `measured: true`
