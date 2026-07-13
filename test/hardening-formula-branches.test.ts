@@ -797,3 +797,151 @@ test("format: a three-section format routes zero to the third (text) section, di
   expect(SC.format_number_for_display(5, "n", '0.00;0.00;"zero"')).toBe("5.00");
   expect(SC.format_number_for_display(-5, "n", '0.00;0.00;"zero"')).toBe("5.00");
 });
+
+// ===========================================================================
+// Gap A: CopyFormulaToRange / CopyValueToRange 2×2 source range
+// Kills formula1.ts L6029 (destcr.col+i/-i) and L6098 (destcr.col+i/-i)
+// ArithmeticOperator mutants 5374/5375 and 5431/5432.
+//
+// All existing tests only use a 1-column source so i is always 0, making
+// +i and -i indistinguishable.  A 2×2 source (ncols=2, nrows=2) drives
+// i∈{0,1} and j∈{0,1}, producing four distinct destination coords whose
+// exact addresses verify the + direction is used (not -).
+// ===========================================================================
+
+test("CopyFormulaToRange: 2×2 source maps all four destination coords with correct +i/+j offsets", async () => {
+  const SC = (await loadSocialCalc()) as FullRuntime;
+  resetFormulaGlobals(SC);
+  const sheet = freshSheet(SC);
+  // Source range A1:B2  (col 1-2, row 1-2)
+  // A1 = formula "C3"  (formula-type cell)
+  // A2 = value 10      (value-type cell, datatype "v")
+  // B1 = text "hello"  (text-type cell, datatype "t")
+  // B2 = blank         (undefined/blank cell)
+  const a1 = sheet.GetAssuredCell("A1") as unknown as {
+    datatype: string; valuetype: string; datavalue: number | string; formula: string;
+  };
+  a1.datatype = "f"; a1.valuetype = "n"; a1.datavalue = 0; a1.formula = "C3";
+  const a2 = sheet.GetAssuredCell("A2") as unknown as {
+    datatype: string; valuetype: string; datavalue: number | string; formula: string;
+  };
+  a2.datatype = "v"; a2.valuetype = "n"; a2.datavalue = 10; a2.formula = "";
+  const b1 = sheet.GetAssuredCell("B1") as unknown as {
+    datatype: string; valuetype: string; datavalue: number | string; formula: string;
+  };
+  b1.datatype = "t"; b1.valuetype = "t"; b1.datavalue = "hello"; b1.formula = "";
+  // B2 left blank/undefined
+
+  // Build the formulaData by calling getStandardizedValues with a range parameter
+  const formulaData = SC.Formula.getStandardizedValues(sheet, { type: "range", value: "A1|B2|" });
+  // Destination upper-left: C1 (col=3, row=1)
+  const destcr = { col: 3, row: 1 };
+
+  const result = SC.TriggerIoAction.CopyFormulaToRange(formulaData, destcr);
+  const lines = result.split("\n");
+
+  // i=0,j=0 → dest col=3+0=3,row=1+0=1 → C1  (formula cell)
+  // i=0,j=1 → dest col=3+0=3,row=1+1=2 → C2  (value cell)
+  // i=1,j=0 → dest col=3+1=4,row=1+0=1 → D1  (text cell)
+  // i=1,j=1 → dest col=3+1=4,row=1+1=2 → D2  (blank cell → "set D2 empty")
+  // With +i: C1/C2/D1/D2. With -i: C1/C2/B1/B2 — would be wrong (B already occupied by source).
+  expect(lines).toHaveLength(4);
+  expect(lines[0]).toMatch(/^set C1 /);   // i=0,j=0
+  expect(lines[1]).toMatch(/^set C2 /);   // i=0,j=1
+  expect(lines[2]).toMatch(/^set D1 /);   // i=1,j=0  — proves +i (not -i → B1)
+  expect(lines[3]).toMatch(/^set D2 /);   // i=1,j=1  — proves +i AND +j
+  // C1 is a formula cell: command contains "formula" and the offset formula string
+  expect(lines[0]).toMatch(/formula/);
+  // C2 is a value cell: "set C2 value n 10"
+  expect(lines[1]).toBe("set C2 value n 10");
+  // D1 is a text cell: "set D1 text t hello"
+  expect(lines[2]).toBe("set D1 text t hello");
+  // D2 is blank: "set D2 empty"
+  expect(lines[3]).toBe("set D2 empty");
+});
+
+test("CopyValueToRange: 2×2 source maps all four destination coords with correct +i/+j offsets", async () => {
+  const SC = (await loadSocialCalc()) as FullRuntime;
+  resetFormulaGlobals(SC);
+  const sheet = freshSheet(SC);
+  // Source range A1:B2  (col 1-2, row 1-2)
+  // A1 = value 1, A2 = value 2, B1 = value 3, B2 = blank
+  const vals: [string, number][] = [["A1", 1], ["A2", 2], ["B1", 3]];
+  for (const [coord, v] of vals) {
+    const c = sheet.GetAssuredCell(coord) as unknown as {
+      datatype: string; valuetype: string; datavalue: number; formula: string;
+    };
+    c.datatype = "v"; c.valuetype = "n"; c.datavalue = v; c.formula = "";
+  }
+  // B2 left blank
+
+  const sourceData = SC.Formula.getStandardizedValues(sheet, { type: "range", value: "A1|B2|" });
+  // Destination: C1 (col=3, row=1)
+  const destcr = { col: 3, row: 1 };
+
+  const result = SC.TriggerIoAction.CopyValueToRange(sourceData, destcr);
+  const lines = result.split("\n");
+
+  // i=0,j=0 → C1; i=0,j=1 → C2; i=1,j=0 → D1; i=1,j=1 → D2
+  // With -i: would land at C1,C2,B1,B2 — overwriting source! +i → C1,C2,D1,D2.
+  expect(lines).toHaveLength(4);
+  expect(lines[0]).toMatch(/^set C1 /);
+  expect(lines[1]).toMatch(/^set C2 /);
+  expect(lines[2]).toMatch(/^set D1 /);   // proves +i
+  expect(lines[3]).toMatch(/^set D2 /);   // proves +i AND +j
+  expect(lines[0]).toBe("set C1 value n 1");
+  expect(lines[1]).toBe("set C2 value n 2");
+  expect(lines[2]).toBe("set D1 value n 3");
+  expect(lines[3]).toBe("set D2 empty");
+});
+
+// ===========================================================================
+// Gap B: TestCriteria L6960 — blank type + '=' comparator returns true
+// Kills formula1.ts L6960 ConditionalExpression/LogicalOperator/MethodExpression
+// mutants 6050/6052/6053/6055/6057.
+//
+// The existing TestCriteria test only covers wildcard matching and a null
+// criteria, never blank type with '=' comparator.  Five distinct mutants
+// at L6960 all leave this unobserved:
+//   6050: whole condition → true (branch fires even for non-blank-non-= pairs)
+//   6052: && → || (fires whenever type='b' OR comparitor='=' independently)
+//   6053: type.charAt(0)=='b' → true (any comparitor would pass)
+//   6055: type.charAt(0) → type (whole type string vs 'b', breaks multi-char types)
+//   6057: comparitor=='=' → true (fires even with comparitor='<>')
+// Control tests with wrong type or wrong comparitor must both return false.
+// ===========================================================================
+
+test("TestCriteria: blank type + '=' comparator returns true; controls prove the && (not ||)", async () => {
+  const SC = (await loadSocialCalc()) as FullRuntime;
+  // --- The target branch: blank cell compared with '=' criteria ---
+  // type 'b' AND comparitor '=' → true (empty equals empty)
+  expect(SC.Formula.TestCriteria("", "b", "=")).toBe(true);
+  // --- Kill mutant 6052 (|| instead of &&): wrong type, correct comparitor → must be false ---
+  // type 'n' (number), comparitor '=': base value is empty string → no criteria base value,
+  // comparitor is '=', but type is not 'b' → must return false
+  expect(SC.Formula.TestCriteria(0, "n", "=")).toBe(false);
+  // --- Kill mutant 6053 (type.charAt(0)=='b' → true): correct type, wrong comparitor → false ---
+  // type 'b', comparitor '<>' (not-equal): blank does NOT equal empty with '<>' → false
+  expect(SC.Formula.TestCriteria("", "b", "<>")).toBe(false);
+  // --- Kill mutant 6055 (type.charAt(0) → type): multi-char type starting with 'b' still matches ---
+  // Original uses type.charAt(0)=='b', so type 'bx' still returns true.
+  // Mutant compares whole type string: 'bx'=='b' is false → would return false.
+  expect(SC.Formula.TestCriteria("", "bx", "=")).toBe(true);
+  // Additional control: type starts with 'n' (number cell), comparitor '=', blank value → false
+  expect(SC.Formula.TestCriteria("", "nt", "=")).toBe(false);
+  // --- Kill mutant 6057 (comparitor=='=' → true): blank type with non-= comparitor → false ---
+  expect(SC.Formula.TestCriteria("", "b", "<")).toBe(false);
+  expect(SC.Formula.TestCriteria("", "b", ">")).toBe(false);
+});
+
+test("COUNTIF with '=' criteria counts exactly the blank cells in a range", async () => {
+  // End-to-end kill of the blank-equals-empty branch via the full formula evaluator.
+  // A1=10 (non-blank), A2=blank (never set), A3=blank (never set).
+  // COUNTIF(A1:A3,"=") should return 2 (A2 and A3 are blank, matching criteria "=").
+  const { getDV } = await buildSheet([
+    "set A1 value n 10",
+    // A2 and A3 intentionally left blank
+    'set B1 formula COUNTIF(A1:A3,"=")',
+  ]);
+  expect(getDV("B1")).toBe(2);
+});
