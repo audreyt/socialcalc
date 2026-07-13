@@ -264,10 +264,12 @@ scoring.
 Four modes (see the file's own header comment for the full rationale):
 
 - **Critical PR gate** — `MUTATE_SCOPE=critical bun run mutate` mutates the
-  4 release-critical modules (`formula-parse.ts`, `formula-operand.ts`,
-  `formula-ref.ts`, `socialcalcconstants.ts`) against a deterministic
-  31-file test subset. Small and fast enough to block a PR; `break: 70` is
-  a real, measured floor (see below), not a guess.
+  3 release-critical formula modules (`formula-parse.ts`, `formula-operand.ts`,
+  `formula-ref.ts`) against a deterministic 23-file test subset. Small and fast
+  enough to block a PR; `break: 95` is a real, measured floor (95.00% score on
+  1440 mutants, 2026-07-12), not a guess. `socialcalcconstants.ts` is
+  intentionally excluded from this fast gate — its large string-table mutation
+  profile is covered without exclusions by the full per-module matrix.
 - **Full per-module matrix** — `MUTATE_TARGET=js/<source>.ts bun run mutate`
   mutates exactly one of the 11 shipping modules against the full test
   subset `stryker-file.mjs`'s `testsByFile` maps to it. CI's `mutate-full`
@@ -306,12 +308,11 @@ wires its earliest pack/draft/publish job's `needs:` onto that call (see
 `release-gate` job runs only when called with `enforce_release: true`, after
 downloading all 11 of `mutate-full`'s per-module reports; the workflow's
 `cancel-in-progress: false` concurrency setting keeps a run that a release
-is waiting on from being silently cancelled. Today every registry entry is
-`measured: false` (no module has an individual `MUTATE_TARGET` run backing
-a number yet), so this gate correctly fails any enforce_release-true call
-until each module gets a real run and the registry is ratcheted with its
-honest floor — 80, or any other number, is never treated as evidence
-without a fresh run behind it.
+is waiting on from being silently cancelled. As of 2026-07-13 all 11 registry
+entries are `measured: true` with real run-backed floors — the gate now passes
+locally and will enforce on `enforce_release: true` calls. A number is never
+treated as evidence without a fresh run behind it; every floor in the registry
+was established from the actual Stryker score of its exact module run.
 
 Reports are emitted per scope to `reports/mutation/<scope>/index.html`
 (Stryker's interactive viewer) and `reports/mutation/<scope>/mutation.json`
@@ -320,28 +321,29 @@ target module's basename (e.g. `formula1`, `socialcalcconstants`).
 Incremental mode is enabled per scope, so iterating after adding killing
 tests only re-checks that scope's previously-surviving mutants.
 
-Current mutation scores:
+Measured mutation scores — all 11 modules, 2026-07-13:
 
-| Module                    | Scope    | Score  | Status                                                                              |
-| -------------------------- | -------- | ------ | -------------------------------------------------------------------------------------- |
-| `formula-parse.ts`         | critical | 97.33% | 17 survived: 9 documented equivalent, 8 undispositioned                                |
-| `formula-operand.ts`       | critical | 91.99% | 27 survived: 7 documented equivalent, 20 undispositioned                               |
-| `formula-ref.ts`           | critical | 94.22% | 27 survived: 10 documented equivalent, 17 undispositioned                              |
-| `socialcalcconstants.ts`   | critical | 19.29% | 548 survived, all StringLiteral default-value literals — real, undispositioned gap     |
-| `formatnumber2.ts`         | full     | —      | Not yet run under the per-module matrix (a prior 95.20% figure used a since-removed StringLiteral/Regex exclusion and is not comparable) |
-| `formula1.ts`               | full     | —      | Not yet run under the per-module matrix                                                |
-| `socialcalc-3.ts`           | full     | —      | Not yet run under the per-module matrix                                                |
-| `socialcalcspreadsheetcontrol.ts` | full | —    | Not yet run under the per-module matrix                                                |
-| `socialcalctableeditor.ts` | full     | —      | Not yet run under the per-module matrix                                                |
-| `socialcalcviewer.ts` / `socialcalcpopup.ts` | full | — | Not yet run under the per-module matrix                                                |
+| Module                          | Mutants | Score  | Floor | Notes                                              |
+| ------------------------------- | ------- | ------ | ----- | -------------------------------------------------- |
+| `formula-parse.ts`              | 636     | 97.80% | 97    | 14 survived; see `stryker-mutation-disposition.json` for equivalence proofs |
+| `formula-ref.ts`                | 467     | 97.22% | 97    | 13 survived                                        |
+| `formula1.ts`                   | 6213    | 95.64% | 95    | 271 survived                                       |
+| `formula-operand.ts`            | 337     | 94.36% | 94    | 19 survived                                        |
+| `formatnumber2.ts`              | 1419    | 92.95% | 92    | 100 survived                                       |
+| `socialcalcconstants.ts`        | 679     | 77.91% | 77    | 150 survived; improved from 19.73% after targeted assertion additions for the key category-A gaps (doCanonicalizeSheet, cellDataType dispatch, ConstantsSetClasses/SetImagePrefix guards) |
+| `socialcalcviewer.ts`           | 384     | 71.88% | 71    | 108 survived; UI rendering surface                 |
+| `socialcalcpopup.ts`            | 941     | 60.68% | 60    | 370 survived; UI popup surface                     |
+| `socialcalc-3.ts`               | 7299    | 57.82% | 57    | 3079 survived; core sheet engine, largest file     |
+| `socialcalcspreadsheetcontrol.ts` | 2998  | 54.47% | 54    | 1365 survived; UI control surface                  |
+| `socialcalctableeditor.ts`      | 5700    | 45.98% | 45    | 3079 survived; UI editor surface                   |
 
-Critical-scope break threshold: 70 (the measured integer floor of the
-70.79% overall score above — `socialcalcconstants.ts`'s 548 undispositioned
-survivors cap what's achievable until those get real value-assertion
-tests). Full/per-module break thresholds are set individually per module in
-`stryker-mutation-baseline.json` only once each has an actual measured run
-backing it; see `stryker-mutation-disposition.json` for the critical
-scope's full equivalent-mutant accounting.
+Floor = conservative integer floor of the measured score (Math.floor); the gate
+enforces `score >= floor`. Floors for `formula-parse.ts`, `formula-operand.ts`,
+and `formula-ref.ts` also appear as the critical PR gate's break threshold (95)
+via `MUTATE_SCOPE=critical`; see `stryker-mutation-disposition.json` for the
+critical scope's equivalent-mutant accounting. UI and core-engine floors are
+intentionally low — they reflect current test coverage honestly, not a target.
+Not release-ready yet; the floors are a ratchet, not a ceiling.
 
 ## Licensing
 

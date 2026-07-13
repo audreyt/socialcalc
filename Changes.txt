@@ -34,34 +34,28 @@ Toolchain and testing
   swallowing behavior.
 - Added a Stryker mutation-testing gate with no mutator exclusions
   (StringLiteral/Regex mutants are real, observable behaviour and are
-  scored, not filtered). `MUTATE_SCOPE=critical` mutates the 4
-  release-critical formula/constants modules against a deterministic
-  31-file test subset — measured 70.79% (2119 mutants, 619 survived),
-  break threshold 70 (the honest integer floor;
-  `socialcalcconstants.ts`'s 548 undispositioned StringLiteral survivors
-  are the dominant remaining gap, tracked in
-  `stryker-mutation-disposition.json` rather than hidden). `MUTATE_TARGET`
-  gates one of the 11 shipping modules at a time against its own test
-  subset; `.github/workflows/mutation.yml` runs this as a per-module CI
-  matrix (`mutate-full`) on PR (critical scope), nightly, and manual
-  dispatch, uploading every module's JSON/HTML report even when red. Each
-  module's break threshold comes from `stryker-mutation-baseline.json` and
-  stays report-only (`break: null`) until an actual run establishes it —
-  no placeholder number is ever treated as a measured floor. The workflow
-  has no `push: tags: v*` trigger of its own; it's a `workflow_call`
-  reusable workflow (inputs: `scope`, `enforce_release`) meant to be
-  invoked from `release.yml`'s own job DAG (`scope: full, enforce_release:
-  true`, with the publish job's `needs:` depending on that call) so
-  mutation evidence and release publish share one run instead of racing as
-  two independent workflows — see the workflow's header comment for the
-  exact job block `release.yml` (on a sibling, not-yet-merged branch) still
-  needs to add. `release-gate` (`scripts/mutate-release-gate.mjs`, also
-  runnable locally as `bun run mutate:release-gate`) runs only when called
-  with `enforce_release: true` and refuses to pass unless every one of the
-  11 modules has both a fresh report and a real measured, passing baseline;
-  `bun run mutate:all` runs the same 11 modules sequentially for local use.
-  `cancel-in-progress: false` so a run a release is waiting on is never
-  silently cancelled.
+  scored, not filtered). All 11 shipping modules are now individually
+  measured (2026-07-13) and registered in `stryker-mutation-baseline.json`
+  with conservative integer-floor break thresholds:
+  formula-parse.ts 97%, formula-ref.ts 97%, formula1.ts 95%,
+  formula-operand.ts 94%, formatnumber2.ts 92%,
+  socialcalcconstants.ts 77% (improved from 19.73% after targeted assertion
+  additions for category-A gaps — doCanonicalizeSheet, cellDataType dispatch
+  table, ConstantsSetClasses/SetImagePrefix guards), socialcalcviewer.ts 71%,
+  socialcalcpopup.ts 60%, socialcalc-3.ts 57%,
+  socialcalcspreadsheetcontrol.ts 54%, socialcalctableeditor.ts 45%.
+  UI and core-engine floors are intentionally honest low-water marks, not
+  targets; the baseline is a ratchet, never a ceiling.
+  `MUTATE_SCOPE=critical` mutates the 3 release-critical formula modules
+  (`formula-parse.ts`, `formula-operand.ts`, `formula-ref.ts`) against a
+  deterministic 23-file test subset — measured 95.00% (1440 mutants, 2026-07-12),
+  break threshold 95. `MUTATE_TARGET` gates one module at a time against its
+  own test subset; `.github/workflows/mutation.yml` runs this as a per-module
+  CI matrix (`mutate-full`). `release-gate` (`scripts/mutate-release-gate.mjs`,
+  `bun run mutate:release-gate`) refuses to pass unless every module has a
+  fresh report and a real measured, passing baseline — no placeholder number is
+  ever treated as evidence. `bun run mutate:all` runs the full 11 sequentially
+  for local use.
 
 Security
 - Added an opt-in, off-by-default policy for rendering sheets from
