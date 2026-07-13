@@ -1,24 +1,44 @@
 {
   "$description": "Machine-readable disposition of Stryker survivors reviewed as behaviorally equivalent in the three critical formula modules (js/formula-parse.ts, js/formula-operand.ts, js/formula-ref.ts). This documentation never excludes or suppresses mutants: every survivor remains counted in Stryker reports. It records ONLY proof-quality equivalence arguments for mutants explicitly listed in `entries`. It does NOT claim a survivor is 'covered' or 'killed' by a new test unless an actual fresh (or targeted incremental) Stryker rerun shows that exact mutant's status flip to Killed — a test file merely targeting a survivor is not evidence and is never enough to disposition it here. socialcalcconstants.ts is intentionally outside this critical registry and remains in the full 11-module matrix with no mutator exclusions.",
   "$schema_note": "entries[].location uses Stryker's own 1-based line/column mutant location format. Stryker reassigns numeric mutant `id`s per run, so entries[].id is NOT stable across runs and must not be used to cross-reference a fresh mutation.json — match on (file, mutatorName, location, replacement) instead, which is stable for as long as the source line doesn't move. scripts/verify-mutation-disposition.mjs implements this exact matching and fails loudly on any Survived mutant in a fresh report that has no entry here.",
-  "reviewedAt": "2026-07-12",
+  "reviewedAt": "2026-07-13",
   "reviewedAgainst": {
-    "mutationJson": "reports/mutation/critical/mutation.json (temporary combined merge of integration per-file formula-parse/operand/ref reports; 2026-07-13 final-gate-plumbing)",
-    "measuredCriticalScope": {
-      "note": "Fresh no-exclusion run after narrowing critical scope to exactly formula-parse.ts, formula-operand.ts, and formula-ref.ts; deterministic 23-file test subset.",
-      "total": 1440,
-      "killed": 1280,
-      "timeout": 88,
-      "survived": 72,
-      "score": "95.00%"
+    "mutationJson": "reports/mutation/critical/mutation.json — temporary untracked merge of files{} from the three final per-file reports reports/mutation/{formula-parse,formula-operand,formula-ref}/mutation.json (integration copies). Built for disposition-audit only; not a single combined Stryker run and no combined score is claimed.",
+    "perFileReports": {
+      "note": "Per-file measured scores from the final integration reports (each module mutated alone). Survivors are summed for disposition accounting; do not treat the sum as a single critical-scope Stryker score.",
+      "js/formula-parse.ts": {
+        "report": "reports/mutation/formula-parse/mutation.json",
+        "total": 636,
+        "killed": 583,
+        "timeout": 39,
+        "survived": 14,
+        "score": "97.80%"
+      },
+      "js/formula-operand.ts": {
+        "report": "reports/mutation/formula-operand/mutation.json",
+        "total": 337,
+        "killed": 282,
+        "timeout": 36,
+        "survived": 19,
+        "score": "94.36%"
+      },
+      "js/formula-ref.ts": {
+        "report": "reports/mutation/formula-ref/mutation.json",
+        "total": 467,
+        "killed": 437,
+        "timeout": 17,
+        "survived": 13,
+        "score": "97.22%"
+      },
+      "combinedSurvivedForDispositionAudit": 46
     },
-    "entriesInThisFile": 46,
+    "entriesInThisFile": 47,
     "entriesStillSurvivedInFreshRun": 46,
-    "entriesNowKilledInFreshRun": 0,
-    "note": "Combined fresh per-file reports (formula-parse 14 + formula-operand 19 + formula-ref 13 = 46 Survived) fully accounted by entries[]. Former id=476 (EqualityOperator cclass != charclass.numstart @ formula-parse.ts:121:9-121:37) was Killed in the fresh per-file formula-parse report and removed as a genuinely stale disposition entry (tuple present only as Killed, not as Survived). Zero undispositioned survivors; zero absent tuples."
+    "entriesNowKilledInFreshRun": 1,
+    "note": "Disposition audit against the temporary multi-file merge of the three final per-file reports (2026-07-13). Survived mutants: formula-parse 14 + formula-operand 19 + formula-ref 13 = 46, every one matching an entries[] tuple (zero undispositioned). Registry has 47 entries: 46 still Survived plus id=476 (EqualityOperator cclass != charclass.numstart @ formula-parse.ts:121:9-121:37), which is present as Killed in the fresh formula-parse report (report mutant id 139; same stable tuple) and is intentionally retained as a valid equivalence proof — findStaleEntries treats Killed tuples as non-stale. Zero absent/stale entries. Not a re-run of the old 72-survivor critical-scope measurement; no combined critical score is asserted from this merge."
   },
   "undispositionedSurvivors": {
-    "note": "Recomputed 2026-07-13 from combined fresh per-file reports (reports/mutation/{formula-parse,formula-operand,formula-ref}/mutation.json merged files). All 46 Survived mutants match an entries[] tuple. socialcalcconstants.ts remains out of critical-registry scope.",
+    "note": "Recomputed 2026-07-13 from the temporary combined multi-file report (files merged from final per-file formula-parse/operand/ref mutation.json). All 46 Survived mutants match an entries[] tuple — zero open formula-module gaps. socialcalcconstants.ts remains out of critical-registry scope (historical full-matrix figure, not recomputed here).",
     "js/formula-operand.ts": 0,
     "js/formula-parse.ts": 0,
     "js/formula-ref.ts": 0,
@@ -40,6 +60,23 @@
       },
       "replacement": "true",
       "justification": "Every `if (state == X)` block in ParseFormulaIntoTokens is a bare `if`, not `else if`, so a state change made here lets the SAME character cascade into the coord-state block within the same loop iteration. Forcing this incoord check to always transition to `state = coord` (instead of only for the literal '$' char) is unobservable because: (1) `str` accumulated while in the alpha state can never contain a digit (a digit transitions out of alpha before being appended), so `coordregex` (which requires a trailing digit) can never match, meaning the coord-state handler's op/numstart/space/eof branch always falls back to pushing the same `name` token the alpha branch would have pushed directly; and (2) the coord-state error branch pushes the identical `s_parseerrchar` text the alpha branch's error branch would have pushed. An exhaustive differential test of every printable-ASCII 2-char suffix after 'A' and '$', comparing the real function against a mutated clone, found zero distinguishing input.",
+      "file": "js/formula-parse.ts"
+    },
+    {
+      "id": 476,
+      "mutatorName": "EqualityOperator",
+      "location": {
+        "start": {
+          "line": 121,
+          "column": 9
+        },
+        "end": {
+          "line": 121,
+          "column": 37
+        }
+      },
+      "replacement": "cclass != charclass.numstart",
+      "justification": "charclass.numstart (2) is assigned to exactly one character in CharClassTable: '.'. The alpha state's own second branch (`cclass == charclass.alpha || ch == \".\"`) already intercepts every '.' character before this terminator group is ever reached, so `cclass == charclass.numstart` can never be observed true (nor can flipping it to != ever be observed false in a way that changes control flow) at this program point. The clause is provably dead code given the fixed CharClassTable content.",
       "file": "js/formula-parse.ts"
     },
     {
