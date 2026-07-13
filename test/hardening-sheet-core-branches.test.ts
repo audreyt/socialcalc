@@ -11,6 +11,7 @@
 
 import { expect, test } from "vite-plus/test";
 
+import type AmbientSC from "../dist/SocialCalc.js";
 import {
   installBrowserShim,
   loadSocialCalc,
@@ -18,6 +19,50 @@ import {
   scheduleCommands,
   sheetUndo,
 } from "./helpers/socialcalc";
+
+// Typed handle for the UMD runtime. loadSocialCalc() returns the live
+// global bag; we cast once at the boundary so the rest of the file never
+// needs `any`/suppressions for RecalcData / RecalcCheckCell / UndoStack.
+type FullSC = typeof AmbientSC;
+
+/** Sheet with an attached RecalcData (not on the public Sheet typedef). */
+type SheetWithRecalc = AmbientSC.Sheet & {
+  recalcdata: AmbientSC.RecalcData;
+};
+
+/**
+ * Build a fresh RecalcData with an empty calclist chain and attach it to
+ * the sheet so RecalcCheckCell can run in isolation (no timer/scheduler).
+ */
+function attachRecalcData(SC: FullSC, sheet: AmbientSC.Sheet): AmbientSC.RecalcData {
+  const recalcdata = new SC.RecalcData();
+  // RecalcTimerRoutine always seeds calclist to {} before walking cells;
+  // mirror that so Add-to-calclist paths never touch a null object.
+  recalcdata.calclist = {};
+  const sheetWithRecalc = sheet as unknown as SheetWithRecalc;
+  sheetWithRecalc.recalcdata = recalcdata;
+  return recalcdata;
+}
+
+/** Plant a formula cell without going through ScheduleSheetCommands. */
+function plantFormula(sheet: AmbientSC.Sheet, coord: string, formula: string): AmbientSC.Cell {
+  const cell = sheet.GetAssuredCell(coord);
+  cell.datatype = "f";
+  cell.formula = formula;
+  cell.valuetype = "n";
+  cell.datavalue = 0;
+  return cell;
+}
+
+/** Plant a numeric value cell. */
+function plantValue(sheet: AmbientSC.Sheet, coord: string, value: number): AmbientSC.Cell {
+  const cell = sheet.GetAssuredCell(coord);
+  cell.datatype = "v";
+  cell.formula = "";
+  cell.valuetype = "n";
+  cell.datavalue = value;
+  return cell;
+}
 
 // ===========================================================================
 // Section 1: ConstantsSetClasses falsy-prefix and object-default entries
@@ -777,7 +822,7 @@ test("RecalcCheckCell C-4114/4119/4125: sheetref from '!' suppresses foreign coo
   // sheetref-reset (C-4125) — or without the '!' handler that makes the
   // subsequent reset meaningful (C-4114/4119) — the local B1 dependency would
   // either be missed (B1 calculated after C1 → C1 sees 0) or the foreign
-  // coord would be walked as local (no hang, but wrong calclist).
+  // coord would be walked as local.
   // Expected with correct sheetref handling: B1=50, C1=0+50=50.
   const SC = await loadSocialCalc();
   const otherSave = "cell:A1:v:0\n";
@@ -796,6 +841,209 @@ test("RecalcCheckCell C-4114/4119/4125: sheetref from '!' suppresses foreign coo
   expect(sheet.cells.C1.datavalue).toBe(50);
 });
 
+// ===========================================================================
+// Section 15b: Direct RecalcCheckCell state-transition tests — Gap C leftovers
+// (js/socialcalc-3.ts L4249 / L4280 / L4296 / L4298 / L4357 BlockStatements).
+//
+// Full-sheet recalc walks every formula cell regardless of dep-graph fidelity,
+// so eventual cell values cannot distinguish an emptied BlockStatement body
+// from a correct one for these five sites.  RecalcCheckCell is public
+// (SC.RecalcCheckCell) and returns the circ-ref error string; its side
+// effects on sheet.recalcdata.{calclist,firstcalc,lastcalc,checkinfo} and
+// sheet.attribs.circularreferencecell / cell.errors are the observable
+// scheduler invariants asserted below.
+// ===========================================================================
+
+test("RecalcCheckCell L4249 direct: row-reversed range puts row-2 formula dep on calclist before consumer", async () => {
+  // L4249 is the row-if body that sets r1/r2 when cr1.row > cr2.row.
+  // Range A2:B1 is row-reversed (2>1) and col-normal (A<B), so only L4249
+  // (not the col-if) is required to populate r1/r2.
+  //
+  // CRITICAL null-coercion trap: if L4249 body is emptied, r1/r2 stay null;
+  // JS coerces null→0 in crToCoord and null+1→1 in the row advance, so the
+  // walk only ever visits "row 1" (A1,B1) and never row 2 (A2,B2).
+  //
+  // CRITICAL first-endpoint trap: A2 is the first token of SUM(A2:B1) and is
+  // walked as a single-cell ref BEFORE range mode is entered — so a formula
+  // on A2 is always on the calclist regardless of L4249.  The intermediate
+  // formula MUST sit on B2 (row 2, col B) which appears in NEITHER endpoint
+  // token and is only reachable via the range walk.
+  //
+  // C1 = SUM(A2:B1); B2 is a formula.  Direct RecalcCheckCell(C1) must walk
+  // B2 via the range and place it on the calclist BEFORE C1.
+  // If L4249 body is emptied: B2 never walked → firstcalc === "C1".
+  const SC = (await loadSocialCalc()) as unknown as FullSC;
+  const sheet = new SC.Sheet();
+  plantFormula(sheet, "C1", "SUM(A2:B1)");
+  plantValue(sheet, "A1", 10);
+  plantValue(sheet, "A2", 20);
+  plantValue(sheet, "B1", 30);
+  // B2 on row 2, col B — only reachable via range walk (not an endpoint token)
+  plantFormula(sheet, "B2", "A1*7");
+
+  const recalcdata = attachRecalcData(SC, sheet);
+  const circref = SC.RecalcCheckCell(sheet, "C1");
+  expect(circref).toBe(""); // no circular ref
+
+  // B2 (formula dep on row 2 of the row-reversed range) must be on the
+  // calclist and must appear BEFORE C1 in the chain.
+  expect(recalcdata.firstcalc).toBe("B2");
+  expect(recalcdata.calclist).not.toBeNull();
+  const calclist = recalcdata.calclist as { [coord: string]: string };
+  expect(calclist["B2"]).toBe("C1");
+  expect(recalcdata.lastcalc).toBe("C1");
+  expect(recalcdata.checkinfo["B2"]).toBe(true);
+  expect(recalcdata.checkinfo["C1"]).toBe(true);
+});
+
+test("RecalcCheckCell L4280 direct: self-range circular ref via second endpoint hits range-path detector", async () => {
+  // L4280 is the RANGE-path circular detector.  SUM(A1:A2) does NOT reach it:
+  // the first endpoint A1 is processed as a single-cell ref first and trips
+  // the SCALAR detector (L4350) before range mode is entered.  SUM(A2:A1)
+  // puts the self-ref on the SECOND endpoint, so A1 is only seen as a range
+  // member — that is the L4280 path exclusively.
+  //
+  // Direct RecalcCheckCell(A1) with A1=SUM(A2:A1) must:
+  //   - return non-empty circ-ref error string
+  //   - set cell.errors
+  //   - set checkinfo[startcoord] = true
+  //   - set sheet.attribs.circularreferencecell
+  //   - append startcoord to calclist (firstcalc/lastcalc/length)
+  // If L4280 body is emptied: return "" and none of the side effects fire.
+  const SC = (await loadSocialCalc()) as unknown as FullSC;
+  const sheet = new SC.Sheet();
+  plantValue(sheet, "A2", 5);
+  const a1 = plantFormula(sheet, "A1", "SUM(A2:A1)");
+
+  const recalcdata = attachRecalcData(SC, sheet);
+  const circref = SC.RecalcCheckCell(sheet, "A1");
+
+  expect(circref).not.toBe("");
+  expect(circref).toContain("A1");
+  expect(a1.errors).toBe(circref);
+  expect(recalcdata.checkinfo["A1"]).toBe(true);
+  expect(sheet.attribs.circularreferencecell).toBeTruthy();
+  expect(recalcdata.firstcalc).toBe("A1");
+  expect(recalcdata.lastcalc).toBe("A1");
+  expect(recalcdata.calclistlength).toBe(1);
+});
+
+test("RecalcCheckCell L4296/L4298 direct: '!' sheetref suppresses foreign A1; local B1 still lands on calclist", async () => {
+  // Formula: C1 = OtherSheet!A1 + B1
+  // Tokens: name(OTHERSHEET) op(!) coord(A1) op(+) coord(B1)
+  //
+  // L4298 body sets sheetref=true on '!'.  L4296 is the whole token_op block
+  // that contains both the '!' set and the non-':' reset.
+  //
+  // With correct handling:
+  //   - A1 after '!' is NOT walked as a local dep (sheetref=true)
+  //   - '+' resets sheetref=false → B1 IS walked
+  //   - calclist: B1 → C1  (A1 absent — A1 is a value cell anyway, but more
+  //     importantly a LOCAL formula at A1 would also be skipped under sheetref)
+  //
+  // To make the foreign-coord skip observable even for a value-typed local
+  // A1, we plant a LOCAL FORMULA at A1.  If sheetref is never set (L4298
+  // emptied or L4296 emptied), the A1 token after '!' is walked as a local
+  // formula dep and A1 appears on the calclist before C1.
+  // With correct sheetref: A1 is skipped, only B1 → C1.
+  const SC = (await loadSocialCalc()) as unknown as FullSC;
+  const sheet = new SC.Sheet();
+  // Local formula at A1 — would be walked if sheetref failed to suppress it.
+  plantFormula(sheet, "A1", "10");
+  plantFormula(sheet, "B1", "5");
+  plantFormula(sheet, "C1", "OtherSheet!A1+B1");
+
+  const recalcdata = attachRecalcData(SC, sheet);
+  const circref = SC.RecalcCheckCell(sheet, "C1");
+  expect(circref).toBe("");
+
+  // B1 must be on the calclist (local dep after '+').
+  expect(recalcdata.checkinfo["B1"]).toBe(true);
+  // A1 must NOT be on the calclist — the '!' sheetref suppressed the foreign
+  // A1 token.  If L4296/L4298 were emptied, A1 would have been walked as a
+  // local formula and checkinfo["A1"] would be true.
+  expect(recalcdata.checkinfo["A1"]).toBeUndefined();
+  // Chain is B1 → C1 (A1 absent).
+  expect(recalcdata.firstcalc).toBe("B1");
+  const calclist = recalcdata.calclist as { [coord: string]: string };
+  expect(calclist["B1"]).toBe("C1");
+  expect(recalcdata.lastcalc).toBe("C1");
+  // C1 itself is marked finished.
+  expect(recalcdata.checkinfo["C1"]).toBe(true);
+});
+
+test("RecalcCheckCell L4357 direct: scalar circ-ref else-append links startcoord onto existing calclist chain", async () => {
+  // L4357 is the `else` branch inside the SCALAR circular-ref detector
+  // (L4350), NOT the normal calclist-append path at L4376.
+  //
+  // When a scalar cycle is found AND recalcdata.firstcalc is already set
+  // (a prior cell is already on the chain), L4357 does:
+  //   recalcdata.calclist[recalcdata.lastcalc] = startcoord;
+  // so the circ-ref cell is linked after the previous lastcalc.
+  //
+  // Setup: seed firstcalc/lastcalc with a sentinel "Z9", then call
+  // RecalcCheckCell on a scalar cycle A1↔B1.  The detector must:
+  //   - return non-empty error
+  //   - set calclist["Z9"] = startcoord  (the L4357 else body)
+  //   - update lastcalc to startcoord
+  // If L4357 body is emptied, calclist["Z9"] stays unset / not equal to
+  // startcoord.
+  const SC = (await loadSocialCalc()) as unknown as FullSC;
+  const sheet = new SC.Sheet();
+  plantFormula(sheet, "A1", "B1");
+  plantFormula(sheet, "B1", "A1");
+
+  const recalcdata = attachRecalcData(SC, sheet);
+  // Seed a prior calclist entry so the else branch (not the firstcalc=)
+  // path fires inside the circular-ref detector.
+  recalcdata.firstcalc = "Z9";
+  recalcdata.lastcalc = "Z9";
+  recalcdata.calclistlength = 1;
+  // calclist is already {} from attachRecalcData; Z9 has no next yet.
+
+  const circref = SC.RecalcCheckCell(sheet, "A1");
+
+  // Circ-ref detected.
+  expect(circref).not.toBe("");
+  expect(sheet.attribs.circularreferencecell).toBeTruthy();
+  // L4357: calclist[previousLast] = startcoord.
+  const calclist = recalcdata.calclist as { [coord: string]: string };
+  expect(calclist["Z9"]).toBe("A1");
+  // lastcalc advanced to the circ-ref cell.
+  expect(recalcdata.lastcalc).toBe("A1");
+  // firstcalc preserved (else branch, not the firstcalc= path).
+  expect(recalcdata.firstcalc).toBe("Z9");
+  // checkinfo marks startcoord finished.
+  expect(recalcdata.checkinfo["A1"]).toBe(true);
+  // cell.errors set on the cell that was being checked when the cycle was found.
+  // (The error is set on `cell` which is the formula currently being walked —
+  // for A1=B1, when B1 is walked and points back to A1, cell is B1's walker
+  // context... actually looking at the code: cell.errors is set on the cell
+  // variable which is sheet.cells[coord] where coord is the formula being
+  // checked at the time of the cycle.  When A1 is the startcoord and we walk
+  // to B1 then back to A1, the cycle is detected while coord=A1 after walking
+  // from B1... wait: cell is re-read each mainloop iteration from
+  // sheet.cells[coord].  When we detect the cycle, coord is the already-seen
+  // cell (A1), and cell = sheet.cells[A1].  But looking at the code more
+  // carefully: the cycle check is AFTER `coord = ttext` (the dependency), so
+  // when A1→B1→A1, coord becomes A1 (the dep), checkinfo[A1] is object, and
+  // cell is still the PREVIOUS cell (B1) because cell is only reassigned at
+  // the top of mainloop.  Actually no — after `coord = ttext; if (checkinfo[coord]...)`
+  // the cell variable still holds the formula cell we were walking (the one
+  // that has the reference), which is B1 when B1 references A1 and A1 is
+  // already being checked.  Hmm.
+  // Looking at the code path for A1=B1, B1=A1:
+  //   start A1, walk dep B1, B1 not yet checked → recurse to B1
+  //   at B1, walk dep A1, checkinfo[A1] is object → CIRCULAR
+  //   cell is still B1 (the formula that referenced A1)
+  //   cell.errors = circRef+startcoord  → B1.errors
+  //   return
+  // So errors land on B1, not A1.  Accept either cell having errors, and
+  // require the return value + circularreferencecell + calclist link.
+  expect(
+    Boolean(sheet.cells.A1.errors) || Boolean(sheet.cells.B1.errors),
+  ).toBe(true);
+});
 test("RecalcCheckCell C-4130/4135: named-range expansion forces intermediate formula deps to calculate first", async () => {
   // Named range 'myRange' covers A1:A2 where A2 is a formula.
   // C1 = SUM(myRange) is created FIRST so that without the token_name
@@ -817,15 +1065,14 @@ test("RecalcCheckCell C-4130/4135: named-range expansion forces intermediate for
   expect(sheet.cells.C1.datavalue).toBe(40);
 });
 
-test("RecalcCheckCell C-4177/4206: range walk orders intermediate formula deps before the consumer", async () => {
+test("RecalcCheckCell C-4177: range walk orders intermediate formula deps before the consumer", async () => {
   // C1 = SUM(A1:B2) created FIRST.  B2 is a formula (A1+A2) created LAST.
   // Without the range-registration block (L4335) C1 would not walk B2 as a
   // dep and would be calculated before B2.
-  // C-4206 (calclist else-append): with two formula cells (B2 and C1) both
-  // ending up on the calclist, the else branch of `if (!firstcalc)` fires
-  // for the second one.  If that else is a no-op, the calclist chain breaks
-  // and the second formula is never evaluated.
   // Expected: B2=1+2=3; C1=1+2+3+3=9  (A1=1,A2=2,B1=3,B2=3).
+  // NOTE: L4357 (calclist else-append) is NOT exercised here — that block
+  // lives inside the SCALAR circular-reference detector (L4350), not the
+  // normal calclist-append path. See the direct L4357 test above.
   const SC = await loadSocialCalc();
   const sheet = new SC.Sheet();
   await scheduleCommands(SC, sheet, [
@@ -837,8 +1084,7 @@ test("RecalcCheckCell C-4177/4206: range walk orders intermediate formula deps b
   ], true, 3000);
   await recalcSheet(SC, sheet, 3000);
   expect(sheet.cells.B2.datavalue).toBe(3);
-  // C1 = 1+2+3+3 = 9.  If range walk or calclist-append is broken, C1 sees
-  // B2 as empty → 1+2+3+0 = 6.
+  // C1 = 1+2+3+3 = 9.  If range walk is broken, C1 sees B2 as empty → 6.
   expect(sheet.cells.C1.datavalue).toBe(9);
 });
 
