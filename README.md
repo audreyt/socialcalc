@@ -302,9 +302,9 @@ it's a `workflow_call` reusable workflow (inputs: `scope`,
 `enforce_release`), invoked by `release.yml` with `scope: full,
 enforce_release: true` so mutation evidence and the release pipeline share
 one run's DAG instead of racing as two independent workflows; `release.yml`
-wires its earliest pack/draft/publish job's `needs:` onto that call (see
-`.github/workflows/mutation.yml`'s header comment for the exact job block —
-`release.yml` lives on a sibling branch and hasn't picked this up yet). CI's
+wires its `mutation` job onto that call (see
+`.github/workflows/mutation.yml`'s header comment for the exact job block).
+CI's
 `release-gate` job runs only when called with `enforce_release: true`, after
 downloading all 11 of `mutate-full`'s per-module reports; the workflow's
 `cancel-in-progress: false` concurrency setting keeps a run that a release

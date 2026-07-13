@@ -44,11 +44,10 @@ name: Mutation
 # downloads every module's fresh report and hard-fails unless ALL 11
 # modules have both a fresh report AND a stryker-mutation-baseline.json
 # entry that's actually `measured: true` with a passing score —
-# scripts/mutate-release-gate.mjs is the same check `bun run
-# mutate:release-gate` runs locally. Right now every module in the registry
-# is `measured: false`, so release-gate correctly fails any
-# enforce_release-true call until each module gets its first real per-file
-# run and the registry is ratcheted with an honest floor.
+# scripts/mutate-release-gate.mjs is the same check `vp run
+# mutate:release-gate` runs locally. All 11 modules in the registry are now
+# `measured: true`, so release-gate enforces both a fresh per-module report
+# and each module's passing threshold on any enforced release call.
 #
 # release.yml wiring: applied. release.yml's own `mutation` job (same job
 # name, so `package`/`publish`'s existing `needs: [..., mutation, ...]`
@@ -158,7 +157,7 @@ jobs:
       - name: Mutation test (critical scope)
         env:
           MUTATE_SCOPE: critical
-        run: bun run mutate
+        run: vp run mutate
 
       - name: Upload mutation report
         if: always()
@@ -247,7 +246,7 @@ jobs:
       - name: Mutation test (${{ matrix.file }})
         env:
           MUTATE_TARGET: ${{ matrix.file }}
-        run: bun run mutate
+        run: vp run mutate
 
       - name: Upload mutation report
         if: always()
@@ -267,12 +266,11 @@ jobs:
   # but ONLY when this workflow was called with `enforce_release: true`
   # (i.e. from release.yml's release path — see the header comment's
   # "Required release.yml wiring"), never on a bare PR/schedule/manual run.
-  # Right now every module in the registry is `measured: false`, so this
-  # job correctly fails any enforce_release-true call until each module
-  # gets its first real per-file run and the registry is ratcheted with an
-  # honest floor.
+  # All 11 registry modules are `measured: true`, so this job enforces each
+  # module's measured baseline threshold and required fresh report in release
+  # runs.
   release-gate:
-    name: mutation (release gate — all 11 modules measured?)
+    name: mutation (release gate — all 11 modules enforced)
     needs: mutate-full
     # `inputs.enforce_release` alone is enough to scope this to a real
     # workflow_call with `enforce_release: true`: that input only exists
@@ -311,4 +309,4 @@ jobs:
           merge-multiple: false
 
       - name: Verify every shipping module has a measured, passing baseline
-        run: bun run mutate:release-gate
+        run: vp run mutate:release-gate

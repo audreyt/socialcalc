@@ -72,7 +72,7 @@ assert.match(mutation, /release-gate:[\s\S]*?\n\s+needs: mutate-full\n/);
 assert.match(mutation, /if: always\(\) && inputs\.enforce_release == true/);
 assert.match(mutation, /pattern: mutation-report-\*/);
 assert.match(mutation, /path: artifacts/);
-assert.match(mutation, /run: bun run mutate:release-gate/);
+assert.match(mutation, /run: vp run mutate:release-gate/);
 const gate = readFileSync("scripts/mutate-release-gate.mjs", "utf8");
 assert.match(gate, /export function validMeasuredBaseline/);
 assert.match(gate, /GITHUB_ACTIONS === "true"/);
