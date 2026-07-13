@@ -9,7 +9,7 @@
 // mutate-everything-against-the-full-suite mode, since each module here
 // only pays for its own test subset, not the whole suite.
 //
-// Usage: vp node scripts/mutate-all.mjs
+// Usage: vp run mutate:all  (or: node scripts/mutate-all.mjs)
 //
 // Runs every module even after an earlier one fails (so a single pass
 // always yields every module's report/score, not just the first failure),

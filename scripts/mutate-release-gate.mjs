@@ -34,7 +34,7 @@
 // artifact downloaded fresh for this exact run counts as evidence, never a
 // stale on-disk report left over from a previous checkout state.
 //
-// Usage: vp node scripts/mutate-release-gate.mjs
+// Usage: vp run mutate:release-gate  (or: node scripts/mutate-release-gate.mjs)
 
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";

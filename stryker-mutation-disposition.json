@@ -1,9 +1,9 @@
 {
-  "$description": "Machine-readable disposition of Stryker survivors reviewed as behaviorally equivalent in the three critical formula modules (js/formula-parse.ts, js/formula-operand.ts, js/formula-ref.ts). This documentation never excludes or suppresses mutants: every survivor remains counted in Stryker reports. It records ONLY proof-quality equivalence arguments for mutants explicitly listed in `entries`. It does NOT claim a survivor is 'covered' or 'killed' by a new test unless an actual fresh (or targeted incremental) Stryker rerun shows that exact mutant's status flip to Killed \u2014 a test file merely targeting a survivor is not evidence and is never enough to disposition it here. socialcalcconstants.ts is intentionally outside this critical registry and remains in the full 11-module matrix with no mutator exclusions.",
-  "$schema_note": "entries[].location uses Stryker's own 1-based line/column mutant location format. Stryker reassigns numeric mutant `id`s per run, so entries[].id is NOT stable across runs and must not be used to cross-reference a fresh mutation.json \u2014 match on (file, mutatorName, location, replacement) instead, which is stable for as long as the source line doesn't move. scripts/verify-mutation-disposition.mjs implements this exact matching and fails loudly on any Survived mutant in a fresh report that has no entry here.",
+  "$description": "Machine-readable disposition of Stryker survivors reviewed as behaviorally equivalent in the three critical formula modules (js/formula-parse.ts, js/formula-operand.ts, js/formula-ref.ts). This documentation never excludes or suppresses mutants: every survivor remains counted in Stryker reports. It records ONLY proof-quality equivalence arguments for mutants explicitly listed in `entries`. It does NOT claim a survivor is 'covered' or 'killed' by a new test unless an actual fresh (or targeted incremental) Stryker rerun shows that exact mutant's status flip to Killed — a test file merely targeting a survivor is not evidence and is never enough to disposition it here. socialcalcconstants.ts is intentionally outside this critical registry and remains in the full 11-module matrix with no mutator exclusions.",
+  "$schema_note": "entries[].location uses Stryker's own 1-based line/column mutant location format. Stryker reassigns numeric mutant `id`s per run, so entries[].id is NOT stable across runs and must not be used to cross-reference a fresh mutation.json — match on (file, mutatorName, location, replacement) instead, which is stable for as long as the source line doesn't move. scripts/verify-mutation-disposition.mjs implements this exact matching and fails loudly on any Survived mutant in a fresh report that has no entry here.",
   "reviewedAt": "2026-07-12",
   "reviewedAgainst": {
-    "mutationJson": "reports/mutation/critical/mutation.json (fresh run 2026-07-12 18:06; not checked in, regenerate via an isolated sandbox MUTATE_SCOPE=critical run \u2014 never in this working checkpoint, see the repo-level ABSOLUTE RULE against running Stryker here)",
+    "mutationJson": "reports/mutation/critical/mutation.json (temporary combined merge of integration per-file formula-parse/operand/ref reports; 2026-07-13 final-gate-plumbing)",
     "measuredCriticalScope": {
       "note": "Fresh no-exclusion run after narrowing critical scope to exactly formula-parse.ts, formula-operand.ts, and formula-ref.ts; deterministic 23-file test subset.",
       "total": 1440,
@@ -12,16 +12,16 @@
       "survived": 72,
       "score": "95.00%"
     },
-    "entriesInThisFile": 47,
-    "entriesStillSurvivedInFreshRun": 43,
-    "entriesNowKilledInFreshRun": 1,
-    "note": "Fresh report has 72 survivors. 43 of them match a proof-quality equivalence entry in this registry (27 carried over plus 16 newly reviewed this session; a 44th entry, id=476, was survived when written but is now incidentally Killed in the fresh report \u2014 left in place as a still-valid equivalence proof, not removed). The remaining 29 fresh formula-module survivors are NOT dispositioned here: new boundary/error/type/reference tests in the three survivor test files target them, but no isolated-sandbox Stryker rerun has confirmed any of the 29 actually flips to Killed, so they are UNVERIFIED gaps, not 'covered' or 'resolved' \u2014 see undispositionedSurvivors below for the exact per-file breakdown pending a real rerun. This registry does not claim zero undispositioned survivors; scripts/verify-mutation-disposition.mjs recomputes and enforces this count directly from a fresh report."
+    "entriesInThisFile": 46,
+    "entriesStillSurvivedInFreshRun": 46,
+    "entriesNowKilledInFreshRun": 0,
+    "note": "Combined fresh per-file reports (formula-parse 14 + formula-operand 19 + formula-ref 13 = 46 Survived) fully accounted by entries[]. Former id=476 (EqualityOperator cclass != charclass.numstart @ formula-parse.ts:121:9-121:37) was Killed in the fresh per-file formula-parse report and removed as a genuinely stale disposition entry (tuple present only as Killed, not as Survived). Zero undispositioned survivors; zero absent tuples."
   },
   "undispositionedSurvivors": {
-    "note": "Exact counts of Survived mutants with no matching entries[] tuple. The three formula-module counts below are freshly recomputed from the 2026-07-12 18:06 critical report (reports/mutation/critical/mutation.json) via scripts/verify-mutation-disposition.mjs and are real, currently-open gaps pending an isolated-sandbox rerun after the new survivor tests are verified to actually kill them \u2014 NOT claimed as covered. socialcalcconstants.ts is a separate, larger figure carried over from the full 11-module matrix (out of critical-registry scope) and is not recomputed by that script. Updated 2026-07-13: 3 formula-ref L370 lockstep equivalents (ids 1364/1365/1368 style) added to entries[]; formula-ref per-file report now 13/13 accounted.",
-    "js/formula-operand.ts": 8,
-    "js/formula-parse.ts": 4,
-    "js/formula-ref.ts": 14,
+    "note": "Recomputed 2026-07-13 from combined fresh per-file reports (reports/mutation/{formula-parse,formula-operand,formula-ref}/mutation.json merged files). All 46 Survived mutants match an entries[] tuple. socialcalcconstants.ts remains out of critical-registry scope.",
+    "js/formula-operand.ts": 0,
+    "js/formula-parse.ts": 0,
+    "js/formula-ref.ts": 0,
     "js/socialcalcconstants.ts": 548
   },
   "entries": [
@@ -40,23 +40,6 @@
       },
       "replacement": "true",
       "justification": "Every `if (state == X)` block in ParseFormulaIntoTokens is a bare `if`, not `else if`, so a state change made here lets the SAME character cascade into the coord-state block within the same loop iteration. Forcing this incoord check to always transition to `state = coord` (instead of only for the literal '$' char) is unobservable because: (1) `str` accumulated while in the alpha state can never contain a digit (a digit transitions out of alpha before being appended), so `coordregex` (which requires a trailing digit) can never match, meaning the coord-state handler's op/numstart/space/eof branch always falls back to pushing the same `name` token the alpha branch would have pushed directly; and (2) the coord-state error branch pushes the identical `s_parseerrchar` text the alpha branch's error branch would have pushed. An exhaustive differential test of every printable-ASCII 2-char suffix after 'A' and '$', comparing the real function against a mutated clone, found zero distinguishing input.",
-      "file": "js/formula-parse.ts"
-    },
-    {
-      "id": 476,
-      "mutatorName": "EqualityOperator",
-      "location": {
-        "start": {
-          "line": 121,
-          "column": 9
-        },
-        "end": {
-          "line": 121,
-          "column": 37
-        }
-      },
-      "replacement": "cclass != charclass.numstart",
-      "justification": "charclass.numstart (2) is assigned to exactly one character in CharClassTable: '.'. The alpha state's own second branch (`cclass == charclass.alpha || ch == \".\"`) already intercepts every '.' character before this terminator group is ever reached, so `cclass == charclass.numstart` can never be observed true (nor can flipping it to != ever be observed false in a way that changes control flow) at this program point. The clause is provably dead code given the fixed CharClassTable content.",
       "file": "js/formula-parse.ts"
     },
     {
@@ -107,7 +90,7 @@
         }
       },
       "replacement": "tprecedence > 0",
-      "justification": "SC.Formula.TokenPrecedence's full value set is {1,2,-3,4,5,6,7,8,9} \u2014 no opcode ever has precedence exactly 0, and an opcode lookup miss yields `undefined`, for which `>= 0` and `> 0` are both `false`. So `tprecedence >= 0` and `tprecedence > 0` can only ever disagree at exactly 0, which is unreachable for any real opcode drawn from that fixed, hardcoded table. An 8000-formula randomized differential fuzz against a hand-transcribed reference implementation of ConvertInfixToPolish found zero disagreements.",
+      "justification": "SC.Formula.TokenPrecedence's full value set is {1,2,-3,4,5,6,7,8,9} — no opcode ever has precedence exactly 0, and an opcode lookup miss yields `undefined`, for which `>= 0` and `> 0` are both `false`. So `tprecedence >= 0` and `tprecedence > 0` can only ever disagree at exactly 0, which is unreachable for any real opcode drawn from that fixed, hardcoded table. An 8000-formula randomized differential fuzz against a hand-transcribed reference implementation of ConvertInfixToPolish found zero disagreements.",
       "file": "js/formula-parse.ts"
     },
     {
@@ -141,7 +124,7 @@
         }
       },
       "replacement": "tstackprecedence <= 0",
-      "justification": "Identical reasoning to id=850, applied to tstackprecedence instead of tprecedence \u2014 both are values looked up from the same fixed, zero-free TokenPrecedence table, so `< 0` and `<= 0` are indistinguishable for every reachable input. Confirmed with the same 8000-formula differential fuzz.",
+      "justification": "Identical reasoning to id=850, applied to tstackprecedence instead of tprecedence — both are values looked up from the same fixed, zero-free TokenPrecedence table, so `< 0` and `<= 0` are indistinguishable for every reachable input. Confirmed with the same 8000-formula differential fuzz.",
       "file": "js/formula-parse.ts"
     },
     {
@@ -158,7 +141,7 @@
         }
       },
       "replacement": "true",
-      "justification": "FormulaTokenTypeCode is a closed TypeScript union `1|2|3|4|5|6|7` (num/coord/op/name/error/string/space). In the ttype/ttext if-else-if chain this condition terminates, every other legal value is already consumed by an earlier branch: num/coord/string by the first branch, name by the second, space by the third, and the ttext-based comma/'('/')' checks plus the generic `ttype == tokentype.op` branch cover every op-typed token. By the time this final `else if` is reached, `ttype` can only legally be `tokentype.error` (5) given the type system, so the condition can never be false there \u2014 forcing it to `true` changes nothing observable.",
+      "justification": "FormulaTokenTypeCode is a closed TypeScript union `1|2|3|4|5|6|7` (num/coord/op/name/error/string/space). In the ttype/ttext if-else-if chain this condition terminates, every other legal value is already consumed by an earlier branch: num/coord/string by the first branch, name by the second, space by the third, and the ttext-based comma/'('/')' checks plus the generic `ttype == tokentype.op` branch cover every op-typed token. By the time this final `else if` is reached, `ttype` can only legally be `tokentype.error` (5) given the type system, so the condition can never be false there — forcing it to `true` changes nothing observable.",
       "file": "js/formula-parse.ts"
     },
     {
@@ -175,7 +158,7 @@
         }
       },
       "replacement": "pos2 <= 0",
-      "justification": "`pos2 = table1.indexOf(\"|\", pos1 + 1)` always searches starting at `pos1 + 1`, and this line is only reached inside `if (pos1 >= 0)`, so the search's fromIndex is always >= 1. String.indexOf can never return exactly 0 when searching from an index >= 1, so a found pos2 is always >= 1, and a miss is always -1 \u2014 0 is unreachable. `pos2 < 0` and `pos2 <= 0` are therefore provably identical for every value this variable can hold.",
+      "justification": "`pos2 = table1.indexOf(\"|\", pos1 + 1)` always searches starting at `pos1 + 1`, and this line is only reached inside `if (pos1 >= 0)`, so the search's fromIndex is always >= 1. String.indexOf can never return exactly 0 when searching from an index >= 1, so a found pos2 is always >= 1, and a miss is always -1 — 0 is unreachable. `pos2 < 0` and `pos2 <= 0` are therefore provably identical for every value this variable can hold.",
       "file": "js/formula-parse.ts"
     },
     {
@@ -192,7 +175,7 @@
         }
       },
       "replacement": "pos2 <= 0",
-      "justification": "Identical reasoning to id=905, applied to the second (wildcard type2) lookup block, which is likewise only reached inside `if (pos1 >= 0)` with the same `table1.indexOf(\"|\", pos1 + 1)` fromIndex >= 1 guarantee \u2014 pos2 can never be exactly 0.",
+      "justification": "Identical reasoning to id=905, applied to the second (wildcard type2) lookup block, which is likewise only reached inside `if (pos1 >= 0)` with the same `table1.indexOf(\"|\", pos1 + 1)` fromIndex >= 1 guarantee — pos2 can never be exactly 0.",
       "file": "js/formula-parse.ts"
     },
     {
@@ -294,7 +277,7 @@
         }
       },
       "replacement": "pos2 <= 0",
-      "justification": "OperandsAsRangeOnSheet L343 `pos2 = leftCoord.indexOf('|', pos1 + 1)`. This line is only reached when `pos1 != -1` (L341), so pos1 >= 0 and the indexOf search starts at pos1+1 >= 1. String.prototype.indexOf can only return 0 when searching from a start index of 0; searching from >= 1 can never find a match at index 0. Therefore pos2 is either -1 (no match) or >= 1 (match found). `pos2 < 0` and `pos2 <= 0` are identical over the reachable set {-1} \u222a [1, \u221e); the value 0 is unreachable. The mutants are behaviorally identical.",
+      "justification": "OperandsAsRangeOnSheet L343 `pos2 = leftCoord.indexOf('|', pos1 + 1)`. This line is only reached when `pos1 != -1` (L341), so pos1 >= 0 and the indexOf search starts at pos1+1 >= 1. String.prototype.indexOf can only return 0 when searching from a start index of 0; searching from >= 1 can never find a match at index 0. Therefore pos2 is either -1 (no match) or >= 1 (match found). `pos2 < 0` and `pos2 <= 0` are identical over the reachable set {-1} ∪ [1, ∞); the value 0 is unreachable. The mutants are behaviorally identical.",
       "file": "js/formula-operand.ts"
     },
     {
@@ -328,7 +311,7 @@
         }
       },
       "replacement": "c >= 702",
-      "justification": "rcColname's clamp `if (c > 702) c = 702` and the mutant `if (c >= 702) c = 702` produce an identical resulting `c` for every input: for c<702 neither fires (same c); for c>702 both fire and clamp to 702 (same c); at exactly c=702 the original doesn't fire (c stays 702) while the mutant fires but assigns c=702 to a variable already equal to 702 \u2014 a no-op. The clamp target equals the comparison threshold, so strict vs non-strict inequality is unobservable for all inputs.",
+      "justification": "rcColname's clamp `if (c > 702) c = 702` and the mutant `if (c >= 702) c = 702` produce an identical resulting `c` for every input: for c<702 neither fires (same c); for c>702 both fire and clamp to 702 (same c); at exactly c=702 the original doesn't fire (c stays 702) while the mutant fires but assigns c=702 to a variable already equal to 702 — a no-op. The clamp target equals the comparison threshold, so strict vs non-strict inequality is unobservable for all inputs.",
       "file": "js/formula-ref.ts"
     },
     {
@@ -430,7 +413,7 @@
         }
       },
       "replacement": "true",
-      "justification": "AdjustFormulaCoords deleted-band check `(coloffset<0 && cr.col>=col && cr.col<col-coloffset)`. Forcing the first conjunct to `true` reduces it to `cr.col>=col && cr.col<col-coloffset`. When coloffset>=0, col-coloffset<=col, so the interval [col, col-coloffset) is always empty (upper bound never exceeds the lower bound) \u2014 the reduced expression is provably false for every cr.col, matching the original (which is also false whenever coloffset>=0 via its own first conjunct). When coloffset<0, the original's first conjunct is already true, so both expressions reduce identically. The two are behaviorally identical for all (coloffset, col, cr.col).",
+      "justification": "AdjustFormulaCoords deleted-band check `(coloffset<0 && cr.col>=col && cr.col<col-coloffset)`. Forcing the first conjunct to `true` reduces it to `cr.col>=col && cr.col<col-coloffset`. When coloffset>=0, col-coloffset<=col, so the interval [col, col-coloffset) is always empty (upper bound never exceeds the lower bound) — the reduced expression is provably false for every cr.col, matching the original (which is also false whenever coloffset>=0 via its own first conjunct). When coloffset<0, the original's first conjunct is already true, so both expressions reduce identically. The two are behaviorally identical for all (coloffset, col, cr.col).",
       "file": "js/formula-ref.ts"
     },
     {
@@ -464,7 +447,7 @@
         }
       },
       "replacement": "true",
-      "justification": "Row-clause mirror of id=1297: `(rowoffset<0 && cr.row>=row && cr.row<row-rowoffset)` \u2014 identical range-emptiness argument applied to row/rowoffset instead of col/coloffset.",
+      "justification": "Row-clause mirror of id=1297: `(rowoffset<0 && cr.row>=row && cr.row<row-rowoffset)` — identical range-emptiness argument applied to row/rowoffset instead of col/coloffset.",
       "file": "js/formula-ref.ts"
     },
     {
@@ -787,7 +770,7 @@
         }
       },
       "replacement": "cr.row < 1 && cr.col < 1",
-      "justification": "AdjustFormulaCoords zeros cr.col and cr.row TOGETHER (both set to 0 in one unconditional block at L346-349) whenever the coord falls in a deletion band. The subsequent col/row offset applications (L352-357) only execute when !sheetref and can never drive a non-deleted coord below 1 (col>=1 from coordToCr, offset>=0 for insertions; deletions already zeroed both). Sheet-qualified refs skip both blocks entirely, leaving cr.col/cr.row as coordToCr output which is always >=1 for any token the lexer tags coord. Therefore cr.row<1 and cr.col<1 are always in lockstep: both true (deletion zeroed both) or both false (not deleted). Replacing || with && at L370 is equivalent because whenever one disjunct is true, the other is also true \u2014 the disjunction truth value is unchanged by this operator mutation.",
+      "justification": "AdjustFormulaCoords zeros cr.col and cr.row TOGETHER (both set to 0 in one unconditional block at L346-349) whenever the coord falls in a deletion band. The subsequent col/row offset applications (L352-357) only execute when !sheetref and can never drive a non-deleted coord below 1 (col>=1 from coordToCr, offset>=0 for insertions; deletions already zeroed both). Sheet-qualified refs skip both blocks entirely, leaving cr.col/cr.row as coordToCr output which is always >=1 for any token the lexer tags coord. Therefore cr.row<1 and cr.col<1 are always in lockstep: both true (deletion zeroed both) or both false (not deleted). Replacing || with && at L370 is equivalent because whenever one disjunct is true, the other is also true — the disjunction truth value is unchanged by this operator mutation.",
       "file": "js/formula-ref.ts"
     },
     {
@@ -804,7 +787,7 @@
         }
       },
       "replacement": "false",
-      "justification": "Forcing cr.row<1 to false at L370 is equivalent: cr.row<1 is true only after the deletion-band zeroing block (L346-349), which also sets cr.col=0 (cr.col<1=true). The surviving disjunct cr.col<1 remains true in every reachable case where cr.row<1 was true \u2014 and the third disjunct cr.col>702 handles column overflow independently \u2014 so the shortened disjunction (false || cr.col<1 || cr.col>702) is always equal to the original (cr.row<1 || cr.col<1 || cr.col>702). See id=1364 for the lockstep proof.",
+      "justification": "Forcing cr.row<1 to false at L370 is equivalent: cr.row<1 is true only after the deletion-band zeroing block (L346-349), which also sets cr.col=0 (cr.col<1=true). The surviving disjunct cr.col<1 remains true in every reachable case where cr.row<1 was true — and the third disjunct cr.col>702 handles column overflow independently — so the shortened disjunction (false || cr.col<1 || cr.col>702) is always equal to the original (cr.row<1 || cr.col<1 || cr.col>702). See id=1364 for the lockstep proof.",
       "file": "js/formula-ref.ts"
     },
     {

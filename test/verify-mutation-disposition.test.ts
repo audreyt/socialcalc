@@ -298,4 +298,67 @@ describe("CLI: verify-mutation-disposition.mjs (fixture files, isolated temp dir
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  test("combined multi-file critical report: all survivors dispositioned, Killed retained, absent stale fails", () => {
+    // Mirrors the temporary merge of formula-parse/operand/ref per-file reports:
+    // multiple files under one mutation.json, survivors fully accounted, a
+    // previously-survived tuple now Killed is NOT stale, and a genuinely
+    // absent registry tuple still fails closed.
+    const combined = report({
+      "js/formula-parse.ts": [
+        mutant({ id: "p1", status: "Survived", location: loc(10), mutatorName: "EqualityOperator", replacement: "a != b" }),
+        mutant({ id: "p2", status: "Killed", location: loc(121, 9, 37), mutatorName: "EqualityOperator", replacement: "cclass != charclass.numstart" }),
+      ],
+      "js/formula-operand.ts": [
+        mutant({ id: "o1", status: "Survived", location: loc(20), mutatorName: "StringLiteral", replacement: '""' }),
+      ],
+      "js/formula-ref.ts": [
+        mutant({ id: "r1", status: "Survived", location: loc(370), mutatorName: "LogicalOperator", replacement: "cr.row < 1 && cr.col < 1" }),
+        mutant({ id: "r2", status: "Timeout", location: loc(99) }),
+      ],
+    });
+    const fullRegistry = registry([
+      entry({ file: "js/formula-parse.ts", location: loc(10), mutatorName: "EqualityOperator", replacement: "a != b", id: 1 }),
+      // Killed in the fresh combined report — retained proof, not stale.
+      entry({
+        file: "js/formula-parse.ts",
+        location: loc(121, 9, 37),
+        mutatorName: "EqualityOperator",
+        replacement: "cclass != charclass.numstart",
+        id: 476,
+      }),
+      entry({ file: "js/formula-operand.ts", location: loc(20), mutatorName: "StringLiteral", replacement: '""', id: 2 }),
+      entry({
+        file: "js/formula-ref.ts",
+        location: loc(370),
+        mutatorName: "LogicalOperator",
+        replacement: "cr.row < 1 && cr.col < 1",
+        id: 3,
+      }),
+    ]);
+    expect(extractSurvivors(combined)).toHaveLength(3);
+    expect(findUndispositioned(combined, fullRegistry)).toEqual([]);
+    expect(findStaleEntries(combined, fullRegistry)).toEqual([]);
+
+    withFixtures(combined, fullRegistry, ({ reportPath, dispositionPath }) => {
+      const result = runCli([`--report=${reportPath}`, `--disposition=${dispositionPath}`]);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toMatch(/OK — all 3 Survived mutant/);
+    });
+
+    // A registry entry whose tuple is completely absent from the combined
+    // report (not Survived, not Killed) must still fail — never weaken this.
+    const withAbsent = registry([
+      ...fullRegistry.entries,
+      entry({ file: "js/formula-parse.ts", location: loc(999), mutatorName: "BlockStatement", replacement: "{}", id: 999 }),
+    ]);
+    expect(findStaleEntries(combined, withAbsent).map((e: DispositionEntry) => e.id)).toEqual([999]);
+    withFixtures(combined, withAbsent, ({ reportPath, dispositionPath }) => {
+      const result = runCli([`--report=${reportPath}`, `--disposition=${dispositionPath}`]);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toMatch(/FAILED — 1 disposition entr/);
+      expect(result.stderr).toMatch(/stale/);
+      expect(result.stderr).toMatch(/js\/formula-parse\.ts BlockStatement @ 999:/);
+    });
+  });
 });
