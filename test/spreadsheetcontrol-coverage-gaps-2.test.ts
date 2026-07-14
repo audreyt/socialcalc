@@ -24,14 +24,18 @@ setIntervalHolder.setInterval = function (
 
 afterEach(() => {
   for (const id of __liveIntervals) {
-    { clearInterval(id as ReturnType<typeof setInterval>); }
+    {
+      clearInterval(id as ReturnType<typeof setInterval>);
+    }
   }
   __liveIntervals.clear();
-  { const SC = (globalThis as unknown as { SocialCalc?: unknown }).SocialCalc;
-  if (SC && typeof SC === "object" && "Keyboard" in SC) {
-    const kbd = SC as unknown as { Keyboard: { focusTable: unknown } };
-    kbd.Keyboard.focusTable = null;
-  } }
+  {
+    const SC = (globalThis as unknown as { SocialCalc?: unknown }).SocialCalc;
+    if (SC && typeof SC === "object" && "Keyboard" in SC) {
+      const kbd = SC as unknown as { Keyboard: { focusTable: unknown } };
+      kbd.Keyboard.focusTable = null;
+    }
+  }
   cancelActiveTrackedTimers();
 });
 
@@ -305,7 +309,9 @@ test("Audit tab: ObjToSource with non-object debug_log entries", async () => {
   const auditTabIdx = control.tabnums.audit;
   const onclick = control.tabs[auditTabIdx].onclick;
   expect(onclick).toBeDefined();
-  { onclick!(control, "audit"); }
+  {
+    onclick!(control, "audit");
+  }
 });
 
 // -------------------------------------------------------------------
@@ -326,7 +332,9 @@ test("Audit tab: ObjToSource with nested objects for check[i]==o false", async (
   const auditTabIdx = control.tabnums.audit;
   const onclick = control.tabs[auditTabIdx].onclick;
   expect(onclick).toBeDefined();
-  { onclick!(control, "audit"); }
+  {
+    onclick!(control, "audit");
+  }
 });
 
 // -------------------------------------------------------------------
@@ -352,7 +360,9 @@ test("InitializeSpreadsheetControl: button missing during first init", async () 
 
   // Create control with idPrefix that matches blockedId
   const control = new SC.SpreadsheetControl("ctrl-");
-  { control.InitializeSpreadsheetControl(container, 400, 600, 20); }
+  {
+    control.InitializeSpreadsheetControl(container, 400, 600, 20);
+  }
 
   patchActive = false;
   patchedDoc.getElementById = origGetById;
@@ -377,7 +387,9 @@ test("InitializeSpreadsheetControl: view without oncreate callback", async () =>
   const body = document as unknown as { body: { appendChild: (n: Node) => void } };
   body.body.appendChild(container);
 
-  { control.InitializeSpreadsheetControl(container, 400, 600, 20); }
+  {
+    control.InitializeSpreadsheetControl(container, 400, 600, 20);
+  }
 });
 
 // -------------------------------------------------------------------
@@ -521,7 +533,9 @@ test("DoCmd: ok-setsort 'all' with multiple cells (max_row/col false branches)",
   ]);
   await recalcSheet(SC, control.sheet as unknown as Parameters<typeof recalcSheet>[1]);
 
-  { SC.DoCmd(null, "ok-setsort"); }
+  {
+    SC.DoCmd(null, "ok-setsort");
+  }
 });
 
 // -------------------------------------------------------------------
@@ -567,8 +581,10 @@ test("DoCmd: dosort with minor/last sort selected and checked=true", async () =>
 
   control.sortrange = "A1:C3";
 
-  { SC.DoCmd(null, "dosort");
-  await waitEditor(control.editor); }
+  {
+    SC.DoCmd(null, "dosort");
+    await waitEditor(control.editor);
+  }
 });
 
 // -------------------------------------------------------------------
@@ -584,8 +600,10 @@ test("DoCmd: merge with SpreadsheetCmdLookup.merge deleted (|| fallback)", async
   const origMerge = lookup.merge;
   delete lookup.merge;
 
-  { SC.DoCmd(null, "merge");
-  await waitEditor(control.editor); }
+  {
+    SC.DoCmd(null, "merge");
+    await waitEditor(control.editor);
+  }
 
   // Restore
   if (origMerge !== undefined) lookup.merge = origMerge;
@@ -615,8 +633,10 @@ test("DoCmd: swapcolors with defaultcolor and defaultbgcolor set", async () => {
   control.editor.ecell.row = 1;
   control.editor.ecell.col = 1;
 
-  { SC.DoCmd(null, "swapcolors");
-  await waitEditor(control.editor); }
+  {
+    SC.DoCmd(null, "swapcolors");
+    await waitEditor(control.editor);
+  }
 });
 
 // -------------------------------------------------------------------
@@ -646,7 +666,9 @@ test("DoLink: editor.state='input' switch case", async () => {
   control.editor.state = "input";
   control.editor.inputBox.element.value = "some text";
 
-  { SC.SpreadsheetControl.DoLink(); }
+  {
+    SC.SpreadsheetControl.DoLink();
+  }
 
   // Clean up the dialog
   const dlg = document.getElementById(control.idPrefix + "linkdialog");
@@ -670,7 +692,9 @@ test("DoLink: cell with textvalueformat set (setformat = '')", async () => {
   control.editor.ecell.coord = "A1";
   control.editor.state = "start";
 
-  { SC.SpreadsheetControl.DoLink(); }
+  {
+    SC.SpreadsheetControl.DoLink();
+  }
 
   const dlg = document.getElementById(control.idPrefix + "linkdialog");
   if (dlg && dlg.parentNode) dlg.parentNode.removeChild(dlg);
@@ -692,7 +716,9 @@ test("DoLink: <<url>> format triggers newwin=true (popup checked)", async () => 
   control.editor.ecell.coord = "A1";
   control.editor.state = "start";
 
-  { SC.SpreadsheetControl.DoLink(); }
+  {
+    SC.SpreadsheetControl.DoLink();
+  }
 
   const dlg = document.getElementById(control.idPrefix + "linkdialog");
   if (dlg && dlg.parentNode) dlg.parentNode.removeChild(dlg);
@@ -714,7 +740,9 @@ test("DoLinkPaste: formatele.checked=false branch", async () => {
   control.editor.ecell.coord = "A1";
   control.editor.state = "start";
 
-  { SC.SpreadsheetControl.DoLink(); }
+  {
+    SC.SpreadsheetControl.DoLink();
+  }
 
   // Now find the format checkbox and set checked=false
   const formatEl = document.getElementById(control.idPrefix + "linkformat") as unknown as {
@@ -724,7 +752,9 @@ test("DoLinkPaste: formatele.checked=false branch", async () => {
     formatEl.checked = false;
   }
 
-  { SC.SpreadsheetControl.DoLinkPaste(); }
+  {
+    SC.SpreadsheetControl.DoLinkPaste();
+  }
 
   // Clean up
   const dlg = document.getElementById(control.idPrefix + "linkdialog");
@@ -762,7 +792,9 @@ test("SpreadsheetControlCommentSet: ECellReadonly()=true skips title assignment"
   control.ExecuteCommand = (command: string) => {
     commands.push(command);
   };
-  { SC.SpreadsheetControlCommentSet(); }
+  {
+    SC.SpreadsheetControlCommentSet();
+  }
   expect(commands).toEqual(["set %C comment test comment"]);
 
   control.editor.ECellReadonly = origECellReadonly;
@@ -793,7 +825,9 @@ test("PopupChangeCallback: defaultCellLayout regex doesn't match (|| fallback)",
 
   const cellPanel = control.views.settings.values!.cellspanel;
 
-  { SC.SettingsControls.PopupChangeCallback({ panelobj: cellPanel }, "", null); }
+  {
+    SC.SettingsControls.PopupChangeCallback({ panelobj: cellPanel }, "", null);
+  }
 
   SC.Constants.defaultCellLayout = origLayout;
 });
@@ -822,7 +856,9 @@ test("PopupChangeCallback: BorderSideGetValue returns falsy (element missing)", 
   // Delete one of the border onoff-bcb elements from the registry
   deleteFromRegistry(cellPanel.cbt.id + "-onoff-bcb");
 
-  { SC.SettingsControls.PopupChangeCallback({ panelobj: cellPanel }, "", null); }
+  {
+    SC.SettingsControls.PopupChangeCallback({ panelobj: cellPanel }, "", null);
+  }
 });
 
 // -------------------------------------------------------------------
@@ -850,7 +886,9 @@ test("PopupListInitialize: no initialdata and no InitialData (|| fallbacks)", as
     ChangedCallback: null,
   };
 
-  { SC.SettingsControls.PopupListInitialize(panelobj, "mockctrl"); }
+  {
+    SC.SettingsControls.PopupListInitialize(panelobj, "mockctrl");
+  }
 
   delete SC.SettingsControls.Controls.MockType;
 });
@@ -869,10 +907,12 @@ test("BorderSideSetValue: element missing (if(!ele) return)", async () => {
   // but delete the onoff-bcb element so if(!ele) is true
   deleteFromRegistry(cellPanel.cbt.id + "-onoff-bcb");
 
-  { SC.SettingsControls.BorderSideSetValue(cellPanel, "cbt", {
-    def: false,
-    val: "1px solid rgb(0,0,0)",
-  }); }
+  {
+    SC.SettingsControls.BorderSideSetValue(cellPanel, "cbt", {
+      def: false,
+      val: "1px solid rgb(0,0,0)",
+    });
+  }
 });
 
 // -------------------------------------------------------------------
@@ -888,6 +928,8 @@ test("BorderSideGetValue: element missing (if(!ele) return)", async () => {
   // Delete the onoff-bcb element from registry so getElementById returns null
   deleteFromRegistry(cellPanel.cbt.id + "-onoff-bcb");
 
-  { const result = SC.SettingsControls.BorderSideGetValue(cellPanel, "cbt");
-  expect(result).toBeUndefined(); }
+  {
+    const result = SC.SettingsControls.BorderSideGetValue(cellPanel, "cbt");
+    expect(result).toBeUndefined();
+  }
 });

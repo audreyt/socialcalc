@@ -230,28 +230,38 @@ async function newControl(
 }
 
 function teardownEditor(SC: SCLike, editor: EditorLike | null): void {
-  { if (editor?.inputEcho?.interval) {
-    clearInterval(editor.inputEcho.interval);
-    editor.inputEcho.interval = null;
-  } }
-  { if (SC.AutoRepeatInfo?.timer) {
-    clearTimeout(SC.AutoRepeatInfo.timer);
-    SC.AutoRepeatInfo.timer = null;
-    SC.AutoRepeatInfo.mouseinfo = null;
-  } }
-  { if (SC.ButtonInfo?.timer) {
-    clearTimeout(SC.ButtonInfo.timer);
-    SC.ButtonInfo.timer = null;
-  } }
-  { SC.Keyboard.focusTable = null;
-  SC.Keyboard.passThru = null; }
-  { if (editor) {
-    editor.state = "start";
-    if (editor.timeout) {
-      clearTimeout(editor.timeout);
-      editor.timeout = null;
+  {
+    if (editor?.inputEcho?.interval) {
+      clearInterval(editor.inputEcho.interval);
+      editor.inputEcho.interval = null;
     }
-  } }
+  }
+  {
+    if (SC.AutoRepeatInfo?.timer) {
+      clearTimeout(SC.AutoRepeatInfo.timer);
+      SC.AutoRepeatInfo.timer = null;
+      SC.AutoRepeatInfo.mouseinfo = null;
+    }
+  }
+  {
+    if (SC.ButtonInfo?.timer) {
+      clearTimeout(SC.ButtonInfo.timer);
+      SC.ButtonInfo.timer = null;
+    }
+  }
+  {
+    SC.Keyboard.focusTable = null;
+    SC.Keyboard.passThru = null;
+  }
+  {
+    if (editor) {
+      editor.state = "start";
+      if (editor.timeout) {
+        clearTimeout(editor.timeout);
+        editor.timeout = null;
+      }
+    }
+  }
 }
 
 interface FakeEventOptions {
@@ -292,7 +302,9 @@ function fakeEvent(extras: FakeEventOptions = {}): Event {
 }
 
 function primeGridLayout(editor: EditorLike): void {
-  { editor.CalculateEditorPositions(); }
+  {
+    editor.CalculateEditorPositions();
+  }
   editor.gridposition = editor.gridposition || { left: 0, top: 0 };
   editor.headposition = editor.headposition || { left: 30, top: 30 };
   editor.colpositions = [0, 0, 80, 160, 240, 320, 400, 480];
@@ -324,7 +336,9 @@ test("CreateTableEditor: cteGriddivClass truthy sets className", async () => {
   const { control } = await newControl(SC, "cte-griddiv-c");
   const editor = control.editor;
 
-  { expect(editor.griddiv.className).toBe("my-grid-class"); }
+  {
+    expect(editor.griddiv.className).toBe("my-grid-class");
+  }
   teardownEditor(SC, editor);
 
   delete SC.Constants.cteGriddivClass;
@@ -352,7 +366,9 @@ test("ProcessEditorMouseDown: no-coord return (no headers)", async () => {
 
   const ev = fakeEvent({ target: editor.fullgrid, clientX: 100, clientY: 100 });
 
-  { SC.ProcessEditorMouseDown(ev); }
+  {
+    SC.ProcessEditorMouseDown(ev);
+  }
   SC.GridMousePosition = origGMP;
   teardownEditor(SC, editor);
 });
@@ -410,8 +426,10 @@ test("ProcessEditorMouseDown: focus inputBox when state != start", async () => {
 
   const ev = fakeEvent({ target: editor.fullgrid, clientX: 100, clientY: 100 });
 
-  { SC.ProcessEditorMouseDown(ev);
-  expect(focused).toBe(true); }
+  {
+    SC.ProcessEditorMouseDown(ev);
+    expect(focused).toBe(true);
+  }
   SC.GridMousePosition = origGMP;
   SC.KeyboardSetFocus = origKSF;
   SC.SetMouseMoveUp = origSMU;
@@ -435,7 +453,9 @@ test("ProcessEditorMouseMove: null result return", async () => {
   const origGMP = SC.GridMousePosition;
   SC.GridMousePosition = () => null;
 
-  { SC.ProcessEditorMouseMove(fakeEvent({ clientX: 100, clientY: 100 })); }
+  {
+    SC.ProcessEditorMouseMove(fakeEvent({ clientX: 100, clientY: 100 }));
+  }
   SC.GridMousePosition = origGMP;
   teardownEditor(SC, editor);
 });
@@ -458,7 +478,9 @@ test("ProcessEditorMouseMove: no-coord return", async () => {
   const origGMP = SC.GridMousePosition;
   SC.GridMousePosition = () => ({ row: 2, col: 1, rowheader: true, distance: 10 });
 
-  { SC.ProcessEditorMouseMove(fakeEvent({ clientX: 5, clientY: 50 })); }
+  {
+    SC.ProcessEditorMouseMove(fakeEvent({ clientX: 5, clientY: 50 }));
+  }
   SC.GridMousePosition = origGMP;
   teardownEditor(SC, editor);
 });
@@ -480,7 +502,9 @@ test("ProcessEditorMouseUp: null result return", async () => {
   const origGMP = SC.GridMousePosition;
   SC.GridMousePosition = () => null;
 
-  { SC.ProcessEditorMouseUp(fakeEvent({ clientX: 100, clientY: 100 })); }
+  {
+    SC.ProcessEditorMouseUp(fakeEvent({ clientX: 100, clientY: 100 }));
+  }
   SC.GridMousePosition = origGMP;
   teardownEditor(SC, editor);
 });
@@ -511,7 +535,9 @@ test("ProcessEditorColsizeMouseMove: newsize clamped to minimum", async () => {
   // clientX = -100, so newsize = 80 + (-100 - 50) = -70 → clamped to min.
   const ev = fakeEvent({ clientX: -100 });
 
-  { SC.ProcessEditorColsizeMouseMove(ev); }
+  {
+    SC.ProcessEditorColsizeMouseMove(ev);
+  }
 
   SC.GetElementPositionWithScroll = origGEP;
   teardownEditor(SC, editor);
@@ -546,13 +572,17 @@ test("ProcessEditorColsizeMouseUp: newsize clamped to minimum + clearTimeout", a
   // clientX = -200 → newsize = 80 + (-200 - 50) = -170 → clamped to min.
   const ev = fakeEvent({ clientX: -200 });
 
-  { SC.ProcessEditorColsizeMouseUp(ev); }
+  {
+    SC.ProcessEditorColsizeMouseUp(ev);
+  }
 
   // Now test with editor.timeout set → clearTimeout branch.
   editor.timeout = setTimeout(() => {}, 10000);
   mi.mouseresizecolnum = 2;
   mi.mouseresizecol = "B";
-  { SC.ProcessEditorColsizeMouseUp(ev); }
+  {
+    SC.ProcessEditorColsizeMouseUp(ev);
+  }
 
   if (editor.timeout) {
     clearTimeout(editor.timeout);
@@ -593,12 +623,16 @@ test("ProcessEditorRowsizeMouseUp: clamped + clearTimeout", async () => {
   // clientY far negative → newsize = 20 + (-200 - 50) = -230 → clamped to min.
   const ev = fakeEvent({ clientY: -200 });
 
-  { SC.ProcessEditorRowsizeMouseUp(ev); }
+  {
+    SC.ProcessEditorRowsizeMouseUp(ev);
+  }
 
   // Now with editor.timeout set → clearTimeout branch (line 6874).
   editor.timeout = setTimeout(() => {}, 10000);
   mi.mouseresizerownum = 2;
-  { SC.ProcessEditorRowsizeMouseUp(ev); }
+  {
+    SC.ProcessEditorRowsizeMouseUp(ev);
+  }
 
   if (editor.timeout) {
     clearTimeout(editor.timeout);
@@ -636,11 +670,13 @@ test("MoveECellWithKey: RangeRemove with hasrange and non-shifted key", async ()
   editor.EnsureECellVisible = () => {};
   editor.cellhandles = { ShowCellHandles: () => {} };
 
-  { const result: unknown = (
-    SC as unknown as { MoveECellWithKey: (e: EditorLike, ch: string) => string | null }
-  ).MoveECellWithKey(editor, "[aright]");
-  expect(result).toBeTruthy();
-  expect(rangeRemoved).toBe(true); }
+  {
+    const result: unknown = (
+      SC as unknown as { MoveECellWithKey: (e: EditorLike, ch: string) => string | null }
+    ).MoveECellWithKey(editor, "[aright]");
+    expect(result).toBeTruthy();
+    expect(rangeRemoved).toBe(true);
+  }
 
   teardownEditor(SC, editor);
 });
@@ -670,7 +706,9 @@ test("FitToEditTable: colwidth blank in non-last pane", async () => {
   ctx.rownamewidth = 30;
   ctx.CalculateColWidthData = () => {};
 
-  { editor.FitToEditTable(); }
+  {
+    editor.FitToEditTable();
+  }
 
   teardownEditor(SC, editor);
 });
@@ -740,7 +778,9 @@ test("CalculateEditorPositions: break on row/col position > table bounds", async
   const origGEP = SC.GetElementPosition;
   SC.GetElementPosition = () => ({ left: 0, top: 0 });
 
-  { editor.CalculateEditorPositions(); }
+  {
+    editor.CalculateEditorPositions();
+  }
   expect(editor.lastvisiblerow).toBe(4);
   expect(editor.lastvisiblecol).toBe(4);
 
@@ -777,8 +817,10 @@ test("PageRelative: newfirst == lastpane.first with dir > 0", async () => {
   editor.FitToEditTable = () => {};
   editor.ScheduleRender = () => {};
 
-  { SC.PageRelative(editor, true, 1);
-  expect(ctx.rowpanes[0].first).toBe(6); }
+  {
+    SC.PageRelative(editor, true, 1);
+    expect(ctx.rowpanes[0].first).toBe(6);
+  }
 
   teardownEditor(SC, editor);
 
@@ -817,9 +859,11 @@ test("PageRelative: newfirst < 1 clamp with direction < 0", async () => {
   editor.FitToEditTable = () => {};
   editor.ScheduleRender = () => {};
 
-  { SC.PageRelative(editor, true, -1);
-  // newfirst should be clamped to 1.
-  expect(ctx.rowpanes[0].first).toBe(1); }
+  {
+    SC.PageRelative(editor, true, -1);
+    // newfirst should be clamped to 1.
+    expect(ctx.rowpanes[0].first).toBe(1);
+  }
 
   teardownEditor(SC, editor);
 
@@ -871,7 +915,9 @@ test("ScrollTableUpOneRow: rowspan break + bottomrownum continue", async () => {
   ctx.coordToCR = {};
   sheetobj.cells = {};
   sheetobj.cells["A1"] = { rowspan: 10 };
-  { SC.ScrollTableUpOneRow(editor); }
+  {
+    SC.ScrollTableUpOneRow(editor);
+  }
 
   // bottomrownum continue (line 8251):
   // After first/last increment: first=3, last=7. bottomrownum = 7.
@@ -883,7 +929,9 @@ test("ScrollTableUpOneRow: rowspan break + bottomrownum continue", async () => {
   sheetobj.cells["A2"] = { rowspan: 2 };
   ctx.coordToCR = { A7: { row: 7, col: 1 } };
   ctx.cellskip = { A7: "A7" };
-  { SC.ScrollTableUpOneRow(editor); }
+  {
+    SC.ScrollTableUpOneRow(editor);
+  }
 
   teardownEditor(SC, editor);
 });
@@ -927,7 +975,9 @@ test("ScrollTableDownOneRow: cellskip, rowspan break, bottom continue", async ()
   ctx.cellskip = { A1: "A1" };
   ctx.coordToCR = {};
   sheetobj.cells = {};
-  { SC.ScrollTableDownOneRow(editor); }
+  {
+    SC.ScrollTableDownOneRow(editor);
+  }
 
   // rowspan break (line 8300):
   // first=2 → after decrement: first=1, last=4. newrownum = 1.
@@ -938,7 +988,9 @@ test("ScrollTableDownOneRow: cellskip, rowspan break, bottom continue", async ()
   ctx.cellskip = {};
   sheetobj.cells = {};
   sheetobj.cells["A1"] = { rowspan: 5 };
-  { SC.ScrollTableDownOneRow(editor); }
+  {
+    SC.ScrollTableDownOneRow(editor);
+  }
 
   // bottom continue (line 8320):
   // first=3 → after decrement: first=2, last=5. bottomrownum = 5.
@@ -950,7 +1002,9 @@ test("ScrollTableDownOneRow: cellskip, rowspan break, bottom continue", async ()
   sheetobj.cells["A3"] = { rowspan: 2 };
   ctx.coordToCR = { A5: { row: 5, col: 1 } };
   ctx.cellskip = { A5: "A5" };
-  { SC.ScrollTableDownOneRow(editor); }
+  {
+    SC.ScrollTableDownOneRow(editor);
+  }
 
   teardownEditor(SC, editor);
 });

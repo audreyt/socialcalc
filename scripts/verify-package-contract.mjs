@@ -33,7 +33,15 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import { createRequire } from "node:module";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, mkdirSync, statSync } from "node:fs";
+import {
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+  mkdirSync,
+  statSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -92,7 +100,6 @@ const MAX_MINIFIED_GZIP_BYTES = 117_000;
 const MAX_CSS_GZIP_BYTES = 1_100;
 const MAX_PACKAGE_RAW_BYTES = 1_600_000;
 const MAX_PACKAGE_GZIP_BYTES = 300_000;
-
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
@@ -191,7 +198,9 @@ function loadInVm(bundlePath) {
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: bundlePath });
   if (typeof sandbox.module !== "undefined") {
-    throw new Error("vm sandbox unexpectedly exposed a `module` global — not a clean browser-global run");
+    throw new Error(
+      "vm sandbox unexpectedly exposed a `module` global — not a clean browser-global run",
+    );
   }
   if (!sandbox.SocialCalc || typeof sandbox.SocialCalc !== "object") {
     throw new Error(`${bundlePath} did not assign a SocialCalc global in the VM sandbox`);
@@ -205,29 +214,37 @@ async function main() {
   // --- Manifest-level contract -------------------------------------------------
   record("package.json declares an explicit CommonJS module type", () => {
     if (pkg.type !== "commonjs") {
-      throw new Error(`expected package.json "type" to be the literal string "commonjs", got ${JSON.stringify(pkg.type)}`);
-    }
-  });
-
-  record("package.json declares an explicit engines.node floor (resolves publint's missing-engines finding)", () => {
-    if (pkg.engines?.node !== ">=22") {
       throw new Error(
-        `expected package.json "engines.node" to be the literal string ">=22" (the maintained, CI-tested support policy — see the CI node-compat matrix job and README's Node compatibility note), got ${JSON.stringify(pkg.engines?.node)}`,
+        `expected package.json "type" to be the literal string "commonjs", got ${JSON.stringify(pkg.type)}`,
       );
     }
   });
 
-  record('package.json "files" field matches the pinned intended manifest (no unreviewed drift)', () => {
-    const actual = pkg.files;
-    const expected = EXPECTED_FILES_FIELD;
-    const extra = actual.filter((f) => !expected.includes(f));
-    const missing = expected.filter((f) => !actual.includes(f));
-    if (extra.length || missing.length) {
-      throw new Error(
-        `package.json "files" drifted from the pinned manifest — unexpected=${JSON.stringify(extra)} missing=${JSON.stringify(missing)}`,
-      );
-    }
-  });
+  record(
+    "package.json declares an explicit engines.node floor (resolves publint's missing-engines finding)",
+    () => {
+      if (pkg.engines?.node !== ">=22") {
+        throw new Error(
+          `expected package.json "engines.node" to be the literal string ">=22" (the maintained, CI-tested support policy — see the CI node-compat matrix job and README's Node compatibility note), got ${JSON.stringify(pkg.engines?.node)}`,
+        );
+      }
+    },
+  );
+
+  record(
+    'package.json "files" field matches the pinned intended manifest (no unreviewed drift)',
+    () => {
+      const actual = pkg.files;
+      const expected = EXPECTED_FILES_FIELD;
+      const extra = actual.filter((f) => !expected.includes(f));
+      const missing = expected.filter((f) => !actual.includes(f));
+      if (extra.length || missing.length) {
+        throw new Error(
+          `package.json "files" drifted from the pinned manifest — unexpected=${JSON.stringify(extra)} missing=${JSON.stringify(missing)}`,
+        );
+      }
+    },
+  );
 
   const workDir = mkdtempSync(path.join(tmpdir(), "socialcalc-package-contract-"));
   const tarballPath = path.join(workDir, "socialcalc-pack.tgz");
@@ -239,48 +256,53 @@ async function main() {
     record("vp pm pack produces a fresh tarball (runs prepack -> vp build --minify)", () => {
       const result = run("vp", ["pm", "pack", "--out", tarballPath], { cwd: repoRoot });
       if (result.status !== 0) {
-        throw new Error(`vp pm pack failed (exit ${result.status}):\n${result.stdout}\n${result.stderr}`);
+        throw new Error(
+          `vp pm pack failed (exit ${result.status}):\n${result.stdout}\n${result.stderr}`,
+        );
       }
       return tarballPath;
     });
 
-    record("tarball contains exactly the pinned 17-member contract (no extra or missing member)", () => {
-      mkdirSync(extractDir, { recursive: true });
-      const extractResult = run("tar", ["-xzf", tarballPath, "-C", extractDir]);
-      if (extractResult.status !== 0) {
-        throw new Error(`tar extract failed: ${extractResult.stderr}`);
-      }
-      const listResult = run("tar", ["-tzf", tarballPath]);
-      const actual = new Set(
-        listResult.stdout
-          .split("\n")
-          .map((line) => line.trim())
-          .filter(Boolean)
-          .map((entry) => entry.replace(/^package\//, "")),
-      );
-      const expected = new Set(EXPECTED_TARBALL_MEMBERS);
-      const extra = [...actual].filter((f) => !expected.has(f));
-      const missing = [...expected].filter((f) => !actual.has(f));
-      if (extra.length || missing.length) {
-        throw new Error(
-          `tarball member set drifted from the pinned contract — unexpected=${JSON.stringify(extra)} missing=${JSON.stringify(missing)}`,
+    record(
+      "tarball contains exactly the pinned 17-member contract (no extra or missing member)",
+      () => {
+        mkdirSync(extractDir, { recursive: true });
+        const extractResult = run("tar", ["-xzf", tarballPath, "-C", extractDir]);
+        if (extractResult.status !== 0) {
+          throw new Error(`tar extract failed: ${extractResult.stderr}`);
+        }
+        const listResult = run("tar", ["-tzf", tarballPath]);
+        const actual = new Set(
+          listResult.stdout
+            .split("\n")
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .map((entry) => entry.replace(/^package\//, "")),
         );
-      }
-      // Cross-check: the dynamic glob expansion of the (already pinned-
-      // verified) package.json "files" patterns against the real repo file
-      // listing must independently agree with the same pinned set — proving
-      // the patterns and the static pin are not coincidentally stale in the
-      // same way at once.
-      const dynamicallyExpanded = expandFilesField(pkg.files, repoRoot);
-      const dynExtra = [...dynamicallyExpanded].filter((f) => !expected.has(f));
-      const dynMissing = [...expected].filter((f) => !dynamicallyExpanded.has(f));
-      if (dynExtra.length || dynMissing.length) {
-        throw new Error(
-          `"files" glob expansion disagrees with the pinned tarball contract — unexpected=${JSON.stringify(dynExtra)} missing=${JSON.stringify(dynMissing)}`,
-        );
-      }
-      return `${actual.size} members, exactly the pinned contract`;
-    });
+        const expected = new Set(EXPECTED_TARBALL_MEMBERS);
+        const extra = [...actual].filter((f) => !expected.has(f));
+        const missing = [...expected].filter((f) => !actual.has(f));
+        if (extra.length || missing.length) {
+          throw new Error(
+            `tarball member set drifted from the pinned contract — unexpected=${JSON.stringify(extra)} missing=${JSON.stringify(missing)}`,
+          );
+        }
+        // Cross-check: the dynamic glob expansion of the (already pinned-
+        // verified) package.json "files" patterns against the real repo file
+        // listing must independently agree with the same pinned set — proving
+        // the patterns and the static pin are not coincidentally stale in the
+        // same way at once.
+        const dynamicallyExpanded = expandFilesField(pkg.files, repoRoot);
+        const dynExtra = [...dynamicallyExpanded].filter((f) => !expected.has(f));
+        const dynMissing = [...expected].filter((f) => !dynamicallyExpanded.has(f));
+        if (dynExtra.length || dynMissing.length) {
+          throw new Error(
+            `"files" glob expansion disagrees with the pinned tarball contract — unexpected=${JSON.stringify(dynExtra)} missing=${JSON.stringify(dynMissing)}`,
+          );
+        }
+        return `${actual.size} members, exactly the pinned contract`;
+      },
+    );
 
     const rootJsPath = path.join(packageDir, "dist", "SocialCalc.js");
     const minJsPath = path.join(packageDir, "dist", "SocialCalc.min.js");
@@ -289,67 +311,74 @@ async function main() {
       return createHash("sha256").update(readFileSync(filePath)).digest("hex");
     }
 
-    record("packed artifacts are nonempty and stay within explicit raw/gzip size budgets (sha256 reported, not pinned)", () => {
-      const sizes = {
-        tarball: statSync(tarballPath).size,
-        rawPackage: EXPECTED_TARBALL_MEMBERS.reduce(
-          (total, member) => total + statSync(path.join(packageDir, member)).size,
-          0,
-        ),
-        normalRaw: statSync(rootJsPath).size,
-        minifiedRaw: statSync(minJsPath).size,
-        cssRaw: statSync(cssPath).size,
-        normalGzip: gzipSync(readFileSync(rootJsPath)).length,
-        minifiedGzip: gzipSync(readFileSync(minJsPath)).length,
-        cssGzip: gzipSync(readFileSync(cssPath)).length,
-      };
-      for (const [name, size] of Object.entries(sizes)) {
-        if (!(size > 0)) throw new Error(`${name} artifact is empty (${size} bytes)`);
-      }
-      const ceilings = {
-        normalRaw: MAX_NORMAL_RAW_BYTES,
-        minifiedRaw: MAX_MINIFIED_RAW_BYTES,
-        cssRaw: MAX_CSS_RAW_BYTES,
-        normalGzip: MAX_NORMAL_GZIP_BYTES,
-        minifiedGzip: MAX_MINIFIED_GZIP_BYTES,
-      };
-      for (const [name, ceiling] of Object.entries(ceilings)) {
-        if (sizes[name] > ceiling) {
-          throw new Error(`${name} size ${sizes[name]}B exceeds the ${ceiling}B budget`);
+    record(
+      "packed artifacts are nonempty and stay within explicit raw/gzip size budgets (sha256 reported, not pinned)",
+      () => {
+        const sizes = {
+          tarball: statSync(tarballPath).size,
+          rawPackage: EXPECTED_TARBALL_MEMBERS.reduce(
+            (total, member) => total + statSync(path.join(packageDir, member)).size,
+            0,
+          ),
+          normalRaw: statSync(rootJsPath).size,
+          minifiedRaw: statSync(minJsPath).size,
+          cssRaw: statSync(cssPath).size,
+          normalGzip: gzipSync(readFileSync(rootJsPath)).length,
+          minifiedGzip: gzipSync(readFileSync(minJsPath)).length,
+          cssGzip: gzipSync(readFileSync(cssPath)).length,
+        };
+        for (const [name, size] of Object.entries(sizes)) {
+          if (!(size > 0)) throw new Error(`${name} artifact is empty (${size} bytes)`);
         }
-      }
-      if (sizes.cssGzip > MAX_CSS_GZIP_BYTES) {
-        throw new Error(`cssGzip size ${sizes.cssGzip}B exceeds the ${MAX_CSS_GZIP_BYTES}B budget`);
-      }
-      if (sizes.rawPackage > MAX_PACKAGE_RAW_BYTES) {
-        throw new Error(
-          `raw package size ${sizes.rawPackage}B exceeds the ${MAX_PACKAGE_RAW_BYTES}B budget`,
+        const ceilings = {
+          normalRaw: MAX_NORMAL_RAW_BYTES,
+          minifiedRaw: MAX_MINIFIED_RAW_BYTES,
+          cssRaw: MAX_CSS_RAW_BYTES,
+          normalGzip: MAX_NORMAL_GZIP_BYTES,
+          minifiedGzip: MAX_MINIFIED_GZIP_BYTES,
+        };
+        for (const [name, ceiling] of Object.entries(ceilings)) {
+          if (sizes[name] > ceiling) {
+            throw new Error(`${name} size ${sizes[name]}B exceeds the ${ceiling}B budget`);
+          }
+        }
+        if (sizes.cssGzip > MAX_CSS_GZIP_BYTES) {
+          throw new Error(
+            `cssGzip size ${sizes.cssGzip}B exceeds the ${MAX_CSS_GZIP_BYTES}B budget`,
+          );
+        }
+        if (sizes.rawPackage > MAX_PACKAGE_RAW_BYTES) {
+          throw new Error(
+            `raw package size ${sizes.rawPackage}B exceeds the ${MAX_PACKAGE_RAW_BYTES}B budget`,
+          );
+        }
+        if (sizes.tarball > MAX_PACKAGE_GZIP_BYTES) {
+          throw new Error(
+            `packed tarball size ${sizes.tarball}B exceeds the ${MAX_PACKAGE_GZIP_BYTES}B budget`,
+          );
+        }
+        if (!(sizes.minifiedRaw < sizes.normalRaw)) {
+          throw new Error(
+            `expected minified bundle smaller than normal — normal=${sizes.normalRaw} minified=${sizes.minifiedRaw}`,
+          );
+        }
+        const hashes = {
+          tarball: sha256(tarballPath),
+          normal: sha256(rootJsPath),
+          minified: sha256(minJsPath),
+          css: sha256(cssPath),
+        };
+        return (
+          `normal raw ${sizes.normalRaw}B gzip ${sizes.normalGzip}B | ` +
+          `minified raw ${sizes.minifiedRaw}B gzip ${sizes.minifiedGzip}B | ` +
+          `css raw ${sizes.cssRaw}B gzip ${sizes.cssGzip}B | ` +
+          `raw package ${sizes.rawPackage}B | ` +
+          `tarball raw ${sizes.tarball}B gzip ${sizes.tarball}B (already gzip; not recompressed) | ` +
+          `sha256 tarball:${hashes.tarball} normal:${hashes.normal} ` +
+          `minified:${hashes.minified} css:${hashes.css}`
         );
-      }
-      if (sizes.tarball > MAX_PACKAGE_GZIP_BYTES) {
-        throw new Error(
-          `packed tarball size ${sizes.tarball}B exceeds the ${MAX_PACKAGE_GZIP_BYTES}B budget`,
-        );
-      }
-      if (!(sizes.minifiedRaw < sizes.normalRaw)) {
-        throw new Error(`expected minified bundle smaller than normal — normal=${sizes.normalRaw} minified=${sizes.minifiedRaw}`);
-      }
-      const hashes = {
-        tarball: sha256(tarballPath),
-        normal: sha256(rootJsPath),
-        minified: sha256(minJsPath),
-        css: sha256(cssPath),
-      };
-      return (
-        `normal raw ${sizes.normalRaw}B gzip ${sizes.normalGzip}B | ` +
-        `minified raw ${sizes.minifiedRaw}B gzip ${sizes.minifiedGzip}B | ` +
-        `css raw ${sizes.cssRaw}B gzip ${sizes.cssGzip}B | ` +
-        `raw package ${sizes.rawPackage}B | ` +
-        `tarball raw ${sizes.tarball}B gzip ${sizes.tarball}B (already gzip; not recompressed) | ` +
-        `sha256 tarball:${hashes.tarball} normal:${hashes.normal} ` +
-        `minified:${hashes.minified} css:${hashes.css}`
-      );
-    });
+      },
+    );
 
     // A real consumer resolves "socialcalc" (and its deep subpaths) through
     // node_modules by package specifier, not by requiring/importing dist/*.js
@@ -369,41 +398,53 @@ async function main() {
     mkdirSync(consumerDir, { recursive: true });
     writeFileSync(
       path.join(consumerDir, "package.json"),
-      JSON.stringify({ name: "package-contract-consumer", private: true, version: "0.0.0" }, null, 2),
+      JSON.stringify(
+        { name: "package-contract-consumer", private: true, version: "0.0.0" },
+        null,
+        2,
+      ),
     );
 
-    record("npm install <tarball> into an empty consumer project (real install, not a directory copy)", () => {
-      const result = run(
-        "npm",
-        ["install", "--ignore-scripts", "--no-package-lock", "--offline", tarballPath],
-        { cwd: consumerDir },
-      );
-      if (result.status !== 0) {
-        throw new Error(
-          `npm install of the packed tarball failed (exit ${result.status}):\n${result.stdout}\n${result.stderr}`,
+    record(
+      "npm install <tarball> into an empty consumer project (real install, not a directory copy)",
+      () => {
+        const result = run(
+          "npm",
+          ["install", "--ignore-scripts", "--no-package-lock", "--offline", tarballPath],
+          { cwd: consumerDir },
         );
-      }
-      return path.join(consumerDir, "node_modules", "socialcalc");
-    });
+        if (result.status !== 0) {
+          throw new Error(
+            `npm install of the packed tarball failed (exit ${result.status}):\n${result.stdout}\n${result.stderr}`,
+          );
+        }
+        return path.join(consumerDir, "node_modules", "socialcalc");
+      },
+    );
 
     const installedDir = path.join(consumerDir, "node_modules", "socialcalc");
     const installedRootJsPath = path.join(installedDir, "dist", "SocialCalc.js");
     const installedMinJsPath = path.join(installedDir, "dist", "SocialCalc.min.js");
 
-    record("npm-installed package bytes are byte-identical to the extracted tarball members", () => {
-      const mismatches = [];
-      for (const member of EXPECTED_TARBALL_MEMBERS) {
-        const extractedHash = sha256(path.join(packageDir, member));
-        const installedHash = sha256(path.join(installedDir, member));
-        if (extractedHash !== installedHash) {
-          mismatches.push(`${member}: extracted=${extractedHash} installed=${installedHash}`);
+    record(
+      "npm-installed package bytes are byte-identical to the extracted tarball members",
+      () => {
+        const mismatches = [];
+        for (const member of EXPECTED_TARBALL_MEMBERS) {
+          const extractedHash = sha256(path.join(packageDir, member));
+          const installedHash = sha256(path.join(installedDir, member));
+          if (extractedHash !== installedHash) {
+            mismatches.push(`${member}: extracted=${extractedHash} installed=${installedHash}`);
+          }
         }
-      }
-      if (mismatches.length) {
-        throw new Error(`npm install altered file bytes vs the raw tar extraction — ${mismatches.join("; ")}`);
-      }
-      return `${EXPECTED_TARBALL_MEMBERS.length} files byte-identical`;
-    });
+        if (mismatches.length) {
+          throw new Error(
+            `npm install altered file bytes vs the raw tar extraction — ${mismatches.join("; ")}`,
+          );
+        }
+        return `${EXPECTED_TARBALL_MEMBERS.length} files byte-identical`;
+      },
+    );
 
     const requireFromConsumer = createRequire(path.join(consumerDir, "noop.cjs"));
 
@@ -411,7 +452,8 @@ async function main() {
 
     record('root require("socialcalc") resolves via node_modules (package specifier)', () => {
       cjsRoot = requireFromConsumer("socialcalc");
-      if (typeof cjsRoot !== "object" || cjsRoot === null) throw new Error("require() did not return an object");
+      if (typeof cjsRoot !== "object" || cjsRoot === null)
+        throw new Error("require() did not return an object");
       return `${Object.keys(cjsRoot).length} top-level keys`;
     });
 
@@ -426,26 +468,29 @@ async function main() {
       },
     );
 
-    record('native static ESM `import SocialCalc from "socialcalc"` resolves via node_modules (package specifier)', () => {
-      writeFileSync(
-        path.join(consumerDir, "esm-default-check.mjs"),
-        [
-          'import SocialCalc from "socialcalc";',
-          "const shape = {};",
-          "for (const key of Object.keys(SocialCalc)) shape[key] = typeof SocialCalc[key];",
-          "console.log(JSON.stringify(shape));",
-          "",
-        ].join("\n"),
-      );
-      const result = run(process.execPath, ["esm-default-check.mjs"], { cwd: consumerDir });
-      if (result.status !== 0) {
-        throw new Error(
-          `native ESM default import failed (exit ${result.status}):\n${result.stdout}\n${result.stderr}`,
+    record(
+      'native static ESM `import SocialCalc from "socialcalc"` resolves via node_modules (package specifier)',
+      () => {
+        writeFileSync(
+          path.join(consumerDir, "esm-default-check.mjs"),
+          [
+            'import SocialCalc from "socialcalc";',
+            "const shape = {};",
+            "for (const key of Object.keys(SocialCalc)) shape[key] = typeof SocialCalc[key];",
+            "console.log(JSON.stringify(shape));",
+            "",
+          ].join("\n"),
         );
-      }
-      esmDefaultShape = JSON.parse(result.stdout.trim());
-      return `${Object.keys(esmDefaultShape).length} top-level keys`;
-    });
+        const result = run(process.execPath, ["esm-default-check.mjs"], { cwd: consumerDir });
+        if (result.status !== 0) {
+          throw new Error(
+            `native ESM default import failed (exit ${result.status}):\n${result.stdout}\n${result.stderr}`,
+          );
+        }
+        esmDefaultShape = JSON.parse(result.stdout.trim());
+        return `${Object.keys(esmDefaultShape).length} top-level keys`;
+      },
+    );
 
     record("normal bundle runs as a pure browser global (VM sandbox, no CJS host)", () => {
       vmNormal = loadInVm(installedRootJsPath);
@@ -473,15 +518,17 @@ async function main() {
       return `${keyCount} keys, identical shape across ${Object.keys(shapes).length} delivery paths`;
     });
 
-    await recordAsync("representative command/formula/save-load behavior (root CJS bundle, package specifier)", () =>
-      exerciseCommandFormulaSaveLoad(cjsRoot, "CJS root"),
+    await recordAsync(
+      "representative command/formula/save-load behavior (root CJS bundle, package specifier)",
+      () => exerciseCommandFormulaSaveLoad(cjsRoot, "CJS root"),
     );
     await recordAsync(
       "representative command/formula/save-load behavior (minified bundle, package specifier)",
       () => exerciseCommandFormulaSaveLoad(cjsMinDeep, "min deep"),
     );
-    await recordAsync("representative command/formula/save-load behavior (VM browser-global, normal bundle)", () =>
-      exerciseCommandFormulaSaveLoad(vmNormal, "VM normal"),
+    await recordAsync(
+      "representative command/formula/save-load behavior (VM browser-global, normal bundle)",
+      () => exerciseCommandFormulaSaveLoad(vmNormal, "VM normal"),
     );
     await recordAsync(
       "representative command/formula/save-load behavior (VM browser-global, minified bundle)",
@@ -525,14 +572,19 @@ async function main() {
           2,
         ),
       );
-      const result = run("vp", ["exec", "tsc", "-p", path.join(consumerDir, "tsconfig.json"), "--pretty", "false"], {
-        cwd: repoRoot,
-      });
+      const result = run(
+        "vp",
+        ["exec", "tsc", "-p", path.join(consumerDir, "tsconfig.json"), "--pretty", "false"],
+        {
+          cwd: repoRoot,
+        },
+      );
       if (result.status !== 0) {
-        throw new Error(`external tsc compile failed (exit ${result.status}):\n${result.stdout}\n${result.stderr}`);
+        throw new Error(
+          `external tsc compile failed (exit ${result.status}):\n${result.stdout}\n${result.stderr}`,
+        );
       }
     });
-
   } finally {
     if (!process.env.SC_KEEP_PACKAGE_CONTRACT_TMP) {
       rmSync(workDir, { recursive: true, force: true });
@@ -542,7 +594,9 @@ async function main() {
   }
 
   console.log("");
-  console.log(`${checks.filter((c) => c.ok).length}/${checks.length} package-contract checks passed`);
+  console.log(
+    `${checks.filter((c) => c.ok).length}/${checks.length} package-contract checks passed`,
+  );
   if (failed) {
     process.exitCode = 1;
   }

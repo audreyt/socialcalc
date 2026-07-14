@@ -47,13 +47,11 @@ interface SheetLike {
   [key: string]: unknown;
 }
 
-
 interface SCFunc {
   (...args: unknown[]): unknown;
   new (...args: unknown[]): unknown;
 }
 type EncodedAttrs = Record<string, { def: boolean; val: string }>;
-
 
 interface FakeEditorContext {
   sheetobj: unknown;
@@ -129,7 +127,14 @@ interface SCCore {
   coordToCr: SCFunc;
   rcColname: SCFunc;
   [key: string]: unknown;
-  RenderCell(context: RenderContextLike, row: number, col: number, coordrow: number, coordcol: number, noElement?: boolean): RenderedCellLike;
+  RenderCell(
+    context: RenderContextLike,
+    row: number,
+    col: number,
+    coordrow: number,
+    coordcol: number,
+    noElement?: boolean,
+  ): RenderedCellLike;
   ParseCellLinkText(str: string): CellLinkText;
 }
 
@@ -557,7 +562,6 @@ test("sort blank vs non-blank down exercises dirs==up false (dist 2709)", async 
   };
   await scheduleCommands(SC, sheet, [
     "set A1 value n 42",
-
 
     // A2 is empty (blank)
     "set A3 value n 10",
@@ -1230,10 +1234,7 @@ test("ExecuteCommand sort with identical text cells for tiebreaker (L2757, L2799
   const sheet = new SC.Sheet() as unknown as SheetLike;
   // Two identical text cells to hit equal text comparison (L2757 arm 1)
   // and trigger the final original-row tiebreaker (L2799 arms 0 & 1)
-  await scheduleCommands(SC, sheet, [
-    "set A1 text t Alice",
-    "set A2 text t Alice",
-  ]);
+  await scheduleCommands(SC, sheet, ["set A1 text t Alice", "set A2 text t Alice"]);
   await recalcSheet(SC, sheet);
   await scheduleCommands(SC, sheet, ["sort A1:A2 A up"]);
   await scheduleCommands(SC, sheet, ["sort A1:A2 A down"]);
@@ -1275,7 +1276,7 @@ test("ExecuteCommand delete named range with description (L3561)", async () => {
   const sheet = new SC.Sheet() as unknown as SheetLike;
   await scheduleCommands(SC, sheet, [
     "name define MyRange A1",
-    "name desc MyRange \"My range description\"",
+    'name desc MyRange "My range description"',
     "name delete MyRange",
   ]);
   expect(sheet.names["MyRange"]).toBeUndefined();
@@ -1294,10 +1295,7 @@ test("ExecuteCommand delete named range without description omits description un
 test("RenderCell with and without cellIDprefix (L5387)", async () => {
   const SC = await loadSCBrowser();
   const sheet = new SC.Sheet() as unknown as SheetLike;
-  await scheduleCommands(SC, sheet, [
-    "set A1 value n 5",
-    "set A1 comment \"Cell comment\"",
-  ]);
+  await scheduleCommands(SC, sheet, ["set A1 value n 5", 'set A1 comment "Cell comment"']);
   const context = new SC.RenderContext(sheet);
   context.showGrid = true;
   context.commentClassName = "comm_class";
@@ -1311,7 +1309,7 @@ test("RenderCell with and without cellIDprefix (L5387)", async () => {
   context.cellIDprefix = "prefix_";
   const cellElWithPrefix = SC.RenderCell(context, 1, 1, 0, 0);
   expect(cellElWithPrefix.id).toBe("prefix_A1");
-  expect(cellElWithPrefix.title).toBe("\"Cell comment\"");
+  expect(cellElWithPrefix.title).toBe('"Cell comment"');
 
   // Render cell without grid (L5543)
   context.showGrid = false;
@@ -1319,7 +1317,7 @@ test("RenderCell with and without cellIDprefix (L5387)", async () => {
   context.CalculateCellSkipData();
   context.PrecomputeSheetFontsAndLayouts();
   const cellElNoGrid = SC.RenderCell(context, 1, 1, 0, 0);
-  expect(cellElNoGrid.title).toBe("\"Cell comment\"");
+  expect(cellElNoGrid.title).toBe('"Cell comment"');
 });
 
 test("ParseCellLinkText with workspace page link (L6559)", async () => {

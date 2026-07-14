@@ -94,7 +94,6 @@ function primeGridLayout(editor: SocialCalc.TableEditor) {
   editor.lastvisiblecol = editor.lastvisiblecol ?? 7;
 }
 
-
 interface FakeEventOptions {
   type?: string;
   clientX?: number;
@@ -578,7 +577,11 @@ test("EditorSheetStatusCallback cmdend: changedrendervalues, celldisplayneeded, 
   // cmdend's own deferredCommands.length branch (distinct from doneposcalc's).
   let rescheduled: { cmdstr: string; saveundo: boolean } | null = null;
   const origSchedule = editor.EditorScheduleSheetCommands.bind(editor);
-  editor.EditorScheduleSheetCommands = (cmdstr: string, saveundo?: boolean, ignorebusy?: boolean) => {
+  editor.EditorScheduleSheetCommands = (
+    cmdstr: string,
+    saveundo?: boolean,
+    ignorebusy?: boolean,
+  ) => {
     rescheduled = { cmdstr, saveundo: saveundo ?? false };
     origSchedule(cmdstr, saveundo, ignorebusy);
   };
@@ -769,7 +772,11 @@ test("EditorGetStatuslineString: calcorder/calcstep/calcloading/calcserverfunc p
   s = editor.GetStatuslineString("calcloading", { sheetname: "Sheet2" }, {});
   expect(s).toContain("Sheet2");
 
-  s = editor.GetStatuslineString("calcserverfunc", { count: 2, total: 4, funcname: "REMOTE", coord: "B2" }, {});
+  s = editor.GetStatuslineString(
+    "calcserverfunc",
+    { count: 2, total: 4, funcname: "REMOTE", coord: "B2" },
+    {},
+  );
   expect(s).toContain("REMOTE");
   expect(s).toContain("B2");
 
@@ -809,7 +816,6 @@ test("MoveECellWithKey: primed pane-relative pgdn/pgup and usermaxrow clamp", as
   sheet.attribs.usermaxrow = 0;
   editor.RangeRemove();
 });
-
 
 test("EditorAddToInput: default state no-ops, inputboxdirect appends str, input state appends with partialexpr reset", async () => {
   const SC = await loadSocialCalc();

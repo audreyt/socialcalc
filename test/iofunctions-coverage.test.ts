@@ -810,7 +810,7 @@ test("TriggerIoAction.updateInputWidgetFormula with various param types", async 
   expect(scheduledCommands).toHaveLength(1);
   expect(scheduledCommands[0]).toContain('set W1 formula TEXTBOX("new value with ');
   expect(scheduledCommands[0]).toContain(',42,"extra text",WS!E5:E8,A1)');
-  expect(scheduledCommands[0]).toContain("+style(\"color:red\")");
+  expect(scheduledCommands[0]).toContain('+style("color:red")');
   control.editor.EditorScheduleSheetCommands = originalSchedule;
 });
 
@@ -1311,9 +1311,9 @@ test("DoOnResize invokes SizeSSDiv with margins and resizes views", async () => 
   // Cleanup-only: best-effort coverage — DoOnResize may render against fake DOM.
   try {
     SC.DoOnResize(control);
-    } catch {
-      // Defensive fake-DOM cleanup: resize rendering may require layout APIs absent here.
-    } finally {
+  } catch {
+    // Defensive fake-DOM cleanup: resize rendering may require layout APIs absent here.
+  } finally {
     SC.GetViewportInfo = origVpi;
   }
 });

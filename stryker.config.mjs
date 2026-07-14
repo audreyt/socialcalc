@@ -104,7 +104,9 @@ const mutate = isCriticalScope ? CRITICAL_FILES : target ? [target] : ALL_MUTATE
 
 // Deterministic test subset for the critical scope: union of testsByFile's
 // entries for CRITICAL_FILES, deduped.
-const criticalTests = [...new Set(CRITICAL_FILES.flatMap((f) => testsByFile[f.replace(/^js\//, "")] ?? []))];
+const criticalTests = [
+  ...new Set(CRITICAL_FILES.flatMap((f) => testsByFile[f.replace(/^js\//, "")] ?? [])),
+];
 
 // Per-file scope's test subset: exactly what testsByFile maps for that one
 // module — the same tests `vp run mutate:file` would use. Refuse to run

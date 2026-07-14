@@ -15,9 +15,14 @@ const mutation = readFileSync(mutationPath, "utf8");
 const release = readFileSync(releasePath, "utf8");
 
 function jobIf(source, job) {
-  const match = source.match(new RegExp(`^  ${job}:\\n(?:.*\\n)*?    if: >-\\n((?:      .*\\n)+)`, "m"));
+  const match = source.match(
+    new RegExp(`^  ${job}:\\n(?:.*\\n)*?    if: >-\\n((?:      .*\\n)+)`, "m"),
+  );
   assert(match, `${job} must have a multiline if expression`);
-  return match[1].replace(/^      /gm, "").replace(/\s+$/g, "").replace(/\n/g, " ");
+  return match[1]
+    .replace(/^      /gm, "")
+    .replace(/\s+$/g, "")
+    .replace(/\n/g, " ");
 }
 
 const criticalIf = jobIf(mutation, "critical");
@@ -28,7 +33,10 @@ assert(releaseIf, "release-gate must have an if expression");
 // A called workflow inherits the caller's event_name. Model release.yml's
 // tag-push caller explicitly: inputs.scope=full and enforce_release=true.
 const releaseCaller = { eventName: "push", scope: "full", enforceRelease: true };
-assert.equal(releaseCaller.eventName === "pull_request" || releaseCaller.scope === "critical", false);
+assert.equal(
+  releaseCaller.eventName === "pull_request" || releaseCaller.scope === "critical",
+  false,
+);
 assert.equal(releaseCaller.eventName === "schedule" || releaseCaller.scope === "full", true);
 assert.equal(releaseCaller.enforceRelease === true, true);
 assert.match(criticalIf, /inputs\.scope == 'critical'/);
@@ -43,15 +51,30 @@ assert.doesNotMatch(releaseIf, /event_name == 'workflow_call'/);
 assert.doesNotMatch(mutation, /^push:\s*$/m);
 assert.doesNotMatch(mutation, /^\s+tags:\s*v\*/m);
 assert.match(mutation, /^  group: mutation-\$\{\{ github\.ref \}\}$/m);
-assert.match(release, /^\s+mutation:\n\s+name: full mutation testing\n\s+if: github\.ref_type == 'tag'\n\s+uses: \.\/\.github\/workflows\/mutation\.yml\n\s+with:\n\s+scope: full\n\s+enforce_release: true/m);
+assert.match(
+  release,
+  /^\s+mutation:\n\s+name: full mutation testing\n\s+if: github\.ref_type == 'tag'\n\s+uses: \.\/\.github\/workflows\/mutation\.yml\n\s+with:\n\s+scope: full\n\s+enforce_release: true/m,
+);
 
-assert.equal((mutation.match(/ref: \$\{\{ github\.sha \}\}/g) ?? []).length, 4, "every mutation job must checkout caller SHA");
+assert.equal(
+  (mutation.match(/ref: \$\{\{ github\.sha \}\}/g) ?? []).length,
+  4,
+  "every mutation job must checkout caller SHA",
+);
 // ALL_MUTATE_FILES is the single source of truth for the matrix. Every entry
 // must be a real source with at least one real test path, and the baseline
 // registry must have exactly the same 11 keys.
-assert.equal(ALL_MUTATE_FILES.length, 11, "release mutation matrix must contain all 11 shipping modules");
+assert.equal(
+  ALL_MUTATE_FILES.length,
+  11,
+  "release mutation matrix must contain all 11 shipping modules",
+);
 const baseline = JSON.parse(readFileSync("stryker-mutation-baseline.json", "utf8"));
-assert.deepEqual(Object.keys(baseline.modules).sort(), [...ALL_MUTATE_FILES].sort(), "baseline/module set drift");
+assert.deepEqual(
+  Object.keys(baseline.modules).sort(),
+  [...ALL_MUTATE_FILES].sort(),
+  "baseline/module set drift",
+);
 for (const file of ALL_MUTATE_FILES) {
   assert.ok(existsSync(file), `mutation target missing: ${file}`);
   const tests = testsByFile[file.replace(/^js\//, "")];
@@ -62,8 +85,14 @@ for (const file of ALL_MUTATE_FILES) {
 // The discover output feeds a fail-fast-disabled matrix, and every leg uploads
 // its own JSON under the exact directory consumed by release-gate.
 assert.match(mutation, /outputs:\n\s+files: \$\{\{ steps\.list\.outputs\.files \}\}/);
-assert.match(mutation, /matrix:\n\s+file: \$\{\{ fromJson\(needs\.mutate-discover\.outputs\.files\) \}\}/);
-assert.match(mutation, /mutate-full:\n\s+name:.*\n\s+needs: mutate-discover\n\s+strategy:\n\s+fail-fast: false/);
+assert.match(
+  mutation,
+  /matrix:\n\s+file: \$\{\{ fromJson\(needs\.mutate-discover\.outputs\.files\) \}\}/,
+);
+assert.match(
+  mutation,
+  /mutate-full:\n\s+name:.*\n\s+needs: mutate-discover\n\s+strategy:\n\s+fail-fast: false/,
+);
 assert.match(mutation, /name: mutation-report-\$\{\{ steps\.meta\.outputs\.slug \}\}/);
 assert.match(mutation, /path: reports\/mutation\/\$\{\{ steps\.meta\.outputs\.slug \}\}\//);
 assert.match(mutation, /if-no-files-found: warn/);
@@ -94,4 +123,6 @@ for (const source of [mutation, release]) {
   }
 }
 
-console.log("mutation/release workflow contracts: 11 targets, fail-closed matrix/artifacts/baselines, caller context, pins, and deadlock-safe concurrency verified");
+console.log(
+  "mutation/release workflow contracts: 11 targets, fail-closed matrix/artifacts/baselines, caller context, pins, and deadlock-safe concurrency verified",
+);

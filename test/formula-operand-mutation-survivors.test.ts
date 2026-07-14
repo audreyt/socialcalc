@@ -272,7 +272,6 @@ test("id305: circular name reference returns e#NAME? error, not bare name", asyn
   expect(r.error).toBe('Circular name reference to name "CIRC".');
 });
 
-
 // ---------------------------------------------------------------------------
 // Fresh no-exclusion survivors: observable defaults, coercions, and errors.
 // ---------------------------------------------------------------------------
@@ -281,14 +280,18 @@ test("fresh id3/id8: empty TopOfStackValueAndType preserves blank type/value and
   const { SC, sheet } = await fresh();
   const r = SC.Formula.TopOfStackValueAndType(sheet, []);
   expect(r).toMatchObject({ type: "", value: "" });
-  expect(r.error).toBe(`${"Internal SocialCalc error (probably an internal bug): "}no operand on stack`);
+  expect(r.error).toBe(
+    `${"Internal SocialCalc error (probably an internal bug): "}no operand on stack`,
+  );
 });
 
 test("fresh id86/id91: empty OperandValueAndType preserves blank type/value and error text", async () => {
   const { SC, sheet } = await fresh();
   const r = SC.Formula.OperandValueAndType(sheet, []);
   expect(r).toMatchObject({ type: "", value: "" });
-  expect(r.error).toBe(`${"Internal SocialCalc error (probably an internal bug): "}no operand on stack`);
+  expect(r.error).toBe(
+    `${"Internal SocialCalc error (probably an internal bug): "}no operand on stack`,
+  );
 });
 
 test("fresh id65: numeric OperandAsText fallback stringifies when formatter is absent", async () => {

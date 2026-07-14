@@ -54,30 +54,40 @@ function ensureDocumentEvents() {
 }
 
 function teardownEditor(SC: SC, editor: Editor) {
-  { if (editor?.inputEcho?.interval) {
-    clearInterval(editor.inputEcho.interval);
-    editor.inputEcho.interval = null;
-  } }
-  { if (SC.AutoRepeatInfo?.timer) {
-    clearTimeout(SC.AutoRepeatInfo.timer);
-    SC.AutoRepeatInfo.timer = null;
-    SC.AutoRepeatInfo.mouseinfo = null;
-  } }
-  { if (SC.ButtonInfo?.timer) {
-    clearTimeout(SC.ButtonInfo.timer);
-    SC.ButtonInfo.timer = null;
-  } }
-  { if (SC.Keyboard) {
-    SC.Keyboard.focusTable = null;
-    SC.Keyboard.passThru = null;
-  } }
-  { if (editor) {
-    editor.state = "start";
-    if (editor.timeout) {
-      clearTimeout(editor.timeout);
-      editor.timeout = null;
+  {
+    if (editor?.inputEcho?.interval) {
+      clearInterval(editor.inputEcho.interval);
+      editor.inputEcho.interval = null;
     }
-  } }
+  }
+  {
+    if (SC.AutoRepeatInfo?.timer) {
+      clearTimeout(SC.AutoRepeatInfo.timer);
+      SC.AutoRepeatInfo.timer = null;
+      SC.AutoRepeatInfo.mouseinfo = null;
+    }
+  }
+  {
+    if (SC.ButtonInfo?.timer) {
+      clearTimeout(SC.ButtonInfo.timer);
+      SC.ButtonInfo.timer = null;
+    }
+  }
+  {
+    if (SC.Keyboard) {
+      SC.Keyboard.focusTable = null;
+      SC.Keyboard.passThru = null;
+    }
+  }
+  {
+    if (editor) {
+      editor.state = "start";
+      if (editor.timeout) {
+        clearTimeout(editor.timeout);
+        editor.timeout = null;
+      }
+    }
+  }
 }
 
 type FakeEvent = {
@@ -125,7 +135,9 @@ function fakeEvent(extras: Partial<FakeEvent> = {}): FakeEvent {
 }
 
 function primeGridLayout(editor: Editor) {
-  { editor.CalculateEditorPositions(); }
+  {
+    editor.CalculateEditorPositions();
+  }
   editor.gridposition = editor.gridposition || { left: 0, top: 0 };
   editor.headposition = editor.headposition || { left: 30, top: 30 };
   editor.tablewidth = editor.tablewidth ?? 400;
@@ -177,7 +189,8 @@ test("CreateTableEditor: Safari-not-Chrome UA + logoImg falsy branches", async (
 
   const navMutable = navigator as unknown as { userAgent: string }; // Unchecked cast to temporary override navigator
   const savedUA = navigator.userAgent;
-  navMutable.userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15";
+  navMutable.userAgent =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15";
 
   const globalThisRec = globalThis as unknown as Record<string, unknown>;
   const globalWindow = globalThisRec.window as Record<string, unknown>;
@@ -238,7 +251,6 @@ test("ctrlkeyFunction [ctrl-v]: GetEditorCellElement returns null + Webkit blank
   SC.GetEditorCellElement = () => null;
 
   SC.Clipboard.clipboard = "version:1.5\nclass:sheet\n";
-
 
   const editorRec = editor as unknown as Record<string, unknown>; // Unchecked cast to record to spy on commands
   const scheduled: string[] = [];
@@ -411,12 +423,14 @@ test("ProcessEditorMouseDown text node + MouseUp return + MouseRange coord falsy
   SC.EditorMouseRegister(editor);
 
   const origGMP = SC.GridMousePosition;
-  SC.GridMousePosition = () => ({ coord: "A1" } as SocialCalc.GridMousePositionResult);
+  SC.GridMousePosition = () => ({ coord: "A1" }) as SocialCalc.GridMousePositionResult;
 
   const ev = fakeEvent({ target: txt }) as unknown as MouseEvent; // target.nodeType == 3 (text node), line 1511 true branch
 
   try {
-    { SC.ProcessEditorMouseDown(ev); }
+    {
+      SC.ProcessEditorMouseDown(ev);
+    }
 
     // Now test MouseUp return false (statement 1733)
     mouseInfoRec.editor = editor; // Ensure editor is set so it doesn't return early
@@ -438,7 +452,6 @@ test("ProcessEditorMouseDown text node + MouseUp return + MouseRange coord falsy
     editorRec.EditorSaveEdit = () => {};
 
     SC.EditorMouseRange(editor, null as unknown as string); // coord is null -> line 1618 false branch
-
   } finally {
     SC.GridMousePosition = origGMP;
     teardownEditor(SC, editor);
@@ -461,7 +474,7 @@ test("ProcessEditorMouseMove: result.coord falsy and same coord branches", async
 
   const origGMP = SC.GridMousePosition;
   let mockCoord: string | null = null;
-  SC.GridMousePosition = () => ({ coord: mockCoord } as SocialCalc.GridMousePositionResult);
+  SC.GridMousePosition = () => ({ coord: mockCoord }) as SocialCalc.GridMousePositionResult;
 
   const ev = fakeEvent() as unknown as MouseEvent;
 
@@ -580,7 +593,6 @@ test("EditorProcessKey [enter]/[tab] arrow paths", async () => {
   const editor = control.editor;
   primeGridLayout(editor);
 
-
   const editorRec = editor as unknown as Record<string, unknown>; // Unchecked cast to record to spy on commands
   const movedKeys: string[] = [];
   editorRec.MoveECellWithKey = (key: string) => {
@@ -660,7 +672,9 @@ test("EditorSaveEdit non-text suffix + GridMousePosition rowunhidebottom + Ensur
   editor.lastvisiblerow = 10;
   editor.ecell = { coord: "A3", row: 3, col: 1 };
   let scrolled = false;
-  editorRec.ScrollRelativeBoth = () => { scrolled = true; };
+  editorRec.ScrollRelativeBoth = () => {
+    scrolled = true;
+  };
   SC.EnsureECellVisible(editor);
   expect(scrolled).toBe(true);
 
@@ -934,7 +948,6 @@ test("CellHandles MouseDown capture, Fill & TCPS/TCT/Button branches", async () 
   teardownEditor(SC, editor);
 });
 
-
 // ============================================================================
 // SECOND PASS: Direct branch targeting
 // ============================================================================
@@ -978,40 +991,62 @@ test("Direct targeting of remaining branches", async () => {
   const txtRec = txt as unknown as Record<string, unknown>;
   txtRec.parentNode = parent;
   const ev = fakeEvent({ target: txt, srcElement: txt }) as unknown as MouseEvent;
-  { SC.ProcessEditorMouseDown(ev); }
+  {
+    SC.ProcessEditorMouseDown(ev);
+  }
 
   // 1677: ProcessEditorMouseMove coord falsy
   mouseInfoRec.editor = editor;
   const origGMP = SC.GridMousePosition;
-  SC.GridMousePosition = () => ({ coord: null } as unknown as SocialCalc.GridMousePositionResult);
-  { SC.ProcessEditorMouseMove(fakeEvent() as unknown as MouseEvent); }
+  SC.GridMousePosition = () => ({ coord: null }) as unknown as SocialCalc.GridMousePositionResult;
+  {
+    SC.ProcessEditorMouseMove(fakeEvent() as unknown as MouseEvent);
+  }
 
   // 1846, 2095: resizecolnum / resizerownum
   mouseInfoRec.mousecoltounhide = 0;
   mouseInfoRec.mouseresizecolnum = 1;
   editor.context.colwidth = [0, 50, 50];
-  { SC.ProcessEditorColsizeMouseUp(fakeEvent() as unknown as MouseEvent); }
+  {
+    SC.ProcessEditorColsizeMouseUp(fakeEvent() as unknown as MouseEvent);
+  }
 
   mouseInfoRec.mouserowtounhide = 0;
   mouseInfoRec.mouseresizerownum = 1;
   editor.context.rowheight = [0, 50, 50];
-  { SC.ProcessEditorRowsizeMouseUp(fakeEvent() as unknown as MouseEvent); }
+  {
+    SC.ProcessEditorRowsizeMouseUp(fakeEvent() as unknown as MouseEvent);
+  }
 
   // 2160, 2171, 2172, 2232: DragAutoRepeat
   const repeatInfoRec = SC.AutoRepeatInfo as unknown as Record<string, unknown>;
   repeatInfoRec.repeatcallback = () => {};
   repeatInfoRec.mouseinfo = { rowheader: true, row: 5, col: 1 };
-  { SC.SetDragAutoRepeat(editor, { rowheader: true, row: 1, col: 1 }, () => {}); }
-  { SC.SetDragAutoRepeat(editor, { colheader: true, row: 1, col: 5 }, () => {}); }
-  { SC.SetDragAutoRepeat(editor, { colheader: true, row: 1, col: 1 }, () => {}); }
+  {
+    SC.SetDragAutoRepeat(editor, { rowheader: true, row: 1, col: 1 }, () => {});
+  }
+  {
+    SC.SetDragAutoRepeat(editor, { colheader: true, row: 1, col: 5 }, () => {});
+  }
+  {
+    SC.SetDragAutoRepeat(editor, { colheader: true, row: 1, col: 1 }, () => {});
+  }
   repeatInfoRec.mouseinfo = { colfooter: true };
   repeatInfoRec.editor = editor;
   editor.ecell = { coord: "A1", row: 1, col: 1 };
-  { SC.DragAutoRepeat(); }
+  {
+    SC.DragAutoRepeat();
+  }
 
   // 2439, 2484, 2485: EditorProcessKey
   editor.state = "input";
-  editor.inputBox = { GetText: () => "A1", skipOne: false, Blur: () => {}, ShowInputBox: () => {}, DisplayCellContents: () => {} } as unknown as SocialCalc.InputBox;
+  editor.inputBox = {
+    GetText: () => "A1",
+    skipOne: false,
+    Blur: () => {},
+    ShowInputBox: () => {},
+    DisplayCellContents: () => {},
+  } as unknown as SocialCalc.InputBox;
   editor.cellhandles = { ShowCellHandles: () => {} } as unknown as SocialCalc.CellHandles;
   (editor as unknown as Record<string, unknown>).EditorSaveEdit = () => {};
   editor.workingvalues.ecoord = "A1";
@@ -1021,11 +1056,25 @@ test("Direct targeting of remaining branches", async () => {
     movedKeys.push(key);
     return "A1";
   };
-  { SC.EditorProcessKey(editor, "[enter]", fakeEvent({ keyCode: 13 }) as unknown as KeyboardEvent); }
+  {
+    SC.EditorProcessKey(editor, "[enter]", fakeEvent({ keyCode: 13 }) as unknown as KeyboardEvent);
+  }
   editor.state = "inputboxdirect";
-  { SC.EditorProcessKey(editor, "[tab]", fakeEvent({ keyCode: 9, shiftKey: false }) as unknown as KeyboardEvent); }
+  {
+    SC.EditorProcessKey(
+      editor,
+      "[tab]",
+      fakeEvent({ keyCode: 9, shiftKey: false }) as unknown as KeyboardEvent,
+    );
+  }
   editor.state = "inputboxdirect";
-  { SC.EditorProcessKey(editor, "[tab]", fakeEvent({ keyCode: 9, shiftKey: true }) as unknown as KeyboardEvent); }
+  {
+    SC.EditorProcessKey(
+      editor,
+      "[tab]",
+      fakeEvent({ keyCode: 9, shiftKey: true }) as unknown as KeyboardEvent,
+    );
+  }
   expect(movedKeys).toEqual(["[adown]", "[aright]", "[aleft]"]);
 
   // 2756: rowunhidebottom
@@ -1036,14 +1085,18 @@ test("Direct targeting of remaining branches", async () => {
   const unhideElRec = unhideEl as unknown as { offsetWidth: number; offsetHeight: number };
   unhideElRec.offsetWidth = 50;
   unhideElRec.offsetHeight = 50;
-  { SC.GridMousePosition(editor, 10, editor.rowpositions[1] + 100); }
+  {
+    SC.GridMousePosition(editor, 10, editor.rowpositions[1] + 100);
+  }
 
   // 3129: EnsureECellVisible col
   editor.ecell = { coord: "C1", row: 1, col: 3 };
   editor.lastnonscrollingcol = 1;
   editor.firstscrollingcol = 5;
   editor.lastvisiblecol = 10;
-  { SC.EnsureECellVisible(editor); }
+  {
+    SC.EnsureECellVisible(editor);
+  }
 
   // 3162, 3176: ReplaceCell style
   (ctx as unknown as Record<string, unknown>).RenderCell = () => {
@@ -1052,8 +1105,12 @@ test("Direct targeting of remaining branches", async () => {
     return el;
   };
   const cell = { element: document.createElement("td") } as unknown as SocialCalc.RenderedCellRef;
-  { SC.ReplaceCell(editor, cell, 1, 1); }
-  { SC.UpdateCellCSS(editor, cell, 1, 1); }
+  {
+    SC.ReplaceCell(editor, cell, 1, 1);
+  }
+  {
+    SC.UpdateCellCSS(editor, cell, 1, 1);
+  }
 
   // 3213-3234: SetECellHeaders
   const tbody = document.createElement("tbody");
@@ -1072,12 +1129,22 @@ test("Direct targeting of remaining branches", async () => {
   editor.fullgrid = table;
   ctx.rowpanes = [{ first: 1, last: 1 }];
   ctx.colpanes = [{ first: 1, last: 1 }];
-  (ctx as unknown as Record<string, unknown>).classnames = { selectedrowname: "a", selectedcolname: "b" };
-  (ctx as unknown as Record<string, unknown>).explicitStyles = { selectedrowname: "a", selectedcolname: "b" };
-  { SC.SetECellHeaders(editor, "selected"); }
+  (ctx as unknown as Record<string, unknown>).classnames = {
+    selectedrowname: "a",
+    selectedcolname: "b",
+  };
+  (ctx as unknown as Record<string, unknown>).explicitStyles = {
+    selectedrowname: "a",
+    selectedcolname: "b",
+  };
+  {
+    SC.SetECellHeaders(editor, "selected");
+  }
   (ctx as unknown as Record<string, unknown>).classnames = undefined;
   (ctx as unknown as Record<string, unknown>).explicitStyles = undefined;
-  { SC.SetECellHeaders(editor, "selected"); }
+  {
+    SC.SetECellHeaders(editor, "selected");
+  }
 
   // 3956: PageRelative
   ctx.rowpanes = [{ first: 3, last: 5 }];
@@ -1086,7 +1153,9 @@ test("Direct targeting of remaining branches", async () => {
   editor.gridposition = { left: 0, top: 0 };
   editor.lastvisiblerow = 4;
   editor.rowheight = [0, 50, 50, 50, 50];
-  { SC.PageRelative(editor, true, -1); }
+  {
+    SC.PageRelative(editor, true, -1);
+  }
 
   // 4092, 4198: ScrollTable cellskip
   ctx.rowpanes = [{ first: 2, last: 4 }];
@@ -1099,8 +1168,12 @@ test("Direct targeting of remaining branches", async () => {
     tr.appendChild(document.createElement("td"));
     return tr;
   };
-  { SC.ScrollTableUpOneRow(editor); }
-  { SC.ScrollTableDownOneRow(editor); }
+  {
+    SC.ScrollTableUpOneRow(editor);
+  }
+  {
+    SC.ScrollTableDownOneRow(editor);
+  }
   expect(ctx.rowpanes[0].first).toBe(2);
   expect(ctx.rowpanes[0].last).toBeGreaterThanOrEqual(4);
 
@@ -1114,8 +1187,10 @@ test("Direct targeting of remaining branches", async () => {
   const fillingHandle = document.createElement("div");
   cellHandlesRec.fillinghandle = fillingHandle;
   SC.EditorMouseInfo.editor = editor;
-  SC.GridMousePosition = () => ({ coord: "A1" } as SocialCalc.GridMousePositionResult);
-  { SC.CellHandlesMouseMove(fakeEvent({ clientX: 30, clientY: 15 }) as unknown as MouseEvent); }
+  SC.GridMousePosition = () => ({ coord: "A1" }) as SocialCalc.GridMousePositionResult;
+  {
+    SC.CellHandlesMouseMove(fakeEvent({ clientX: 30, clientY: 15 }) as unknown as MouseEvent);
+  }
   expect(fillingHandle.style.display).toBe("block");
 
   // 5792: TCPS
@@ -1125,16 +1200,12 @@ test("Direct targeting of remaining branches", async () => {
   paneSlider.style.left = "0px";
   const paneDragInfo = { clientX: 0, clientY: 0 } as unknown as typeof SocialCalc.DragInfo;
   {
-    SC.TCPSDragFunctionStart(
-      fakeEvent() as unknown as Event,
-      paneDragInfo,
-      {
-        element: paneSlider,
-        vertical: false,
-        horizontal: true,
-        functionobj: { control: { editor, sliderthickness: 0 } },
-      } as unknown as SocialCalc.DragRegisteredElement,
-    );
+    SC.TCPSDragFunctionStart(fakeEvent() as unknown as Event, paneDragInfo, {
+      element: paneSlider,
+      vertical: false,
+      horizontal: true,
+      functionobj: { control: { editor, sliderthickness: 0 } },
+    } as unknown as SocialCalc.DragRegisteredElement);
   }
   expect(paneDragInfo.trackingline.className).toBe("test-class");
 
@@ -1165,7 +1236,9 @@ test("Direct targeting of remaining branches", async () => {
   btnInfoRec.buttonDown = true;
   const btnRegistered = btnInfoRec.registeredElements as { element: unknown }[]; // registeredElements is unknown off the Record cast; LookupElement needs T[]
   btnInfoRec.buttonElement = SC.LookupElement(btn, btnRegistered);
-  { SC.ButtonMouseUp(fakeEvent() as unknown as MouseEvent); }
+  {
+    SC.ButtonMouseUp(fakeEvent() as unknown as MouseEvent);
+  }
 
   globalThisRec.setTimeout = origSetTimeout;
   SC.GridMousePosition = origGMP;

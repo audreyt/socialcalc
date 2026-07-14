@@ -29,7 +29,9 @@ afterEach(() => {
   __liveIntervals.clear();
   // Reset the heartbeat flag left by the prior test; optional chaining keeps
   // teardown safe when another test has not installed SocialCalc yet.
-  const SC = (globalThis as typeof globalThis & { SocialCalc?: { Keyboard?: { focusTable?: unknown } } }).SocialCalc;
+  const SC = (
+    globalThis as typeof globalThis & { SocialCalc?: { Keyboard?: { focusTable?: unknown } } }
+  ).SocialCalc;
   if (SC?.Keyboard) SC.Keyboard.focusTable = null;
 });
 
@@ -1389,7 +1391,11 @@ test("Comment tab: Onclick/Display/Set/MoveECell/Onunclick", async () => {
 
   // Set: ecell readonly variant is not typical; test non-readonly
   (commentInput as any).value = "new note";
-  const cellEle = SC.GetEditorCellElement(control.editor, control.editor.ecell.row, control.editor.ecell.col);
+  const cellEle = SC.GetEditorCellElement(
+    control.editor,
+    control.editor.ecell.row,
+    control.editor.ecell.col,
+  );
   SC.SpreadsheetControlCommentSet();
   await waitEditor(control.editor);
   expect(scheduleSpy.calls).toEqual(["set A1 comment new note"]);
@@ -1551,7 +1557,9 @@ test("Clipboard tab: Onclick/Format/Load/Clear/Export", async () => {
   const scheduleSpy = spyScheduled(control.sheet as ScheduledCommandSheet);
 
   SC.SpreadsheetControlClipboardOnclick(control, "clipboard");
-  expect((document.getElementById(control.idPrefix + "clipboardformat-tab") as any).checked).toBe(true);
+  expect((document.getElementById(control.idPrefix + "clipboardformat-tab") as any).checked).toBe(
+    true,
+  );
   expect(clipele.value).toBe("Hello\n");
 
   // Format switching for all three output types.
@@ -2327,7 +2335,6 @@ test("InitializeSpreadsheetControl: unknown string id triggers alert", async () 
   (globalThis as any).alert = origAlert;
 });
 
-
 // -------------------------------------------------------------------
 // Test 33b: SortSave with minor/last sort > 0 selected indices
 // -------------------------------------------------------------------
@@ -2420,7 +2427,6 @@ test("SortOnclick with sortrange matching a name", async () => {
     ["MYSORT", "MYSORT", false],
   ]);
 });
-
 
 // -------------------------------------------------------------------
 // Test 33d: CreateCellHTML with displaystring undefined but value set

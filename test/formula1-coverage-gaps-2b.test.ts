@@ -15,7 +15,7 @@ function resetFormulaGlobals(SC: typeof globalThis.SocialCalc) {
     SC.RecalcInfo.currentState = 0;
     SC.RecalcInfo.queue = [];
     if (SC.RecalcInfo.recalctimer) {
-      clearTimeout(SC.RecalcInfo.recalctimer)
+      clearTimeout(SC.RecalcInfo.recalctimer);
       SC.RecalcInfo.recalctimer = null;
     }
     SC.RecalcInfo.firstRenderScheduled = false;

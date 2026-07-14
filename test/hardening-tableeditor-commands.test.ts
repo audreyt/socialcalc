@@ -20,7 +20,11 @@
 
 import { afterAll, afterEach, expect, test } from "vite-plus/test";
 
-import { loadSocialCalc as _loadSocialCalc, scheduleCommands, waitForStatus } from "./helpers/socialcalc";
+import {
+  loadSocialCalc as _loadSocialCalc,
+  scheduleCommands,
+  waitForStatus,
+} from "./helpers/socialcalc";
 import { installUiShim } from "./helpers/ui";
 import {
   cancelActiveTrackedTimers,
@@ -132,7 +136,11 @@ function waitForEditorStatus(
   // lib types; use a typed wrapper to bridge the gap (matches
   // hardening-control-viewer.test.ts's waitEditor helper).
   const PR = Promise as unknown as {
-    withResolvers: <T>() => { promise: Promise<T>; resolve: (v: T) => void; reject: (e: unknown) => void };
+    withResolvers: <T>() => {
+      promise: Promise<T>;
+      resolve: (v: T) => void;
+      reject: (e: unknown) => void;
+    };
   };
   const { promise, resolve, reject } = PR.withResolvers<void>();
   const key = `zz-wait_${Math.random().toString(36).slice(2)}`;
@@ -256,13 +264,20 @@ test("column resize: full mousedown/move/up cycle applies the new width and clea
   primeGridLayout(editor);
 
   SC.EditorMouseInfo.editor = editor;
-  const result = { coltoresize: 2, coltounhide: null } as unknown as SocialCalc.GridMousePositionResult;
+  const result = {
+    coltoresize: 2,
+    coltounhide: null,
+  } as unknown as SocialCalc.GridMousePositionResult;
   editor.busy = false;
   await waitForStatus(
     sheet,
     "cmdend",
     () => {
-      SC.ProcessEditorColsizeMouseDown(asMouseEvent(fakeEvent({ clientX: 100, clientY: 0 })), editor.fullgrid as HTMLElement, result);
+      SC.ProcessEditorColsizeMouseDown(
+        asMouseEvent(fakeEvent({ clientX: 100, clientY: 0 })),
+        editor.fullgrid as HTMLElement,
+        result,
+      );
       SC.ProcessEditorColsizeMouseMove(asMouseEvent(fakeEvent({ clientX: 160, clientY: 0 })));
       SC.ProcessEditorColsizeMouseUp(asMouseEvent(fakeEvent({ clientX: 160, clientY: 0 })));
     },
@@ -273,7 +288,7 @@ test("column resize: full mousedown/move/up cycle applies the new width and clea
   expect(sheet.colattribs.width["B"]).toBe("140");
   // FinishColRowSize is normally deferred via setTimeout; call it
   // directly to verify the cleanup side-effect synchronously.
- SC.FinishColRowSize();
+  SC.FinishColRowSize();
   expect(SC.EditorMouseInfo.mouseresizedisplay).toBeFalsy();
 });
 
@@ -286,13 +301,20 @@ test("column resize: clamps to the minimum column width when dragged far left", 
   primeGridLayout(editor);
 
   SC.EditorMouseInfo.editor = editor;
-  const result = { coltoresize: 2, coltounhide: null } as unknown as SocialCalc.GridMousePositionResult;
+  const result = {
+    coltoresize: 2,
+    coltounhide: null,
+  } as unknown as SocialCalc.GridMousePositionResult;
   editor.busy = false;
   await waitForStatus(
     sheet,
     "cmdend",
     () => {
-      SC.ProcessEditorColsizeMouseDown(asMouseEvent(fakeEvent({ clientX: 100, clientY: 0 })), editor.fullgrid as HTMLElement, result);
+      SC.ProcessEditorColsizeMouseDown(
+        asMouseEvent(fakeEvent({ clientX: 100, clientY: 0 })),
+        editor.fullgrid as HTMLElement,
+        result,
+      );
       SC.ProcessEditorColsizeMouseUp(asMouseEvent(fakeEvent({ clientX: -500, clientY: 0 })));
     },
     2000,
@@ -314,13 +336,20 @@ test("column resize: mouseup with coltounhide clears the hidden flag for that co
   primeGridLayout(editor);
 
   SC.EditorMouseInfo.editor = editor;
-  const result = { coltoresize: null, coltounhide: 2 } as unknown as SocialCalc.GridMousePositionResult;
+  const result = {
+    coltoresize: null,
+    coltounhide: 2,
+  } as unknown as SocialCalc.GridMousePositionResult;
   editor.busy = false;
   await waitForStatus(
     sheet,
     "cmdend",
     () => {
-      SC.ProcessEditorColsizeMouseDown(asMouseEvent(fakeEvent({ clientX: 100, clientY: 0 })), editor.fullgrid as HTMLElement, result);
+      SC.ProcessEditorColsizeMouseDown(
+        asMouseEvent(fakeEvent({ clientX: 100, clientY: 0 })),
+        editor.fullgrid as HTMLElement,
+        result,
+      );
       SC.ProcessEditorColsizeMouseUp(asMouseEvent(fakeEvent({ clientX: 100, clientY: 0 })));
     },
     2000,
@@ -341,13 +370,20 @@ test("row resize: full mousedown/move/up cycle applies the new height", async ()
   } as unknown as HTMLElement;
 
   SC.EditorMouseInfo.editor = editor;
-  const result = { rowtoresize: 2, rowtounhide: null } as unknown as SocialCalc.GridMousePositionResult;
+  const result = {
+    rowtoresize: 2,
+    rowtounhide: null,
+  } as unknown as SocialCalc.GridMousePositionResult;
   editor.busy = false;
   await waitForStatus(
     sheet,
     "cmdend",
     () => {
-      SC.ProcessEditorRowsizeMouseDown(asMouseEvent(fakeEvent({ clientX: 0, clientY: 100 })), editor.fullgrid as HTMLElement, result);
+      SC.ProcessEditorRowsizeMouseDown(
+        asMouseEvent(fakeEvent({ clientX: 0, clientY: 100 })),
+        editor.fullgrid as HTMLElement,
+        result,
+      );
       SC.ProcessEditorRowsizeMouseMove(asMouseEvent(fakeEvent({ clientX: 0, clientY: 130 })));
       SC.ProcessEditorRowsizeMouseUp(asMouseEvent(fakeEvent({ clientX: 0, clientY: 130 })));
     },
@@ -371,13 +407,20 @@ test("row resize: clamps to the minimum assumed row height when dragged far up",
   } as unknown as HTMLElement;
 
   SC.EditorMouseInfo.editor = editor;
-  const result = { rowtoresize: 2, rowtounhide: null } as unknown as SocialCalc.GridMousePositionResult;
+  const result = {
+    rowtoresize: 2,
+    rowtounhide: null,
+  } as unknown as SocialCalc.GridMousePositionResult;
   editor.busy = false;
   await waitForStatus(
     sheet,
     "cmdend",
     () => {
-      SC.ProcessEditorRowsizeMouseDown(asMouseEvent(fakeEvent({ clientX: 0, clientY: 100 })), editor.fullgrid as HTMLElement, result);
+      SC.ProcessEditorRowsizeMouseDown(
+        asMouseEvent(fakeEvent({ clientX: 0, clientY: 100 })),
+        editor.fullgrid as HTMLElement,
+        result,
+      );
       SC.ProcessEditorRowsizeMouseUp(asMouseEvent(fakeEvent({ clientX: 0, clientY: -500 })));
     },
     2000,
@@ -402,13 +445,20 @@ test("row resize: mouseup with rowtounhide clears the hidden flag for that row",
   primeGridLayout(editor);
 
   SC.EditorMouseInfo.editor = editor;
-  const result = { rowtoresize: null, rowtounhide: 3 } as unknown as SocialCalc.GridMousePositionResult;
+  const result = {
+    rowtoresize: null,
+    rowtounhide: 3,
+  } as unknown as SocialCalc.GridMousePositionResult;
   editor.busy = false;
   await waitForStatus(
     sheet,
     "cmdend",
     () => {
-      SC.ProcessEditorRowsizeMouseDown(asMouseEvent(fakeEvent({ clientX: 0, clientY: 100 })), editor.fullgrid as HTMLElement, result);
+      SC.ProcessEditorRowsizeMouseDown(
+        asMouseEvent(fakeEvent({ clientX: 0, clientY: 100 })),
+        editor.fullgrid as HTMLElement,
+        result,
+      );
       SC.ProcessEditorRowsizeMouseUp(asMouseEvent(fakeEvent({ clientX: 0, clientY: 100 })));
     },
     2000,
@@ -524,7 +574,10 @@ test("fill handle: dragging right extends a numeric series horizontally", async 
   // with an incremented value from the series (5, 15, 25, 35, ...).
   const filled = ["C1", "D1", "E1", "F1", "G1"]
     .map((coord) => sheet.cells[coord])
-    .filter((cell) => cell && cell.datavalue !== undefined && cell.datavalue !== null && cell.datavalue !== "");
+    .filter(
+      (cell) =>
+        cell && cell.datavalue !== undefined && cell.datavalue !== null && cell.datavalue !== "",
+    );
   expect(filled.length).toBeGreaterThan(0);
   // Each filled cell's value should be a number continuing the series.
   for (const cell of filled) {
@@ -727,11 +780,27 @@ test("SetDragAutoRepeat: cancels an active repeat once the pointer distance exce
   ensureDocumentEvents();
   primeGridLayout(editor);
 
-  const mouseinfoNear = { rowheader: false, rowfooter: true, colheader: false, colfooter: false, distance: 10, row: 3, col: 1 };
+  const mouseinfoNear = {
+    rowheader: false,
+    rowfooter: true,
+    colheader: false,
+    colfooter: false,
+    distance: 10,
+    row: 3,
+    col: 1,
+  };
   SC.SetDragAutoRepeat(editor, mouseinfoNear, SC.CellHandlesDragAutoRepeat);
   expect(SC.AutoRepeatInfo.timer).toBeTruthy();
 
-  const mouseinfoFar = { rowheader: false, rowfooter: true, colheader: false, colfooter: false, distance: 999, row: 3, col: 1 };
+  const mouseinfoFar = {
+    rowheader: false,
+    rowfooter: true,
+    colheader: false,
+    colfooter: false,
+    distance: 999,
+    row: 3,
+    col: 1,
+  };
   SC.SetDragAutoRepeat(editor, mouseinfoFar, SC.CellHandlesDragAutoRepeat);
 
   expect(SC.AutoRepeatInfo.timer).toBeNull();
@@ -744,7 +813,15 @@ test("SetDragAutoRepeat(editor, null) cancels any pending repeat timer", async (
   ensureDocumentEvents();
   primeGridLayout(editor);
 
-  const mouseinfo = { rowheader: false, rowfooter: true, colheader: false, colfooter: false, distance: 10, row: 3, col: 1 };
+  const mouseinfo = {
+    rowheader: false,
+    rowfooter: true,
+    colheader: false,
+    colfooter: false,
+    distance: 10,
+    row: 3,
+    col: 1,
+  };
   SC.SetDragAutoRepeat(editor, mouseinfo, SC.CellHandlesDragAutoRepeat);
   expect(SC.AutoRepeatInfo.timer).toBeTruthy();
 
@@ -811,7 +888,9 @@ test("EditedTriggerCell: EMAILONEDITIF pushes a real setemailparameters command 
 
   SC.EditedTriggerCell({ G1: true }, "A1", editor, sheet);
 
-  expect(editor.deferredEmailCommands).toEqual([{ cmdstr: "setemailparameters G1 A1", saveundo: false }]);
+  expect(editor.deferredEmailCommands).toEqual([
+    { cmdstr: "setemailparameters G1 A1", saveundo: false },
+  ]);
 });
 
 test("EditedTriggerCell: an actionCellId absent from ioParameterList is skipped without pushing a command", async () => {
@@ -882,7 +961,10 @@ test("EditorScheduleSheetCommands: setemailparameters completes the busy/deferre
     // scheduleCommands only awaits "cmdend"; the sheet's own needsrecalc/
     // render/position-calc chain still has to settle before editor.busy
     // drops back to false.
-    await waitForEditorStatus(editor, (status) => status === "doneposcalc" && editor.busy === false);
+    await waitForEditorStatus(
+      editor,
+      (status) => status === "doneposcalc" && editor.busy === false,
+    );
 
     sheet.ioParameterList = { E1: emailIfParams() };
 
@@ -901,7 +983,10 @@ test("EditorScheduleSheetCommands: setemailparameters completes the busy/deferre
     editor.EditorScheduleSheetCommands("set F1 text t queued", true, false);
     expect(editor.deferredCommands).toEqual([{ cmdstr: "set F1 text t queued", saveundo: true }]);
 
-    await waitForEditorStatus(editor, (status) => status === "doneposcalc" && editor.busy === false);
+    await waitForEditorStatus(
+      editor,
+      (status) => status === "doneposcalc" && editor.busy === false,
+    );
 
     // Before the fix this point was unreachable: setemailparameters never
     // signaled completion, so busy stayed true forever and the queued F1
@@ -936,7 +1021,10 @@ test("EditorScheduleSheetCommands: setemailparameters does not double-dispatch w
     // render/position-calc chain still has to settle before editor.busy
     // drops back to false (required so the dispatch below executes
     // synchronously instead of landing in editor.deferredCommands).
-    await waitForEditorStatus(editor, (status) => status === "doneposcalc" && editor.busy === false);
+    await waitForEditorStatus(
+      editor,
+      (status) => status === "doneposcalc" && editor.busy === false,
+    );
 
     sheet.ioParameterList = { E1: emailIfParams() };
 
@@ -958,7 +1046,10 @@ test("EditorScheduleSheetCommands: setemailparameters does not double-dispatch w
     // already completes the cycle on its own.
     expect(scheduledCmds).toEqual(["sendemail to@example.com subj body"]);
 
-    await waitForEditorStatus(editor, (status) => status === "doneposcalc" && editor.busy === false);
+    await waitForEditorStatus(
+      editor,
+      (status) => status === "doneposcalc" && editor.busy === false,
+    );
     expect(editor.busy).toBe(false);
   } finally {
     delete (globalThis as unknown as { spreadsheet?: unknown }).spreadsheet;
@@ -986,7 +1077,9 @@ test("TableControl less-button: real closure calls ScrollRelative(vertical,-1) a
   };
 
   editor.busy = false;
-  SC.ButtonMouseDown(asMouseEvent(fakeEvent({ target: vtc.lessbutton, clientX: 505, clientY: 60 })));
+  SC.ButtonMouseDown(
+    asMouseEvent(fakeEvent({ target: vtc.lessbutton, clientX: 505, clientY: 60 })),
+  );
   expect(calls).toEqual([[true, -1]]);
   expect(SC.ButtonInfo.buttonDown).toBe(true);
   expect(SC.ButtonInfo.timer).toBeTruthy();
@@ -997,7 +1090,9 @@ test("TableControl less-button: real closure calls ScrollRelative(vertical,-1) a
 
   calls.length = 0;
   editor.busy = true;
-  SC.ButtonMouseDown(asMouseEvent(fakeEvent({ target: vtc.lessbutton, clientX: 505, clientY: 60 })));
+  SC.ButtonMouseDown(
+    asMouseEvent(fakeEvent({ target: vtc.lessbutton, clientX: 505, clientY: 60 })),
+  );
   expect(calls).toEqual([]);
   expect(SC.ButtonInfo.buttonDown).toBe(false);
   editor.busy = false;
@@ -1021,7 +1116,9 @@ test("TableControl more-button: real closure calls ScrollRelative(vertical,+1)",
   };
 
   editor.busy = false;
-  SC.ButtonMouseDown(asMouseEvent(fakeEvent({ target: vtc.morebutton, clientX: 505, clientY: 570 })));
+  SC.ButtonMouseDown(
+    asMouseEvent(fakeEvent({ target: vtc.morebutton, clientX: 505, clientY: 570 })),
+  );
   expect(calls).toEqual([[true, 1]]);
   SC.ButtonMouseUp(asMouseEvent(fakeEvent({ clientX: 505, clientY: 570 })));
 
@@ -1040,7 +1137,9 @@ test("TableControl scrollarea: ScrollAreaClick pages the last row pane past the 
   const before = { ...editor.context.rowpanes[0] };
   editor.busy = false;
 
-  SC.ButtonMouseDown(asMouseEvent(fakeEvent({ target: vtc.scrollarea, clientX: 505, clientY: 400 })));
+  SC.ButtonMouseDown(
+    asMouseEvent(fakeEvent({ target: vtc.scrollarea, clientX: 505, clientY: 400 })),
+  );
 
   // clickpos(400) > thumbpos(300) -> PageRelative(true, +1) advances the
   // last pane's "first" row to lastvisiblerow.
@@ -1060,7 +1159,9 @@ test("TableControl scrollarea: ScrollAreaClick is a no-op while editor.busy", as
   editor.busy = true;
   const before = { ...editor.context.rowpanes[0] };
 
-  SC.ButtonMouseDown(asMouseEvent(fakeEvent({ target: vtc.scrollarea, clientX: 505, clientY: 400 })));
+  SC.ButtonMouseDown(
+    asMouseEvent(fakeEvent({ target: vtc.scrollarea, clientX: 505, clientY: 400 })),
+  );
 
   expect(editor.context.rowpanes[0]).toEqual(before);
   editor.busy = false;
@@ -1078,7 +1179,13 @@ function registerTestButton(SC: SC, editor: Editor) {
   SC.ButtonRegister(
     editor,
     element,
-    { normalstyle: "color:black;", hoverstyle: "color:blue;", downstyle: "color:red;", repeatwait: 50, repeatinterval: 20 },
+    {
+      normalstyle: "color:black;",
+      hoverstyle: "color:blue;",
+      downstyle: "color:red;",
+      repeatwait: 50,
+      repeatinterval: 20,
+    },
     {
       MouseOver: () => overCalls.push(true),
       MouseOut: () => outCalls.push(true),
@@ -1156,7 +1263,12 @@ test("ButtonRegister mousedown: repeatwait schedules ButtonRepeat, which re-invo
   const element = document.createElement("div");
   (editor.toplevel as HTMLElement).appendChild(element);
   let repeatCalls = 0;
-  SC.ButtonRegister(editor, element, { repeatwait: 50, repeatinterval: 20 }, { Repeat: () => repeatCalls++ });
+  SC.ButtonRegister(
+    editor,
+    element,
+    { repeatwait: 50, repeatinterval: 20 },
+    { Repeat: () => repeatCalls++ },
+  );
 
   SC.ButtonMouseDown(asMouseEvent(fakeEvent({ target: element })));
   expect(SC.ButtonInfo.timer).toBeTruthy();
@@ -1230,7 +1342,13 @@ test("DragUnregister: removes a registered element so a subsequent DragMouseDown
   const element = document.createElement("div");
   (editor.toplevel as HTMLElement).appendChild(element);
   let moveCalls = 0;
-  SC.DragRegister(element, true, true, { MouseDown: () => moveCalls++ }, editor.toplevel as HTMLElement);
+  SC.DragRegister(
+    element,
+    true,
+    true,
+    { MouseDown: () => moveCalls++ },
+    editor.toplevel as HTMLElement,
+  );
   const countBefore = SC.DragInfo.registeredElements.length;
 
   SC.DragUnregister(element);
@@ -1314,7 +1432,11 @@ test("TCTDragFunctionStop: moves the scrolling pane to the computed thumb positi
 
   const overlay = document.createElement("div");
   (editor.toplevel as HTMLElement).appendChild(overlay);
-  const draginfo = { offsetY: 0, clientY: 100, thumbstatus: overlay } as unknown as typeof SC.DragInfo;
+  const draginfo = {
+    offsetY: 0,
+    clientY: 100,
+    thumbstatus: overlay,
+  } as unknown as typeof SC.DragInfo;
   const dobj = {
     vertical: true,
     horizontal: false,

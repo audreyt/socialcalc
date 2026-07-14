@@ -209,7 +209,11 @@ describe("id=696: unary-position guard for ')' immediately after '('", () => {
     // and str != "(" -> must hit the two-ops error, not be silently accepted.
     expect(SC.Formula.ParseFormulaIntoTokens("(!")).toEqual([
       { text: "(", type: TOKEN_TYPE.op, opcode: "(" },
-      { text: "Error in formula (two operators inappropriately in a row)", type: TOKEN_TYPE.error, opcode: "!" },
+      {
+        text: "Error in formula (two operators inappropriately in a row)",
+        type: TOKEN_TYPE.error,
+        opcode: "!",
+      },
     ]);
   });
 
@@ -473,7 +477,6 @@ describe("id=830: precedence while-loop must not pop non-op entries from parsest
     expect(SC.Formula.ConvertInfixToPolish(tokens)).toEqual([-1, -1, 1, -1, 3, 2, 0]);
   });
 });
-
 
 // --------------------------------------------------------------------------
 // Fresh no-exclusion survivors: regex anchoring and comparison-token spelling.

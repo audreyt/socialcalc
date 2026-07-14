@@ -84,7 +84,13 @@ export async function runCommands(
 ): Promise<SheetInstance> {
   const sheet = new SC.Sheet();
   const commandString = Array.isArray(commands) ? commands.join("\n") : (commands as string);
-  await scheduleCommands(SC, sheet, commandString, options.saveundo ?? true, options.timeoutMs ?? 2000);
+  await scheduleCommands(
+    SC,
+    sheet,
+    commandString,
+    options.saveundo ?? true,
+    options.timeoutMs ?? 2000,
+  );
   if (options.recalc ?? true) {
     await recalcSheet(SC, sheet, options.timeoutMs ?? 2000);
   }

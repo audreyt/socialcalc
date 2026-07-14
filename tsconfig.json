@@ -26,6 +26,13 @@
 
     "types": ["node"]
   },
-  "include": ["build.ts", "js/**/*.js", "js/**/*.ts", "test/**/*.ts", "dist/SocialCalc.d.ts", "types/**/*.d.ts"],
+  "include": [
+    "build.ts",
+    "js/**/*.js",
+    "js/**/*.ts",
+    "test/**/*.ts",
+    "dist/SocialCalc.d.ts",
+    "types/**/*.d.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

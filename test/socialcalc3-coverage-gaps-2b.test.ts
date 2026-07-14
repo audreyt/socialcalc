@@ -1,10 +1,6 @@
 import { expect, test } from "vite-plus/test";
 
-import {
-  loadSocialCalc,
-  recalcSheet,
-  scheduleCommands,
-} from "./helpers/socialcalc";
+import { loadSocialCalc, recalcSheet, scheduleCommands } from "./helpers/socialcalc";
 import { installUiShim } from "./helpers/ui";
 
 // ── Narrow types for the SC bundle surface ──────────────────────────────
@@ -650,7 +646,11 @@ test("RenderCell with left border index and comment uses border-left + comment c
     gridCSS: string;
     cellskip: Record<string, string>;
     CalculateCellSkipData(): void;
-    RenderCell(...args: unknown[]): { className: string; title: string; style: { cssText: string } };
+    RenderCell(...args: unknown[]): {
+      className: string;
+      title: string;
+      style: { cssText: string };
+    };
   };
 
   // Register a border style at index 1 and apply it to the left border only.

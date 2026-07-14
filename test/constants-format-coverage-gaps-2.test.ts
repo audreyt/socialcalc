@@ -169,7 +169,6 @@ describe("FormatNumber am/pm without date section", () => {
 //    never fire.
 // ---------------------------------------------------------------------------
 
-
 describe("FormatNumber.formatNumberWithFormat LCOV branch matrix", () => {
   test.each([
     { value: Number.POSITIVE_INFINITY, format: "General", currency: "$", expected: "NaN" },
@@ -182,8 +181,18 @@ describe("FormatNumber.formatNumberWithFormat LCOV branch matrix", () => {
     { value: 0.125, format: "0.0%", currency: "$", expected: "12.5%" },
     { value: 1e21, format: "0%", currency: "$", expected: "1e+23%" },
     { value: -42, format: "$0.00", currency: "€", expected: "-€42.00" },
-    { value: 42, format: "[Blue]0", currency: "$", expected: '<span style="color:#0000FF;">42</span>' },
-    { value: 42, format: "[style=color:red]0", currency: "$", expected: '<span style="color:red;">42</span>' },
+    {
+      value: 42,
+      format: "[Blue]0",
+      currency: "$",
+      expected: '<span style="color:#0000FF;">42</span>',
+    },
+    {
+      value: 42,
+      format: "[style=color:red]0",
+      currency: "$",
+      expected: '<span style="color:red;">42</span>',
+    },
     { value: 3, format: "[<5]0;[<10]0.0;0.00", currency: "$", expected: "3" },
     { value: 7, format: "[<5]0;[<10]0.0;0.00", currency: "$", expected: "7.0" },
     { value: 12, format: "[<5]0;[<10]0.0;0.00", currency: "$", expected: "12.00" },
@@ -202,10 +211,14 @@ describe("FormatNumber.formatNumberWithFormat LCOV branch matrix", () => {
     { value: 1.5, format: "[h]:mm:ss", expected: "36:00:00" },
     { value: 1.5, format: "[m]:ss", expected: "2160:00" },
     { value: 1.5, format: "[ss]", expected: "129600" },
-    { value: 44561, format: "yyyy m mmm mmmm mmmmm d dd ddd dddd", expected: "2021 12 Dec December D 31 31 Fri Friday" },
+    {
+      value: 44561,
+      format: "yyyy m mmm mmmm mmmmm d dd ddd dddd",
+      expected: "2021 12 Dec December D 31 31 Fri Friday",
+    },
   ])("formats date/time $value with $format", async ({ value, format, expected }) => {
     const SC = await loadSC();
-    expect(SC.FormatNumber.formatNumberWithFormat(value, format, "$" )).toBe(expected);
+    expect(SC.FormatNumber.formatNumberWithFormat(value, format, "$")).toBe(expected);
   });
 
   test.each([
@@ -213,19 +226,16 @@ describe("FormatNumber.formatNumberWithFormat LCOV branch matrix", () => {
     { value: 42, format: "0$", currency: "€", expected: "42€" },
     { value: 0.5, format: "hh:mm:ss", currency: "$", expected: "12:00:00" },
     { value: 0.5, format: "a", currency: "$", expected: "" },
-  ])("V8-visible bundle import formats $value with $format", async ({
-    value,
-    format,
-    currency,
-    expected,
-  }) => {
-    const SC = await loadFreshBundleSocialCalc(
-      `formatnumber-${String(format).replace(/\W/g, "-")}-${String(value).replace(/\W/g, "-")}`,
-    );
-    expect(SC.FormatNumber.formatNumberWithFormat(value, format, currency)).toBe(expected);
-  });
+  ])(
+    "V8-visible bundle import formats $value with $format",
+    async ({ value, format, currency, expected }) => {
+      const SC = await loadFreshBundleSocialCalc(
+        `formatnumber-${String(format).replace(/\W/g, "-")}-${String(value).replace(/\W/g, "-")}`,
+      );
+      expect(SC.FormatNumber.formatNumberWithFormat(value, format, currency)).toBe(expected);
+    },
+  );
 });
-
 
 // ---------------------------------------------------------------------------
 // FormatNumber: throw "Format not parsed error!" via cache manipulation (L245)
@@ -246,9 +256,9 @@ describe("FormatNumber throw via cache corruption", () => {
     // Use a NOVEL format string so the cache miss is guaranteed.
     scfn.format_definitions["__cache_corrupt_throw_test__"] = undefined;
     try {
-      expect(() =>
-        scfn.formatNumberWithFormat(42, "__cache_corrupt_throw_test__", "$"),
-      ).toThrow("Format not parsed error!");
+      expect(() => scfn.formatNumberWithFormat(42, "__cache_corrupt_throw_test__", "$")).toThrow(
+        "Format not parsed error!",
+      );
     } finally {
       scfn.parse_format_string = origParse;
       delete scfn.format_definitions["__cache_corrupt_throw_test__"];
@@ -262,9 +272,9 @@ describe("FormatNumber throw via cache corruption", () => {
     scfn.parse_format_string = function () {};
     scfn.format_definitions["__cache_corrupt_text_throw__"] = undefined;
     try {
-      expect(() =>
-        scfn.formatTextWithFormat("hello", "__cache_corrupt_text_throw__"),
-      ).toThrow("Format not parsed error!");
+      expect(() => scfn.formatTextWithFormat("hello", "__cache_corrupt_text_throw__")).toThrow(
+        "Format not parsed error!",
+      );
     } finally {
       scfn.parse_format_string = origParse;
       delete scfn.format_definitions["__cache_corrupt_text_throw__"];
@@ -312,11 +322,11 @@ describe("FormatNumber comparison and parse error operator coverage", () => {
       hascomparison: false,
       operators: [
         scfn.commands.comparison, // 9 (comparison command)
-        9999,                      // bogus operator code
+        9999, // bogus operator code
       ],
       operands: [
-        "<=:5",                   // operand for comparison
-        "bogus",                  // operand for bogus operator
+        "<=:5", // operand for comparison
+        "bogus", // operand for bogus operator
       ],
     } satisfies BogusFormat;
 

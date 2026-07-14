@@ -51,7 +51,11 @@ export function waitForStatus(sheet, match, trigger, timeoutMs = 4000) {
 export async function exerciseCommandFormulaSaveLoad(SC, label) {
   const sheet = new SC.Sheet();
   await waitForStatus(sheet, "cmdend", () =>
-    SC.ScheduleSheetCommands(sheet, "set A1 value n 2\nset A2 value n 3\nset A3 formula A1+A2", true),
+    SC.ScheduleSheetCommands(
+      sheet,
+      "set A1 value n 2\nset A2 value n 3\nset A3 formula A1+A2",
+      true,
+    ),
   );
   if (SC.RecalcInfo) {
     SC.RecalcInfo.currentState = 0;
@@ -59,7 +63,9 @@ export async function exerciseCommandFormulaSaveLoad(SC, label) {
   }
   await waitForStatus(sheet, "calcfinished", () => SC.RecalcSheet(sheet));
   if (sheet.cells.A3?.datavalue !== 5) {
-    throw new Error(`[${label}] expected A3 formula A1+A2 to evaluate to 5, got ${sheet.cells.A3?.datavalue}`);
+    throw new Error(
+      `[${label}] expected A3 formula A1+A2 to evaluate to 5, got ${sheet.cells.A3?.datavalue}`,
+    );
   }
 
   const saved = SC.CreateSheetSave(sheet);

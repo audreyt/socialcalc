@@ -176,9 +176,7 @@ beforeAll(async () => {
       return;
     }
     if (u.pathname === "/dist/SocialCalc.js") {
-      res
-        .writeHead(200, { "content-type": "text/javascript" })
-        .end(readFileSync(bundlePath));
+      res.writeHead(200, { "content-type": "text/javascript" }).end(readFileSync(bundlePath));
       return;
     }
     res.writeHead(404).end("not found");
@@ -192,7 +190,9 @@ beforeAll(async () => {
   // `test.skip` doesn't exist at suite-scope in this older version; we mark
   // every test below with a `chromiumAvailable` guard instead.
   if (!ok) {
-    (globalThis as { __SC_BROWSER_COVERAGE_MAPPING_SKIP?: boolean }).__SC_BROWSER_COVERAGE_MAPPING_SKIP = true;
+    (
+      globalThis as { __SC_BROWSER_COVERAGE_MAPPING_SKIP?: boolean }
+    ).__SC_BROWSER_COVERAGE_MAPPING_SKIP = true;
   }
 }, 120_000);
 
@@ -202,12 +202,19 @@ afterAll(async () => {
 });
 
 function chromiumAvailable(): boolean {
-  return !(globalThis as { __SC_BROWSER_COVERAGE_MAPPING_SKIP?: boolean }).__SC_BROWSER_COVERAGE_MAPPING_SKIP;
+  return !(globalThis as { __SC_BROWSER_COVERAGE_MAPPING_SKIP?: boolean })
+    .__SC_BROWSER_COVERAGE_MAPPING_SKIP;
 }
 
 // Helper: find the statement id whose start line matches `anchorSourceLine`
 // in a given FileCoverage's statementMap. Returns the id, or throws if none.
-function findStatementAtLine(fileCoverage: { statementMap: Record<string, { start: { line: number } }>; s: Record<string, number> }, line: number): { id: string; hits: number } {
+function findStatementAtLine(
+  fileCoverage: {
+    statementMap: Record<string, { start: { line: number } }>;
+    s: Record<string, number>;
+  },
+  line: number,
+): { id: string; hits: number } {
   // exact line match preferred; fall back to "any statement whose start line
   // equals line" (the function-assignment statement is a single-line
   // declaration in socialcalctableeditor.ts).
@@ -248,7 +255,10 @@ mappingDescribe("Chromium Playwright V8 → Istanbul → js/*.ts mapping (focuse
     }
     const ctx = await browser!.newContext();
     const page: Page = await ctx.newPage();
-    await page.coverage.startJSCoverage({ resetOnNavigation: false, reportAnonymousScripts: false });
+    await page.coverage.startJSCoverage({
+      resetOnNavigation: false,
+      reportAnonymousScripts: false,
+    });
     await page.goto(`http://127.0.0.1:${port}/index.html`);
     await page.waitForFunction(() => {
       const win = window as unknown as BrowserWindow;
@@ -307,10 +317,11 @@ mappingDescribe("Chromium Playwright V8 → Istanbul → js/*.ts mapping (focuse
     // fix the merge script applies, kept here so the local merged map below
     // uses identical statementMap keys as the unit-only side.
     const browserMap = createCoverageMap(JSON.parse(JSON.stringify(covData)));
-    const teBrowserKey = browserMap
-      .files()
-      .find((f) => f.endsWith(expectedSourceFileSuffix));
-    expect(teBrowserKey, `${expectedSourceFileSuffix} present in browser-converted coverage`).toBeDefined();
+    const teBrowserKey = browserMap.files().find((f) => f.endsWith(expectedSourceFileSuffix));
+    expect(
+      teBrowserKey,
+      `${expectedSourceFileSuffix} present in browser-converted coverage`,
+    ).toBeDefined();
     const browserFc = browserMap.fileCoverageFor(teBrowserKey!);
     const browserStmt = findStatementAtLine(browserFc, anchorSourceLine);
 

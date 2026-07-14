@@ -67,7 +67,7 @@ describe("quoteFormulaString re-emission via OffsetFormulaCoords (id=1111)", () 
     // (indexOf >= 0). Requiring indexOf > 0 misses index-0 matches and falls through to
     // the double-quote branch, which for this payload reproduces the original input
     // byte-for-byte instead of re-emitting with single quotes.
-    const formula = 'A1&"\'\'foo"';
+    const formula = "A1&\"''foo\"";
     expect(SC.OffsetFormulaCoords(formula, 1, 0)).toBe("B1&'''foo'");
   });
 });
@@ -78,9 +78,9 @@ describe("OffsetFormulaCoords sheetref state (id=1121, id=1164)", () => {
     // With sheetref initialized true, `band && sheetref` would be wrongly satisfied for
     // the very first coord token even though no '!' was ever seen, freezing a shift that
     // should have happened.
-    expect(SC.OffsetFormulaCoords("A1", 1, 0, { startCol: 1, endCol: 5, startRow: 1, endRow: 5 })).toBe(
-      "B1",
-    );
+    expect(
+      SC.OffsetFormulaCoords("A1", 1, 0, { startCol: 1, endCol: 5, startRow: 1, endRow: 5 }),
+    ).toBe("B1");
   });
 
   test("band + sheet-qualified coord freezes the column shift, not just the row shift", async () => {
@@ -222,7 +222,6 @@ describe("AdjustFormulaCoords overflow to #REF!", () => {
     expect(SC.AdjustFormulaCoords("A1", 1, 750, 1, 0)).toBe("#REF!");
   });
 });
-
 
 // --------------------------------------------------------------------------
 // Fresh no-exclusion survivors: every middle column letter (ids 1002-1015).

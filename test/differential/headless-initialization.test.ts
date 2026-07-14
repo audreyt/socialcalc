@@ -48,9 +48,21 @@ describe("headless initialization parity", () => {
     const candidateSheet = new candidate.Sheet();
     const oracleSheet = new oracle.Sheet();
 
-    expectParity("fresh sheet cell count", Object.keys(candidateSheet.cells).length, Object.keys(oracleSheet.cells).length);
-    expectParity("fresh sheet lastcol", candidateSheet.attribs.lastcol, oracleSheet.attribs.lastcol);
-    expectParity("fresh sheet lastrow", candidateSheet.attribs.lastrow, oracleSheet.attribs.lastrow);
+    expectParity(
+      "fresh sheet cell count",
+      Object.keys(candidateSheet.cells).length,
+      Object.keys(oracleSheet.cells).length,
+    );
+    expectParity(
+      "fresh sheet lastcol",
+      candidateSheet.attribs.lastcol,
+      oracleSheet.attribs.lastcol,
+    );
+    expectParity(
+      "fresh sheet lastrow",
+      candidateSheet.attribs.lastrow,
+      oracleSheet.attribs.lastrow,
+    );
   });
 
   test("headless recalculation works without any DOM globals on both runtimes", async () => {
@@ -58,7 +70,10 @@ describe("headless initialization parity", () => {
 
     for (const SC of [candidate, oracle]) {
       const sheet = new SC.Sheet();
-      SC.ParseSheetSave(`version:1.5\ncell:A1:v:2\ncell:B1:vtf:n:0:${SC.encodeForSave("A1*3")}\nsheet:c:2:r:1\n`, sheet);
+      SC.ParseSheetSave(
+        `version:1.5\ncell:A1:v:2\ncell:B1:vtf:n:0:${SC.encodeForSave("A1*3")}\nsheet:c:2:r:1\n`,
+        sheet,
+      );
       const evaluated = evaluateFormula(SC, "A1*3", sheet);
       expect(evaluated.value).toBe(6);
       expect(evaluated.type.startsWith("n")).toBe(true);

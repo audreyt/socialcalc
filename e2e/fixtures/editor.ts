@@ -72,7 +72,10 @@ export const test = base.extend<{ issues: PageIssues; coverage: void }>({
       await use(issues);
 
       expect(issues.pageErrors, "uncaught page errors").toEqual([]);
-      expect(issues.consoleErrors, "console.error messages (includes unhandled promise rejections)").toEqual([]);
+      expect(
+        issues.consoleErrors,
+        "console.error messages (includes unhandled promise rejections)",
+      ).toEqual([]);
       expect(issues.dialogs, "unexpected native dialogs (alert/confirm/prompt)").toEqual([]);
     },
     { auto: true },
@@ -108,9 +111,7 @@ export const test = base.extend<{ issues: PageIssues; coverage: void }>({
         await use();
       } finally {
         const entries = await page.coverage.stopJSCoverage();
-        const bundle = entries.filter((e) =>
-          e.url.endsWith(browserCoverageBundleUrlSuffix),
-        );
+        const bundle = entries.filter((e) => e.url.endsWith(browserCoverageBundleUrlSuffix));
         const outPath = join(browserCoverageDir, `${sanitizeTestId(testInfo.testId)}.json`);
         writeFileSync(
           outPath,
@@ -122,7 +123,12 @@ export const test = base.extend<{ issues: PageIssues; coverage: void }>({
           //     against the on-disk dist/SocialCalc.js read by the merge
           //     script — they must be byte-identical for sourcemap offsets
           //     to be valid).
-          JSON.stringify({ testTitle: testInfo.title, testId: testInfo.testId, entries: bundle, source: bundle[0]?.source }),
+          JSON.stringify({
+            testTitle: testInfo.title,
+            testId: testInfo.testId,
+            entries: bundle,
+            source: bundle[0]?.source,
+          }),
           "utf8",
         );
       }
@@ -181,7 +187,11 @@ export async function createControl(
     (idPrefix) => window.__scControls[idPrefix].editor.EditorScheduleSheetCommands("recalc", true),
     idPrefix,
   );
-  await waitFor(page, (idPrefix) => window.__scControls[idPrefix].sheet.attribs.needsrecalc !== "yes", idPrefix);
+  await waitFor(
+    page,
+    (idPrefix) => window.__scControls[idPrefix].sheet.attribs.needsrecalc !== "yes",
+    idPrefix,
+  );
   return idPrefix;
 }
 
@@ -215,7 +225,11 @@ export async function waitFor(
  * user would, without asserting anything about *why* a given attempt
  * no-opped.
  */
-export async function clickCell(page: Page, coord: string, idPrefix = "SocialCalc-"): Promise<void> {
+export async function clickCell(
+  page: Page,
+  coord: string,
+  idPrefix = "SocialCalc-",
+): Promise<void> {
   const locator = cellLocator(page, coord);
   const deadline = Date.now() + 8000;
   for (;;) {
@@ -225,7 +239,8 @@ export async function clickCell(page: Page, coord: string, idPrefix = "SocialCal
       { coord, idPrefix },
     );
     if (moved) return;
-    if (Date.now() > deadline) throw new Error(`click on ${coord} never moved the active cell there`);
+    if (Date.now() > deadline)
+      throw new Error(`click on ${coord} never moved the active cell there`);
     await page.waitForTimeout(25);
   }
 }
@@ -249,15 +264,24 @@ export async function typeAndCommit(page: Page, text: string): Promise<void> {
 }
 
 /** Schedule a sheet command string through the real editor command pipeline. */
-export async function scheduleCommand(page: Page, cmd: string, idPrefix = "SocialCalc-"): Promise<void> {
+export async function scheduleCommand(
+  page: Page,
+  cmd: string,
+  idPrefix = "SocialCalc-",
+): Promise<void> {
   await page.evaluate(
-    ({ cmd, idPrefix }) => window.__scControls[idPrefix].editor.EditorScheduleSheetCommands(cmd, true),
+    ({ cmd, idPrefix }) =>
+      window.__scControls[idPrefix].editor.EditorScheduleSheetCommands(cmd, true),
     { cmd, idPrefix },
   );
 }
 
 /** Read a cell's computed value after recalculation settles. */
-export async function cellValue(page: Page, coord: string, idPrefix = "SocialCalc-"): Promise<unknown> {
+export async function cellValue(
+  page: Page,
+  coord: string,
+  idPrefix = "SocialCalc-",
+): Promise<unknown> {
   return page.evaluate(
     ({ coord, idPrefix }) => window.__scControls[idPrefix].sheet.cells[coord]?.datavalue,
     { coord, idPrefix },

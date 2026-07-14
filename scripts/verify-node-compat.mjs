@@ -37,17 +37,23 @@ if (!consumerDir) {
 const sheetSmokePath = fileURLToPath(new URL("./lib/sheet-smoke.mjs", import.meta.url));
 
 async function main() {
-  console.log(`Node.js runtime under test: ${process.version} (package.json engines.node requires >=22)`);
+  console.log(
+    `Node.js runtime under test: ${process.version} (package.json engines.node requires >=22)`,
+  );
 
   const requireFromConsumer = createRequire(path.join(consumerDir, "noop.cjs"));
 
   console.log('Checking CJS root require("socialcalc") ...');
   const cjsRoot = requireFromConsumer("socialcalc");
-  console.log(`  ok - ${await exerciseCommandFormulaSaveLoad(cjsRoot, `Node ${process.version} CJS root`)}`);
+  console.log(
+    `  ok - ${await exerciseCommandFormulaSaveLoad(cjsRoot, `Node ${process.version} CJS root`)}`,
+  );
 
   console.log('Checking deep require("socialcalc/dist/SocialCalc.min.js") ...');
   const cjsMinDeep = requireFromConsumer("socialcalc/dist/SocialCalc.min.js");
-  console.log(`  ok - ${await exerciseCommandFormulaSaveLoad(cjsMinDeep, `Node ${process.version} min deep`)}`);
+  console.log(
+    `  ok - ${await exerciseCommandFormulaSaveLoad(cjsMinDeep, `Node ${process.version} min deep`)}`,
+  );
 
   console.log("Checking native ESM default import ...");
   const esmCheckPath = path.join(consumerDir, "esm-check.mjs");
@@ -62,7 +68,10 @@ async function main() {
       "",
     ].join("\n"),
   );
-  const esmResult = spawnSync(process.execPath, [esmCheckPath], { cwd: consumerDir, encoding: "utf8" });
+  const esmResult = spawnSync(process.execPath, [esmCheckPath], {
+    cwd: consumerDir,
+    encoding: "utf8",
+  });
   if (esmResult.status !== 0) {
     throw new Error(
       `native ESM default import compat check failed (exit ${esmResult.status}):\n${esmResult.stdout}\n${esmResult.stderr}`,
@@ -70,7 +79,9 @@ async function main() {
   }
   console.log(`  ok - ${esmResult.stdout.trim()}`);
 
-  console.log(`PASS: socialcalc is installable and functionally correct under Node.js ${process.version}.`);
+  console.log(
+    `PASS: socialcalc is installable and functionally correct under Node.js ${process.version}.`,
+  );
 }
 
 main().catch((error) => {

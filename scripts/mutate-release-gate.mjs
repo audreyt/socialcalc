@@ -184,7 +184,10 @@ export function evaluateFileReport(mutationJson, expectedFile) {
       return { ok: false, detail: `${expectedFile} mutant[${i}] is missing mutatorName` };
     }
     if (typeof m.status !== "string" || !STRYKER_MUTANT_STATUSES.has(m.status)) {
-      return { ok: false, detail: `${expectedFile} mutant[${i}] has unrecognized status: ${JSON.stringify(m.status)}` };
+      return {
+        ok: false,
+        detail: `${expectedFile} mutant[${i}] has unrecognized status: ${JSON.stringify(m.status)}`,
+      };
     }
     total++;
     if (m.status === "Killed" || m.status === "Timeout") killedLike++;
@@ -251,7 +254,11 @@ export function evaluateAllModules(allMutateFiles, baselineModules, { artifactsD
     const { total, score } = evaluated;
     const ok = score >= entry.break;
     if (!ok) failed = true;
-    rows.push({ file, status: ok ? "PASS" : "FAIL", detail: `${score.toFixed(2)}% (floor ${entry.break}%, ${total} mutants)` });
+    rows.push({
+      file,
+      status: ok ? "PASS" : "FAIL",
+      detail: `${score.toFixed(2)}% (floor ${entry.break}%, ${total} mutants)`,
+    });
   }
 
   return { rows, failed };
@@ -262,10 +269,16 @@ function main() {
   const baselinePath = join(here, "..", "stryker-mutation-baseline.json");
   const baseline = JSON.parse(readFileSync(baselinePath, "utf8"));
 
-  const { missingFromRegistry, staleInRegistry } = checkBaselineRegistry(ALL_MUTATE_FILES, baseline.modules);
+  const { missingFromRegistry, staleInRegistry } = checkBaselineRegistry(
+    ALL_MUTATE_FILES,
+    baseline.modules,
+  );
   if (missingFromRegistry.length > 0 || staleInRegistry.length > 0) {
-    console.error("stryker-mutation-baseline.json is out of sync with stryker-file.mjs's ALL_MUTATE_FILES:");
-    if (missingFromRegistry.length > 0) console.error(`  missing entries: ${missingFromRegistry.join(", ")}`);
+    console.error(
+      "stryker-mutation-baseline.json is out of sync with stryker-file.mjs's ALL_MUTATE_FILES:",
+    );
+    if (missingFromRegistry.length > 0)
+      console.error(`  missing entries: ${missingFromRegistry.join(", ")}`);
     if (staleInRegistry.length > 0) console.error(`  stale entries: ${staleInRegistry.join(", ")}`);
     process.exit(1);
   }
@@ -274,7 +287,11 @@ function main() {
   const isCI = process.env.GITHUB_ACTIONS === "true";
   const cwd = process.cwd();
 
-  const { rows, failed } = evaluateAllModules(ALL_MUTATE_FILES, baseline.modules, { artifactsDir, isCI, cwd });
+  const { rows, failed } = evaluateAllModules(ALL_MUTATE_FILES, baseline.modules, {
+    artifactsDir,
+    isCI,
+    cwd,
+  });
 
   console.log("Mutation release gate — all 11 shipping modules:\n");
   for (const { file, status, detail } of rows) {
@@ -288,7 +305,9 @@ function main() {
     process.exit(1);
   }
 
-  console.log("\nRelease gate PASSED: all 11 modules measured, reported, and at or above their floor.");
+  console.log(
+    "\nRelease gate PASSED: all 11 modules measured, reported, and at or above their floor.",
+  );
 }
 
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;

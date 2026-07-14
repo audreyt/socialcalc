@@ -49,7 +49,9 @@ test.describe("editor initialize / destroy", () => {
 });
 
 test.describe("cell edit / command / recalc", () => {
-  test("real click + keyboard typing edits a cell and drives formula recalculation", async ({ page }) => {
+  test("real click + keyboard typing edits a cell and drives formula recalculation", async ({
+    page,
+  }) => {
     await gotoBundle(page, "normal");
     await createControl(page);
 
@@ -58,7 +60,11 @@ test.describe("cell edit / command / recalc", () => {
     await clickCell(page, "B1");
     await typeAndCommit(page, "=A1*3");
 
-    await waitFor(page, (idPrefix) => window.__scControls[idPrefix].sheet.cells.B1?.datavalue === 30, "SocialCalc-");
+    await waitFor(
+      page,
+      (idPrefix) => window.__scControls[idPrefix].sheet.cells.B1?.datavalue === 30,
+      "SocialCalc-",
+    );
     expect(await cellValue(page, "A1")).toBe(10);
     expect(await cellValue(page, "B1")).toBe(30);
     await expect(cellLocator(page, "B1")).toHaveText("30");
@@ -66,18 +72,28 @@ test.describe("cell edit / command / recalc", () => {
     // Editing the precedent recalculates the dependent formula cell.
     await clickCell(page, "A1");
     await typeAndCommit(page, "20");
-    await waitFor(page, (idPrefix) => window.__scControls[idPrefix].sheet.cells.B1?.datavalue === 60, "SocialCalc-");
+    await waitFor(
+      page,
+      (idPrefix) => window.__scControls[idPrefix].sheet.cells.B1?.datavalue === 60,
+      "SocialCalc-",
+    );
     expect(await cellValue(page, "B1")).toBe(60);
   });
 
-  test("EditorScheduleSheetCommands drives the same command pipeline the toolbar uses", async ({ page }) => {
+  test("EditorScheduleSheetCommands drives the same command pipeline the toolbar uses", async ({
+    page,
+  }) => {
     await gotoBundle(page, "normal");
     await createControl(page);
 
     await scheduleCommand(page, "set A1 value n 7");
     await scheduleCommand(page, "set A2 formula A1*A1");
     await scheduleCommand(page, "recalc");
-    await waitFor(page, (idPrefix) => window.__scControls[idPrefix].sheet.cells.A2?.datavalue === 49, "SocialCalc-");
+    await waitFor(
+      page,
+      (idPrefix) => window.__scControls[idPrefix].sheet.cells.A2?.datavalue === 49,
+      "SocialCalc-",
+    );
     expect(await cellValue(page, "A2")).toBe(49);
   });
 });
@@ -90,7 +106,11 @@ test.describe("copy / paste / fill", () => {
     await scheduleCommand(page, "set A1 value n 5");
     await scheduleCommand(page, "copy A1:A1");
     await scheduleCommand(page, "paste C3:C3 all");
-    await waitFor(page, (idPrefix) => window.__scControls[idPrefix].sheet.cells.C3?.datavalue === 5, "SocialCalc-");
+    await waitFor(
+      page,
+      (idPrefix) => window.__scControls[idPrefix].sheet.cells.C3?.datavalue === 5,
+      "SocialCalc-",
+    );
     expect(await cellValue(page, "C3")).toBe(5);
   });
 
@@ -101,29 +121,53 @@ test.describe("copy / paste / fill", () => {
     await scheduleCommand(page, "set B1 value n 1");
     await scheduleCommand(page, "set B2 value n 2");
     await scheduleCommand(page, "filldown B1:B5 all");
-    await waitFor(page, (idPrefix) => window.__scControls[idPrefix].sheet.cells.B5?.datavalue === 5, "SocialCalc-");
+    await waitFor(
+      page,
+      (idPrefix) => window.__scControls[idPrefix].sheet.cells.B5?.datavalue === 5,
+      "SocialCalc-",
+    );
     expect(await cellValue(page, "B3")).toBe(3);
     expect(await cellValue(page, "B5")).toBe(5);
   });
 });
 
 test.describe("insert / delete / undo", () => {
-  test("insertrow shifts existing data down and SheetUndo/SheetRedo restore it", async ({ page }) => {
+  test("insertrow shifts existing data down and SheetUndo/SheetRedo restore it", async ({
+    page,
+  }) => {
     await gotoBundle(page, "normal");
     await createControl(page);
 
     await scheduleCommand(page, "set A1 text t Original");
     await scheduleCommand(page, "insertrow 1");
-    await waitFor(page, (idPrefix) => window.__scControls[idPrefix].sheet.cells.A2?.datavalue === "Original", "SocialCalc-");
+    await waitFor(
+      page,
+      (idPrefix) => window.__scControls[idPrefix].sheet.cells.A2?.datavalue === "Original",
+      "SocialCalc-",
+    );
     expect(await cellValue(page, "A1")).toBe("");
     expect(await cellValue(page, "A2")).toBe("Original");
 
-    await page.evaluate((idPrefix) => window.__scControls[idPrefix].editor.SheetUndo(), "SocialCalc-");
-    await waitFor(page, (idPrefix) => window.__scControls[idPrefix].sheet.cells.A1?.datavalue === "Original", "SocialCalc-");
+    await page.evaluate(
+      (idPrefix) => window.__scControls[idPrefix].editor.SheetUndo(),
+      "SocialCalc-",
+    );
+    await waitFor(
+      page,
+      (idPrefix) => window.__scControls[idPrefix].sheet.cells.A1?.datavalue === "Original",
+      "SocialCalc-",
+    );
     expect(await cellValue(page, "A2")).toBeUndefined();
 
-    await page.evaluate((idPrefix) => window.__scControls[idPrefix].editor.SheetRedo(), "SocialCalc-");
-    await waitFor(page, (idPrefix) => window.__scControls[idPrefix].sheet.cells.A2?.datavalue === "Original", "SocialCalc-");
+    await page.evaluate(
+      (idPrefix) => window.__scControls[idPrefix].editor.SheetRedo(),
+      "SocialCalc-",
+    );
+    await waitFor(
+      page,
+      (idPrefix) => window.__scControls[idPrefix].sheet.cells.A2?.datavalue === "Original",
+      "SocialCalc-",
+    );
     expect(await cellValue(page, "A1")).toBe("");
   });
 
@@ -134,7 +178,11 @@ test.describe("insert / delete / undo", () => {
     await scheduleCommand(page, "set A1 value n 1");
     await scheduleCommand(page, "set B1 value n 2");
     await scheduleCommand(page, "deletecol A");
-    await waitFor(page, (idPrefix) => window.__scControls[idPrefix].sheet.cells.A1?.datavalue === 2, "SocialCalc-");
+    await waitFor(
+      page,
+      (idPrefix) => window.__scControls[idPrefix].sheet.cells.A1?.datavalue === 2,
+      "SocialCalc-",
+    );
     expect(await cellValue(page, "A1")).toBe(2);
   });
 });
@@ -148,9 +196,18 @@ test.describe("save / reload", () => {
 
     await scheduleCommand(page, "set A1 value n 42", "SC1-");
     await scheduleCommand(page, "set A2 text t Saved", "SC1-");
-    await waitFor(page, (idPrefix) => window.__scControls[idPrefix].sheet.cells.A1?.datavalue === 42 && window.__scControls[idPrefix].sheet.cells.A2?.datavalue === "Saved", "SC1-");
+    await waitFor(
+      page,
+      (idPrefix) =>
+        window.__scControls[idPrefix].sheet.cells.A1?.datavalue === 42 &&
+        window.__scControls[idPrefix].sheet.cells.A2?.datavalue === "Saved",
+      "SC1-",
+    );
 
-    const save = await page.evaluate((idPrefix) => window.__scControls[idPrefix].CreateSpreadsheetSave(), "SC1-");
+    const save = await page.evaluate(
+      (idPrefix) => window.__scControls[idPrefix].CreateSpreadsheetSave(),
+      "SC1-",
+    );
     expect(save).toContain("socialcalc:version:1.0");
 
     // Simulate a page reload: tear down the old control, build a new one
@@ -180,7 +237,9 @@ test.describe("save / reload", () => {
 });
 
 test.describe("popup / keyboard smoke", () => {
-  test("multi-line input popup opens, accepts typed text, and commits to the selected cell", async ({ page }) => {
+  test("multi-line input popup opens, accepts typed text, and commits to the selected cell", async ({
+    page,
+  }) => {
     await gotoBundle(page, "normal");
     await createControl(page);
 
@@ -192,21 +251,41 @@ test.describe("popup / keyboard smoke", () => {
     await page.click('input[value="Set Cell Contents"]');
     await expect(dialog).toHaveCount(0);
 
-    await waitFor(page, (idPrefix) => window.__scControls[idPrefix].sheet.cells.A1?.datavalue === "line one\nline two", "SocialCalc-");
+    await waitFor(
+      page,
+      (idPrefix) =>
+        window.__scControls[idPrefix].sheet.cells.A1?.datavalue === "line one\nline two",
+      "SocialCalc-",
+    );
     expect(await cellValue(page, "A1")).toBe("line one\nline two");
   });
 
-  test("arrow keys move the active cell after a real click sets keyboard focus", async ({ page }) => {
+  test("arrow keys move the active cell after a real click sets keyboard focus", async ({
+    page,
+  }) => {
     await gotoBundle(page, "normal");
     await createControl(page);
 
     await clickCell(page, "B2");
-    await waitFor(page, (idPrefix) => window.__scControls[idPrefix].editor.ecell.coord === "B2", "SocialCalc-", 8000);
+    await waitFor(
+      page,
+      (idPrefix) => window.__scControls[idPrefix].editor.ecell.coord === "B2",
+      "SocialCalc-",
+      8000,
+    );
 
     await page.keyboard.press("ArrowDown");
-    await waitFor(page, (idPrefix) => window.__scControls[idPrefix].editor.ecell.coord === "B3", "SocialCalc-");
+    await waitFor(
+      page,
+      (idPrefix) => window.__scControls[idPrefix].editor.ecell.coord === "B3",
+      "SocialCalc-",
+    );
     await page.keyboard.press("ArrowRight");
-    await waitFor(page, (idPrefix) => window.__scControls[idPrefix].editor.ecell.coord === "C3", "SocialCalc-");
+    await waitFor(
+      page,
+      (idPrefix) => window.__scControls[idPrefix].editor.ecell.coord === "C3",
+      "SocialCalc-",
+    );
     expect(await page.evaluate(() => window.__scControl.editor.ecell.coord)).toBe("C3");
   });
 });

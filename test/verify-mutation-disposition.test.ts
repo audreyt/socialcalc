@@ -95,7 +95,9 @@ function registry(entries: DispositionEntry[]): DispositionRegistry {
   return { entries };
 }
 
-const scriptPath = fileURLToPath(new URL("../scripts/verify-mutation-disposition.mjs", import.meta.url));
+const scriptPath = fileURLToPath(
+  new URL("../scripts/verify-mutation-disposition.mjs", import.meta.url),
+);
 
 function runCli(args: string[]): { status: number | null; stdout: string; stderr: string } {
   const result = spawnSync(process.execPath, [scriptPath, ...args], { encoding: "utf8" });
@@ -104,8 +106,20 @@ function runCli(args: string[]): { status: number | null; stdout: string; stderr
 
 describe("stableKey", () => {
   test("is identical for two mutants sharing (file, mutatorName, location, replacement) despite different id", () => {
-    const a = { file: "js/x.ts", mutatorName: "EqualityOperator", location: loc(42, 3, 9), replacement: "true", id: "1" };
-    const b = { file: "js/x.ts", mutatorName: "EqualityOperator", location: loc(42, 3, 9), replacement: "true", id: "999" };
+    const a = {
+      file: "js/x.ts",
+      mutatorName: "EqualityOperator",
+      location: loc(42, 3, 9),
+      replacement: "true",
+      id: "1",
+    };
+    const b = {
+      file: "js/x.ts",
+      mutatorName: "EqualityOperator",
+      location: loc(42, 3, 9),
+      replacement: "true",
+      id: "999",
+    };
     expect(stableKey(a)).toBe(stableKey(b));
   });
   test("normalizes redundant relative prefixes and Windows separators", () => {
@@ -165,7 +179,9 @@ describe("schema validation", () => {
     expect(() => validateReport({ files: { "js/a.ts": {} } } as unknown as StrykerReport)).toThrow(
       /mutants array/,
     );
-    expect(() => validateDisposition({} as unknown as DispositionRegistry)).toThrow(/entries array/);
+    expect(() => validateDisposition({} as unknown as DispositionRegistry)).toThrow(
+      /entries array/,
+    );
   });
 });
 
@@ -194,26 +210,34 @@ describe("findUndispositioned", () => {
 
   test("ignores Killed/Timeout mutants entirely, even with no disposition entry", () => {
     const r = report({
-      "js/a.ts": [mutant({ id: "1", status: "Killed", location: loc(5) }), mutant({ id: "2", status: "Timeout", location: loc(6) })],
+      "js/a.ts": [
+        mutant({ id: "1", status: "Killed", location: loc(5) }),
+        mutant({ id: "2", status: "Timeout", location: loc(6) }),
+      ],
     });
     expect(findUndispositioned(r, registry([]))).toEqual([]);
   });
 });
 describe("findStaleEntries", () => {
   test("finds stale entries but retains entries for mutants now Killed", () => {
-    const d = registry([entry({ file: "js/a.ts", location: loc(5) }), entry({ file: "js/a.ts", location: loc(6) })]);
+    const d = registry([
+      entry({ file: "js/a.ts", location: loc(5) }),
+      entry({ file: "js/a.ts", location: loc(6) }),
+    ]);
     const r = report({
-      "js/a.ts": [
-        mutant({ id: "1", status: "Killed", location: loc(5) }),
-      ],
+      "js/a.ts": [mutant({ id: "1", status: "Killed", location: loc(5) })],
     });
     expect(findStaleEntries(r, d).map((e: DispositionEntry) => e.location.start.line)).toEqual([6]);
-    expect(findStaleEntries(r, registry([entry({ file: "js/a.ts", location: loc(5) })]))).toEqual([]);
+    expect(findStaleEntries(r, registry([entry({ file: "js/a.ts", location: loc(5) })]))).toEqual(
+      [],
+    );
   });
 
   test("rejects duplicate disposition tuple keys", () => {
     const e = entry({ file: "js/a.ts", location: loc(5) });
-    expect(() => validateDisposition(registry([e, { ...e, id: 2 }]))).toThrow(/duplicate disposition key/);
+    expect(() => validateDisposition(registry([e, { ...e, id: 2 }]))).toThrow(
+      /duplicate disposition key/,
+    );
   });
 });
 
@@ -250,14 +274,19 @@ describe("CLI: verify-mutation-disposition.mjs (fixture files, isolated temp dir
   test("exits 1 and lists the exact undispositioned mutant(s) and count", () => {
     withFixtures(
       report({
-        "js/a.ts": [mutant({ id: "1", location: loc(5) }), mutant({ id: "2", mutatorName: "BlockStatement", location: loc(6) })],
+        "js/a.ts": [
+          mutant({ id: "1", location: loc(5) }),
+          mutant({ id: "2", mutatorName: "BlockStatement", location: loc(6) }),
+        ],
       }),
       registry([entry({ file: "js/a.ts", location: loc(5) })]),
       ({ reportPath, dispositionPath }) => {
         const result = runCli([`--report=${reportPath}`, `--disposition=${dispositionPath}`]);
         expect(result.status).toBe(1);
         expect(result.stderr).toMatch(/FAILED — 1 of 2 Survived mutant/);
-        expect(result.stderr).toMatch(/js\/a\.ts BlockStatement @ 6:1-6:10 -> true \(report id=2\)/);
+        expect(result.stderr).toMatch(
+          /js\/a\.ts BlockStatement @ 6:1-6:10 -> true \(report id=2\)/,
+        );
       },
     );
   });
@@ -306,19 +335,49 @@ describe("CLI: verify-mutation-disposition.mjs (fixture files, isolated temp dir
     // absent registry tuple still fails closed.
     const combined = report({
       "js/formula-parse.ts": [
-        mutant({ id: "p1", status: "Survived", location: loc(10), mutatorName: "EqualityOperator", replacement: "a != b" }),
-        mutant({ id: "p2", status: "Killed", location: loc(121, 9, 37), mutatorName: "EqualityOperator", replacement: "cclass != charclass.numstart" }),
+        mutant({
+          id: "p1",
+          status: "Survived",
+          location: loc(10),
+          mutatorName: "EqualityOperator",
+          replacement: "a != b",
+        }),
+        mutant({
+          id: "p2",
+          status: "Killed",
+          location: loc(121, 9, 37),
+          mutatorName: "EqualityOperator",
+          replacement: "cclass != charclass.numstart",
+        }),
       ],
       "js/formula-operand.ts": [
-        mutant({ id: "o1", status: "Survived", location: loc(20), mutatorName: "StringLiteral", replacement: '""' }),
+        mutant({
+          id: "o1",
+          status: "Survived",
+          location: loc(20),
+          mutatorName: "StringLiteral",
+          replacement: '""',
+        }),
       ],
       "js/formula-ref.ts": [
-        mutant({ id: "r1", status: "Survived", location: loc(370), mutatorName: "LogicalOperator", replacement: "cr.row < 1 && cr.col < 1" }),
+        mutant({
+          id: "r1",
+          status: "Survived",
+          location: loc(370),
+          mutatorName: "LogicalOperator",
+          replacement: "cr.row < 1 && cr.col < 1",
+        }),
         mutant({ id: "r2", status: "Timeout", location: loc(99) }),
       ],
     });
     const fullRegistry = registry([
-      entry({ file: "js/formula-parse.ts", location: loc(10), mutatorName: "EqualityOperator", replacement: "a != b", id: 1 }),
+      entry({
+        file: "js/formula-parse.ts",
+        location: loc(10),
+        mutatorName: "EqualityOperator",
+        replacement: "a != b",
+        id: 1,
+      }),
       // Killed in the fresh combined report — retained proof, not stale.
       entry({
         file: "js/formula-parse.ts",
@@ -327,7 +386,13 @@ describe("CLI: verify-mutation-disposition.mjs (fixture files, isolated temp dir
         replacement: "cclass != charclass.numstart",
         id: 476,
       }),
-      entry({ file: "js/formula-operand.ts", location: loc(20), mutatorName: "StringLiteral", replacement: '""', id: 2 }),
+      entry({
+        file: "js/formula-operand.ts",
+        location: loc(20),
+        mutatorName: "StringLiteral",
+        replacement: '""',
+        id: 2,
+      }),
       entry({
         file: "js/formula-ref.ts",
         location: loc(370),
@@ -350,9 +415,17 @@ describe("CLI: verify-mutation-disposition.mjs (fixture files, isolated temp dir
     // report (not Survived, not Killed) must still fail — never weaken this.
     const withAbsent = registry([
       ...fullRegistry.entries,
-      entry({ file: "js/formula-parse.ts", location: loc(999), mutatorName: "BlockStatement", replacement: "{}", id: 999 }),
+      entry({
+        file: "js/formula-parse.ts",
+        location: loc(999),
+        mutatorName: "BlockStatement",
+        replacement: "{}",
+        id: 999,
+      }),
     ]);
-    expect(findStaleEntries(combined, withAbsent).map((e: DispositionEntry) => e.id)).toEqual([999]);
+    expect(findStaleEntries(combined, withAbsent).map((e: DispositionEntry) => e.id)).toEqual([
+      999,
+    ]);
     withFixtures(combined, withAbsent, ({ reportPath, dispositionPath }) => {
       const result = runCli([`--report=${reportPath}`, `--disposition=${dispositionPath}`]);
       expect(result.status).toBe(1);

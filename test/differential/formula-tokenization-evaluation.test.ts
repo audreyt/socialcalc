@@ -17,7 +17,7 @@ describe("formula tokenization parity", () => {
     "A1+B1",
     'CONCATENATE("a""b",A1)',
     "SUM(A1:A10)",
-    "IF(A1>0,\"pos\",\"neg\")",
+    'IF(A1>0,"pos","neg")',
     "$A1+A$1+$A$1",
     "Sheet2!A1+B1",
     "#REF!",

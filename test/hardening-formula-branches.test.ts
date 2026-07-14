@@ -294,14 +294,19 @@ test("lexer: SUM() null arg list is not an error, and two consecutive binary ops
 
 test("ConvertInfixToPolish: ^ is LEFT-associative in this engine, but unary minus still binds tighter than ^", async () => {
   const SC = (await loadSocialCalc()) as FullRuntime;
-  const polish = (f: string) => SC.Formula.ConvertInfixToPolish(SC.Formula.ParseFormulaIntoTokens(f));
+  const polish = (f: string) =>
+    SC.Formula.ConvertInfixToPolish(SC.Formula.ParseFormulaIntoTokens(f));
   // 2^3^2 evaluates as (2^3)^2=64, not 2^(3^2)=512 — verified against
   // TokenPrecedence directly, not by re-deriving the RPN by hand: ^ has no
   // negative (right-assoc) precedence entry in FormulaMut.TokenPrecedence,
   // so the shunting-yard loop pops equal-precedence '^' left-to-right.
   expect(polish("2^3^2")).toEqual([0, 2, 1, 4, 3]);
 
-  const { getDV } = await buildSheet(["set A1 formula 2^3^2", "set A2 formula (2^(3^2))", "set A3 formula -2^2"]);
+  const { getDV } = await buildSheet([
+    "set A1 formula 2^3^2",
+    "set A2 formula (2^(3^2))",
+    "set A3 formula -2^2",
+  ]);
   expect(getDV("A1")).toBe(64); // left-assoc: (2^3)^2
   expect(getDV("A2")).toBe(512); // explicit parens force the other grouping
   // Excel-style convention: unary minus binds tighter than ^ for the leading
@@ -311,7 +316,8 @@ test("ConvertInfixToPolish: ^ is LEFT-associative in this engine, but unary minu
 
 test("ConvertInfixToPolish: comma without an open paren, close without open, and an unmatched open all produce distinct error strings", async () => {
   const SC = (await loadSocialCalc()) as FullRuntime;
-  const polish = (f: string) => SC.Formula.ConvertInfixToPolish(SC.Formula.ParseFormulaIntoTokens(f));
+  const polish = (f: string) =>
+    SC.Formula.ConvertInfixToPolish(SC.Formula.ParseFormulaIntoTokens(f));
   // Each failure mode has its own named constant in SocialCalc.Constants —
   // assert against those directly rather than merely checking the three
   // strings differ from each other.
@@ -519,7 +525,7 @@ test("DGET returns #NUM! for multiple matches and #VALUE! for zero matches", asy
     "set D2 text t x",
     'set E1 formula DGET(A1:B3,"Val",D1:D2)',
     "set F2 text t nomatch",
-    'set F1 text t Name',
+    "set F1 text t Name",
     'set G1 formula DGET(A1:B3,"Val",F1:F2)',
   ]);
   expect(getVT("E1")).toBe("e#NUM!"); // two rows match "x"
@@ -819,17 +825,35 @@ test("CopyFormulaToRange: 2×2 source maps all four destination coords with corr
   // B1 = text "hello"  (text-type cell, datatype "t")
   // B2 = blank         (undefined/blank cell)
   const a1 = sheet.GetAssuredCell("A1") as unknown as {
-    datatype: string; valuetype: string; datavalue: number | string; formula: string;
+    datatype: string;
+    valuetype: string;
+    datavalue: number | string;
+    formula: string;
   };
-  a1.datatype = "f"; a1.valuetype = "n"; a1.datavalue = 0; a1.formula = "C3";
+  a1.datatype = "f";
+  a1.valuetype = "n";
+  a1.datavalue = 0;
+  a1.formula = "C3";
   const a2 = sheet.GetAssuredCell("A2") as unknown as {
-    datatype: string; valuetype: string; datavalue: number | string; formula: string;
+    datatype: string;
+    valuetype: string;
+    datavalue: number | string;
+    formula: string;
   };
-  a2.datatype = "v"; a2.valuetype = "n"; a2.datavalue = 10; a2.formula = "";
+  a2.datatype = "v";
+  a2.valuetype = "n";
+  a2.datavalue = 10;
+  a2.formula = "";
   const b1 = sheet.GetAssuredCell("B1") as unknown as {
-    datatype: string; valuetype: string; datavalue: number | string; formula: string;
+    datatype: string;
+    valuetype: string;
+    datavalue: number | string;
+    formula: string;
   };
-  b1.datatype = "t"; b1.valuetype = "t"; b1.datavalue = "hello"; b1.formula = "";
+  b1.datatype = "t";
+  b1.valuetype = "t";
+  b1.datavalue = "hello";
+  b1.formula = "";
   // B2 left blank/undefined
 
   // Build the formulaData by calling getStandardizedValues with a range parameter
@@ -846,10 +870,10 @@ test("CopyFormulaToRange: 2×2 source maps all four destination coords with corr
   // i=1,j=1 → dest col=3+1=4,row=1+1=2 → D2  (blank cell → "set D2 empty")
   // With +i: C1/C2/D1/D2. With -i: C1/C2/B1/B2 — would be wrong (B already occupied by source).
   expect(lines).toHaveLength(4);
-  expect(lines[0]).toMatch(/^set C1 /);   // i=0,j=0
-  expect(lines[1]).toMatch(/^set C2 /);   // i=0,j=1
-  expect(lines[2]).toMatch(/^set D1 /);   // i=1,j=0  — proves +i (not -i → B1)
-  expect(lines[3]).toMatch(/^set D2 /);   // i=1,j=1  — proves +i AND +j
+  expect(lines[0]).toMatch(/^set C1 /); // i=0,j=0
+  expect(lines[1]).toMatch(/^set C2 /); // i=0,j=1
+  expect(lines[2]).toMatch(/^set D1 /); // i=1,j=0  — proves +i (not -i → B1)
+  expect(lines[3]).toMatch(/^set D2 /); // i=1,j=1  — proves +i AND +j
   // C1 is a formula cell: command contains "formula" and the offset formula string
   expect(lines[0]).toMatch(/formula/);
   // C2 is a value cell: "set C2 value n 10"
@@ -866,12 +890,22 @@ test("CopyValueToRange: 2×2 source maps all four destination coords with correc
   const sheet = freshSheet(SC);
   // Source range A1:B2  (col 1-2, row 1-2)
   // A1 = value 1, A2 = value 2, B1 = value 3, B2 = blank
-  const vals: [string, number][] = [["A1", 1], ["A2", 2], ["B1", 3]];
+  const vals: [string, number][] = [
+    ["A1", 1],
+    ["A2", 2],
+    ["B1", 3],
+  ];
   for (const [coord, v] of vals) {
     const c = sheet.GetAssuredCell(coord) as unknown as {
-      datatype: string; valuetype: string; datavalue: number; formula: string;
+      datatype: string;
+      valuetype: string;
+      datavalue: number;
+      formula: string;
     };
-    c.datatype = "v"; c.valuetype = "n"; c.datavalue = v; c.formula = "";
+    c.datatype = "v";
+    c.valuetype = "n";
+    c.datavalue = v;
+    c.formula = "";
   }
   // B2 left blank
 
@@ -887,8 +921,8 @@ test("CopyValueToRange: 2×2 source maps all four destination coords with correc
   expect(lines).toHaveLength(4);
   expect(lines[0]).toMatch(/^set C1 /);
   expect(lines[1]).toMatch(/^set C2 /);
-  expect(lines[2]).toMatch(/^set D1 /);   // proves +i
-  expect(lines[3]).toMatch(/^set D2 /);   // proves +i AND +j
+  expect(lines[2]).toMatch(/^set D1 /); // proves +i
+  expect(lines[3]).toMatch(/^set D2 /); // proves +i AND +j
   expect(lines[0]).toBe("set C1 value n 1");
   expect(lines[1]).toBe("set C2 value n 2");
   expect(lines[2]).toBe("set D1 value n 3");

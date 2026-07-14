@@ -172,7 +172,10 @@ describe("typed public API smoke", () => {
       expect(tokens.length).toBeGreaterThan(0);
 
       const sheet: SC.Sheet = new runtime.Sheet();
-      const result: SC.FormulaEvaluateResult = runtime.Formula.evaluate_parsed_formula(tokens, sheet);
+      const result: SC.FormulaEvaluateResult = runtime.Formula.evaluate_parsed_formula(
+        tokens,
+        sheet,
+      );
 
       expect(result.value).toBe(7);
       expect(typeof result.type).toBe("string");

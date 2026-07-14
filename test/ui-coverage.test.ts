@@ -930,7 +930,9 @@ test("SpreadsheetControl: Clipboard + Settings helpers", async () => {
 
   // Settings switch (both targets) toggles which settings table/toolbar pair
   // is visible.
-  const sheettable = document.getElementById(control.idPrefix + "sheetsettingstable") as HTMLElement;
+  const sheettable = document.getElementById(
+    control.idPrefix + "sheetsettingstable",
+  ) as HTMLElement;
   const celltable = document.getElementById(control.idPrefix + "cellsettingstable") as HTMLElement;
   const sheettoolbar = document.getElementById(
     control.idPrefix + "sheetsettingstoolbar",

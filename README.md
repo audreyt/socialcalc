@@ -179,9 +179,9 @@ retains one candidate artifact.
 | ----------------------------------- | -------------------------------------------------------------------------------------------- |
 | `vp build`                          | Build the ordered UMD bundle and CSS.                                                        |
 | `vp build --minify`                 | Build normal and minified UMD bundles.                                                       |
-| `vp run typecheck`                  | Run the ordinary `tsc --noEmit` project check.                                               |
+| `vp check --fix`                    | Apply repository formatting and safe lint fixes, then typecheck.                             |
+| `vp check`                          | Check formatting, warning-free type-aware lint, and types without modifying files.           |
 | `vp run typecheck:strict`           | Check the narrower strict build configuration.                                               |
-| `vp lint`                           | Run warning-free, type-aware lint plus typechecking.                                         |
 | `vp test`                           | Build a fresh instrumented UMD, run Vitest, and enforce 100/100/100/100 Istanbul coverage.   |
 | `vp run test`                       | Build the plain shipping bundle first, then run the default Istanbul test gate.              |
 | `bun run test:bun`                  | Run the same corpus in isolated native Bun workers; no authoritative coverage aggregate.     |
@@ -261,8 +261,7 @@ Required matrix for formula-reference changes:
 ```bash
 vp build
 vp test run test/formula-rewrite-cases.test.ts test/formula-rewrite-regressions.test.ts
-vp run typecheck
-vp lint
+vp check
 ```
 
 Compatibility rules:

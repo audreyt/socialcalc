@@ -43,7 +43,9 @@ async function main() {
       JSON.stringify({ name: "registry-smoke", private: true, version: "0.0.0" }, null, 2),
     );
 
-    console.log(`Installing socialcalc@${version} from the real npm registry into ${scratchDir} ...`);
+    console.log(
+      `Installing socialcalc@${version} from the real npm registry into ${scratchDir} ...`,
+    );
     const install = run(
       "npm",
       ["install", `socialcalc@${version}`, "--no-save", "--no-audit", "--no-fund"],
@@ -59,11 +61,15 @@ async function main() {
 
     console.log('Checking CJS root require("socialcalc") ...');
     const cjsRoot = requireFromScratch("socialcalc");
-    console.log(`  ok - ${await exerciseCommandFormulaSaveLoad(cjsRoot, `registry CJS root (${version})`)}`);
+    console.log(
+      `  ok - ${await exerciseCommandFormulaSaveLoad(cjsRoot, `registry CJS root (${version})`)}`,
+    );
 
     console.log('Checking deep require("socialcalc/dist/SocialCalc.min.js") ...');
     const cjsMinDeep = requireFromScratch("socialcalc/dist/SocialCalc.min.js");
-    console.log(`  ok - ${await exerciseCommandFormulaSaveLoad(cjsMinDeep, `registry min deep (${version})`)}`);
+    console.log(
+      `  ok - ${await exerciseCommandFormulaSaveLoad(cjsMinDeep, `registry min deep (${version})`)}`,
+    );
 
     console.log("Checking native ESM default import ...");
     const esmCheckPath = path.join(scratchDir, "esm-check.mjs");

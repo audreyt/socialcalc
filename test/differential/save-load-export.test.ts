@@ -38,7 +38,11 @@ describe("save/load round-trip parity", () => {
   test("filldown persists a rectangular numeric series across a save/reload cycle", async () => {
     const { candidate, oracle } = await loadPair();
     for (const SC of [candidate, oracle]) {
-      const sheet = await runCommands(SC, ["set A1 value n 1", "set A2 value n 2", "filldown A1:A5 all"]);
+      const sheet = await runCommands(SC, [
+        "set A1 value n 1",
+        "set A2 value n 2",
+        "filldown A1:A5 all",
+      ]);
       const save = sheet.CreateSheetSave();
       const reloaded = new SC.Sheet();
       reloaded.ParseSheetSave(save);

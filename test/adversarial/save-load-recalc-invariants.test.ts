@@ -12,7 +12,13 @@ const SCENARIOS = [
   ["value/formula mix", ["set A1 value n 3", "set B1 formula A1*2+1", "set C1 formula SUM(A1:B1)"]],
   [
     "named range + dependent formula",
-    ["set A1 value n 1", "set A2 value n 2", "set A3 value n 3", "name define BAND A1:A3", "set D1 formula SUM(BAND)"],
+    [
+      "set A1 value n 1",
+      "set A2 value n 2",
+      "set A3 value n 3",
+      "name define BAND A1:A3",
+      "set D1 formula SUM(BAND)",
+    ],
   ],
   ["text and a direct error formula", ["set A1 text t hello", "set B1 formula 1/0"]],
 ] as const;
@@ -53,31 +59,44 @@ async function valuesAfterOneRoundTrip(SC: SocialCalcRuntime, commands: readonly
 }
 
 describe("save-load-recalc invariants", () => {
-  test.each(SCENARIOS)("%s: reload+recalc reproduces the original values", async (_label, commands) => {
-    const { candidate, oracle } = await loadPair();
-    for (const SC of [candidate, oracle]) {
-      const { originalValues, reloadedValues } = await valuesAfterOneRoundTrip(SC, [...commands]);
-      expect(reloadedValues).toStrictEqual(originalValues);
-    }
-  });
+  test.each(SCENARIOS)(
+    "%s: reload+recalc reproduces the original values",
+    async (_label, commands) => {
+      const { candidate, oracle } = await loadPair();
+      for (const SC of [candidate, oracle]) {
+        const { originalValues, reloadedValues } = await valuesAfterOneRoundTrip(SC, [...commands]);
+        expect(reloadedValues).toStrictEqual(originalValues);
+      }
+    },
+  );
 
-  test.each(SCENARIOS)("%s: two round trips converge to the same fixed point", async (_label, commands) => {
-    const { candidate, oracle } = await loadPair();
-    for (const SC of [candidate, oracle]) {
-      const first = await valuesAfterOneRoundTrip(SC, [...commands]);
-      const secondSave = first.sheet.CreateSheetSave();
-      const secondSheet = new SC.Sheet();
-      secondSheet.ParseSheetSave(secondSave);
-      await recalcSheet(SC, secondSheet);
-      const secondValues = snapshotStable(secondSheet);
-      expect(secondValues).toStrictEqual(first.reloadedValues);
-    }
-  });
+  test.each(SCENARIOS)(
+    "%s: two round trips converge to the same fixed point",
+    async (_label, commands) => {
+      const { candidate, oracle } = await loadPair();
+      for (const SC of [candidate, oracle]) {
+        const first = await valuesAfterOneRoundTrip(SC, [...commands]);
+        const secondSave = first.sheet.CreateSheetSave();
+        const secondSheet = new SC.Sheet();
+        secondSheet.ParseSheetSave(secondSave);
+        await recalcSheet(SC, secondSheet);
+        const secondValues = snapshotStable(secondSheet);
+        expect(secondValues).toStrictEqual(first.reloadedValues);
+      }
+    },
+  );
 
-  test.each(SCENARIOS)("%s: candidate and oracle agree on the round-tripped values", async (_label, commands) => {
-    const { candidate, oracle } = await loadPair();
-    const candidateResult = await valuesAfterOneRoundTrip(candidate, [...commands]);
-    const oracleResult = await valuesAfterOneRoundTrip(oracle, [...commands]);
-    expectParity(`round trip: ${_label}`, candidateResult.reloadedValues, oracleResult.reloadedValues);
-  });
+  test.each(SCENARIOS)(
+    "%s: candidate and oracle agree on the round-tripped values",
+    async (_label, commands) => {
+      const { candidate, oracle } = await loadPair();
+      const candidateResult = await valuesAfterOneRoundTrip(candidate, [...commands]);
+      const oracleResult = await valuesAfterOneRoundTrip(oracle, [...commands]);
+      expectParity(
+        `round trip: ${_label}`,
+        candidateResult.reloadedValues,
+        oracleResult.reloadedValues,
+      );
+    },
+  );
 });

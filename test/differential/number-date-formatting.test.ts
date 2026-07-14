@@ -58,11 +58,16 @@ describe("date/time format parity", () => {
       [1900, 3, 1],
       [2099, 12, 31],
     ] as const) {
-      const candidateJulian = candidate.FormatNumber.convert_date_gregorian_to_julian(year, month, day);
+      const candidateJulian = candidate.FormatNumber.convert_date_gregorian_to_julian(
+        year,
+        month,
+        day,
+      );
       const oracleJulian = oracle.FormatNumber.convert_date_gregorian_to_julian(year, month, day);
       expectParity(`gregorian_to_julian(${year},${month},${day})`, candidateJulian, oracleJulian);
 
-      const candidateBack = candidate.FormatNumber.convert_date_julian_to_gregorian(candidateJulian);
+      const candidateBack =
+        candidate.FormatNumber.convert_date_julian_to_gregorian(candidateJulian);
       const oracleBack = oracle.FormatNumber.convert_date_julian_to_gregorian(oracleJulian);
       expectParity(`julian_to_gregorian(${candidateJulian})`, candidateBack, oracleBack);
     }

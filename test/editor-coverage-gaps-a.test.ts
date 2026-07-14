@@ -45,28 +45,38 @@ async function newControl(
 }
 
 function teardownEditor(SC: any, editor: any): void {
-  { if (editor?.inputEcho?.interval) {
-    clearInterval(editor.inputEcho.interval);
-    editor.inputEcho.interval = null;
-  } }
-  { if (SC.AutoRepeatInfo?.timer) {
-    clearTimeout(SC.AutoRepeatInfo.timer);
-    SC.AutoRepeatInfo.timer = null;
-    SC.AutoRepeatInfo.mouseinfo = null;
-  } }
-  { if (SC.ButtonInfo?.timer) {
-    clearTimeout(SC.ButtonInfo.timer);
-    SC.ButtonInfo.timer = null;
-  } }
-  { SC.Keyboard.focusTable = null;
-  SC.Keyboard.passThru = null; }
-  { if (editor) {
-    editor.state = "start";
-    if (editor.timeout) {
-      clearTimeout(editor.timeout);
-      editor.timeout = null;
+  {
+    if (editor?.inputEcho?.interval) {
+      clearInterval(editor.inputEcho.interval);
+      editor.inputEcho.interval = null;
     }
-  } }
+  }
+  {
+    if (SC.AutoRepeatInfo?.timer) {
+      clearTimeout(SC.AutoRepeatInfo.timer);
+      SC.AutoRepeatInfo.timer = null;
+      SC.AutoRepeatInfo.mouseinfo = null;
+    }
+  }
+  {
+    if (SC.ButtonInfo?.timer) {
+      clearTimeout(SC.ButtonInfo.timer);
+      SC.ButtonInfo.timer = null;
+    }
+  }
+  {
+    SC.Keyboard.focusTable = null;
+    SC.Keyboard.passThru = null;
+  }
+  {
+    if (editor) {
+      editor.state = "start";
+      if (editor.timeout) {
+        clearTimeout(editor.timeout);
+        editor.timeout = null;
+      }
+    }
+  }
 }
 
 function fakeEvent(extras: Record<string, any> = {}): any {
@@ -93,7 +103,9 @@ function fakeEvent(extras: Record<string, any> = {}): any {
 }
 
 function primeGridLayout(editor: any): void {
-  { editor.CalculateEditorPositions(); }
+  {
+    editor.CalculateEditorPositions();
+  }
   editor.gridposition = editor.gridposition || { left: 0, top: 0 };
   editor.headposition = editor.headposition || { left: 30, top: 30 };
   editor.colpositions = [0, 0, 80, 160, 240, 320, 400, 480];
@@ -125,7 +137,9 @@ test("ResizeTableEditor prototype passthrough", async () => {
   const SC = await loadSocialCalc();
   const { control } = await newControl(SC, "resize-te");
   const editor = control.editor;
-  { editor.ResizeTableEditor(500, 400); }
+  {
+    editor.ResizeTableEditor(500, 400);
+  }
   teardownEditor(SC, editor);
 });
 
@@ -142,22 +156,34 @@ test("ScheduleRender _app + DoRenderStep/DoPositionCalculations/ScrollTableLeft/
   // ScheduleRender with _app=true and renderwidgets=true (line 5849-5850)
   const savApp = SC._app;
   SC._app = true;
-  { editor.ScheduleRender(true); }
+  {
+    editor.ScheduleRender(true);
+  }
   // ScheduleRender with _app=true and renderwidgets=false (false branch of 5849)
-  { editor.ScheduleRender(false); }
+  {
+    editor.ScheduleRender(false);
+  }
   SC._app = savApp;
 
   // DoRenderStep (line 5853-5854 — uncovered function)
-  { editor.DoRenderStep(); }
+  {
+    editor.DoRenderStep();
+  }
 
   // DoPositionCalculations (line 5859-5860 — uncovered function)
-  { editor.DoPositionCalculations(); }
+  {
+    editor.DoPositionCalculations();
+  }
 
   // ScrollTableLeftOneCol (line 5886-5887 — uncovered function)
-  { editor.ScrollTableLeftOneCol(); }
+  {
+    editor.ScrollTableLeftOneCol();
+  }
 
   // ScrollTableRightOneCol (line 5889-5890 — uncovered function)
-  { editor.ScrollTableRightOneCol(); }
+  {
+    editor.ScrollTableRightOneCol();
+  }
 
   teardownEditor(SC, editor);
 });
@@ -190,7 +216,9 @@ test("ResizeTableEditor: _app=true tablewidth branch", async () => {
   const editor = control.editor;
   const savApp = SC._app;
   SC._app = true;
-  { editor.ResizeTableEditor(500, 400); }
+  {
+    editor.ResizeTableEditor(500, 400);
+  }
   SC._app = savApp;
   teardownEditor(SC, editor);
 });
@@ -206,8 +234,12 @@ test("EditorScheduleSheetCommands: undo/redo with _app=true", async () => {
   editor.busy = false;
   const savApp = SC._app;
   SC._app = true;
-  { editor.EditorScheduleSheetCommands("undo", true, true); }
-  { editor.EditorScheduleSheetCommands("redo", true, true); }
+  {
+    editor.EditorScheduleSheetCommands("undo", true, true);
+  }
+  {
+    editor.EditorScheduleSheetCommands("redo", true, true);
+  }
   SC._app = savApp;
   teardownEditor(SC, editor);
 });
@@ -247,35 +279,47 @@ test("EditorSheetStatusCallback: uncovered status branches", async () => {
   sheetobj.changedrendervalues = false;
   sheetobj.celldisplayneeded = "";
   editor.deferredCommands = [];
-  { SC.EditorSheetStatusCallback(null, "cmdend", null, editor); }
+  {
+    SC.EditorSheetStatusCallback(null, "cmdend", null, editor);
+  }
 
   // cmdend with recalconce (line 6201 — recalconce branch)
   sheetobj.attribs.needsrecalc = true;
   sheetobj.attribs.recalc = "off";
   sheetobj.recalconce = true;
-  { SC.EditorSheetStatusCallback(null, "cmdend", null, editor); }
+  {
+    SC.EditorSheetStatusCallback(null, "cmdend", null, editor);
+  }
   delete sheetobj.recalconce;
 
   // hiddencolrow == "col" with ecell !== null (line 6217 true)
   sheetobj.hiddencolrow = "col";
   editor.ecell = editor.ecell || { coord: "A1", row: 1, col: 1 };
   sheetobj.colattribs.hide = sheetobj.colattribs.hide || {};
-  { SC.EditorSheetStatusCallback(null, "cmdend", null, editor); }
+  {
+    SC.EditorSheetStatusCallback(null, "cmdend", null, editor);
+  }
 
   // hiddencolrow == "col" with ecell === null (line 6217 false)
   const savedEcell = editor.ecell;
   editor.ecell = null;
-  { SC.EditorSheetStatusCallback(null, "cmdend", null, editor); }
+  {
+    SC.EditorSheetStatusCallback(null, "cmdend", null, editor);
+  }
   editor.ecell = savedEcell;
 
   // hiddencolrow == "row" with ecell !== null (line 6228 true)
   sheetobj.hiddencolrow = "row";
   sheetobj.rowattribs.hide = sheetobj.rowattribs.hide || {};
-  { SC.EditorSheetStatusCallback(null, "cmdend", null, editor); }
+  {
+    SC.EditorSheetStatusCallback(null, "cmdend", null, editor);
+  }
 
   // hiddencolrow == "row" with ecell === null (line 6228 false)
   editor.ecell = null;
-  { SC.EditorSheetStatusCallback(null, "cmdend", null, editor); }
+  {
+    SC.EditorSheetStatusCallback(null, "cmdend", null, editor);
+  }
   editor.ecell = savedEcell;
   sheetobj.hiddencolrow = "";
 
@@ -284,21 +328,39 @@ test("EditorSheetStatusCallback: uncovered status branches", async () => {
   editor.busy = true;
   editor.deferredCommands = [];
   editor.deferredEmailCommands = [];
-  { SC.EditorSheetStatusCallback(null, "doneposcalc", null, editor); }
+  {
+    SC.EditorSheetStatusCallback(null, "doneposcalc", null, editor);
+  }
 
   // doneposcalc with state != "start"
   editor.state = "input";
   editor.busy = true;
-  { SC.EditorSheetStatusCallback(null, "doneposcalc", null, editor); }
+  {
+    SC.EditorSheetStatusCallback(null, "doneposcalc", null, editor);
+  }
 
   // Other switch cases in EditorSheetStatusCallback (line 6292)
-  { SC.EditorSheetStatusCallback(null, "schedposcalc", null, editor); }
-  { SC.EditorSheetStatusCallback(null, "schedrender", null, editor); }
-  { SC.EditorSheetStatusCallback(null, "donerecalc", null, editor); }
-  { SC.EditorSheetStatusCallback(null, "donecalc", null, editor); }
-  { SC.EditorSheetStatusCallback(null, "calccycle", null, editor); }
-  { SC.EditorSheetStatusCallback(null, "calcorder", { count: 1, total: 2 }, editor); }
-  { SC.EditorSheetStatusCallback(null, "calcstep", { count: 2, total: 2 }, editor); }
+  {
+    SC.EditorSheetStatusCallback(null, "schedposcalc", null, editor);
+  }
+  {
+    SC.EditorSheetStatusCallback(null, "schedrender", null, editor);
+  }
+  {
+    SC.EditorSheetStatusCallback(null, "donerecalc", null, editor);
+  }
+  {
+    SC.EditorSheetStatusCallback(null, "donecalc", null, editor);
+  }
+  {
+    SC.EditorSheetStatusCallback(null, "calccycle", null, editor);
+  }
+  {
+    SC.EditorSheetStatusCallback(null, "calcorder", { count: 1, total: 2 }, editor);
+  }
+  {
+    SC.EditorSheetStatusCallback(null, "calcstep", { count: 2, total: 2 }, editor);
+  }
   {
     SC.EditorSheetStatusCallback(
       null,
@@ -307,9 +369,15 @@ test("EditorSheetStatusCallback: uncovered status branches", async () => {
       editor,
     );
   }
-  { SC.EditorSheetStatusCallback(null, "calcloading", { sheetname: "Sheet2" }, editor); }
-  { SC.EditorSheetStatusCallback(null, "confirmemailsent", "sent", editor); }
-  { SC.EditorSheetStatusCallback(null, "unknownstatus", null, editor); }
+  {
+    SC.EditorSheetStatusCallback(null, "calcloading", { sheetname: "Sheet2" }, editor);
+  }
+  {
+    SC.EditorSheetStatusCallback(null, "confirmemailsent", "sent", editor);
+  }
+  {
+    SC.EditorSheetStatusCallback(null, "unknownstatus", null, editor);
+  }
 
   expect(seen.length).toBeGreaterThan(0);
   teardownEditor(SC, editor);
@@ -373,28 +441,40 @@ test("ProcessEditorMouseDown: no-coord, shiftKey, state!=start branches", async 
   editor.range = { hasrange: false };
 
   // Valid mousedown — exercises the normal path including 6543-6544
-  { SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 100, target })); }
+  {
+    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 100, target }));
+  }
 
   // no-coord return (line 6514-6515) — position in rowheader area
-  { SC.ProcessEditorMouseDown(fakeEvent({ clientX: 5, clientY: 100, target })); }
+  {
+    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 5, clientY: 100, target }));
+  }
 
   // shiftKey with no range → RangeAnchor (line 6517-6518)
   editor.range = { hasrange: false };
-  { SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 100, target, shiftKey: true })); }
+  {
+    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 100, target, shiftKey: true }));
+  }
 
   // state != "start" → inputBox.element.focus (line 6543-6544)
   editor.state = "input";
   editor.range = { hasrange: false };
-  { SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 100, target })); }
+  {
+    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 100, target }));
+  }
 
   // ignore=true → return
   mi.ignore = true;
-  { SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 100, target })); }
+  {
+    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 100, target }));
+  }
   mi.ignore = false;
 
   // no mobj found (target not in registeredElements)
   const otherEl = document.createElement("div");
-  { SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 100, target: otherEl })); }
+  {
+    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 100, target: otherEl }));
+  }
 
   teardownEditor(SC, editor);
 });
@@ -418,27 +498,39 @@ test("ProcessEditorMouseMove: ignore, no-result, no-coord, coord-changed branche
 
   // ignore=true → return (line 6592-6593)
   mi.ignore = true;
-  { SC.ProcessEditorMouseMove(fakeEvent({ clientX: 100, clientY: 100 })); }
+  {
+    SC.ProcessEditorMouseMove(fakeEvent({ clientX: 100, clientY: 100 }));
+  }
   mi.ignore = false;
 
   // no result → return (line 6599-6600) — position outside grid
-  { SC.ProcessEditorMouseMove(fakeEvent({ clientX: -100, clientY: -100 })); }
+  {
+    SC.ProcessEditorMouseMove(fakeEvent({ clientX: -100, clientY: -100 }));
+  }
 
   // result with no coord → SetDragAutoRepeat + return (line 6601-6602)
-  { SC.ProcessEditorMouseMove(fakeEvent({ clientX: 5, clientY: 100 })); }
+  {
+    SC.ProcessEditorMouseMove(fakeEvent({ clientX: 5, clientY: 100 }));
+  }
 
   // result with coord, coord == mouselastcoord → no MoveECell
   mi.mouselastcoord = "A1";
-  { SC.ProcessEditorMouseMove(fakeEvent({ clientX: 100, clientY: 100 })); }
+  {
+    SC.ProcessEditorMouseMove(fakeEvent({ clientX: 100, clientY: 100 }));
+  }
 
   // result with coord, coord != mouselastcoord → MoveECell + RangeExtend
   mi.mouselastcoord = "B2";
   editor.range = { hasrange: false };
-  { SC.ProcessEditorMouseMove(fakeEvent({ clientX: 100, clientY: 100 })); }
+  {
+    SC.ProcessEditorMouseMove(fakeEvent({ clientX: 100, clientY: 100 }));
+  }
 
   // no editor → return
   mi.editor = null;
-  { SC.ProcessEditorMouseMove(fakeEvent({ clientX: 100, clientY: 100 })); }
+  {
+    SC.ProcessEditorMouseMove(fakeEvent({ clientX: 100, clientY: 100 }));
+  }
   mi.editor = editor;
 
   teardownEditor(SC, editor);
@@ -465,16 +557,22 @@ test("ProcessEditorMouseUp: ignore, no-result, no-coord branches", async () => {
 
   // no editor → return
   mi.editor = null;
-  { SC.ProcessEditorMouseUp(fakeEvent({ clientX: 100, clientY: 100 })); }
+  {
+    SC.ProcessEditorMouseUp(fakeEvent({ clientX: 100, clientY: 100 }));
+  }
   mi.editor = editor;
 
   // ignore=true → return (line 6627-6628)
   mi.ignore = true;
-  { SC.ProcessEditorMouseUp(fakeEvent({ clientX: 100, clientY: 100 })); }
+  {
+    SC.ProcessEditorMouseUp(fakeEvent({ clientX: 100, clientY: 100 }));
+  }
   mi.ignore = false;
 
   // no result → return (line 6635-6636)
-  { SC.ProcessEditorMouseUp(fakeEvent({ clientX: -100, clientY: -100 })); }
+  {
+    SC.ProcessEditorMouseUp(fakeEvent({ clientX: -100, clientY: -100 }));
+  }
 
   // result with coord, hasrange → MoveECell + RangeExtend
   editor.range = {
@@ -487,11 +585,15 @@ test("ProcessEditorMouseUp: ignore, no-result, no-coord branches", async () => {
     anchorrow: 1,
     anchorcol: 1,
   };
-  { SC.ProcessEditorMouseUp(fakeEvent({ clientX: 100, clientY: 100 })); }
+  {
+    SC.ProcessEditorMouseUp(fakeEvent({ clientX: 100, clientY: 100 }));
+  }
 
   // result with no coord → result.coord = ecell.coord
   editor.range = { hasrange: false };
-  { SC.ProcessEditorMouseUp(fakeEvent({ clientX: 5, clientY: 100 })); }
+  {
+    SC.ProcessEditorMouseUp(fakeEvent({ clientX: 5, clientY: 100 }));
+  }
 
   teardownEditor(SC, editor);
 });
@@ -519,37 +621,51 @@ test("ProcessEditorColsize: MouseMove + MouseUp + FinishColRowSize", async () =>
   editor.context.colwidth = [0, 80, 80, 80, 80];
 
   // MouseMove with mouseresizecolnum set (lines 6685-6690)
-  { SC.ProcessEditorColsizeMouseMove(fakeEvent({ clientX: 60 })); }
+  {
+    SC.ProcessEditorColsizeMouseMove(fakeEvent({ clientX: 60 }));
+  }
 
   // MouseMove with no editor → return
   mi.editor = null;
-  { SC.ProcessEditorColsizeMouseMove(fakeEvent({ clientX: 60 })); }
+  {
+    SC.ProcessEditorColsizeMouseMove(fakeEvent({ clientX: 60 }));
+  }
   mi.editor = editor;
 
   // MouseMove with no mouseresizecolnum → skip resize block
   mi.mouseresizecolnum = null;
-  { SC.ProcessEditorColsizeMouseMove(fakeEvent({ clientX: 60 })); }
+  {
+    SC.ProcessEditorColsizeMouseMove(fakeEvent({ clientX: 60 }));
+  }
   mi.mouseresizecolnum = 2;
 
   // MouseUp with mouseresizecolnum set (lines 6710-6713)
   mi.mouseresizecolnum = 2;
   mi.mouseresizecol = "B";
   editor.timeout = null;
-  { SC.ProcessEditorColsizeMouseUp(fakeEvent({ clientX: 60 })); }
+  {
+    SC.ProcessEditorColsizeMouseUp(fakeEvent({ clientX: 60 }));
+  }
 
   // MouseUp with mousecoltounhide set (line 6708-6709)
   mi.mousecoltounhide = 3;
-  { SC.ProcessEditorColsizeMouseUp(fakeEvent({ clientX: 60 })); }
+  {
+    SC.ProcessEditorColsizeMouseUp(fakeEvent({ clientX: 60 }));
+  }
   mi.mousecoltounhide = null;
 
   // MouseUp with no editor → return
   mi.editor = null;
-  { SC.ProcessEditorColsizeMouseUp(fakeEvent({ clientX: 60 })); }
+  {
+    SC.ProcessEditorColsizeMouseUp(fakeEvent({ clientX: 60 }));
+  }
   mi.editor = editor;
 
   // FinishColRowSize with no editor → return (line 6724-6725)
   mi.editor = null;
-  { SC.FinishColRowSize(); }
+  {
+    SC.FinishColRowSize();
+  }
   mi.editor = editor;
 
   teardownEditor(SC, editor);
@@ -579,32 +695,44 @@ test("ProcessEditorRowsize: MouseMove + MouseUp resize + unhide branches", async
   editor.context.rowheight = [0, 30, 20, 20, 20];
 
   // MouseMove with mouseresizerownum set (lines 6843-6848)
-  { SC.ProcessEditorRowsizeMouseMove(fakeEvent({ clientY: 60 })); }
+  {
+    SC.ProcessEditorRowsizeMouseMove(fakeEvent({ clientY: 60 }));
+  }
 
   // MouseMove with no editor → return
   mi.editor = null;
-  { SC.ProcessEditorRowsizeMouseMove(fakeEvent({ clientY: 60 })); }
+  {
+    SC.ProcessEditorRowsizeMouseMove(fakeEvent({ clientY: 60 }));
+  }
   mi.editor = editor;
 
   // MouseMove with no mouseresizerownum → skip resize block
   mi.mouseresizerownum = null;
-  { SC.ProcessEditorRowsizeMouseMove(fakeEvent({ clientY: 60 })); }
+  {
+    SC.ProcessEditorRowsizeMouseMove(fakeEvent({ clientY: 60 }));
+  }
   mi.mouseresizerownum = 2;
 
   // MouseUp with mouseresizerownum set (lines 6868-6874)
   mi.mouseresizerownum = 2;
   mi.mouserowtounhide = null;
   editor.timeout = null;
-  { SC.ProcessEditorRowsizeMouseUp(fakeEvent({ clientY: 60 })); }
+  {
+    SC.ProcessEditorRowsizeMouseUp(fakeEvent({ clientY: 60 }));
+  }
 
   // MouseUp with mouserowtounhide set (line 6866-6867)
   mi.mouserowtounhide = 3;
-  { SC.ProcessEditorRowsizeMouseUp(fakeEvent({ clientY: 60 })); }
+  {
+    SC.ProcessEditorRowsizeMouseUp(fakeEvent({ clientY: 60 }));
+  }
   mi.mouserowtounhide = null;
 
   // MouseUp with no editor → return
   mi.editor = null;
-  { SC.ProcessEditorRowsizeMouseUp(fakeEvent({ clientY: 60 })); }
+  {
+    SC.ProcessEditorRowsizeMouseUp(fakeEvent({ clientY: 60 }));
+  }
   mi.editor = editor;
 
   teardownEditor(SC, editor);
@@ -628,23 +756,33 @@ test("SetDragAutoRepeat: colheader/colfooter + callback direction branches", asy
 
   // rowheader, different row → direction "left" (line 6903-6904)
   ar.mouseinfo = { row: 3, col: 1, rowheader: true, distance: 10 };
-  { SC.SetDragAutoRepeat(editor, { row: 5, col: 1, rowheader: true, distance: 10 }); }
+  {
+    SC.SetDragAutoRepeat(editor, { row: 5, col: 1, rowheader: true, distance: 10 });
+  }
 
   // rowheader, row < previous → direction "right"
   ar.mouseinfo = { row: 5, col: 1, rowheader: true, distance: 10 };
-  { SC.SetDragAutoRepeat(editor, { row: 1, col: 1, rowheader: true, distance: 10 }); }
+  {
+    SC.SetDragAutoRepeat(editor, { row: 1, col: 1, rowheader: true, distance: 10 });
+  }
 
   // colheader/colfooter branch (lines 6913-6914)
   ar.mouseinfo = { row: 1, col: 3, colheader: true, distance: 10 };
-  { SC.SetDragAutoRepeat(editor, { row: 1, col: 5, colheader: true, distance: 10 }); }
+  {
+    SC.SetDragAutoRepeat(editor, { row: 1, col: 5, colheader: true, distance: 10 });
+  }
 
   // colfooter
   ar.mouseinfo = { row: 1, col: 3, colfooter: true, distance: 10 };
-  { SC.SetDragAutoRepeat(editor, { row: 1, col: 5, colfooter: true, distance: 10 }); }
+  {
+    SC.SetDragAutoRepeat(editor, { row: 1, col: 5, colfooter: true, distance: 10 });
+  }
 
   // rowfooter
   ar.mouseinfo = { row: 3, col: 1, rowfooter: true, distance: 10 };
-  { SC.SetDragAutoRepeat(editor, { row: 5, col: 1, rowfooter: true, distance: 10 }); }
+  {
+    SC.SetDragAutoRepeat(editor, { row: 5, col: 1, rowfooter: true, distance: 10 });
+  }
 
   // With a repeatcallback
   ar.repeatcallback = (coord: string, dir: string) => {
@@ -652,11 +790,15 @@ test("SetDragAutoRepeat: colheader/colfooter + callback direction branches", asy
     void dir;
   };
   ar.mouseinfo = { row: 3, col: 1, rowheader: true, distance: 10 };
-  { SC.SetDragAutoRepeat(editor, { row: 5, col: 1, rowheader: true, distance: 10 }); }
+  {
+    SC.SetDragAutoRepeat(editor, { row: 5, col: 1, rowheader: true, distance: 10 });
+  }
   ar.repeatcallback = null;
 
   // null mouseinfo → clear timer
-  { SC.SetDragAutoRepeat(editor, null); }
+  {
+    SC.SetDragAutoRepeat(editor, null);
+  }
 
   teardownEditor(SC, editor);
 });
@@ -682,54 +824,76 @@ test("DragAutoRepeat: rowfooter, colheader, colfooter, all direction branches", 
     void coord;
     void dir;
   };
-  { SC.DragAutoRepeat(); }
+  {
+    SC.DragAutoRepeat();
+  }
 
   // colheader → direction "up" (line 6956)
   ar.mouseinfo = { rowheader: false, rowfooter: false, colheader: true, colfooter: false };
-  { SC.DragAutoRepeat(); }
+  {
+    SC.DragAutoRepeat();
+  }
 
   // colfooter → direction "down" (line 6958-6959)
   ar.mouseinfo = { rowheader: false, rowfooter: false, colheader: false, colfooter: true };
-  { SC.DragAutoRepeat(); }
+  {
+    SC.DragAutoRepeat();
+  }
 
   // direction "left" with cr.col > 1 → cr.col-- (line 6962-6963)
   ar.mouseinfo = { rowheader: true, rowfooter: false, colheader: false, colfooter: false };
   editor.ecell = { coord: "C1", row: 1, col: 3 };
-  { SC.DragAutoRepeat(); }
+  {
+    SC.DragAutoRepeat();
+  }
 
   // direction "left" with cr.col == 1 → no decrement (false branch of 6962)
   editor.ecell = { coord: "A1", row: 1, col: 1 };
-  { SC.DragAutoRepeat(); }
+  {
+    SC.DragAutoRepeat();
+  }
 
   // direction "right" → cr.col++ (line 6964-6965)
   ar.mouseinfo = { rowheader: false, rowfooter: true, colheader: false, colfooter: false };
   editor.ecell = { coord: "A1", row: 1, col: 1 };
-  { SC.DragAutoRepeat(); }
+  {
+    SC.DragAutoRepeat();
+  }
 
   // direction "up" with cr.row > 1 → cr.row-- (line 6966-6968)
   ar.mouseinfo = { rowheader: false, rowfooter: false, colheader: true, colfooter: false };
   editor.ecell = { coord: "A3", row: 3, col: 1 };
-  { SC.DragAutoRepeat(); }
+  {
+    SC.DragAutoRepeat();
+  }
 
   // direction "up" with cr.row == 1 → no decrement (false branch of 6966)
   editor.ecell = { coord: "A1", row: 1, col: 1 };
-  { SC.DragAutoRepeat(); }
+  {
+    SC.DragAutoRepeat();
+  }
 
   // direction "down" → cr.row++ (line 6968-6969)
   ar.mouseinfo = { rowheader: false, rowfooter: false, colheader: false, colfooter: true };
   editor.ecell = { coord: "A1", row: 1, col: 1 };
-  { SC.DragAutoRepeat(); }
+  {
+    SC.DragAutoRepeat();
+  }
 
   // No repeatcallback → MoveECellWithKey path (line 6973-6975)
   ar.repeatcallback = null;
   ar.mouseinfo = { rowheader: true, rowfooter: false, colheader: false, colfooter: false };
   editor.ecell = { coord: "B2", row: 2, col: 2 };
   editor.range = { hasrange: false };
-  { SC.DragAutoRepeat(); }
+  {
+    SC.DragAutoRepeat();
+  }
 
   // No repeatcallback, MoveECellWithKey returns null → no EditorMouseRange
   editor.MoveECellWithKey = () => null;
-  { SC.DragAutoRepeat(); }
+  {
+    SC.DragAutoRepeat();
+  }
 
   ar.repeatcallback = null;
   teardownEditor(SC, editor);
@@ -754,23 +918,33 @@ test("ProcessEditorDblClick: no-result, no-coord, input/default state", async ()
 
   // no mobj found (target not in registeredElements)
   const otherEl = document.createElement("div");
-  { SC.ProcessEditorDblClick(fakeEvent({ target: otherEl, srcElement: otherEl })); }
+  {
+    SC.ProcessEditorDblClick(fakeEvent({ target: otherEl, srcElement: otherEl }));
+  }
 
   // ignore=true → return
   mi.ignore = true;
-  { SC.ProcessEditorDblClick(fakeEvent({ target, srcElement: target })); }
+  {
+    SC.ProcessEditorDblClick(fakeEvent({ target, srcElement: target }));
+  }
   mi.ignore = false;
 
   // result with no coord → return (line 6999-7000)
-  { SC.ProcessEditorDblClick(fakeEvent({ target, srcElement: target, clientX: 5, clientY: 100 })); }
+  {
+    SC.ProcessEditorDblClick(fakeEvent({ target, srcElement: target, clientX: 5, clientY: 100 }));
+  }
 
   // state = "input" → break (line 7012)
   editor.state = "input";
-  { SC.ProcessEditorDblClick(fakeEvent({ target, srcElement: target, clientX: 100, clientY: 100 })); }
+  {
+    SC.ProcessEditorDblClick(fakeEvent({ target, srcElement: target, clientX: 100, clientY: 100 }));
+  }
 
   // default state (not start, not input) → default break
   editor.state = "other";
-  { SC.ProcessEditorDblClick(fakeEvent({ target, srcElement: target, clientX: 100, clientY: 100 })); }
+  {
+    SC.ProcessEditorDblClick(fakeEvent({ target, srcElement: target, clientX: 100, clientY: 100 }));
+  }
 
   teardownEditor(SC, editor);
 });
@@ -829,52 +1003,70 @@ test("EditorProcessKey: tab-shift, del-readonly, esc-no-range, f2-readonly, no-e
   editor.state = "start";
 
   // [tab] with shiftKey → [aleft] (line 7052)
-  { editor.EditorProcessKey("[tab]", { shiftKey: true }); }
+  {
+    editor.EditorProcessKey("[tab]", { shiftKey: true });
+  }
 
   // [tab] without shiftKey → [aright] (line 7052 false branch)
-  { editor.EditorProcessKey("[tab]", { shiftKey: false }); }
+  {
+    editor.EditorProcessKey("[tab]", { shiftKey: false });
+  }
 
   // [del] with noEdit → skip (line 7058)
   editor.state = "start";
   editor.noEdit = true;
-  { editor.EditorProcessKey("[del]", { shiftKey: false }); }
+  {
+    editor.EditorProcessKey("[del]", { shiftKey: false });
+  }
   editor.noEdit = false;
 
   // [del] with ECellReadonly → skip
   editor.ECellReadonly = () => true;
   editor.state = "start";
-  { editor.EditorProcessKey("[del]", { shiftKey: false }); }
+  {
+    editor.EditorProcessKey("[del]", { shiftKey: false });
+  }
   editor.ECellReadonly = () => false;
 
   // [esc] with no range → no RangeRemove (line 7064 false branch)
   editor.state = "start";
   editor.range = { hasrange: false };
-  { editor.EditorProcessKey("[esc]", { shiftKey: false }); }
+  {
+    editor.EditorProcessKey("[esc]", { shiftKey: false });
+  }
 
   // [f2] with noEdit → return true (line 7074-7075)
   editor.state = "start";
   editor.noEdit = true;
-  { editor.EditorProcessKey("[f2]", { shiftKey: false }); }
+  {
+    editor.EditorProcessKey("[f2]", { shiftKey: false });
+  }
   editor.noEdit = false;
 
   // [f2] with ECellReadonly → return true
   editor.ECellReadonly = () => true;
   editor.state = "start";
-  { editor.EditorProcessKey("[f2]", { shiftKey: false }); }
+  {
+    editor.EditorProcessKey("[f2]", { shiftKey: false });
+  }
   editor.ECellReadonly = () => false;
 
   // no ecell → return true (line 7087-7088)
   editor.state = "start";
   const savedEcell = editor.ecell;
   editor.ecell = null;
-  { editor.EditorProcessKey("x", { shiftKey: false }); }
+  {
+    editor.EditorProcessKey("x", { shiftKey: false });
+  }
   editor.ecell = savedEcell;
 
   // no inputBox → return true (line 7089-7090)
   editor.state = "start";
   const savedIB = editor.inputBox;
   editor.inputBox = null;
-  { editor.EditorProcessKey("x", { shiftKey: false }); }
+  {
+    editor.EditorProcessKey("x", { shiftKey: false });
+  }
   editor.inputBox = savedIB;
 
   // input state: [enter] → EditorSaveEdit + MoveECellWithKey (line 7131+)
@@ -883,38 +1075,52 @@ test("EditorProcessKey: tab-shift, del-readonly, esc-no-range, f2-readonly, no-e
   editor.inputBox.GetText = () => "hello";
   editor.inputBox.skipOne = false;
   editor.workingvalues = { ecoord: "A1", erow: 1, ecol: 1, partialexpr: "" };
-  { editor.EditorProcessKey("[enter]", { shiftKey: false }); }
+  {
+    editor.EditorProcessKey("[enter]", { shiftKey: false });
+  }
 
   // input state: [tab] with shiftKey → [aleft] (line 7139)
   editor.state = "input";
   editor.range = { hasrange: false };
   editor.inputBox.GetText = () => "hello";
   editor.workingvalues = { ecoord: "A1", erow: 1, ecol: 1, partialexpr: "" };
-  { editor.EditorProcessKey("[tab]", { shiftKey: true }); }
+  {
+    editor.EditorProcessKey("[tab]", { shiftKey: true });
+  }
 
   // input state: [tab] without shiftKey → [aright] (line 7140)
   editor.state = "input";
   editor.workingvalues = { ecoord: "A1", erow: 1, ecol: 1, partialexpr: "" };
-  { editor.EditorProcessKey("[tab]", { shiftKey: false }); }
+  {
+    editor.EditorProcessKey("[tab]", { shiftKey: false });
+  }
 
   // inputboxdirect state: [tab] with shiftKey → [aleft] (line 7187-7188)
   editor.state = "inputboxdirect";
   editor.range = { hasrange: false };
   editor.inputBox.GetText = () => "hello";
   editor.workingvalues = { ecoord: "A1", erow: 1, ecol: 1, partialexpr: "" };
-  { editor.EditorProcessKey("[tab]", { shiftKey: true }); }
+  {
+    editor.EditorProcessKey("[tab]", { shiftKey: true });
+  }
 
   // inputboxdirect: [enter] → [adown] + MoveECellWithKey
   editor.state = "inputboxdirect";
-  { editor.EditorProcessKey("[enter]", { shiftKey: false }); }
+  {
+    editor.EditorProcessKey("[enter]", { shiftKey: false });
+  }
 
   // inputboxdirect: [esc] → DisplayCellContents
   editor.state = "inputboxdirect";
-  { editor.EditorProcessKey("[esc]", { shiftKey: false }); }
+  {
+    editor.EditorProcessKey("[esc]", { shiftKey: false });
+  }
 
   // inputboxdirect: [f2] → state = "input"
   editor.state = "inputboxdirect";
-  { editor.EditorProcessKey("[f2]", { shiftKey: false }); }
+  {
+    editor.EditorProcessKey("[f2]", { shiftKey: false });
+  }
 
   teardownEditor(SC, editor);
 });
@@ -934,34 +1140,46 @@ test("EditorSaveEdit: text-type + ioEventTree/ioParameterList undefined", async 
 
   // text t type with value.charAt(0) == "'" (line 7264)
   editor.inputBox.GetText = () => "'hello";
-  { SC.EditorSaveEdit(editor); }
+  {
+    SC.EditorSaveEdit(editor);
+  }
 
   // ioEventTree undefined → return (line 7284-7285)
   sheetobj.ioEventTree = undefined;
   editor.inputBox.GetText = () => "newvalue";
-  { SC.EditorSaveEdit(editor); }
+  {
+    SC.EditorSaveEdit(editor);
+  }
 
   // ioParameterList undefined → return (line 7286-7287)
   sheetobj.ioEventTree = {};
   sheetobj.ioParameterList = undefined;
-  { SC.EditorSaveEdit(editor); }
+  {
+    SC.EditorSaveEdit(editor);
+  }
 
   // ioEventTree with a cell entry → EditedTriggerCell
   sheetobj.ioEventTree = { A1: { B1: {} } };
   sheetobj.ioParameterList = { B1: { function_name: "EMAILONEDIT" } };
   editor.deferredEmailCommands = [];
-  { SC.EditorSaveEdit(editor); }
+  {
+    SC.EditorSaveEdit(editor);
+  }
 
   // ioParameterList with undefined entry → continue
   sheetobj.ioEventTree = { A1: { B1: {} } };
   sheetobj.ioParameterList = {};
-  { SC.EditorSaveEdit(editor); }
+  {
+    SC.EditorSaveEdit(editor);
+  }
 
   // value == oldvalue → early return
   editor.inputBox.GetText = () => "";
   sheetobj.ioEventTree = undefined;
   sheetobj.ioParameterList = undefined;
-  { SC.EditorSaveEdit(editor, ""); }
+  {
+    SC.EditorSaveEdit(editor, "");
+  }
 
   teardownEditor(SC, editor);
 });
@@ -1195,19 +1413,27 @@ test("EnsureECellVisible: vertical + horizontal scroll branches", async () => {
 
   // ecell.row < firstscrollingrow → vamount negative (line 7615-7616)
   editor.ecell = { coord: "A1", row: 1, col: 5 };
-  { SC.EnsureECellVisible(editor); }
+  {
+    SC.EnsureECellVisible(editor);
+  }
 
   // ecell.row + 1 > lastvisiblerow → vamount positive (line 7617-7618)
   editor.ecell = { coord: "A6", row: 6, col: 5 };
-  { SC.EnsureECellVisible(editor); }
+  {
+    SC.EnsureECellVisible(editor);
+  }
 
   // ecell.col < firstscrollingcol → hamount negative (line 7622-7623)
   editor.ecell = { coord: "A5", row: 5, col: 1 };
-  { SC.EnsureECellVisible(editor); }
+  {
+    SC.EnsureECellVisible(editor);
+  }
 
   // ecell.col + 1 > lastvisiblecol → hamount positive (line 7624-7625)
   editor.ecell = { coord: "F5", row: 5, col: 6 };
-  { SC.EnsureECellVisible(editor); }
+  {
+    SC.EnsureECellVisible(editor);
+  }
 
   // vamount == 0 && hamount == 0 → ShowCellHandles (line 7631)
   editor.ecell = { coord: "C3", row: 3, col: 3 };
@@ -1219,7 +1445,9 @@ test("EnsureECellVisible: vertical + horizontal scroll branches", async () => {
   editor.cellhandles.ShowCellHandles = () => {
     handlesShown = true;
   };
-  { SC.EnsureECellVisible(editor); }
+  {
+    SC.EnsureECellVisible(editor);
+  }
   expect(handlesShown).toBe(true);
 
   teardownEditor(SC, editor);
@@ -1293,7 +1521,9 @@ test("SetECellHeaders: fullgrid-null, headercell-null, classnames/explicitStyles
   // fullgrid = null → i >= 0 check fails (line 7686 false branch)
   const savedGrid = editor.fullgrid;
   editor.fullgrid = null;
-  { SC.SetECellHeaders(editor, "selected"); }
+  {
+    SC.SetECellHeaders(editor, "selected");
+  }
   editor.fullgrid = savedGrid;
 
   // fullgrid with DOM structure but no matching headercell (line 7688 false)
@@ -1312,12 +1542,16 @@ test("SetECellHeaders: fullgrid-null, headercell-null, classnames/explicitStyles
   // No classnames, no explicitStyles → skip inner branches
   ctx.classnames = null;
   ctx.explicitStyles = null;
-  { SC.SetECellHeaders(editor, "selected"); }
+  {
+    SC.SetECellHeaders(editor, "selected");
+  }
 
   // With classnames and explicitStyles (lines 7689, 7691, 7707, 7709)
   ctx.classnames = { selectedrowname: "row-sel", selectedcolname: "col-sel" };
   ctx.explicitStyles = { selectedrowname: "color:red", selectedcolname: "color:blue" };
-  { SC.SetECellHeaders(editor, "selected"); }
+  {
+    SC.SetECellHeaders(editor, "selected");
+  }
   const rowHeader = rows[4].childNodes[0];
   const colHeader = rows[1].childNodes[2];
   expect(rowHeader).toBeInstanceOf(HTMLElement);
@@ -1339,7 +1573,9 @@ test("SetECellHeaders: fullgrid-null, headercell-null, classnames/explicitStyles
   editor.fullgrid = {
     childNodes: [null, { childNodes: emptyRows }],
   } as any;
-  { SC.SetECellHeaders(editor, "selected"); }
+  {
+    SC.SetECellHeaders(editor, "selected");
+  }
 
   editor.fullgrid = savedGrid;
   teardownEditor(SC, editor);
@@ -1439,16 +1675,22 @@ test("FitToEditTable: blank/auto colwidth + hidden col branches", async () => {
   ctx.pixelsPerRow = 20;
 
   // Normal colwidth (numeric)
-  { SC.FitToEditTable(editor); }
+  {
+    SC.FitToEditTable(editor);
+  }
 
   // colwidth = "blank" (line 7924)
   sheetobj.colattribs.width = { A: "blank" };
   sheetobj.attribs.defaultcolwidth = null;
-  { SC.FitToEditTable(editor); }
+  {
+    SC.FitToEditTable(editor);
+  }
 
   // colwidth = "auto" (line 7924)
   sheetobj.colattribs.width = { A: "auto" };
-  { SC.FitToEditTable(editor); }
+  {
+    SC.FitToEditTable(editor);
+  }
 
   // Hidden col in non-last pane (line 7922)
   sheetobj.colattribs.width = {};
@@ -1457,21 +1699,29 @@ test("FitToEditTable: blank/auto colwidth + hidden col branches", async () => {
     { first: 1, last: 3 },
     { first: 4, last: 10 },
   ];
-  { SC.FitToEditTable(editor); }
+  {
+    SC.FitToEditTable(editor);
+  }
 
   // Hidden col in last pane (line 7933)
   sheetobj.colattribs.hide = { D: "yes" };
-  { SC.FitToEditTable(editor); }
+  {
+    SC.FitToEditTable(editor);
+  }
 
   // blank/auto in last pane (line 7935)
   sheetobj.colattribs.hide = {};
   sheetobj.colattribs.width = { D: "auto" };
-  { SC.FitToEditTable(editor); }
+  {
+    SC.FitToEditTable(editor);
+  }
 
   // usermaxcol
   sheetobj.colattribs.width = {};
   sheetobj.attribs.usermaxcol = 5;
-  { SC.FitToEditTable(editor); }
+  {
+    SC.FitToEditTable(editor);
+  }
   delete sheetobj.attribs.usermaxcol;
 
   teardownEditor(SC, editor);
@@ -1524,21 +1774,27 @@ test("CalculateEditorPositions: break on position > table bounds", async () => {
   editor.colpositions = [];
 
   // rowpositions[i] > gridposition.top + tableheight → break (line 7972-7973)
-  { SC.CalculateEditorPositions(editor); }
+  {
+    SC.CalculateEditorPositions(editor);
+  }
   expect(editor.lastvisiblerow).toBe(8);
   expect(editor.lastvisiblecol).toBe(5);
 
   // colpositions[i] > gridposition.left + tablewidth → break (line 7981-7982)
   nextRows = [0, 50, 70];
   nextCols = [0, 80, 160, 240, 320, 400, 480, 560, 640, 720, 800];
-  { SC.CalculateEditorPositions(editor); }
+  {
+    SC.CalculateEditorPositions(editor);
+  }
   expect(editor.lastvisiblerow).toBe(2);
   expect(editor.lastvisiblecol).toBe(5);
 
   // No break (all positions within bounds)
   nextRows = [0, 50, 70, 90];
   nextCols = [0, 80, 160, 240];
-  { SC.CalculateEditorPositions(editor); }
+  {
+    SC.CalculateEditorPositions(editor);
+  }
   expect(editor.lastvisiblerow).toBe(3);
   expect(editor.lastvisiblecol).toBe(3);
 
@@ -1574,13 +1830,19 @@ test("CalculateRowPositions: trowobj-null + position-already-set branches", asyn
   editor.fullgrid = { lastChild: fakeTbody } as any;
 
   // trowobj null → continue (line 8055-8056)
-  { SC.CalculateRowPositions(editor, 0, [], []); }
+  {
+    SC.CalculateRowPositions(editor, 0, [], []);
+  }
 
   // position already set → skip (line 8058 false branch)
-  { SC.CalculateRowPositions(editor, 0, [0, 50, 70, 90], [0, 20, 20, 20]); }
+  {
+    SC.CalculateRowPositions(editor, 0, [0, 50, 70, 90], [0, 20, 20, 20]);
+  }
 
   // No positions set → set them (line 8058 true branch)
-  { SC.CalculateRowPositions(editor, 0, [], []); }
+  {
+    SC.CalculateRowPositions(editor, 0, [], []);
+  }
 
   teardownEditor(SC, editor);
 });
@@ -1613,10 +1875,14 @@ test("CalculateColPositions: position-already-set branch", async () => {
   SC.GetElementPosition = () => ({ left: 0, top: 0 });
 
   // position already set → skip (line 8081 false branch)
-  { SC.CalculateColPositions(editor, 0, [0, 30, 80, 160], [0, 30, 80, 80]); }
+  {
+    SC.CalculateColPositions(editor, 0, [0, 30, 80, 160], [0, 30, 80, 80]);
+  }
 
   // No positions set → set them (line 8081 true branch)
-  { SC.CalculateColPositions(editor, 0, [], []); }
+  {
+    SC.CalculateColPositions(editor, 0, [], []);
+  }
   SC.GetElementPosition = originalGetElementPosition;
 
   teardownEditor(SC, editor);
@@ -1642,24 +1908,36 @@ test("ScrollRelativeBoth: single-pane vlimit/hlimit + ecell branch", async () =>
 
   // vamount=1, hamount=0 → ScrollTableUpOneRow + ecell (line 8126-8132)
   editor.ecell = { coord: "A1", row: 1, col: 1 };
-  { SC.ScrollRelativeBoth(editor, 1, 0); }
+  {
+    SC.ScrollRelativeBoth(editor, 1, 0);
+  }
 
   // vamount=-1, hamount=0 → ScrollTableDownOneRow + ecell (line 8129-8132)
-  { SC.ScrollRelativeBoth(editor, -1, 0); }
+  {
+    SC.ScrollRelativeBoth(editor, -1, 0);
+  }
 
   // vamount=1, hamount=0, no ecell → skip SetECellHeaders (line 8132 false)
   editor.ecell = null;
-  { SC.ScrollRelativeBoth(editor, 1, 0); }
+  {
+    SC.ScrollRelativeBoth(editor, 1, 0);
+  }
   editor.ecell = { coord: "A1", row: 1, col: 1 };
 
   // vamount=0, hamount=1 → neither single-row path (line 8137)
-  { SC.ScrollRelativeBoth(editor, 0, 1); }
+  {
+    SC.ScrollRelativeBoth(editor, 0, 1);
+  }
 
   // vamount=2, hamount=2 → pane shift (line 8137-8145)
-  { SC.ScrollRelativeBoth(editor, 2, 2); }
+  {
+    SC.ScrollRelativeBoth(editor, 2, 2);
+  }
 
   // vamount=0, hamount=0 → no scroll
-  { SC.ScrollRelativeBoth(editor, 0, 0); }
+  {
+    SC.ScrollRelativeBoth(editor, 0, 0);
+  }
 
   teardownEditor(SC, editor);
 });
@@ -1680,11 +1958,15 @@ test("PageRelative: newfirst==lastpane.first, clamp branches", async () => {
 
   // direction > 0, newfirst == lastpane.first → newfirst += 1 (line 8157-8158)
   editor.lastvisiblerow = 3;
-  { SC.PageRelative(editor, true, 1); }
+  {
+    SC.PageRelative(editor, true, 1);
+  }
 
   // direction > 0, newfirst != lastpane.first
   editor.lastvisiblerow = 5;
-  { SC.PageRelative(editor, true, 1); }
+  {
+    SC.PageRelative(editor, true, 1);
+  }
 
   // direction < 0, vertical — newfirst >= current → newfirst = current - 1 (line 8173-8174)
   editor.lastvisiblerow = 3;
@@ -1692,7 +1974,9 @@ test("PageRelative: newfirst==lastpane.first, clamp branches", async () => {
   editor.gridposition = { left: 0, top: 0 };
   editor.tableheight = 200;
   editor.rowheight = [0, 20, 20, 20, 20, 20, 20, 20];
-  { SC.PageRelative(editor, true, -1); }
+  {
+    SC.PageRelative(editor, true, -1);
+  }
 
   // direction < 0, horizontal
   editor.lastvisiblecol = 3;
@@ -1700,14 +1984,18 @@ test("PageRelative: newfirst==lastpane.first, clamp branches", async () => {
   editor.gridposition = { left: 0, top: 0 };
   editor.tablewidth = 400;
   editor.colwidth = [0, 80, 80, 80, 80, 80, 80, 80];
-  { SC.PageRelative(editor, false, -1); }
+  {
+    SC.PageRelative(editor, false, -1);
+  }
 
   // direction < 0, newfirst < 1 → newfirst = 1 (line 8175-8176)
   editor.lastvisiblerow = 1;
   editor.firstscrollingrowtop = 0;
   editor.tableheight = 50;
   editor.rowheight = [0, 20, 20];
-  { SC.PageRelative(editor, true, -1); }
+  {
+    SC.PageRelative(editor, true, -1);
+  }
 
   teardownEditor(SC, editor);
 });
@@ -1749,7 +2037,9 @@ test("LimitLastPanes: multi-pane overlap + usermax branches", async () => {
   // Single pane → no overlap (false branch of 8188)
   ctx.rowpanes = [{ first: 1, last: 5 }];
   ctx.colpanes = [{ first: 1, last: 5 }];
-  { SC.LimitLastPanes(editor); }
+  {
+    SC.LimitLastPanes(editor);
+  }
 
   // Multi-pane with overlap (line 8188 true)
   ctx.rowpanes = [
@@ -1760,7 +2050,9 @@ test("LimitLastPanes: multi-pane overlap + usermax branches", async () => {
     { first: 1, last: 3 },
     { first: 2, last: 5 },
   ];
-  { SC.LimitLastPanes(editor); }
+  {
+    SC.LimitLastPanes(editor);
+  }
 
   // Multi-pane no overlap (false branch of 8188)
   ctx.rowpanes = [
@@ -1771,7 +2063,9 @@ test("LimitLastPanes: multi-pane overlap + usermax branches", async () => {
     { first: 1, last: 3 },
     { first: 5, last: 10 },
   ];
-  { SC.LimitLastPanes(editor); }
+  {
+    SC.LimitLastPanes(editor);
+  }
 
   // usermaxrow (line 8190-8191)
   ctx.rowpanes = [
@@ -1779,7 +2073,9 @@ test("LimitLastPanes: multi-pane overlap + usermax branches", async () => {
     { first: 5, last: 10 },
   ];
   sheetobj.attribs.usermaxrow = 7;
-  { SC.LimitLastPanes(editor); }
+  {
+    SC.LimitLastPanes(editor);
+  }
   delete sheetobj.attribs.usermaxrow;
 
   // usermaxcol (line 8195-8196)
@@ -1788,7 +2084,9 @@ test("LimitLastPanes: multi-pane overlap + usermax branches", async () => {
     { first: 5, last: 10 },
   ];
   sheetobj.attribs.usermaxcol = 7;
-  { SC.LimitLastPanes(editor); }
+  {
+    SC.LimitLastPanes(editor);
+  }
   delete sheetobj.attribs.usermaxcol;
 
   teardownEditor(SC, editor);
@@ -1830,37 +2128,51 @@ test("ScrollTableUpOneRow: cellskip, rowspan, showRCHeaders=false, usermaxrow", 
 
   // showRCHeaders = false → toprow = 1 (line 8206)
   ctx.showRCHeaders = false;
-  { SC.ScrollTableUpOneRow(editor); }
+  {
+    SC.ScrollTableUpOneRow(editor);
+  }
 
   // showRCHeaders = true → toprow = 2 (line 8206 true branch)
   ctx.showRCHeaders = true;
-  { SC.ScrollTableUpOneRow(editor); }
+  {
+    SC.ScrollTableUpOneRow(editor);
+  }
 
   // usermaxrow boundary (line 8210-8211)
   sheetobj.attribs.usermaxrow = ctx.rowpanes[0].first;
-  { SC.ScrollTableUpOneRow(editor); }
+  {
+    SC.ScrollTableUpOneRow(editor);
+  }
   delete sheetobj.attribs.usermaxrow;
 
   // cellskip continue (line 8227-8228)
   ctx.rowpanes = [{ first: 2, last: 5 }];
   ctx.cellskip = { A2: "B2" };
-  { SC.ScrollTableUpOneRow(editor); }
+  {
+    SC.ScrollTableUpOneRow(editor);
+  }
   ctx.cellskip = {};
 
   // rowspan > 1 → maxrowspan loop (line 8234-8237)
   ctx.rowpanes = [{ first: 2, last: 5 }];
   sheetobj.cells["A1"] = { rowspan: 2 };
-  { SC.ScrollTableUpOneRow(editor); }
+  {
+    SC.ScrollTableUpOneRow(editor);
+  }
 
   // rowspan break (line 8236-8237: rownum + oldrownum >= last)
   ctx.rowpanes = [{ first: 2, last: 3 }];
   sheetobj.cells["A1"] = { rowspan: 5 };
-  { SC.ScrollTableUpOneRow(editor); }
+  {
+    SC.ScrollTableUpOneRow(editor);
+  }
 
   // usermaxrow: last == usermaxrow → no RenderRow (line 8218 false branch)
   ctx.rowpanes = [{ first: 2, last: 5 }];
   sheetobj.attribs.usermaxrow = 5;
-  { SC.ScrollTableUpOneRow(editor); }
+  {
+    SC.ScrollTableUpOneRow(editor);
+  }
   delete sheetobj.attribs.usermaxrow;
 
   teardownEditor(SC, editor);
@@ -1882,23 +2194,33 @@ test("EditorMouseRange: input state with coord + no-partialexpr", async () => {
   editor.workingvalues = { partialexpr: "" };
 
   // input state, partialexpr = "" → else branch (Blur/ShowInputBox/EditorSaveEdit)
-  { SC.EditorMouseRange(editor, "B2"); }
+  {
+    SC.EditorMouseRange(editor, "B2");
+  }
 
   // input state, partialexpr = "=SUM(", coord = "B2", hasrange = true (line 6559 true, 6560 true)
   editor.workingvalues = { partialexpr: "=SUM(" };
   editor.range = { hasrange: true, left: 1, right: 2, top: 1, bottom: 2 };
-  { SC.EditorMouseRange(editor, "B2"); }
+  {
+    SC.EditorMouseRange(editor, "B2");
+  }
 
   // input state, partialexpr = "=SUM(", coord = "B2", hasrange = false (line 6560 false)
   editor.range = { hasrange: false };
-  { SC.EditorMouseRange(editor, "B2"); }
+  {
+    SC.EditorMouseRange(editor, "B2");
+  }
 
   // input state, partialexpr = "=SUM(", coord = null (line 6559 false)
-  { SC.EditorMouseRange(editor, ""); }
+  {
+    SC.EditorMouseRange(editor, "");
+  }
 
   // inputboxdirect state
   editor.state = "inputboxdirect";
-  { SC.EditorMouseRange(editor, "B2"); }
+  {
+    SC.EditorMouseRange(editor, "B2");
+  }
 
   teardownEditor(SC, editor);
 });
@@ -2012,12 +2334,16 @@ test("ctrlkeyFunction: recalcFunction + ctrl-c/ctrl-v/ctrl-s branches", async ()
   const editor = control.editor;
 
   // recalcFunction branch (line 5606): call it
-  { editor.recalcFunction(editor); }
+  {
+    editor.recalcFunction(editor);
+  }
   // false branch by nulling RecalcSheet
   const sheetobj = editor.context.sheetobj;
   const savedRecalc = sheetobj.RecalcSheet;
   sheetobj.RecalcSheet = undefined;
-  { editor.recalcFunction(editor); }
+  {
+    editor.recalcFunction(editor);
+  }
   sheetobj.RecalcSheet = savedRecalc;
 
   // ctrl-c: cell exists branch (line 5657)
@@ -2025,7 +2351,9 @@ test("ctrlkeyFunction: recalcFunction + ctrl-c/ctrl-v/ctrl-s branches", async ()
   editor.range = editor.range || { hasrange: false };
   editor.pasteTextarea = editor.pasteTextarea || { style: {}, value: "", focus() {}, select() {} };
 
-  { editor.ctrlkeyFunction(editor, "[ctrl-c]"); }
+  {
+    editor.ctrlkeyFunction(editor, "[ctrl-c]");
+  }
 
   // Ctrl-V: clipboard comparison branch (line 5677)
   editor.pastescclipboard = false;
@@ -2033,9 +2361,13 @@ test("ctrlkeyFunction: recalcFunction + ctrl-c/ctrl-v/ctrl-s branches", async ()
   if (SC.Clipboard) {
     SC.Clipboard.clipboard = "test_clipboard_data";
   }
-  { editor.ctrlkeyFunction(editor, "[ctrl-v]"); }
+  {
+    editor.ctrlkeyFunction(editor, "[ctrl-v]");
+  }
   editor.pastescclipboard = true;
-  { editor.ctrlkeyFunction(editor, "[ctrl-v]"); }
+  {
+    editor.ctrlkeyFunction(editor, "[ctrl-v]");
+  }
   editor.pastescclipboard = false;
 
   // Ctrl-S: ntvf branch (line 5709) — cell with nontextvalueformat
@@ -2056,10 +2388,14 @@ test("ctrlkeyFunction: recalcFunction + ctrl-c/ctrl-v/ctrl-s branches", async ()
 
   (globalThis as any).prompt = (_m: string, _d: string) => "General";
   (globalThis as any).setTimeout = captureST;
-  { editor.ctrlkeyFunction(editor, "[ctrl-s]"); }
+  {
+    editor.ctrlkeyFunction(editor, "[ctrl-s]");
+  }
   (globalThis as any).setTimeout = origST;
   if (captured) {
-    { (captured as (...args: any[]) => void)(); }
+    {
+      (captured as (...args: any[]) => void)();
+    }
   }
 
   // Ctrl-S with edit: prefix — CtrlSEditor branch (line 5718)
@@ -2069,10 +2405,14 @@ test("ctrlkeyFunction: recalcFunction + ctrl-c/ctrl-v/ctrl-s branches", async ()
   (globalThis as any).prompt = (_m: string, _d: string) => "edit:foo";
   captured = null;
   (globalThis as any).setTimeout = captureST;
-  { editor.ctrlkeyFunction(editor, "[ctrl-s]"); }
+  {
+    editor.ctrlkeyFunction(editor, "[ctrl-s]");
+  }
   (globalThis as any).setTimeout = origST;
   if (captured) {
-    { (captured as (...args: any[]) => void)(); }
+    {
+      (captured as (...args: any[]) => void)();
+    }
   }
   delete SC.CtrlSEditor;
 
@@ -2080,20 +2420,28 @@ test("ctrlkeyFunction: recalcFunction + ctrl-c/ctrl-v/ctrl-s branches", async ()
   (globalThis as any).prompt = (_m: string, _d: string) => "cmd:recalc";
   captured = null;
   (globalThis as any).setTimeout = captureST;
-  { editor.ctrlkeyFunction(editor, "[ctrl-s]"); }
+  {
+    editor.ctrlkeyFunction(editor, "[ctrl-s]");
+  }
   (globalThis as any).setTimeout = origST;
   if (captured) {
-    { (captured as (...args: any[]) => void)(); }
+    {
+      (captured as (...args: any[]) => void)();
+    }
   }
 
   // Ctrl-S with null prompt
   (globalThis as any).prompt = (_m: string, _d: string) => null;
   captured = null;
   (globalThis as any).setTimeout = captureST;
-  { editor.ctrlkeyFunction(editor, "[ctrl-s]"); }
+  {
+    editor.ctrlkeyFunction(editor, "[ctrl-s]");
+  }
   (globalThis as any).setTimeout = origST;
   if (captured) {
-    { (captured as (...args: any[]) => void)(); }
+    {
+      (captured as (...args: any[]) => void)();
+    }
   }
 
   (globalThis as any).prompt = savedPrompt;
@@ -2127,7 +2475,9 @@ test("mouse handlers: e||window.event + target||srcElement fallback branches", a
 
   // ProcessEditorMouseDown with e=null → window.event branch (line 6474)
   (globalThis as any).event = fakeEvent({ clientX: 100, clientY: 100, target });
-  { SC.ProcessEditorMouseDown(null); }
+  {
+    SC.ProcessEditorMouseDown(null);
+  }
 
   // ProcessEditorMouseDown with target=null, srcElement set (line 6476)
   (globalThis as any).event = fakeEvent({
@@ -2136,19 +2486,25 @@ test("mouse handlers: e||window.event + target||srcElement fallback branches", a
     target: null,
     srcElement: target,
   });
-  { SC.ProcessEditorMouseDown(null); }
+  {
+    SC.ProcessEditorMouseDown(null);
+  }
 
   // ProcessEditorMouseMove with e=null → window.event branch (line 6587)
   mi.mouselastcoord = "A1";
   (globalThis as any).event = fakeEvent({ clientX: 100, clientY: 100, target });
-  { SC.ProcessEditorMouseMove(null); }
+  {
+    SC.ProcessEditorMouseMove(null);
+  }
 
   // ProcessEditorMouseUp with e=null → window.event branch (line 6622)
   mi.mousedowncoord = "A1";
   editor.range = { hasrange: false };
   editor.ecell = { coord: "A1", row: 1, col: 1 };
   (globalThis as any).event = fakeEvent({ clientX: 100, clientY: 100, target });
-  { SC.ProcessEditorMouseUp(null); }
+  {
+    SC.ProcessEditorMouseUp(null);
+  }
 
   // ProcessEditorColsizeMouseMove with e=null → window.event branch (line 6653)
   mi.mouseresizecolnum = 2;
@@ -2157,14 +2513,18 @@ test("mouse handlers: e||window.event + target||srcElement fallback branches", a
   mi.mouseresizedisplay = document.createElement("div");
   editor.context.colwidth = [0, 80, 80, 80, 80];
   (globalThis as any).event = fakeEvent({ clientX: 60, target });
-  { SC.ProcessEditorColsizeMouseMove(null); }
+  {
+    SC.ProcessEditorColsizeMouseMove(null);
+  }
 
   // ProcessEditorColsizeMouseUp with e=null → window.event branch (line 6680)
   mi.mouseresizecolnum = 2;
   mi.mouseresizecol = "B";
   editor.timeout = null;
   (globalThis as any).event = fakeEvent({ clientX: 60, target });
-  { SC.ProcessEditorColsizeMouseUp(null); }
+  {
+    SC.ProcessEditorColsizeMouseUp(null);
+  }
 
   // ProcessEditorRowsizeMouseMove with e=null → window.event branch (line 6732)
   mi.mouseresizerownum = 2;
@@ -2173,18 +2533,24 @@ test("mouse handlers: e||window.event + target||srcElement fallback branches", a
   mi.mouseresizedisplay = document.createElement("div");
   editor.context.rowheight = [0, 30, 20, 20, 20];
   (globalThis as any).event = fakeEvent({ clientY: 60, target });
-  { SC.ProcessEditorRowsizeMouseMove(null); }
+  {
+    SC.ProcessEditorRowsizeMouseMove(null);
+  }
 
   // ProcessEditorRowsizeMouseUp with e=null → window.event branch (line 6838)
   mi.mouseresizerownum = 2;
   mi.mouserowtounhide = null;
   editor.timeout = null;
   (globalThis as any).event = fakeEvent({ clientY: 60, target });
-  { SC.ProcessEditorRowsizeMouseUp(null); }
+  {
+    SC.ProcessEditorRowsizeMouseUp(null);
+  }
 
   // ProcessEditorDblClick with e=null → window.event branch (line 6981)
   (globalThis as any).event = fakeEvent({ clientX: 100, clientY: 100, target });
-  { SC.ProcessEditorDblClick(null); }
+  {
+    SC.ProcessEditorDblClick(null);
+  }
 
   // ProcessEditorDblClick with target=null, srcElement set (line 6983)
   (globalThis as any).event = fakeEvent({
@@ -2193,7 +2559,9 @@ test("mouse handlers: e||window.event + target||srcElement fallback branches", a
     target: null,
     srcElement: target,
   });
-  { SC.ProcessEditorDblClick(null); }
+  {
+    SC.ProcessEditorDblClick(null);
+  }
 
   (globalThis as any).event = savedWindowEvent;
   teardownEditor(SC, editor);
@@ -2209,16 +2577,26 @@ test("EditorSheetStatusCallback: calcserverfunc and other switch cases", async (
   const editor = control.editor;
 
   // These switch cases should call GetStatuslineString
-  { SC.EditorSheetStatusCallback(
-    null,
-    "calcserverfunc",
-    { count: 1, total: 5, funcname: "SUM", coord: "A1" },
-    editor,
-  ); }
-  { SC.EditorSheetStatusCallback(null, "calcorder", { count: 1, total: 5 }, editor); }
-  { SC.EditorSheetStatusCallback(null, "calcstep", { count: 1, total: 5 }, editor); }
-  { SC.EditorSheetStatusCallback(null, "calcloading", { sheetname: "Sheet1" }, editor); }
-  { SC.EditorSheetStatusCallback(null, "confirmemailsent", "test", editor); }
+  {
+    SC.EditorSheetStatusCallback(
+      null,
+      "calcserverfunc",
+      { count: 1, total: 5, funcname: "SUM", coord: "A1" },
+      editor,
+    );
+  }
+  {
+    SC.EditorSheetStatusCallback(null, "calcorder", { count: 1, total: 5 }, editor);
+  }
+  {
+    SC.EditorSheetStatusCallback(null, "calcstep", { count: 1, total: 5 }, editor);
+  }
+  {
+    SC.EditorSheetStatusCallback(null, "calcloading", { sheetname: "Sheet1" }, editor);
+  }
+  {
+    SC.EditorSheetStatusCallback(null, "confirmemailsent", "test", editor);
+  }
 
   teardownEditor(SC, editor);
 });
@@ -2261,13 +2639,17 @@ test("EditorSheetStatusCallback: hiddencolrow branches with ecell null", async (
   sheetobj.hiddencolrow = "col";
   sheetobj.colattribs.hide = sheetobj.colattribs.hide || {};
   editor.ecell = null;
-  { SC.EditorSheetStatusCallback(null, "cmdend", null, editor); }
+  {
+    SC.EditorSheetStatusCallback(null, "cmdend", null, editor);
+  }
 
   // hiddencolrow == "row" with ecell null (line 6228 false branch)
   sheetobj.hiddencolrow = "row";
   sheetobj.rowattribs.hide = sheetobj.rowattribs.hide || {};
   editor.ecell = null;
-  { SC.EditorSheetStatusCallback(null, "cmdend", null, editor); }
+  {
+    SC.EditorSheetStatusCallback(null, "cmdend", null, editor);
+  }
 
   sheetobj.hiddencolrow = "";
   teardownEditor(SC, editor);
@@ -2296,36 +2678,52 @@ test("colsize/rowsize/colselect/rowselect MouseDown: e||window.event branches", 
 
   // ProcessEditorColsizeMouseDown(e=null, ele, result) → line 6653
   (globalThis as any).event = fakeEvt;
-  { SC.ProcessEditorColsizeMouseDown(null, target, { coltoresize: 2 }); }
+  {
+    SC.ProcessEditorColsizeMouseDown(null, target, { coltoresize: 2 });
+  }
 
   // ProcessEditorRowselectMouseDown(e=null, ele, result) → line 6732
   (globalThis as any).event = fakeEvt;
-  { SC.ProcessEditorRowselectMouseDown(null, target, { row: 2 }); }
+  {
+    SC.ProcessEditorRowselectMouseDown(null, target, { row: 2 });
+  }
 
   // ProcessEditorRowselectMouseMove(e=null) → line 6745
   (globalThis as any).event = fakeEvt;
   mi.mouselastcoord = "A1";
-  { SC.ProcessEditorRowselectMouseMove(null); }
+  {
+    SC.ProcessEditorRowselectMouseMove(null);
+  }
 
   // ProcessEditorRowselectMouseUp(e=null) → line 6762
   (globalThis as any).event = fakeEvt;
-  { SC.ProcessEditorRowselectMouseUp(null); }
+  {
+    SC.ProcessEditorRowselectMouseUp(null);
+  }
 
   // ProcessEditorColselectMouseDown(e=null, ele, result) → line 6770
   (globalThis as any).event = fakeEvt;
-  { SC.ProcessEditorColselectMouseDown(null, target, { col: 2 }); }
+  {
+    SC.ProcessEditorColselectMouseDown(null, target, { col: 2 });
+  }
 
   // ProcessEditorColselectMouseMove(e=null) → line 6784
   (globalThis as any).event = fakeEvt;
-  { SC.ProcessEditorColselectMouseMove(null); }
+  {
+    SC.ProcessEditorColselectMouseMove(null);
+  }
 
   // ProcessEditorColselectMouseUp(e=null) → line 6801
   (globalThis as any).event = fakeEvt;
-  { SC.ProcessEditorColselectMouseUp(null); }
+  {
+    SC.ProcessEditorColselectMouseUp(null);
+  }
 
   // ProcessEditorRowsizeMouseDown(e=null, ele, result) → line 6810
   (globalThis as any).event = fakeEvt;
-  { SC.ProcessEditorRowsizeMouseDown(null, target, { rowtoresize: 2 }); }
+  {
+    SC.ProcessEditorRowsizeMouseDown(null, target, { rowtoresize: 2 });
+  }
 
   // ProcessEditorRowsizeMouseMove(e=null) → line 6838
   (globalThis as any).event = fakeEvent({ clientY: 60, target });
@@ -2334,7 +2732,9 @@ test("colsize/rowsize/colselect/rowselect MouseDown: e||window.event branches", 
   mi.mousedownclienty = 50;
   mi.mouseresizedisplay = document.createElement("div");
   editor.context.rowheight = [0, 30, 20, 20, 20];
-  { SC.ProcessEditorRowsizeMouseMove(null); }
+  {
+    SC.ProcessEditorRowsizeMouseMove(null);
+  }
 
   (globalThis as any).event = savedWindowEvent;
   teardownEditor(SC, editor);

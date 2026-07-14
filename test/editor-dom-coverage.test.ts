@@ -800,8 +800,17 @@ test("TCPSDragFunctionMove: hidden row/col skip loops advance trackingline", asy
   // Move completes without throwing.
   const vPos = document.createElement("div");
   const hPos = document.createElement("div");
-  const dobj: any = { vertical: true, functionobj: { control: vctrl, positionobj: vPos }, element: null };
-  const dobjH: any = { vertical: false, horizontal: true, functionobj: { control: hctrl, positionobj: hPos }, element: null };
+  const dobj: any = {
+    vertical: true,
+    functionobj: { control: vctrl, positionobj: vPos },
+    element: null,
+  };
+  const dobjH: any = {
+    vertical: false,
+    horizontal: true,
+    functionobj: { control: hctrl, positionobj: hPos },
+    element: null,
+  };
   const draginfo: any = {
     clientX: 70,
     clientY: 40,
@@ -1455,7 +1464,6 @@ test("ProcessKeyPress: Safari controlKeysSafari via metaKey (14145)", async () =
   expect(rc).toBe(false);
 });
 
-
 // -------------------------------------------------------------------
 // 25) TCTDragFunctionStart: draginfo.thumbstatus pre-existing with
 //     rowmsgele / rowpreviewele null → editor.toplevel.removeChild
@@ -1569,7 +1577,6 @@ test("ctrlkeyFunction [ctrl-v]: range + single-cell-clipsheet (7995-7996)", asyn
   // Single-cell clipboard (copiedfrom A1:A1) pasted to range B1:D3.
   expect(scheduledCmd).toBe("paste B1:D3 formulas");
 });
-
 
 test("ctrlkeyFunction [ctrl-v]: timer callback reads value, blurs, hides, and schedules paste", async () => {
   const SC = await loadSocialCalc({ browser: true });
@@ -1899,8 +1906,12 @@ test("ProcessEditorMouseDown: colheader dispatch reaches trailing return (9064)"
   const origSel = SC.ProcessEditorColselectMouseDown;
   let colsizeCalled = false;
   let colselCalled = false;
-  SC.ProcessEditorColsizeMouseDown = function () { colsizeCalled = true; };
-  SC.ProcessEditorColselectMouseDown = function () { colselCalled = true; };
+  SC.ProcessEditorColsizeMouseDown = function () {
+    colsizeCalled = true;
+  };
+  SC.ProcessEditorColselectMouseDown = function () {
+    colselCalled = true;
+  };
 
   // Stub GridMousePosition to deterministically return a colheader hit.
   const origGMP = SC.GridMousePosition;

@@ -1,11 +1,6 @@
 import { expect, test } from "vite-plus/test";
 
-import {
-  loadSocialCalc,
-  makeSave,
-  recalcSheet,
-  scheduleCommands,
-} from "./helpers/socialcalc";
+import { loadSocialCalc, makeSave, recalcSheet, scheduleCommands } from "./helpers/socialcalc";
 import { installUiShim } from "./helpers/ui";
 
 // ── Narrow types for the SC bundle surface ──────────────────────────────

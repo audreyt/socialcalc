@@ -117,10 +117,7 @@ test("lastcol clamps to 1 while usermaxcol clamps to 0 for same input of 0", asy
   const SC = (await loadSocialCalc()) as unknown as SCCore;
   const sheet = new SC.Sheet() as unknown as SheetLike;
 
-  await scheduleCommands(SC, sheet, [
-    "set sheet lastcol 0",
-    "set sheet usermaxcol 0",
-  ]);
+  await scheduleCommands(SC, sheet, ["set sheet lastcol 0", "set sheet usermaxcol 0"]);
   expect(sheet.attribs.lastcol).toBe(1);
   expect(sheet.attribs.usermaxcol).toBe(0);
 });
@@ -213,10 +210,7 @@ test("RenderCell comment showGrid=true: className set to commentClassName exactl
   const SC = (await loadSocialCalc({ browser: true })) as unknown as SCCore;
   const sheet = new SC.Sheet() as unknown as SheetLike;
 
-  await scheduleCommands(SC, sheet, [
-    "set A1 value n 1",
-    "set A1 comment text hello",
-  ]);
+  await scheduleCommands(SC, sheet, ["set A1 value n 1", "set A1 comment text hello"]);
 
   const context = new SC.RenderContext(sheet) as unknown as {
     showGrid: boolean;
@@ -248,10 +242,7 @@ test("RenderCell comment showGrid=false: className set to commentNoGridClassName
   const SC = (await loadSocialCalc({ browser: true })) as unknown as SCCore;
   const sheet = new SC.Sheet() as unknown as SheetLike;
 
-  await scheduleCommands(SC, sheet, [
-    "set A1 value n 1",
-    "set A1 comment text world",
-  ]);
+  await scheduleCommands(SC, sheet, ["set A1 value n 1", "set A1 comment text world"]);
 
   const context = new SC.RenderContext(sheet) as unknown as {
     showGrid: boolean;

@@ -30,21 +30,15 @@ describe("trusted (legacy) mode is unaffected by the opt-in policy", () => {
   test("text-html still passes raw markup through unchanged", async () => {
     const SC = await loadSocialCalc();
     expect(
-      SC.format_text_for_display(
-        '<img src=x onerror="alert(1)">',
-        "th",
-        "text-html",
-        null,
-        "",
-      ),
+      SC.format_text_for_display('<img src=x onerror="alert(1)">', "th", "text-html", null, ""),
     ).toBe('<img src=x onerror="alert(1)">');
   });
 
   test("text-url still emits javascript: hrefs unescaped", async () => {
     const SC = await loadSocialCalc();
-    expect(
-      SC.format_text_for_display("javascript:alert(1)", "t", "text-url", null, ""),
-    ).toBe('<a href="javascript:alert(1)">javascript:alert(1)</a>');
+    expect(SC.format_text_for_display("javascript:alert(1)", "t", "text-url", null, "")).toBe(
+      '<a href="javascript:alert(1)">javascript:alert(1)</a>',
+    );
   });
 
   test("text-image still emits data: srcs unescaped", async () => {
@@ -56,26 +50,19 @@ describe("trusted (legacy) mode is unaffected by the opt-in policy", () => {
       null,
       "",
     );
-    expect(out).toBe(
-      '<img src="data:image/svg+xml,%3Csvg%20onload=alert(1)%3E">',
-    );
+    expect(out).toBe('<img src="data:image/svg+xml,%3Csvg%20onload=alert(1)%3E">');
   });
 
   test("text-custom @r still substitutes raw, unescaped text", async () => {
     const SC = await loadSocialCalc();
-    expect(
-      SC.format_text_for_display("<b>hi</b>", "t", "text-custom:@r", null, ""),
-    ).toBe("<b>hi</b>");
+    expect(SC.format_text_for_display("<b>hi</b>", "t", "text-custom:@r", null, "")).toBe(
+      "<b>hi</b>",
+    );
   });
 
   test("expand_text_link still emits javascript: hrefs unescaped", async () => {
     const SC = await loadSocialCalc();
-    const html = SC.expand_text_link(
-      "javascript:alert(1)",
-      new SC.Sheet(),
-      null,
-      "text-link",
-    );
+    const html = SC.expand_text_link("javascript:alert(1)", new SC.Sheet(), null, "text-link");
     expect(html).toBe('<a href="javascript:alert(1)" target="_blank">javascript:alert(1)</a>');
   });
 });
@@ -133,13 +120,7 @@ describe("untrusted mode: raw HTML and text-custom @r", () => {
       allowedUrlSchemes: ["http:", "https:"],
       allowedDataMimeTypes: [],
     };
-    const out = SC.format_text_for_display(
-      "<script>x</script>",
-      "t",
-      "text-custom:@r",
-      null,
-      "",
-    );
+    const out = SC.format_text_for_display("<script>x</script>", "t", "text-custom:@r", null, "");
     expect(out).toBe("<b>safe</b>");
   });
 });
@@ -151,12 +132,12 @@ describe("untrusted mode: URL and image scheme allowlist", () => {
   test("text-url allows http/https/mailto by default", async () => {
     const SC = await loadSocialCalc();
     SC.Callbacks.untrustedContent = true;
-    expect(
-      SC.format_text_for_display("https://example.com", "t", "text-url", null, ""),
-    ).toBe('<a href="https://example.com">https://example.com</a>');
-    expect(
-      SC.format_text_for_display("mailto:a@example.com", "t", "text-url", null, ""),
-    ).toBe('<a href="mailto:a@example.com">mailto:a@example.com</a>');
+    expect(SC.format_text_for_display("https://example.com", "t", "text-url", null, "")).toBe(
+      '<a href="https://example.com">https://example.com</a>',
+    );
+    expect(SC.format_text_for_display("mailto:a@example.com", "t", "text-url", null, "")).toBe(
+      '<a href="mailto:a@example.com">mailto:a@example.com</a>',
+    );
   });
 
   test("text-url rejects javascript: and falls back to inert escaped text", async () => {
@@ -228,13 +209,7 @@ describe("untrusted mode: URL and image scheme allowlist", () => {
       allowedDataMimeTypes: ["image/png"],
     };
     expect(
-      SC.format_text_for_display(
-        "data:image/png;base64,AAAA",
-        "t",
-        "text-image",
-        null,
-        "",
-      ),
+      SC.format_text_for_display("data:image/png;base64,AAAA", "t", "text-image", null, ""),
     ).toBe('<img src="data:image/png;base64,AAAA">');
     // Still rejects mime types not on the explicit allowlist.
     const svgOut = SC.format_text_for_display(
@@ -262,9 +237,7 @@ describe("untrusted mode: URL and image scheme allowlist", () => {
     // data too (a valueformat: entry), so with no host sanitizer it is
     // escaped exactly like the rejected @u value - the whole thing is
     // rendered as inert text, not a live anchor with an empty href.
-    expect(out).toBe(
-      '&lt;a href=&quot;&quot;&gt;javascript:alert(1)&lt;/a&gt;',
-    );
+    expect(out).toBe("&lt;a href=&quot;&quot;&gt;javascript:alert(1)&lt;/a&gt;");
     expect(out).not.toContain("<a ");
   });
 
@@ -280,9 +253,7 @@ describe("untrusted mode: URL and image scheme allowlist", () => {
     );
     // Template markup is escaped without a sanitizer; only the
     // placeholder VALUES (@u, @s) keep their untrusted-mode semantics.
-    expect(out).toBe(
-      '&lt;a href=&quot;https://example.com&quot;&gt;https://example.com&lt;/a&gt;',
-    );
+    expect(out).toBe("&lt;a href=&quot;https://example.com&quot;&gt;https://example.com&lt;/a&gt;");
     expect(out).not.toContain("<a ");
   });
 
@@ -306,7 +277,7 @@ describe("untrusted mode: URL and image scheme allowlist", () => {
     // final cleanup), then the FULL result (template + values) is handed
     // to sanitizeHtml in one pass.
     expect(out).toBe('<a href="alert(1)">alert(1)</a>');
-    expect(out).not.toContain("javascript:alert(1)\">");
+    expect(out).not.toContain('javascript:alert(1)">');
   });
 
   test("expand_text_link rejects javascript: and returns inert text (no anchor)", async () => {
@@ -326,12 +297,7 @@ describe("untrusted mode: URL and image scheme allowlist", () => {
   test("expand_text_link allows a plain http(s) link in untrusted mode", async () => {
     const SC = await loadSocialCalc();
     SC.Callbacks.untrustedContent = true;
-    const html = SC.expand_text_link(
-      "desc<http://example.com>",
-      new SC.Sheet(),
-      null,
-      "text-link",
-    );
+    const html = SC.expand_text_link("desc<http://example.com>", new SC.Sheet(), null, "text-link");
     expect(html).toBe('<a href="http://example.com" target="_blank">desc</a>');
   });
 });
@@ -371,7 +337,7 @@ describe("SafeUrlForRender: HTML entity-decoding bypass is closed", () => {
 
   test("a named entity ('&quot;') used to smuggle a quote for attribute breakout is HTML-escaped", async () => {
     const SC = await loadSocialCalc();
-    const out = SC.SafeUrlForRender('x&quot;onmouseover=&quot;alert(1)');
+    const out = SC.SafeUrlForRender("x&quot;onmouseover=&quot;alert(1)");
     expect(out).not.toBeNull();
     expect(out).not.toContain('"');
     expect(out).toBe("x&amp;quot;onmouseover=&amp;quot;alert(1)");
@@ -394,7 +360,11 @@ describe("SafeUrlForRender: HTML entity-decoding bypass is closed", () => {
     // Round-trip check: HTML-unescaping the attribute value recovers the
     // exact original URL, proving no semantic change to the query string.
     const htmlUnescape = (s: string) =>
-      s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
+      s
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"');
     expect(htmlUnescape(out as string)).toBe("http://example.com/?a=1&b=2");
   });
 
@@ -418,9 +388,7 @@ describe("SafeUrlForRender: HTML entity-decoding bypass is closed", () => {
       null,
       "",
     );
-    expect(malicious).toBe(
-      '<a href="javascript&amp;#58;alert(1)">javascript&amp;#58;alert(1)</a>',
-    );
+    expect(malicious).toBe('<a href="javascript&amp;#58;alert(1)">javascript&amp;#58;alert(1)</a>');
 
     const safeQuery = SC.format_text_for_display(
       "http://example.com/?a=1&b=2",
@@ -437,13 +405,7 @@ describe("SafeUrlForRender: HTML entity-decoding bypass is closed", () => {
   test("sink: text-image neutralizes a hex-entity javascript: payload in an image src", async () => {
     const SC = await loadSocialCalc();
     SC.Callbacks.untrustedContent = true;
-    const out = SC.format_text_for_display(
-      "jav&#x61;script:alert(1)",
-      "t",
-      "text-image",
-      null,
-      "",
-    );
+    const out = SC.format_text_for_display("jav&#x61;script:alert(1)", "t", "text-image", null, "");
     expect(out).toBe('<img src="jav&amp;#x61;script:alert(1)">');
   });
 
@@ -451,7 +413,7 @@ describe("SafeUrlForRender: HTML entity-decoding bypass is closed", () => {
     const SC = await loadSocialCalc();
     SC.Callbacks.untrustedContent = true;
     const out = SC.format_text_for_display(
-      'x&quot;onmouseover=&quot;alert(1)',
+      "x&quot;onmouseover=&quot;alert(1)",
       "t",
       'text-custom:<a href="@u">@s</a>',
       null,
@@ -460,7 +422,7 @@ describe("SafeUrlForRender: HTML entity-decoding bypass is closed", () => {
     // The template markup is escaped anyway (no sanitizer configured), so
     // this is doubly inert - but @u itself must also carry no live quote.
     expect(out).toBe(
-      '&lt;a href=&quot;x&amp;quot;onmouseover=&amp;quot;alert(1)&quot;&gt;x&amp;quot;onmouseover=&amp;quot;alert(1)&lt;/a&gt;',
+      "&lt;a href=&quot;x&amp;quot;onmouseover=&amp;quot;alert(1)&quot;&gt;x&amp;quot;onmouseover=&amp;quot;alert(1)&lt;/a&gt;",
     );
   });
 
@@ -604,7 +566,7 @@ describe("untrusted mode: text-wiki via expand_wiki/expand_markup callbacks", ()
     SC.Callbacks.untrustedContent = true;
     try {
       const out = SC.format_text_for_display("hi", "tw", "text-wiki", null, "");
-      expect(out).toBe('&lt;img src=x onerror=&quot;alert(1)&quot;&gt;hi');
+      expect(out).toBe("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;hi");
     } finally {
       SC.Callbacks.expand_wiki = prev;
     }
@@ -633,7 +595,7 @@ describe("untrusted mode: text-wiki via expand_wiki/expand_markup callbacks", ()
     SC.Callbacks.untrustedContent = true;
     try {
       const out = SC.format_text_for_display("hi", "t", "text-wiki", null, "");
-      expect(out).toBe('&lt;svg onload=&quot;alert(1)&quot;&gt;');
+      expect(out).toBe("&lt;svg onload=&quot;alert(1)&quot;&gt;");
     } finally {
       SC.Callbacks.expand_wiki = prevWiki;
       SC.Callbacks.expand_markup = prevMarkup;
@@ -708,7 +670,7 @@ describe("untrusted mode: formula-widget cell_html is disabled, not sanitized", 
       const cell = sheet.GetAssuredCell("A1");
       cell.valuetype = "niBUTTON";
       cell.datatype = "f";
-      cell.formula = "BUTTON(\"'\"><script>alert(2)</script>\")";
+      cell.formula = 'BUTTON("\'"><script>alert(2)</script>")';
       cell.datavalue = 0;
       sheet.ioParameterList = {
         A1: Object.assign([{ type: "value", value: '"><script>alert(2)</script>' }], {
@@ -794,7 +756,7 @@ describe("untrusted mode: statusline escapes cross-sheet-formula sheet names", (
     const out = SC.EditorGetStatuslineString(
       fakeEditor(),
       "calcloading",
-      { sheetname: '<img src=x onerror=alert(1)>' },
+      { sheetname: "<img src=x onerror=alert(1)>" },
       {},
     );
     expect(out).toBe(
@@ -807,7 +769,7 @@ describe("untrusted mode: statusline escapes cross-sheet-formula sheet names", (
     const out = SC.EditorGetStatuslineString(
       fakeEditor(),
       "calcloading",
-      { sheetname: '<img src=x onerror=alert(1)>' },
+      { sheetname: "<img src=x onerror=alert(1)>" },
       {},
     );
     expect(out).toBe(
@@ -854,7 +816,7 @@ describe("untrusted mode: text-custom template markup itself (not just placehold
       null,
       "",
     );
-    expect(out).toBe('&lt;img src=x onerror=&quot;alert(1)&quot;&gt;hi');
+    expect(out).toBe("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;hi");
   });
 
   test("direct: a <script> tag embedded in the template is escaped when untrusted, no sanitizer", async () => {
@@ -867,7 +829,7 @@ describe("untrusted mode: text-custom template markup itself (not just placehold
       null,
       "",
     );
-    expect(out).toBe('&lt;script&gt;alert(1)&lt;/script&gt;hi');
+    expect(out).toBe("&lt;script&gt;alert(1)&lt;/script&gt;hi");
   });
 
   test("direct: template markup is sanitized (not just placeholder values) when sanitizeHtml is configured", async () => {
@@ -914,7 +876,7 @@ describe("untrusted mode: text-custom template markup itself (not just placehold
     cell.textvalueformat = 1;
 
     const out = String(SC.FormatValueForDisplay(sheet, "payload", "A1", ""));
-    expect(out).toBe('&lt;svg onload=alert(1)&gt;payload');
+    expect(out).toBe("&lt;svg onload=alert(1)&gt;payload");
   });
 
   test("render-level: trusted (default) mode still renders the same valueformat template raw", async () => {

@@ -20,7 +20,13 @@
 
 import { describe, expect, test } from "vite-plus/test";
 
-const CONFIG_ENV_KEYS = ["MUTATE_SCOPE", "MUTATE_TARGET", "MUTATE_TESTS", "TEST_RUNNER_MAX_WORKERS", "STRYKER_CONCURRENCY"] as const;
+const CONFIG_ENV_KEYS = [
+  "MUTATE_SCOPE",
+  "MUTATE_TARGET",
+  "MUTATE_TESTS",
+  "TEST_RUNNER_MAX_WORKERS",
+  "STRYKER_CONCURRENCY",
+] as const;
 
 interface StrykerOptionsShape {
   concurrency: number;
@@ -29,7 +35,9 @@ interface StrykerOptionsShape {
 }
 
 /** Re-imports stryker.config.mjs under a fresh env snapshot (see file header). */
-async function loadConfig(env: Partial<Record<(typeof CONFIG_ENV_KEYS)[number], string>>): Promise<StrykerOptionsShape> {
+async function loadConfig(
+  env: Partial<Record<(typeof CONFIG_ENV_KEYS)[number], string>>,
+): Promise<StrykerOptionsShape> {
   const saved: Record<string, string | undefined> = {};
   for (const key of CONFIG_ENV_KEYS) {
     saved[key] = process.env[key];
@@ -39,7 +47,9 @@ async function loadConfig(env: Partial<Record<(typeof CONFIG_ENV_KEYS)[number], 
     if (value !== undefined) process.env[key] = value;
   }
   try {
-    const mod = (await import(/* @vite-ignore */ `../stryker.config.mjs?t=${Date.now()}-${Math.random()}`)) as {
+    const mod = (await import(
+      /* @vite-ignore */ `../stryker.config.mjs?t=${Date.now()}-${Math.random()}`
+    )) as {
       default: StrykerOptionsShape;
     };
     return mod.default;
@@ -61,7 +71,11 @@ describe("stryker.config.mjs test-runner concurrency cap", () => {
   test("MUTATE_SCOPE=critical still caps vitest workers on the filtered test command", async () => {
     const config = await loadConfig({ MUTATE_SCOPE: "critical" });
     expect(config.commandRunner.command).toMatch(/vp test run --maxWorkers=2 /);
-    expect(config.mutate).toEqual(["js/formula-parse.ts", "js/formula-operand.ts", "js/formula-ref.ts"]);
+    expect(config.mutate).toEqual([
+      "js/formula-parse.ts",
+      "js/formula-operand.ts",
+      "js/formula-ref.ts",
+    ]);
   });
 
   test("MUTATE_TARGET still caps vitest workers on the filtered test command", async () => {
@@ -83,7 +97,10 @@ describe("stryker.config.mjs test-runner concurrency cap", () => {
   });
 
   test("non-numeric or non-positive overrides fall back to the measured safe defaults, never NaN/0/negative", async () => {
-    const config = await loadConfig({ TEST_RUNNER_MAX_WORKERS: "not-a-number", STRYKER_CONCURRENCY: "-3" });
+    const config = await loadConfig({
+      TEST_RUNNER_MAX_WORKERS: "not-a-number",
+      STRYKER_CONCURRENCY: "-3",
+    });
     expect(config.commandRunner.command).toMatch(/--maxWorkers=2\b/);
     expect(config.concurrency).toBe(4);
     expect(config.commandRunner.command).not.toMatch(/NaN/);

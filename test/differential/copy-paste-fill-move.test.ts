@@ -29,7 +29,13 @@ describe("copy/paste parity", () => {
     const { candidate, oracle } = await loadPair();
     const result = await runDifferentialCommands(
       { candidate, oracle },
-      ["set C3 value n 30", "set C4 value n 40", "set D4 formula C4+C3", "cut D4 formulas", "paste B2 formulas"],
+      [
+        "set C3 value n 30",
+        "set C4 value n 40",
+        "set D4 formula C4+C3",
+        "cut D4 formulas",
+        "paste B2 formulas",
+      ],
       ["B2", "D4"],
     );
     expect(result.candidate).toStrictEqual(result.oracle);
@@ -51,7 +57,13 @@ describe("fill parity", () => {
     const { candidate, oracle } = await loadPair();
     const result = await runDifferentialCommands(
       { candidate, oracle },
-      ["set A1 value n 1", "set A2 value n 2", "set B1 value n 10", "set B2 value n 20", "filldown A1:B5 all"],
+      [
+        "set A1 value n 1",
+        "set A2 value n 2",
+        "set B1 value n 10",
+        "set B2 value n 20",
+        "filldown A1:B5 all",
+      ],
       ["A3", "A4", "A5", "B3", "B4", "B5"],
     );
     expect(result.candidate).toStrictEqual(result.oracle);

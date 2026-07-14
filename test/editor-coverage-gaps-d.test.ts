@@ -60,30 +60,40 @@ function ensureDocumentEvents() {
 }
 
 function teardownEditor(SC: SC, editor: Editor) {
-  { if (editor?.inputEcho?.interval) {
-    clearInterval(editor.inputEcho.interval);
-    editor.inputEcho.interval = null;
-  } }
-  { if (SC.AutoRepeatInfo?.timer) {
-    clearTimeout(SC.AutoRepeatInfo.timer);
-    SC.AutoRepeatInfo.timer = null;
-    SC.AutoRepeatInfo.mouseinfo = null;
-  } }
-  { if (SC.ButtonInfo?.timer) {
-    clearTimeout(SC.ButtonInfo.timer);
-    SC.ButtonInfo.timer = null;
-  } }
-  { if (SC.Keyboard) {
-    SC.Keyboard.focusTable = null;
-    SC.Keyboard.passThru = null;
-  } }
-  { if (editor) {
-    editor.state = "start";
-    if (editor.timeout) {
-      clearTimeout(editor.timeout);
-      editor.timeout = null;
+  {
+    if (editor?.inputEcho?.interval) {
+      clearInterval(editor.inputEcho.interval);
+      editor.inputEcho.interval = null;
     }
-  } }
+  }
+  {
+    if (SC.AutoRepeatInfo?.timer) {
+      clearTimeout(SC.AutoRepeatInfo.timer);
+      SC.AutoRepeatInfo.timer = null;
+      SC.AutoRepeatInfo.mouseinfo = null;
+    }
+  }
+  {
+    if (SC.ButtonInfo?.timer) {
+      clearTimeout(SC.ButtonInfo.timer);
+      SC.ButtonInfo.timer = null;
+    }
+  }
+  {
+    if (SC.Keyboard) {
+      SC.Keyboard.focusTable = null;
+      SC.Keyboard.passThru = null;
+    }
+  }
+  {
+    if (editor) {
+      editor.state = "start";
+      if (editor.timeout) {
+        clearTimeout(editor.timeout);
+        editor.timeout = null;
+      }
+    }
+  }
 }
 
 // A minimal event shape sufficient for the mouse/keyboard handlers under test.
@@ -132,7 +142,9 @@ function fakeEvent(extras: Partial<FakeEvent> = {}): FakeEvent {
 }
 
 function primeGridLayout(editor: Editor) {
-  { editor.CalculateEditorPositions(); }
+  {
+    editor.CalculateEditorPositions();
+  }
   editor.gridposition = editor.gridposition || { left: 0, top: 0 };
   editor.headposition = editor.headposition || { left: 30, top: 30 };
   editor.tablewidth = editor.tablewidth ?? 400;
@@ -189,17 +201,23 @@ test("ScrollTableDownOneRow: cellskip pointing at a non-rowspanned origin — fa
   // where `cell.rowspan > 1` evaluates to false (NaN), covering 8322 alt1.
   editor.context.rowpanes = [{ first: 2, last: 7 }];
   editor.context.colpanes = [{ first: 1, last: 3 }];
-  { // Update editor.fullgrid to match the new rowpane config so ScrollTableDownOneRow
-  // can iterate tbody.childNodes by the rowpane (otherwise Stale tbody throws).
-  editor.EditorRenderSheet(); }
-  { editor.context.CalculateCellSkipData(); }
+  {
+    // Update editor.fullgrid to match the new rowpane config so ScrollTableDownOneRow
+    // can iterate tbody.childNodes by the rowpane (otherwise Stale tbody throws).
+    editor.EditorRenderSheet();
+  }
+  {
+    editor.context.CalculateCellSkipData();
+  }
   // After ScrollTableDownOneRow decrements rowpanes[0].last (7→6), the bottom
   // row scan uses bottomrownum=6. Inject a cellskip+coordToCR pair mapping A6→A2
   // manually, so the code path enters the cellskip lookup branch and finds
   // cell A2 (defined) with rowspan undefined (NaN > 1 is false → alt1).
   (editor.context.cellskip as Record<string, string>)["A6"] = "A2";
   (editor.context.coordToCR as Record<string, unknown>)["A2"] = { row: 2, col: 1 };
-  { SC.ScrollTableDownOneRow(editor); }
+  {
+    SC.ScrollTableDownOneRow(editor);
+  }
   teardownEditor(SC, editor);
 });
 
@@ -213,14 +231,18 @@ test("InputBoxDisplayCellContents: falsy coord falls through to editor/ecell fal
   const editor = control.editor;
 
   // !inputbox → return
-  { SC.InputBoxDisplayCellContents(null as unknown as SocialCalc.InputBox, "A1"); }
+  {
+    SC.InputBoxDisplayCellContents(null as unknown as SocialCalc.InputBox, "A1");
+  }
 
   // !coord + !inputbox.editor → return (covers bid=1603 alt0 + stmt 8386)
   const fakeInputBox = {
     editor: null as unknown as Editor,
     element: document.createElement("input"),
   } as unknown as SocialCalc.InputBox;
-  { SC.InputBoxDisplayCellContents(fakeInputBox, null as unknown as string); }
+  {
+    SC.InputBoxDisplayCellContents(fakeInputBox, null as unknown as string);
+  }
 
   // !coord + editor set but !editor.ecell — return (covers !editor.ecell sanity path)
   const fakeInputBox2 = {
@@ -229,7 +251,9 @@ test("InputBoxDisplayCellContents: falsy coord falls through to editor/ecell fal
   } as unknown as SocialCalc.InputBox;
   const savedEcell = editor.ecell;
   editor.ecell = null as unknown as SocialCalc.ECell;
-  { SC.InputBoxDisplayCellContents(fakeInputBox2, null as unknown as string); }
+  {
+    SC.InputBoxDisplayCellContents(fakeInputBox2, null as unknown as string);
+  }
   editor.ecell = savedEcell;
 
   teardownEditor(SC, editor);
@@ -254,8 +278,10 @@ test("InputEcho: empty style constants skip setStyles branches", async () => {
     saved[k] = (scc as Record<string, unknown>)[k];
     (scc as Record<string, unknown>)[k] = "";
   }
-  { const echo = new SC.InputEcho(editor);
-  expect(echo).toBeTruthy(); }
+  {
+    const echo = new SC.InputEcho(editor);
+    expect(echo).toBeTruthy();
+  }
   for (const k of keys) {
     (scc as Record<string, unknown>)[k] = saved[k];
   }
@@ -282,7 +308,9 @@ test("ShowCellHandles: rowpositions + 20 > controlborder — break branch", asyn
   vtc.controlborder = 500;
   editor.headposition.top = 30;
   editor.headposition.left = 30;
-  { SC.ShowCellHandles(editor.cellhandles as SocialCalc.CellHandles, true, false); }
+  {
+    SC.ShowCellHandles(editor.cellhandles as SocialCalc.CellHandles, true, false);
+  }
   teardownEditor(SC, editor);
 });
 
@@ -302,11 +330,15 @@ test("CellHandlesMouseMoveOnHandle: target falsy + target != dragpalette", async
   // event.target falsy → event.target || event.srcElement evaluates srcElement (alt1)
   // event.srcElement also fallback null, target = null
   // Then target != cellhandles.dragpalette (which is a real element) → cover 8674 alt1
-  { SC.CellHandlesMouseMoveOnHandle(fakeEvent() as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMoveOnHandle(fakeEvent() as unknown as MouseEvent);
+  }
 
   // e = undefined → event || window.event alt1 of 8661 (window.event evaluated, may be undefined)
   (globalThis as any).event = fakeEvent();
-  { SC.CellHandlesMouseMoveOnHandle(undefined as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMoveOnHandle(undefined as unknown as MouseEvent);
+  }
   delete (globalThis as any).event;
 
   teardownEditor(SC, editor);
@@ -322,8 +354,10 @@ test("CellHandlesHoverTimeout: Keyboard.focusTable falsy returns true", async ()
   const editor = control.editor;
   SC.KeyboardSetFocus(editor);
   SC.Keyboard.focusTable = null;
-  { const r = SC.CellHandlesHoverTimeout();
-  expect(r).toBe(true); }
+  {
+    const r = SC.CellHandlesHoverTimeout();
+    expect(r).toBe(true);
+  }
   teardownEditor(SC, editor);
 });
 
@@ -340,17 +374,23 @@ test("CellHandlesMouseDown: editor falsy + busy returns; e falsy fallback path",
 
   // event falsy (e || window.event)
   (globalThis as any).event = fakeEvent({ clientX: 50, clientY: 50 });
-  { SC.CellHandlesMouseDown(undefined as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseDown(undefined as unknown as MouseEvent);
+  }
   delete (globalThis as any).event;
 
   // editor falsy (Keyboard.focusTable null)
   SC.Keyboard.focusTable = null;
-  { SC.CellHandlesMouseDown(fakeEvent() as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseDown(fakeEvent() as unknown as MouseEvent);
+  }
   SC.KeyboardSetFocus(editor);
 
   // editor.busy truthy → return
   editor.busy = true;
-  { SC.CellHandlesMouseDown(fakeEvent() as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseDown(fakeEvent() as unknown as MouseEvent);
+  }
   editor.busy = false;
 
   teardownEditor(SC, editor);
@@ -388,21 +428,27 @@ test("CellHandlesMouseDown: whichhandle==4 and nonzero alts + switch default", a
   (SC as Record<string, unknown>).SegmentDivHit = () => 4;
   const ch = editor.cellhandles as SocialCalc.CellHandles;
   ch.mouseDown = false;
-  { SC.CellHandlesMouseDown(fakeEvent({ clientX: 50, clientY: 50 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseDown(fakeEvent({ clientX: 50, clientY: 50 }) as unknown as MouseEvent);
+  }
 
   // whichhandle = -2 → Move (covers stmt 8826 = noCursorSuffix = true)
   (SC as Record<string, unknown>).SegmentDivHit = () => -2;
   ch.mouseDown = false;
   editor.range2 = { hasrange: true, top: 3, bottom: 3, left: 3, right: 3 };
   editor.range = { hasrange: true, top: 3, bottom: 3, left: 3, right: 3 } as SocialCalc.EditorRange;
-  { SC.CellHandlesMouseDown(fakeEvent({ clientX: 50, clientY: 50 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseDown(fakeEvent({ clientX: 50, clientY: 50 }) as unknown as MouseEvent);
+  }
 
   // whichhandle = 5 (unmatched) → all if-else-if skip → switch default (alt6) — covers 8865 stmt
   (SC as Record<string, unknown>).SegmentDivHit = () => 5 as unknown as number;
   ch.mouseDown = false;
   // preset dragtype to a non-matching string so switch hits default
   (ch as Record<string, unknown>).dragtype = "abc";
-  { SC.CellHandlesMouseDown(fakeEvent({ clientX: 50, clientY: 50 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseDown(fakeEvent({ clientX: 50, clientY: 50 }) as unknown as MouseEvent);
+  }
 
   (SC as Record<string, unknown>).SegmentDivHit = origSDH;
   teardownEditor(SC, editor);
@@ -422,14 +468,18 @@ test("CellHandlesMouseMove: e falsy fallback + no-result/no-coord returns", asyn
 
   // e falsy → e || window.event alt1
   (globalThis as any).event = fakeEvent({ clientX: 50, clientY: 90 });
-  { SC.CellHandlesMouseMove(undefined as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMove(undefined as unknown as MouseEvent);
+  }
   delete (globalThis as any).event;
 
   // !result path → 8900 IF alt0 + stmt 8901. Mock GridMousePosition to return null.
   const origGMP = SC.GridMousePosition;
   (SC as Record<string, unknown>).GridMousePosition = () => null;
   SC.EditorMouseInfo.editor = editor;
-  { SC.CellHandlesMouseMove(fakeEvent({ clientX: 50, clientY: 90 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMove(fakeEvent({ clientX: 50, clientY: 90 }) as unknown as MouseEvent);
+  }
 
   // !result.coord path → 8907 IF alt0 + stmt 8908. result.coord truthy at the 8902
   // check, then falsy at the 8907 check. Use a Proxy-like getter that morphs on second
@@ -444,7 +494,9 @@ test("CellHandlesMouseMove: e falsy fallback + no-result/no-coord returns", asyn
         return coordReads === 1 ? "C3" : null;
       },
     }) as unknown as SocialCalc.GridMousePositionResult) as typeof SocialCalc.GridMousePosition;
-  { SC.CellHandlesMouseMove(fakeEvent({ clientX: 50, clientY: 90 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMove(fakeEvent({ clientX: 50, clientY: 90 }) as unknown as MouseEvent);
+  }
 
   (SC as Record<string, unknown>).GridMousePosition = origGMP;
 
@@ -462,13 +514,17 @@ test("CellHandlesMouseMove: e falsy fallback + no-result/no-coord returns", asyn
     ch.startingcoord = "C3";
     editor.range2 = { hasrange: true, top: 3, bottom: 3, left: 3, right: 3 };
     SC.EditorMouseInfo.mouselastcoord = "Z0";
-    { SC.CellHandlesMouseMove(fakeEvent({ clientX: 50, clientY: 5 }) as unknown as MouseEvent); }
+    {
+      SC.CellHandlesMouseMove(fakeEvent({ clientX: 50, clientY: 5 }) as unknown as MouseEvent);
+    }
     (SC as Record<string, unknown>).GridMousePosition = origGMP2;
   }
 
   // !editor early return
   SC.EditorMouseInfo.editor = null;
-  { SC.CellHandlesMouseMove(fakeEvent({ clientX: 9999, clientY: 9999 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMove(fakeEvent({ clientX: 9999, clientY: 9999 }) as unknown as MouseEvent);
+  }
   SC.EditorMouseInfo.editor = editor;
 
   teardownEditor(SC, editor);
@@ -502,9 +558,13 @@ test("CellHandlesMouseMove: Move case coord-equal skip body (8945 alt1)", async 
     }) as unknown as SocialCalc.GridMousePositionResult) as typeof SocialCalc.GridMousePosition;
   SC.EditorMouseInfo.mouselastcoord = "Z0";
   // First call: sets mouselastcoord = "D4"
-  { SC.CellHandlesMouseMove(fakeEvent({ clientX: 240, clientY: 110 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMove(fakeEvent({ clientX: 240, clientY: 110 }) as unknown as MouseEvent);
+  }
   // Second call: result.coord == mouselastcoord → skip Move body (8945 alt1)
-  { SC.CellHandlesMouseMove(fakeEvent({ clientX: 240, clientY: 110 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMove(fakeEvent({ clientX: 240, clientY: 110 }) as unknown as MouseEvent);
+  }
   (SC as Record<string, unknown>).GridMousePosition = origGMP;
 
   teardownEditor(SC, editor);
@@ -535,7 +595,9 @@ test("CellHandlesMouseMove: Fill Right col-clamp + MoveI null-filltype deltas<=1
   ch.filltype = "Right";
   ch.startingcoord = "C3";
   SC.EditorMouseInfo.mouselastcoord = "Z0";
-  { SC.CellHandlesMouseMove(fakeEvent({ clientX: 80, clientY: 90 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMove(fakeEvent({ clientX: 80, clientY: 90 }) as unknown as MouseEvent);
+  }
   (SC as Record<string, unknown>).GridMousePosition = origGMP;
 
   // MoveI, null filltype, both abs deltas <= 10 → bid=1727 alt1 (skip Horizontal-set)
@@ -546,7 +608,9 @@ test("CellHandlesMouseMove: Fill Right col-clamp + MoveI null-filltype deltas<=1
   ch.startingY = 90;
   SC.EditorMouseInfo.mouselastcoord = "Z0";
   // GridMousePosition returns "C4" (col=3, row=4); abs(165-160)=5, abs(95-90)=5, both <= 10
-  { SC.CellHandlesMouseMove(fakeEvent({ clientX: 165, clientY: 95 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMove(fakeEvent({ clientX: 165, clientY: 95 }) as unknown as MouseEvent);
+  }
 
   teardownEditor(SC, editor);
 });
@@ -569,21 +633,27 @@ test("CellHandlesDragAutoRepeat: unmatched direction + MoveI Vertical/Horizontal
   ch.dragtype = "Fill";
   ch.filltype = null;
   SC.EditorMouseInfo.mouselastcoord = "C3";
-  { SC.CellHandlesDragAutoRepeat("C3", "backwards"); }
+  {
+    SC.CellHandlesDragAutoRepeat("C3", "backwards");
+  }
 
   // MoveI, Vertical, crend.row NOT in [top, bottom+1] → 9057 alt1 (no bump)
   ch.dragtype = "MoveI";
   ch.filltype = "Vertical";
   editor.range2 = { hasrange: true, top: 2, bottom: 4, left: 3, right: 4 };
   SC.EditorMouseInfo.mouselastcoord = "C3";
-  { SC.CellHandlesDragAutoRepeat("C9", "down"); }
+  {
+    SC.CellHandlesDragAutoRepeat("C9", "down");
+  }
 
   // MoveI, Horizontal, crend.col NOT in [left, right+1] → 9061 alt1 (no bump)
   ch.dragtype = "MoveI";
   ch.filltype = "Horizontal";
   editor.range2 = { hasrange: true, top: 2, bottom: 4, left: 3, right: 4 };
   SC.EditorMouseInfo.mouselastcoord = "C3";
-  { SC.CellHandlesDragAutoRepeat("J3", "right"); }
+  {
+    SC.CellHandlesDragAutoRepeat("J3", "right");
+  }
 
   teardownEditor(SC, editor);
 });
@@ -611,7 +681,9 @@ test("CellHandlesMouseUp: e falsy + result.falsy/coord.falsy + filltype null alt
   editor.MoveECell("C3");
   editor.range2 = { hasrange: true, top: 3, bottom: 3, left: 3, right: 3 };
   (globalThis as any).event = fakeEvent({ clientX: 160, clientY: 110 });
-  { SC.CellHandlesMouseUp(undefined as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseUp(undefined as unknown as MouseEvent);
+  }
   delete (globalThis as any).event;
 
   // !result → alt0 + stmt 9101 (result = {}) + 9102 alt0 + stmt 9103 (coord=editor.ecell.coord)
@@ -626,7 +698,9 @@ test("CellHandlesMouseUp: e falsy + result.falsy/coord.falsy + filltype null alt
   SC.EditorMouseInfo.editor = editor;
   SC.EditorMouseInfo.ignore = true;
   editor.range2 = { hasrange: true, top: 3, bottom: 3, left: 3, right: 3 };
-  { SC.CellHandlesMouseUp(fakeEvent({ clientX: 160, clientY: 110 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseUp(fakeEvent({ clientX: 160, clientY: 110 }) as unknown as MouseEvent);
+  }
 
   // !result.coord → alt0 + stmt 9103
   (SC as Record<string, unknown>).GridMousePosition = () =>
@@ -639,7 +713,9 @@ test("CellHandlesMouseUp: e falsy + result.falsy/coord.falsy + filltype null alt
   SC.EditorMouseInfo.editor = editor;
   SC.EditorMouseInfo.ignore = true;
   editor.range2 = { hasrange: true, top: 3, bottom: 3, left: 3, right: 3 };
-  { SC.CellHandlesMouseUp(fakeEvent({ clientX: 160, clientY: 110 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseUp(fakeEvent({ clientX: 160, clientY: 110 }) as unknown as MouseEvent);
+  }
 
   (SC as Record<string, unknown>).GridMousePosition = origGMP;
 
@@ -652,7 +728,9 @@ test("CellHandlesMouseUp: e falsy + result.falsy/coord.falsy + filltype null alt
   SC.EditorMouseInfo.editor = editor;
   SC.EditorMouseInfo.ignore = true;
   editor.range2 = { hasrange: true, top: 3, bottom: 3, left: 3, right: 3 };
-  { SC.CellHandlesMouseUp(fakeEvent({ clientX: 160, clientY: 110 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseUp(fakeEvent({ clientX: 160, clientY: 110 }) as unknown as MouseEvent);
+  }
 
   SC.EditorMouseInfo.ignore = false;
   teardownEditor(SC, editor);
@@ -681,34 +759,48 @@ test("Drag functions: e falsy · dragpalette no-parent · MouseMove/Up calling",
 
   // DragMouseDown with event undefined (e || window.event alt1 of 9729)
   (globalThis as any).event = fakeEvent({ target: el, clientX: 10, clientY: 10 });
-  { SC.DragMouseDown(undefined as unknown as MouseEvent); }
+  {
+    SC.DragMouseDown(undefined as unknown as MouseEvent);
+  }
   delete (globalThis as any).event;
 
   // DragMouseDown with target=null (e.target || e.srcElement alt1 of 9731) — LookupElement returns null → early return
-  { SC.DragMouseDown(fakeEvent() as unknown as MouseEvent); }
+  {
+    SC.DragMouseDown(fakeEvent() as unknown as MouseEvent);
+  }
 
   // DragMouseDown with target=el → dobj found, no parent → 9740 alt1 covered
-  { SC.DragMouseDown(fakeEvent({ target: el, clientX: 10, clientY: 10 }) as unknown as MouseEvent); }
+  {
+    SC.DragMouseDown(fakeEvent({ target: el, clientX: 10, clientY: 10 }) as unknown as MouseEvent);
+  }
 
   // DragMouseMove with event undefined (9757 alt1 of e || window.event)
   (globalThis as any).event = fakeEvent({ target: el, clientX: 20, clientY: 20 });
-  { SC.DragMouseMove(undefined as unknown as MouseEvent); }
+  {
+    SC.DragMouseMove(undefined as unknown as MouseEvent);
+  }
   delete (globalThis as any).event;
 
   // DragMouseMove with target=null (sets draggingElement via the found dobj path)
   const foundDobj = SC.DragInfo.registeredElements[SC.DragInfo.registeredElements.length - 1];
   SC.DragInfo.draggingElement = foundDobj;
-  { SC.DragMouseMove(fakeEvent({ clientX: 20, clientY: 20 }) as unknown as MouseEvent); }
+  {
+    SC.DragMouseMove(fakeEvent({ clientX: 20, clientY: 20 }) as unknown as MouseEvent);
+  }
 
   // DragMouseUp with event undefined (9768 alt1 of e || window.event)
   SC.DragInfo.draggingElement = foundDobj;
   (globalThis as any).event = fakeEvent({ target: el, clientX: 25, clientY: 25 });
-  { SC.DragMouseUp(undefined as unknown as MouseEvent); }
+  {
+    SC.DragMouseUp(undefined as unknown as MouseEvent);
+  }
   delete (globalThis as any).event;
 
   // DragMouseUp with target=null and editable proper flow
   SC.DragInfo.draggingElement = foundDobj;
-  { SC.DragMouseUp(fakeEvent({ clientX: 25, clientY: 25 }) as unknown as MouseEvent); }
+  {
+    SC.DragMouseUp(fakeEvent({ clientX: 25, clientY: 25 }) as unknown as MouseEvent);
+  }
 
   teardownEditor(SC, editor);
 });
@@ -745,45 +837,61 @@ test("Button functions: event falsy alt paths + pre-defined state branches", asy
   SC.ButtonInfo.doingHover = false;
   SC.ButtonInfo.buttonElement = null;
   (globalThis as any).event = fakeEvent({ target: b });
-  { SC.ButtonMouseOver(undefined as unknown as MouseEvent); }
+  {
+    SC.ButtonMouseOver(undefined as unknown as MouseEvent);
+  }
   delete (globalThis as any).event;
 
   // ButtonMouseOver with target=null (9825 alt1 of e.target || e.srcElement)
   SC.ButtonInfo.buttonDown = false;
   SC.ButtonInfo.doingHover = false;
-  { SC.ButtonMouseOver(fakeEvent() as unknown as MouseEvent); }
+  {
+    SC.ButtonMouseOver(fakeEvent() as unknown as MouseEvent);
+  }
 
   // ButtonMouseOut with event undefined (9845 alt1 of e || window.event)
   SC.ButtonInfo.buttonDown = false;
   (globalThis as any).event = fakeEvent({ target: b });
-  { SC.ButtonMouseOut(undefined as unknown as MouseEvent); }
+  {
+    SC.ButtonMouseOut(undefined as unknown as MouseEvent);
+  }
   delete (globalThis as any).event;
 
   // ButtonMouseOut with target=null (9851 alt1)
   SC.ButtonInfo.buttonDown = false;
   SC.ButtonInfo.doingHover = false;
-  { SC.ButtonMouseOut(fakeEvent() as unknown as MouseEvent); }
+  {
+    SC.ButtonMouseOut(fakeEvent() as unknown as MouseEvent);
+  }
 
   // ButtonMouseOut with buttonElement=null AND doingHover=true → 9853 alt1 of (buttoninfo.buttonElement)
   SC.ButtonInfo.buttonDown = false;
   SC.ButtonInfo.doingHover = true;
   SC.ButtonInfo.buttonElement = null;
-  { SC.ButtonMouseOut(fakeEvent({ target: b }) as unknown as MouseEvent); }
+  {
+    SC.ButtonMouseOut(fakeEvent({ target: b }) as unknown as MouseEvent);
+  }
 
   // ButtonMouseDown with event undefined (9863 alt1 of e || window.event)
   SC.ButtonInfo.buttonDown = false;
   (globalThis as any).event = fakeEvent({ target: b });
-  { SC.ButtonMouseDown(undefined as unknown as MouseEvent); }
+  {
+    SC.ButtonMouseDown(undefined as unknown as MouseEvent);
+  }
   delete (globalThis as any).event;
 
   // ButtonMouseDown with target=null (9866 alt1)
   SC.ButtonInfo.buttonDown = false;
-  { SC.ButtonMouseDown(fakeEvent() as unknown as MouseEvent); }
+  {
+    SC.ButtonMouseDown(fakeEvent() as unknown as MouseEvent);
+  }
 
   // ButtonMouseUp with event undefined (9890 alt1)
   SC.ButtonInfo.buttonElement = ourBtn;
   (globalThis as any).event = fakeEvent({ target: b });
-  { SC.ButtonMouseUp(undefined as unknown as MouseEvent); }
+  {
+    SC.ButtonMouseUp(undefined as unknown as MouseEvent);
+  }
   delete (globalThis as any).event;
 
   // ButtonRepeat: bobj found, but Repeat fn null (9916 alt1)
@@ -798,7 +906,9 @@ test("Button functions: event falsy alt paths + pre-defined state branches", asy
   const bobjNoRepeat = SC.ButtonInfo.registeredElements.find((r) => r.element === btnNoRepeat);
   if (bobjNoRepeat) {
     SC.ButtonInfo.buttonElement = bobjNoRepeat;
-    { SC.ButtonRepeat(); }
+    {
+      SC.ButtonRepeat();
+    }
   }
 
   // ButtonRepeat: bobj with Repeat but no repeatinterval (9918 alt1: bobj.repeatinterval || 100)
@@ -813,7 +923,9 @@ test("Button functions: event falsy alt paths + pre-defined state branches", asy
   const bobjRepeat = SC.ButtonInfo.registeredElements.find((r) => r.element === btnRepeat);
   if (bobjRepeat) {
     SC.ButtonInfo.buttonElement = bobjRepeat;
-    { SC.ButtonRepeat(); }
+    {
+      SC.ButtonRepeat();
+    }
     if (SC.ButtonInfo.timer) {
       clearTimeout(SC.ButtonInfo.timer);
       SC.ButtonInfo.timer = null;
@@ -839,19 +951,25 @@ test("ProcessMouseWheel: event undefined · target null · preventDefault missin
 
   // event undefined → 9931 alt1 of e || window.event
   (globalThis as any).event = fakeEvent({ target: child, wheelDelta: 120 });
-  { SC.ProcessMouseWheel(undefined as unknown as Event); }
+  {
+    SC.ProcessMouseWheel(undefined as unknown as Event);
+  }
   delete (globalThis as any).event;
 
   // target=null → 9936 alt1 of event.target || event.srcElement
-  { SC.ProcessMouseWheel(fakeEvent() as unknown as Event); }
+  {
+    SC.ProcessMouseWheel(fakeEvent() as unknown as Event);
+  }
 
   // No preventDefault field on event → 9951 alt1 (if falsy)
-  { SC.ProcessMouseWheel({
-    target: child,
-    wheelDelta: 120,
-    detail: 100,
-    returnValue: true,
-  } as unknown as Event); }
+  {
+    SC.ProcessMouseWheel({
+      target: child,
+      wheelDelta: 120,
+      detail: 100,
+      returnValue: true,
+    } as unknown as Event);
+  }
 
   teardownEditor(SC, editor);
 });
@@ -865,7 +983,9 @@ test("ProcessKeyDown: event undefined — e || window.event alt1", async () => {
   const { control } = await newControl(SC, "pkd-undef");
   SC.KeyboardSetFocus(control.editor);
   (globalThis as any).event = fakeEvent({ which: 0, keyCode: 0 });
-  { SC.ProcessKeyDown(undefined as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyDown(undefined as unknown as KeyboardEvent);
+  }
   delete (globalThis as any).event;
   teardownEditor(SC, control.editor);
 });
@@ -875,7 +995,9 @@ test("ProcessKeyPress: event undefined — e || window.event alt1", async () => 
   const { control } = await newControl(SC, "pkp-undef");
   SC.KeyboardSetFocus(control.editor);
   (globalThis as any).event = fakeEvent({ which: 0, keyCode: 0 });
-  { SC.ProcessKeyPress(undefined as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyPress(undefined as unknown as KeyboardEvent);
+  }
   delete (globalThis as any).event;
   teardownEditor(SC, control.editor);
 });
@@ -893,25 +1015,35 @@ test("CreateTableControl: register + invoke paneslider/lessbutton/morebutton/thu
   const vctrl = editor.verticaltablecontrol as SocialCalc.TableControl;
   const hctrl = editor.horizontaltablecontrol as SocialCalc.TableControl;
   // Build the controls and register their internal callbacks
-  { SC.CreateTableControl(vctrl); }
-  { SC.CreateTableControl(hctrl); }
+  {
+    SC.CreateTableControl(vctrl);
+  }
+  {
+    SC.CreateTableControl(hctrl);
+  }
 
   // Vertical paneslider — DragMouseDown triggers Disabled (line 9259)
   editor.busy = false;
-  { SC.DragMouseDown(
-    fakeEvent({ target: vctrl.paneslider, clientX: 10, clientY: 10 }) as unknown as MouseEvent,
-  ); }
+  {
+    SC.DragMouseDown(
+      fakeEvent({ target: vctrl.paneslider, clientX: 10, clientY: 10 }) as unknown as MouseEvent,
+    );
+  }
 
   // Vertical thumb — DragMouseDown triggers Disabled (line 9374)
-  { SC.DragMouseDown(
-    fakeEvent({ target: vctrl.thumb, clientX: 10, clientY: 10 }) as unknown as MouseEvent,
-  ); }
+  {
+    SC.DragMouseDown(
+      fakeEvent({ target: vctrl.thumb, clientX: 10, clientY: 10 }) as unknown as MouseEvent,
+    );
+  }
 
   // Vertical lessbutton — ButtonMouseDown triggers MouseDown (line 9287-9288)
   (SC.ButtonInfo as Record<string, unknown>).buttonDown = false;
-  { SC.ButtonMouseDown(
-    fakeEvent({ target: vctrl.lessbutton, clientX: 10, clientY: 10 }) as unknown as MouseEvent,
-  ); }
+  {
+    SC.ButtonMouseDown(
+      fakeEvent({ target: vctrl.lessbutton, clientX: 10, clientY: 10 }) as unknown as MouseEvent,
+    );
+  }
 
   // Vertical lessbutton — ButtonRepeat triggers Repeat (line 9291-9292). ButtonRepeat reads ButtonInfo.buttonElement.
   // editor.busy must be false so !busy=true → enter body. It may have been set true by
@@ -920,7 +1052,9 @@ test("CreateTableControl: register + invoke paneslider/lessbutton/morebutton/thu
   const lessBtnReg = SC.ButtonInfo.registeredElements.find((r) => r.element === vctrl.lessbutton);
   if (lessBtnReg) {
     (SC.ButtonInfo as Record<string, unknown>).buttonElement = lessBtnReg;
-    { SC.ButtonRepeat(); }
+    {
+      SC.ButtonRepeat();
+    }
     if (SC.ButtonInfo.timer) {
       clearTimeout(SC.ButtonInfo.timer);
       SC.ButtonInfo.timer = null;
@@ -930,16 +1064,20 @@ test("CreateTableControl: register + invoke paneslider/lessbutton/morebutton/thu
   // Vertical morebutton — ButtonMouseDown triggers MouseDown (line 9321-9322)
   editor.busy = false;
   (SC.ButtonInfo as Record<string, unknown>).buttonDown = false;
-  { SC.ButtonMouseDown(
-    fakeEvent({ target: vctrl.morebutton, clientX: 10, clientY: 10 }) as unknown as MouseEvent,
-  ); }
+  {
+    SC.ButtonMouseDown(
+      fakeEvent({ target: vctrl.morebutton, clientX: 10, clientY: 10 }) as unknown as MouseEvent,
+    );
+  }
 
   // Vertical morebutton — ButtonRepeat triggers Repeat (line 9325-9326). Set busy=false so alt0 covers.
   editor.busy = false;
   const moreBtnReg = SC.ButtonInfo.registeredElements.find((r) => r.element === vctrl.morebutton);
   if (moreBtnReg) {
     (SC.ButtonInfo as Record<string, unknown>).buttonElement = moreBtnReg;
-    { SC.ButtonRepeat(); }
+    {
+      SC.ButtonRepeat();
+    }
     if (SC.ButtonInfo.timer) {
       clearTimeout(SC.ButtonInfo.timer);
       SC.ButtonInfo.timer = null;
@@ -948,22 +1086,30 @@ test("CreateTableControl: register + invoke paneslider/lessbutton/morebutton/thu
 
   // Horizontal paneslider/thumb/lessbutton/morebutton — both vertical=false callback paths
   editor.busy = false;
-  { SC.DragMouseDown(
-    fakeEvent({ target: hctrl.paneslider, clientX: 10, clientY: 10 }) as unknown as MouseEvent,
-  ); }
-  { SC.DragMouseDown(
-    fakeEvent({ target: hctrl.thumb, clientX: 10, clientY: 10 }) as unknown as MouseEvent,
-  ); }
+  {
+    SC.DragMouseDown(
+      fakeEvent({ target: hctrl.paneslider, clientX: 10, clientY: 10 }) as unknown as MouseEvent,
+    );
+  }
+  {
+    SC.DragMouseDown(
+      fakeEvent({ target: hctrl.thumb, clientX: 10, clientY: 10 }) as unknown as MouseEvent,
+    );
+  }
   (SC.ButtonInfo as Record<string, unknown>).buttonDown = false;
   editor.busy = false;
-  { SC.ButtonMouseDown(
-    fakeEvent({ target: hctrl.lessbutton, clientX: 10, clientY: 10 }) as unknown as MouseEvent,
-  ); }
+  {
+    SC.ButtonMouseDown(
+      fakeEvent({ target: hctrl.lessbutton, clientX: 10, clientY: 10 }) as unknown as MouseEvent,
+    );
+  }
   const hLess = SC.ButtonInfo.registeredElements.find((r) => r.element === hctrl.lessbutton);
   if (hLess) {
     editor.busy = false;
     (SC.ButtonInfo as Record<string, unknown>).buttonElement = hLess;
-    { SC.ButtonRepeat(); }
+    {
+      SC.ButtonRepeat();
+    }
     if (SC.ButtonInfo.timer) {
       clearTimeout(SC.ButtonInfo.timer);
       SC.ButtonInfo.timer = null;
@@ -971,14 +1117,18 @@ test("CreateTableControl: register + invoke paneslider/lessbutton/morebutton/thu
   }
   (SC.ButtonInfo as Record<string, unknown>).buttonDown = false;
   editor.busy = false;
-  { SC.ButtonMouseDown(
-    fakeEvent({ target: hctrl.morebutton, clientX: 10, clientY: 10 }) as unknown as MouseEvent,
-  ); }
+  {
+    SC.ButtonMouseDown(
+      fakeEvent({ target: hctrl.morebutton, clientX: 10, clientY: 10 }) as unknown as MouseEvent,
+    );
+  }
   const hMore = SC.ButtonInfo.registeredElements.find((r) => r.element === hctrl.morebutton);
   if (hMore) {
     editor.busy = false;
     (SC.ButtonInfo as Record<string, unknown>).buttonElement = hMore;
-    { SC.ButtonRepeat(); }
+    {
+      SC.ButtonRepeat();
+    }
     if (SC.ButtonInfo.timer) {
       clearTimeout(SC.ButtonInfo.timer);
       SC.ButtonInfo.timer = null;
@@ -998,17 +1148,21 @@ test("ScrollAreaClick: clickpos <= thumbpos → PageRelative(-1) alt1", async ()
   const editor = control.editor;
   primeGridLayout(editor);
   const vctrl = editor.verticaltablecontrol as SocialCalc.TableControl;
-  { SC.CreateTableControl(vctrl); }
+  {
+    SC.CreateTableControl(vctrl);
+  }
   const btnInfo = SC.ButtonInfo;
   const scrollareaReg = btnInfo.registeredElements.find((r) => r.element === vctrl.scrollarea);
   if (scrollareaReg) {
     (vctrl as Record<string, unknown>).thumbpos = 1000000; // clickpos much less than thumbpos
     editor.busy = false;
-    { SC.ScrollAreaClick(
-      fakeEvent({ clientX: 10, clientY: 10 }) as unknown as MouseEvent,
-      btnInfo,
-      scrollareaReg,
-    ); }
+    {
+      SC.ScrollAreaClick(
+        fakeEvent({ clientX: 10, clientY: 10 }) as unknown as MouseEvent,
+        btnInfo,
+        scrollareaReg,
+      );
+    }
   }
   teardownEditor(SC, editor);
 });
@@ -1025,14 +1179,16 @@ test("CreateTableControl: TCpanesliderClass falsy skip paneslider.className set"
   const scc = SC.Constants;
   const saved = (scc as Record<string, unknown>).TCpanesliderClass;
   (scc as Record<string, unknown>).TCpanesliderClass = "";
-  { const vctrl = new SC.TableControl(editor, true, 400);
-  SC.CreateTableControl(vctrl);
-  editor.verticaltablecontrol = vctrl;
-  // Also build a horizontal control so both branches of TClessbuttonClass/etc are exercised
-  // (alt1 = empty — skipped). The vTCpanesliderClass is the only branch missing before this test.
-  const hctrl = new SC.TableControl(editor, false, 400);
-  SC.CreateTableControl(hctrl);
-  editor.horizontaltablecontrol = hctrl; }
+  {
+    const vctrl = new SC.TableControl(editor, true, 400);
+    SC.CreateTableControl(vctrl);
+    editor.verticaltablecontrol = vctrl;
+    // Also build a horizontal control so both branches of TClessbuttonClass/etc are exercised
+    // (alt1 = empty — skipped). The vTCpanesliderClass is the only branch missing before this test.
+    const hctrl = new SC.TableControl(editor, false, 400);
+    SC.CreateTableControl(hctrl);
+    editor.horizontaltablecontrol = hctrl;
+  }
   (scc as Record<string, unknown>).TCpanesliderClass = saved;
   teardownEditor(SC, editor);
 });
@@ -1100,10 +1256,14 @@ test("TCPSDragFunctionStart/Move: rowpositions/colpositions out-of-range alt1 fa
     offsetX: 0,
     offsetY: 0,
   };
-  { SC.TCPSDragFunctionStart({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj); }
+  {
+    SC.TCPSDragFunctionStart({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj);
+  }
 
   // For TCPSDragFunctionMove (line 9529 alt1) — same negative case
-  { SC.TCPSDragFunctionMove({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj); }
+  {
+    SC.TCPSDragFunctionMove({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj);
+  }
 
   // Horizontal
   const hctrl = editor.horizontaltablecontrol as SocialCalc.TableControl;
@@ -1124,8 +1284,12 @@ test("TCPSDragFunctionStart/Move: rowpositions/colpositions out-of-range alt1 fa
     offsetX: 0,
     offsetY: 0,
   };
-  { SC.TCPSDragFunctionStart({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
-  { SC.TCPSDragFunctionMove({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCPSDragFunctionStart({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
+  {
+    SC.TCPSDragFunctionMove({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
 
   teardownEditor(SC, editor);
 });
@@ -1153,13 +1317,19 @@ test("TCTDragFunctionStart: tracking-then-clear path + horizontal class/style tr
   const draginfoV: Record<string, unknown> = { clientX: 200, clientY: 200, offsetX: 0, offsetY: 0 };
 
   // First call: no pre-existing thumbstatus
-  { SC.TCTDragFunctionStart({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV); }
+  {
+    SC.TCTDragFunctionStart({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV);
+  }
 
   // Second call: thumbstatus already set → covers 9578 alt1 (truth) and 9580 alt1 (rowpreviewele truthy)
-  { SC.TCTDragFunctionStart({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV); }
+  {
+    SC.TCTDragFunctionStart({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV);
+  }
 
   // TCTDragFunctionRowSetStatus — covers 9602 binary-expr alt1 by using firstscrollingrow not falsy
-  { SC.TCTDragFunctionRowSetStatus(draginfoV as typeof SocialCalc.DragInfo, editor, 5); }
+  {
+    SC.TCTDragFunctionRowSetStatus(draginfoV as typeof SocialCalc.DragInfo, editor, 5);
+  }
 
   // Horizontal TCTDragFunctionStart with style/class truthy const-overrides (covers truthy-side of conditional classes which istanbul sometimes splits)
   const saved: Record<string, unknown> = {};
@@ -1178,7 +1348,9 @@ test("TCTDragFunctionStart: tracking-then-clear path + horizontal class/style tr
   } as SocialCalc.DragRegisteredElement;
   (dobjH.functionobj as Record<string, unknown>).control = hctrl;
   const draginfoH: Record<string, unknown> = { clientX: 200, clientY: 200, offsetX: 0, offsetY: 0 };
-  { SC.TCTDragFunctionStart({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCTDragFunctionStart({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
   for (const [k, v] of Object.entries(saved)) {
     (scc as Record<string, unknown>)[k] = v;
   }

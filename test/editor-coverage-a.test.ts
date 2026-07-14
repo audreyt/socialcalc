@@ -202,7 +202,9 @@ test("TableEditor: prototype passthrough methods", async () => {
   // throws when called — this is a real (if unfortunate) reference bug in
   // production code, not a test setup gap.
   if (typeof editor.EditorStepSet === "function") {
-    expect(() => editor.EditorStepSet("calcstart", null)).toThrow(/EditorStepSet is not a function/);
+    expect(() => editor.EditorStepSet("calcstart", null)).toThrow(
+      /EditorStepSet is not a function/,
+    );
   }
   // StopPropagation prototype version forwards `this` (the editor) as the
   // "event" object, so it sets cancelBubble/returnValue directly on editor.
@@ -288,7 +290,9 @@ test("EditorSheetStatusCallback: all switch branches + alert fallback", async ()
     calcserverfunc: { total: 10, count: 3 },
   };
   for (const s of statuses) {
-    expect(() => SC.EditorSheetStatusCallback(null, s, statusArgs[s] ?? null, editor)).not.toThrow();
+    expect(() =>
+      SC.EditorSheetStatusCallback(null, s, statusArgs[s] ?? null, editor),
+    ).not.toThrow();
   }
   // Stack up a deferred command so the cmdend branch pops it.
   editor.deferredCommands.push({ cmdstr: "recalc", saveundo: false });
@@ -472,21 +476,31 @@ test("ProcessEditorMouseDown: valid target, shiftKey range extension", async () 
 
   // ignore=true branch — a no-op early return.
   SC.EditorMouseInfo.ignore = true;
-  expect(() => SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 60, target }))).not.toThrow();
+  expect(() =>
+    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 60, target })),
+  ).not.toThrow();
   SC.EditorMouseInfo.ignore = false;
 
   // Target not in registeredElements path.
-  expect(() => SC.ProcessEditorMouseDown(fakeEvent({ target: document.createElement("div") }))).not.toThrow();
+  expect(() =>
+    SC.ProcessEditorMouseDown(fakeEvent({ target: document.createElement("div") })),
+  ).not.toThrow();
 
   // Text node target (nodeType 3) — goes to parentNode.
   const textTarget: any = document.createTextNode("x");
   (textTarget as any).parentNode = target;
-  expect(() => SC.ProcessEditorMouseDown(fakeEvent({ target: textTarget, clientX: 100, clientY: 60 }))).not.toThrow();
+  expect(() =>
+    SC.ProcessEditorMouseDown(fakeEvent({ target: textTarget, clientX: 100, clientY: 60 })),
+  ).not.toThrow();
 
   // ProcessEditorMouseMove without mouseinfo.editor — early return.
   SC.EditorMouseInfo.editor = null;
-  expect(() => SC.ProcessEditorMouseMove(fakeEvent({ clientX: 100, clientY: 60, target }))).not.toThrow();
-  expect(() => SC.ProcessEditorMouseUp(fakeEvent({ clientX: 100, clientY: 60, target }))).not.toThrow();
+  expect(() =>
+    SC.ProcessEditorMouseMove(fakeEvent({ clientX: 100, clientY: 60, target })),
+  ).not.toThrow();
+  expect(() =>
+    SC.ProcessEditorMouseUp(fakeEvent({ clientX: 100, clientY: 60, target })),
+  ).not.toThrow();
 });
 
 test("ProcessEditorMouseDown: SocialCalc._app=true takes CmdGotFocus branch", async () => {
@@ -525,11 +539,15 @@ test("ProcessEditorMouseDown: cell containing ioWidget (valuetype 'ni') is click
   const target = cellInfo?.element ?? editor.fullgrid;
   // The widget_id is "BUTTON_B2" per the source; fire a click on both the
   // cell itself and on a fake widget element with matching id.
-  expect(() => SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 60, target }))).not.toThrow();
+  expect(() =>
+    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 60, target })),
+  ).not.toThrow();
   const widget = document.createElement("button");
   widget.id = "BUTTON_B2";
   document.body.appendChild(widget);
-  expect(() => SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 60, target: widget }))).not.toThrow();
+  expect(() =>
+    SC.ProcessEditorMouseDown(fakeEvent({ clientX: 100, clientY: 60, target: widget })),
+  ).not.toThrow();
 });
 
 test("ProcessEditorDblClick → EditorOpenCellEdit", async () => {
@@ -556,11 +574,15 @@ test("ProcessEditorDblClick → EditorOpenCellEdit", async () => {
   SC.EditorMouseInfo.ignore = false;
 
   // No editor target in registered elements.
-  expect(() => SC.ProcessEditorDblClick(fakeEvent({ target: document.createElement("div") }))).not.toThrow();
+  expect(() =>
+    SC.ProcessEditorDblClick(fakeEvent({ target: document.createElement("div") })),
+  ).not.toThrow();
 
   // State != start should fall through default.
   editor.state = "input";
-  expect(() => SC.ProcessEditorDblClick(fakeEvent({ clientX: 100, clientY: 60, target }))).not.toThrow();
+  expect(() =>
+    SC.ProcessEditorDblClick(fakeEvent({ clientX: 100, clientY: 60, target })),
+  ).not.toThrow();
   editor.state = "start";
 });
 
@@ -778,14 +800,20 @@ test("EditorSaveEdit: text/formula/constant/text-prefix/empty paths", async () =
   // fires from EditorSaveEdit directly.
   editor.workingvalues.ecoord = "G1";
   expect(() => editor.EditorSaveEdit("triggered")).not.toThrow();
-  expect(() => SC.EditedTriggerCell({ G1: true }, "G1", editor, editor.context.sheetobj)).not.toThrow();
+  expect(() =>
+    SC.EditedTriggerCell({ G1: true }, "G1", editor, editor.context.sheetobj),
+  ).not.toThrow();
   editor.context.sheetobj.ioEventTree = { H1: { H1: true } };
   editor.context.sheetobj.ioParameterList = {
     H1: { function_name: "OTHER" },
   };
-  expect(() => SC.EditedTriggerCell({ H1: true }, "H1", editor, editor.context.sheetobj)).not.toThrow();
+  expect(() =>
+    SC.EditedTriggerCell({ H1: true }, "H1", editor, editor.context.sheetobj),
+  ).not.toThrow();
   editor.context.sheetobj.ioParameterList = {};
-  expect(() => SC.EditedTriggerCell({ Z1: true }, "Z1", editor, editor.context.sheetobj)).not.toThrow();
+  expect(() =>
+    SC.EditedTriggerCell({ Z1: true }, "Z1", editor, editor.context.sheetobj),
+  ).not.toThrow();
 
   delete editor.context.sheetobj.ioEventTree;
   delete editor.context.sheetobj.ioParameterList;
@@ -879,8 +907,12 @@ test("ProcessEditorColsize Down/Move/Up: full sequence", async () => {
   const result: any = { coltoresize: 2, coltounhide: null };
   const ev = fakeEvent({ clientX: 100, clientY: 0 });
   expect(() => SC.ProcessEditorColsizeMouseDown(ev, editor.fullgrid, result)).not.toThrow();
-  expect(() => SC.ProcessEditorColsizeMouseMove(fakeEvent({ clientX: 120, clientY: 0 }))).not.toThrow();
-  expect(() => SC.ProcessEditorColsizeMouseUp(fakeEvent({ clientX: 130, clientY: 0 }))).not.toThrow();
+  expect(() =>
+    SC.ProcessEditorColsizeMouseMove(fakeEvent({ clientX: 120, clientY: 0 })),
+  ).not.toThrow();
+  expect(() =>
+    SC.ProcessEditorColsizeMouseUp(fakeEvent({ clientX: 130, clientY: 0 })),
+  ).not.toThrow();
   // FinishColRowSize runs deferred (we invoke directly to cover it).
   expect(() => SC.FinishColRowSize()).not.toThrow();
 
@@ -888,12 +920,16 @@ test("ProcessEditorColsize Down/Move/Up: full sequence", async () => {
   SC.EditorMouseInfo.editor = editor;
   SC.EditorMouseInfo.mouseresizedisplay = document.createElement("div");
   editor.toplevel.appendChild(SC.EditorMouseInfo.mouseresizedisplay);
-  expect(() => SC.ProcessEditorColsizeMouseUp(fakeEvent({ clientX: 130, clientY: 0 }))).not.toThrow();
+  expect(() =>
+    SC.ProcessEditorColsizeMouseUp(fakeEvent({ clientX: 130, clientY: 0 })),
+  ).not.toThrow();
 
   // Colsize with coltounhide.
   const resultU: any = { coltoresize: null, coltounhide: 3 };
   expect(() => SC.ProcessEditorColsizeMouseDown(ev, editor.fullgrid, resultU)).not.toThrow();
-  expect(() => SC.ProcessEditorColsizeMouseUp(fakeEvent({ clientX: 130, clientY: 0 }))).not.toThrow();
+  expect(() =>
+    SC.ProcessEditorColsizeMouseUp(fakeEvent({ clientX: 130, clientY: 0 })),
+  ).not.toThrow();
 });
 
 test("ProcessEditorRowsize Down/Move/Up: full sequence", async () => {
@@ -920,14 +956,20 @@ test("ProcessEditorRowsize Down/Move/Up: full sequence", async () => {
   const result: any = { rowtoresize: 2, rowtounhide: null };
   const ev = fakeEvent({ clientX: 0, clientY: 100 });
   expect(() => SC.ProcessEditorRowsizeMouseDown(ev, editor.fullgrid, result)).not.toThrow();
-  expect(() => SC.ProcessEditorRowsizeMouseMove(fakeEvent({ clientX: 0, clientY: 120 }))).not.toThrow();
-  expect(() => SC.ProcessEditorRowsizeMouseUp(fakeEvent({ clientX: 0, clientY: 130 }))).not.toThrow();
+  expect(() =>
+    SC.ProcessEditorRowsizeMouseMove(fakeEvent({ clientX: 0, clientY: 120 })),
+  ).not.toThrow();
+  expect(() =>
+    SC.ProcessEditorRowsizeMouseUp(fakeEvent({ clientX: 0, clientY: 130 })),
+  ).not.toThrow();
 
   // rowtounhide branch.
   SC.EditorMouseInfo.editor = editor;
   const resultU: any = { rowtoresize: null, rowtounhide: 3 };
   expect(() => SC.ProcessEditorRowsizeMouseDown(ev, editor.fullgrid, resultU)).not.toThrow();
-  expect(() => SC.ProcessEditorRowsizeMouseUp(fakeEvent({ clientX: 0, clientY: 130 }))).not.toThrow();
+  expect(() =>
+    SC.ProcessEditorRowsizeMouseUp(fakeEvent({ clientX: 0, clientY: 130 })),
+  ).not.toThrow();
 });
 
 /**
@@ -1089,7 +1131,9 @@ test("ProcessEditorRowselect / Colselect Down/Move/Up", async () => {
   // clientY=100 maps to row 4 under primeGridLayout's rowpositions.
   SC.ProcessEditorRowselectMouseMove(fakeEvent({ clientX: 10, clientY: 100 }));
   expect(editor.range.bottom).toBe(4);
-  expect(() => SC.ProcessEditorRowselectMouseUp(fakeEvent({ clientX: 10, clientY: 120 }))).not.toThrow();
+  expect(() =>
+    SC.ProcessEditorRowselectMouseUp(fakeEvent({ clientX: 10, clientY: 120 })),
+  ).not.toThrow();
 
   // Colselect: anchors col 3 and extends to sheet.LastRow() (==1 here).
   SC.EditorMouseInfo.editor = editor;
@@ -1104,7 +1148,9 @@ test("ProcessEditorRowselect / Colselect Down/Move/Up", async () => {
   SC.ProcessEditorColselectMouseMove(fakeEvent({ clientX: 200, clientY: 10 }));
   expect(editor.range.left).toBe(3);
   expect(editor.range.right).toBe(3);
-  expect(() => SC.ProcessEditorColselectMouseUp(fakeEvent({ clientX: 250, clientY: 10 }))).not.toThrow();
+  expect(() =>
+    SC.ProcessEditorColselectMouseUp(fakeEvent({ clientX: 250, clientY: 10 })),
+  ).not.toThrow();
 
   // Without editor (early return): each handler's `if (!editor) return;`
   // guard means the range is left completely untouched.
@@ -1673,9 +1719,15 @@ test("ButtonRegister/Over/Out/Down/Up/Repeat: exercise all flows", async () => {
   expect(() => SC.ButtonMouseUp(fakeEvent({ target: btn }))).not.toThrow();
 
   // Unknown target.
-  expect(() => SC.ButtonMouseOver(fakeEvent({ target: document.createElement("div") }))).not.toThrow();
-  expect(() => SC.ButtonMouseDown(fakeEvent({ target: document.createElement("div") }))).not.toThrow();
-  expect(() => SC.ButtonMouseOut(fakeEvent({ target: document.createElement("div") }))).not.toThrow();
+  expect(() =>
+    SC.ButtonMouseOver(fakeEvent({ target: document.createElement("div") })),
+  ).not.toThrow();
+  expect(() =>
+    SC.ButtonMouseDown(fakeEvent({ target: document.createElement("div") })),
+  ).not.toThrow();
+  expect(() =>
+    SC.ButtonMouseOut(fakeEvent({ target: document.createElement("div") })),
+  ).not.toThrow();
 
   // Null paramobj in ButtonRegister.
   const btn3 = document.createElement("div");
@@ -1694,13 +1746,17 @@ test("MouseWheelRegister / ProcessMouseWheel", async () => {
   });
   // With wheelDelta set and no wheelDelta.
   expect(() => SC.ProcessMouseWheel(fakeEvent({ target: el, wheelDelta: 120 }))).not.toThrow();
-  expect(() => SC.ProcessMouseWheel(fakeEvent({ target: el, wheelDelta: 0, detail: 3 }))).not.toThrow();
+  expect(() =>
+    SC.ProcessMouseWheel(fakeEvent({ target: el, wheelDelta: 0, detail: 3 })),
+  ).not.toThrow();
   // passThru branch.
   SC.Keyboard.passThru = true;
   expect(() => SC.ProcessMouseWheel(fakeEvent({ target: el }))).not.toThrow();
   SC.Keyboard.passThru = null;
   // Not one of our elements.
-  expect(() => SC.ProcessMouseWheel(fakeEvent({ target: document.createElement("div") }))).not.toThrow();
+  expect(() =>
+    SC.ProcessMouseWheel(fakeEvent({ target: document.createElement("div") })),
+  ).not.toThrow();
 });
 
 test("KeyboardSetFocus, ProcessKey, ProcessKeyDown, ProcessKeyPress", async () => {
@@ -1927,7 +1983,6 @@ test("Ctrl-A/C/V/X/Z/S flows via ctrlkeyFunction", async () => {
   // Unknown key passes through.
   const rc3 = editor.ctrlkeyFunction(editor, "[ctrl-q]");
   expect(rc3).toBe(true);
-
 });
 
 test("ScrollTable helpers (Up/Down): direct and boundary cases", async () => {

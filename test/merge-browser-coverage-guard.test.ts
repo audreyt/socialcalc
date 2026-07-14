@@ -174,11 +174,7 @@ guardDescribe("scripts/merge-browser-coverage.mjs: fail-open guards (focused too
         },
       ],
     };
-    writeFileSync(
-      join(tempDir!, "no-convert-guard-fixture.json"),
-      JSON.stringify(fixture),
-      "utf8",
-    );
+    writeFileSync(join(tempDir!, "no-convert-guard-fixture.json"), JSON.stringify(fixture), "utf8");
 
     const result = runMergeScript();
 
@@ -186,9 +182,7 @@ guardDescribe("scripts/merge-browser-coverage.mjs: fail-open guards (focused too
       result.status,
       "merge script must exit nonzero when no browser entry converts real coverage",
     ).not.toBe(0);
-    expect(result.stderr, "error must mention zero converted ranges").toMatch(
-      /convertedRanges=0/,
-    );
+    expect(result.stderr, "error must mention zero converted ranges").toMatch(/convertedRanges=0/);
     expect(result.stdout, "must never print the per-file report on this failure").not.toContain(
       "per-file merged result",
     );
@@ -197,7 +191,7 @@ guardDescribe("scripts/merge-browser-coverage.mjs: fail-open guards (focused too
     );
   });
 
-  test("a browser-coverage entry for the bundle URL with no \"source\" field fails the merge instead of silently trusting unverifiable V8 ranges", () => {
+  test('a browser-coverage entry for the bundle URL with no "source" field fails the merge instead of silently trusting unverifiable V8 ranges', () => {
     if (!unitCoverageAvailable()) {
       test.skip("coverage/coverage-final.json is unavailable");
       return;
@@ -218,16 +212,16 @@ guardDescribe("scripts/merge-browser-coverage.mjs: fail-open guards (focused too
           scriptId: "1",
           // `source` deliberately omitted.
           functions: [
-            { functionName: "fake", isBlockCoverage: true, ranges: [{ startOffset: 0, endOffset: 10, count: 5 }] },
+            {
+              functionName: "fake",
+              isBlockCoverage: true,
+              ranges: [{ startOffset: 0, endOffset: 10, count: 5 }],
+            },
           ],
         },
       ],
     };
-    writeFileSync(
-      join(tempDir!, "no-source-guard-fixture.json"),
-      JSON.stringify(fixture),
-      "utf8",
-    );
+    writeFileSync(join(tempDir!, "no-source-guard-fixture.json"), JSON.stringify(fixture), "utf8");
 
     const result = runMergeScript();
 

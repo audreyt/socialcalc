@@ -36,9 +36,10 @@ describe("recalculation performance budget", () => {
       const elapsedMs = performance.now() - start;
 
       expect(sheet.cells[`A${CHAIN_LENGTH}`].datavalue).toBe(CHAIN_LENGTH);
-      expect(elapsedMs, `${CHAIN_LENGTH}-cell chain took ${elapsedMs.toFixed(1)}ms, budget is ${BUDGET_MS}ms`).toBeLessThan(
-        BUDGET_MS,
-      );
+      expect(
+        elapsedMs,
+        `${CHAIN_LENGTH}-cell chain took ${elapsedMs.toFixed(1)}ms, budget is ${BUDGET_MS}ms`,
+      ).toBeLessThan(BUDGET_MS);
     },
     BUDGET_MS + 3000,
   );

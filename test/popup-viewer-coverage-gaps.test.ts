@@ -23,10 +23,7 @@ function setElementMetrics(element: HTMLElement, metrics: MutableElementMetrics)
   Object.defineProperties(
     element,
     Object.fromEntries(
-      Object.entries(metrics).map(([name, value]) => [
-        name,
-        { configurable: true, value },
-      ]),
+      Object.entries(metrics).map(([name, value]) => [name, { configurable: true, value }]),
     ),
   );
 }
@@ -411,7 +408,10 @@ test("Gaps: ColorChooser.CreateGrid appends grid nodes and SetColors resets stat
 
   // gridNode contains both the color table and action-row controls.
   expect(gridNode.childNodes.length).toBe(2);
-  const table = gridNode.childNodes[0] as unknown as { childNodes: Array<Record<string, any>>; tagName: string };
+  const table = gridNode.childNodes[0] as unknown as {
+    childNodes: Array<Record<string, any>>;
+    tagName: string;
+  };
   expect(table.tagName).toBe("TABLE");
   const tbody = table.childNodes[0] as { childNodes: Array<Record<string, any>> };
   expect(tbody.childNodes.length).toBe(16);
@@ -2167,7 +2167,11 @@ test("Gaps3: ColorChooser.DefaultClicked/CustomClicked/CloseOK with null event",
   // Set up oldEvent so window.event fallback works.
   const eventGlobal = globalWithOptionalEvent();
   const oldEvent = eventGlobal.event;
-  (eventGlobal as unknown as Record<string, unknown>).event = { type: "click", clientX: 0, clientY: 0 };
+  (eventGlobal as unknown as Record<string, unknown>).event = {
+    type: "click",
+    clientX: 0,
+    clientY: 0,
+  };
 
   SC.Popup.CClick("ccevents-pv");
   SC.Popup.Types.ColorChooser.DefaultClicked(null as unknown as MouseEvent);
@@ -2540,7 +2544,6 @@ test("Gaps: Viewer DecodeSpreadsheetSave direct function captures sheet part off
   expect(sheetChunk).toContain("sheet:c:1:r:1");
 });
 
-
 // -----------------------------------------------------------------------------
 // ColorChooser CreateGrid onclick arrow handlers (lines 1490, 1492, 1494)
 // These arrow functions are wired as grid.defaultbox.onclick, grid.custom.onclick,
@@ -2598,7 +2601,6 @@ test("Gaps6: ColorChooser grid.msg.onclick fires CloseOK via arrow handler", asy
   expect(SC.Popup.Current.id).toBeNull();
 });
 
-
 // -----------------------------------------------------------------------------
 // ColorChooser grid.table.onmousedown arrow handler (line 1497)
 // The arrow function wired as grid.table.onmousedown in CreateGrid. Existing
@@ -2630,7 +2632,6 @@ test("Gaps6: ColorChooser grid.table.onmousedown fires GridMouseDown via arrow h
   // Clean up.
   SC.Popup.Close();
 });
-
 
 // -----------------------------------------------------------------------------
 // Viewer: InitializeSpreadsheetViewer with editorDiv falsy (L270 branch 1)
@@ -2666,8 +2667,6 @@ test("Gaps6: Viewer InitializeSpreadsheetViewer skips appendChild when editorDiv
   // Verify the guard worked: editorDiv was NOT appended.
   const spreadsheetDiv = viewer.spreadsheetDiv;
   expect(spreadsheetDiv).not.toBeNull();
-  const hasEditorChild = Array.from(spreadsheetDiv!.childNodes).some(
-    (n) => n === viewer.editorDiv,
-  );
+  const hasEditorChild = Array.from(spreadsheetDiv!.childNodes).some((n) => n === viewer.editorDiv);
   expect(hasEditorChild).toBe(false);
 });

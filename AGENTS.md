@@ -22,9 +22,10 @@ or release workflows.
 5. **Default rendering compatibility is intentional.** The untrusted-content
    policy is opt-in and off by default. Security fixes must preserve the legacy
    path unless the change explicitly revises that public contract.
-6. **No warning suppressions.** `vp lint` is type-aware, typechecking, and
-   warning-denying. Fix diagnostics; do not add `oxlint-disable`, `@ts-ignore`,
-   blanket `eslint-disable`, or equivalent debt markers.
+6. **Formatting, lint, and types are one gate.** `vp check` runs Oxfmt in
+   check mode plus warning-denying, type-aware lint and typechecking. Use
+   `vp check --fix` before committing; do not add `oxlint-disable`,
+   `@ts-ignore`, blanket `eslint-disable`, or equivalent debt markers.
 7. **Release evidence must be real.** Coverage and mutation floors come from
    measured runs. Missing reports, unmeasured baselines, skipped scripts, and
    placeholder values are failures, not acceptable fallbacks.
@@ -136,25 +137,25 @@ file is current.
 
 Run focused behavior first. Run broader gates after the change works.
 
-| Change                                    | Required checks                                                                                                                      |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Documentation only                        | `vp fmt --check <files>` plus every command/config fact referenced by the edit.                                                      |
-| Ordinary `js/` change                     | `vp build`, focused Vitest file(s), `vp run typecheck`, `vp lint`.                                                                   |
-| Public declaration change                 | `vp run typecheck`, `vp lint`, `vp run test:package-contract`; add a packed-consumer type assertion when the public surface changes. |
-| `build.ts` / source ordering / UMD change | `vp run typecheck:strict`, `vp build`, coverage attribution tests, bundle serialization/parity tests, package contract.              |
-| Formula-reference rewrite                 | The dedicated formula matrix below plus command-level scenarios.                                                                     |
-| Security policy or sink                   | Security unit tests, sink inventory review, Chromium active-content test, full browser suite if DOM behavior changed.                |
-| Popup/editor UI behavior                  | Focused hardening test plus the relevant Playwright interaction.                                                                     |
-| Test helper/fake DOM                      | All directly dependent test files, credibility guard, then the full Vitest suite.                                                    |
-| Coverage config/merge                     | Unit coverage, mapping/guard tests, merged coverage, and a deliberate negative threshold/source-integrity probe.                     |
-| Mutation config/baseline/disposition      | Workflow verifier, disposition verifier/tests, targeted Stryker run when measurement changes, and release-gate validation.           |
-| Lemma facade                              | Focused facade-oracle test, Dafny regeneration/check, Lean generation smoke.                                                         |
-| Package manifest/dependency               | Frozen install, typecheck/lint, package contract, audit, deterministic pack if release-facing.                                       |
-| Workflow                                  | `actionlint` plus the local workflow verifier/script that exercises the changed contract.                                            |
-| Release candidate                         | Full tag DAG: core, merged coverage, full mutation, three browsers, EtherCalc canary, package contract, deterministic pack.          |
+| Change                                    | Required checks                                                                                                                             |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Documentation only                        | `vp fmt --check <files>` plus every command/config fact referenced by the edit.                                                             |
+| Ordinary `js/` change                     | `vp build`, focused Vitest file(s), `vp check`.                                                                                             |
+| Public declaration change                 | `vp check`, `vp run test:package-contract`; add a packed-consumer type assertion when the public surface changes.                           |
+| `build.ts` / source ordering / UMD change | `vp run typecheck:strict`, `vp build`, coverage attribution tests, bundle serialization/parity tests, package contract.                     |
+| Formula-reference rewrite                 | The dedicated formula matrix below plus command-level scenarios.                                                                            |
+| Security policy or sink                   | Security unit tests, sink inventory review, Chromium active-content test, full browser suite if DOM behavior changed.                       |
+| Popup/editor UI behavior                  | Focused hardening test plus the relevant Playwright interaction.                                                                            |
+| Test helper/fake DOM                      | All directly dependent test files, credibility guard, then the full Vitest suite.                                                           |
+| Coverage config/merge                     | Unit coverage, mapping/guard tests, merged coverage, and a deliberate negative threshold/source-integrity probe.                            |
+| Mutation config/baseline/disposition      | Workflow verifier, disposition verifier/tests, targeted Stryker run when measurement changes, and release-gate validation.                  |
+| Lemma facade                              | Focused facade-oracle test, Dafny regeneration/check, Lean generation smoke.                                                                |
+| Package manifest/dependency               | Frozen install, `vp check`, package contract, audit, deterministic pack if release-facing.                                                  |
+| Workflow                                  | `vp check`, `actionlint`, and the local workflow verifier/script that exercises the changed contract.                                       |
+| Release candidate                         | `vp check` plus full tag DAG: core, merged coverage, full mutation, three browsers, EtherCalc canary, package contract, deterministic pack. |
 
 Do not run a full Stryker matrix as routine verification for an unrelated edit.
-Do not skip a focused behavior check merely because typecheck or lint is green.
+Do not skip a focused behavior check merely because `vp check` is green.
 
 ## Tests and credibility
 
@@ -345,8 +346,7 @@ Required matrix:
 ```bash
 vp build
 vp test run test/formula-rewrite-cases.test.ts test/formula-rewrite-regressions.test.ts
-vp run typecheck
-vp lint
+vp check
 ```
 
 Use `ScheduleSheetCommands` / `loadSocialCalc()` scenarios for copy, paste,
@@ -510,8 +510,8 @@ The contract verifies:
 
 A `v*` tag runs five independent required gates:
 
-1. core: typecheck, strict typecheck, lint, build, Vitest, credibility, Dafny,
-   Lean generation, blocking high/critical audit;
+1. core: `vp check` (format, lint, types), strict typecheck, build, Vitest,
+   credibility, Dafny, Lean generation, blocking high/critical audit;
 2. merged source coverage;
 3. full eleven-module mutation matrix and release-gate aggregation;
 4. Chromium/Firefox/WebKit Playwright;

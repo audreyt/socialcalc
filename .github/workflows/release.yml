@@ -5,8 +5,8 @@ name: Release
 # external EtherCalc canary) serializes behind the others in one long-
 # running job:
 #
-#   core              typecheck, strict typecheck, lint, build, unit tests,
-#                     test credibility guard, Dafny verification, Lean
+#   core              format, lint, typecheck, strict typecheck, build, unit
+#                     tests, test credibility guard, Dafny verification, Lean
 #                     generation, blocking high/critical dependency audit.
 #   coverage          source-attributed coverage (`vp run test:coverage`),
 #                     enforces the per-file/global floors in vite.config.ts.
@@ -144,14 +144,11 @@ jobs:
       - name: Install dependencies (frozen lockfile)
         run: vp install --frozen-lockfile
 
-      - name: Typecheck
-        run: vp run typecheck
+      - name: Check formatting, lint, and types
+        run: vp check
 
       - name: Typecheck (strict)
         run: vp run typecheck:strict
-
-      - name: Lint
-        run: vp lint
 
       - name: Build
         run: vp build

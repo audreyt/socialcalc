@@ -23,14 +23,18 @@ setIntervalHolder.setInterval = function (
 
 afterEach(() => {
   for (const id of __liveIntervals) {
-    { clearInterval(id as ReturnType<typeof setInterval>); }
+    {
+      clearInterval(id as ReturnType<typeof setInterval>);
+    }
   }
   __liveIntervals.clear();
-  { const SC = (globalThis as unknown as { SocialCalc?: unknown }).SocialCalc;
-  if (SC && typeof SC === "object" && "Keyboard" in SC) {
-    const kbd = SC as unknown as { Keyboard: { focusTable: unknown } };
-    kbd.Keyboard.focusTable = null;
-  } }
+  {
+    const SC = (globalThis as unknown as { SocialCalc?: unknown }).SocialCalc;
+    if (SC && typeof SC === "object" && "Keyboard" in SC) {
+      const kbd = SC as unknown as { Keyboard: { focusTable: unknown } };
+      kbd.Keyboard.focusTable = null;
+    }
+  }
   cancelActiveTrackedTimers();
 });
 
@@ -490,8 +494,6 @@ test("PopupListInitialize: processes optionvals from initialdata (L19106)", asyn
 // with length ≥ 1, so optionvals.length is always truthy.
 // -------------------------------------------------------------------
 
-
-
 // -------------------------------------------------------------------
 // Test 9: PopupChangeCallback with date format → str2 is bad-date string (L4057 branch 1)
 // When formatnumber is a date format like "yyyy-mm-dd", formatting -1234.5
@@ -572,7 +574,9 @@ test("SpreadsheetControlCommentSet: readonly cell skips title update (L3440 bran
 
   // Make the cell readonly by setting readonly property on the cell.
   if (!control.sheet.cells["A1"]) {
-    control.sheet.cells["A1"] = { readonly: true } as unknown as typeof control.sheet.cells[string];
+    control.sheet.cells["A1"] = {
+      readonly: true,
+    } as unknown as (typeof control.sheet.cells)[string];
   } else {
     (control.sheet.cells["A1"] as unknown as { readonly: boolean }).readonly = true;
   }

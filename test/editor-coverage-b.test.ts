@@ -141,7 +141,6 @@ function ensureDocumentEvents(): void {
   }
 }
 
-
 test("ScrollTableDownOneRow with rowspan cell starting inside pane", async () => {
   const SC = await loadSocialCalc({ browser: true });
   const { control } = await newControl(SC, "stds-root");

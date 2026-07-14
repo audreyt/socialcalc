@@ -15,7 +15,7 @@ function resetFormulaGlobals(SC: typeof globalThis.SocialCalc) {
     SC.RecalcInfo.currentState = 0;
     SC.RecalcInfo.queue = [];
     if (SC.RecalcInfo.recalctimer) {
-      clearTimeout(SC.RecalcInfo.recalctimer)
+      clearTimeout(SC.RecalcInfo.recalctimer);
       SC.RecalcInfo.recalctimer = null;
     }
     SC.RecalcInfo.firstRenderScheduled = false;
@@ -394,18 +394,15 @@ test("IRRFunction: error in cashflow range produces e#VALUE! (L5066)", async () 
 // ---------------------------------------------------------------------------
 
 test("EvaluatePolish: numeric N (<>) comparison branch (L575)", async () => {
-  const { getDV } = await buildSheet([
-    "set A1 formula 5<>3",
-    "set A2 formula 5<>5",
-  ]);
+  const { getDV } = await buildSheet(["set A1 formula 5<>3", "set A2 formula 5<>5"]);
   expect(getDV("A1")).toBe(1);
   expect(getDV("A2")).toBe(0);
 });
 
 test("EvaluatePolish: text N (<>) comparison branch (L612)", async () => {
   const { getDV } = await buildSheet([
-    "set A1 formula \"hello\"<>\"world\"",
-    "set A2 formula \"hello\"<>\"hello\"",
+    'set A1 formula "hello"<>"world"',
+    'set A2 formula "hello"<>"hello"',
   ]);
   expect(getDV("A1")).toBe(1);
   expect(getDV("A2")).toBe(0);
@@ -440,7 +437,7 @@ test("LookupFunctions: text rangelookup descending overshoot (L2536)", async () 
     "set B1 text t C",
     "set B2 text t B",
     "set B3 text t A",
-    "set A1 formula MATCH(\"B\", B1:B3, -1)",
+    'set A1 formula MATCH("B", B1:B3, -1)',
   ]);
   // Descending range {"C", "B", "A"}, looking for "B" with -1 (descending approximate)
   // "B" < "C" is true, enters L2536 descending branch
@@ -452,11 +449,11 @@ test("LookupFunctions: text rangelookup previousOK=2 break and instant overshoot
     "set B1 text t A",
     "set B2 text t B",
     "set B3 text t D",
-    "set A1 formula MATCH(\"C\", B1:B3, 1)",
+    'set A1 formula MATCH("C", B1:B3, 1)',
     "set C1 text t B",
     "set C2 text t C",
     "set C3 text t D",
-    "set A2 formula MATCH(\"A\", C1:C3, 1)",
+    'set A2 formula MATCH("A", C1:C3, 1)',
   ]);
   // Ascending range {"A", "B", "D"}, looking for "C" with 1 (ascending approximate)
   // Matches "A" (OK), "B" (OK), then overshoots at "D" ("C" < "D"), previousOK becomes 2, breaks
@@ -473,10 +470,10 @@ test("LookupFunctions: text rangelookup previousOK=2 break and instant overshoot
 
 test("ExactFunction: propagates errors in arguments (L3280, L3291, L3302, L3306)", async () => {
   const { getVT } = await buildSheet([
-    "set A1 formula EXACT(NA(), \"hello\")", // v1type == "e" (L3306)
-    "set A2 formula EXACT(\"hello\", NA())", // v1type == "t", v2type == "e" (L3280)
-    "set A3 formula EXACT(5, NA())",       // v1type == "n", v2type == "e" (L3291)
-    "set A4 formula EXACT(C99, NA())",     // v1type == "b", v2type == "e" (L3302) (C99 is blank)
+    'set A1 formula EXACT(NA(), "hello")', // v1type == "e" (L3306)
+    'set A2 formula EXACT("hello", NA())', // v1type == "t", v2type == "e" (L3280)
+    "set A3 formula EXACT(5, NA())", // v1type == "n", v2type == "e" (L3291)
+    "set A4 formula EXACT(C99, NA())", // v1type == "b", v2type == "e" (L3302) (C99 is blank)
   ]);
   expect(getVT("A1")).toBe("e#N/A");
   expect(getVT("A2")).toBe("e#N/A");
@@ -550,10 +547,34 @@ test("ExactFunction: direct operands propagate error-typed branches", async () =
   const SC = await loadSC();
   const sheet = new SC.Sheet();
   const cases: Array<{ operands: Operand[]; expected: string }> = [
-    { operands: [{ type: "e#N/A", value: 0 }, { type: "t", value: "hello" }], expected: "e#N/A" },
-    { operands: [{ type: "e#DIV/0!", value: 0 }, { type: "n", value: 5 }], expected: "e#DIV/0!" },
-    { operands: [{ type: "e#VALUE!", value: 0 }, { type: "b", value: 0 }], expected: "e#VALUE!" },
-    { operands: [{ type: "t", value: "hello" }, { type: "e#REF!", value: 0 }], expected: "e#REF!" },
+    {
+      operands: [
+        { type: "e#N/A", value: 0 },
+        { type: "t", value: "hello" },
+      ],
+      expected: "e#N/A",
+    },
+    {
+      operands: [
+        { type: "e#DIV/0!", value: 0 },
+        { type: "n", value: 5 },
+      ],
+      expected: "e#DIV/0!",
+    },
+    {
+      operands: [
+        { type: "e#VALUE!", value: 0 },
+        { type: "b", value: 0 },
+      ],
+      expected: "e#VALUE!",
+    },
+    {
+      operands: [
+        { type: "t", value: "hello" },
+        { type: "e#REF!", value: 0 },
+      ],
+      expected: "e#REF!",
+    },
   ];
 
   for (const item of cases) {
@@ -567,10 +588,22 @@ test("ExactFunction: unsupported direct operand types fall through as logical fa
   const SC = await loadSC();
   const sheet = new SC.Sheet();
   const cases: Operand[][] = [
-    [{ type: "x", value: "ignored" }, { type: "t", value: "hello" }],
-    [{ type: "x", value: "ignored" }, { type: "n", value: 5 }],
-    [{ type: "x", value: "ignored" }, { type: "b", value: 0 }],
-    [{ type: "x", value: "ignored" }, { type: "x", value: "also-ignored" }],
+    [
+      { type: "x", value: "ignored" },
+      { type: "t", value: "hello" },
+    ],
+    [
+      { type: "x", value: "ignored" },
+      { type: "n", value: 5 },
+    ],
+    [
+      { type: "x", value: "ignored" },
+      { type: "b", value: 0 },
+    ],
+    [
+      { type: "x", value: "ignored" },
+      { type: "x", value: "also-ignored" },
+    ],
   ];
 
   for (const operands of cases) {
@@ -592,18 +625,17 @@ test("IRRFunction: unsupported cashflow type falls through to e#NUM!", async () 
   expect(operand[0]).toMatchObject({ type: "e#NUM!", value: 0 });
 });
 
-
 // ---------------------------------------------------------------------------
 // 24. ISERR vs ISERROR family with #N/A vs other (L3650)
 // ---------------------------------------------------------------------------
 
 test("IsFunctions: ISERR handles NA vs other errors differently (L3650)", async () => {
   const { getDV } = await buildSheet([
-    "set A1 formula ISERR(NA())",   // ISERR(#N/A) -> false (0)
-    "set A2 formula ISERR(1/0)",    // ISERR(#DIV/0!) -> true (1)
+    "set A1 formula ISERR(NA())", // ISERR(#N/A) -> false (0)
+    "set A2 formula ISERR(1/0)", // ISERR(#DIV/0!) -> true (1)
     "set B1 formula ISERROR(NA())", // ISERROR(#N/A) -> true (1)
-    "set B2 formula ISERR(5)",      // ISERR(5) -> false (0) (L3650 non-error arm)
-    "set B3 formula ISERR(\"hi\")",  // ISERR("hi") -> false (0)
+    "set B2 formula ISERR(5)", // ISERR(5) -> false (0) (L3650 non-error arm)
+    'set B3 formula ISERR("hi")', // ISERR("hi") -> false (0)
   ]);
   expect(getDV("A1")).toBe(0);
   expect(getDV("A2")).toBe(1);

@@ -7,7 +7,13 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { expectParity, loadPair, recalcSheet, scheduleCommands } from "../helpers/differential";
 
-const PROTOTYPE_LIKE_NAMES = ["__proto__", "constructor", "hasOwnProperty", "toString", "valueOf"] as const;
+const PROTOTYPE_LIKE_NAMES = [
+  "__proto__",
+  "constructor",
+  "hasOwnProperty",
+  "toString",
+  "valueOf",
+] as const;
 
 describe("prototype-like named ranges", () => {
   test("defining __proto__ as a name does not pollute Object.prototype", async () => {
@@ -27,7 +33,11 @@ describe("prototype-like named ranges", () => {
       const outcomes: Array<{ datavalue: unknown; valuetype: string }> = [];
       for (const SC of [candidate, oracle]) {
         const sheet = new SC.Sheet();
-        await scheduleCommands(SC, sheet, [`set A1 value n 7`, `name define ${name} A1`, `set B1 formula ${name}`]);
+        await scheduleCommands(SC, sheet, [
+          `set A1 value n 7`,
+          `name define ${name} A1`,
+          `set B1 formula ${name}`,
+        ]);
         await recalcSheet(SC, sheet);
         outcomes.push({ datavalue: sheet.cells.B1.datavalue, valuetype: sheet.cells.B1.valuetype });
       }

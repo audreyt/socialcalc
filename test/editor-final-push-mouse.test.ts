@@ -238,8 +238,12 @@ function teardownEditor(SC: SC, editor: Editor): void {
 }
 
 function makeNextCreatedDivFirstChildNull(): () => void {
-  const documentWithCreate = document as Document & { createElement: typeof document.createElement };
-  const originalCreateElement = document.createElement.bind(document) as typeof document.createElement;
+  const documentWithCreate = document as Document & {
+    createElement: typeof document.createElement;
+  };
+  const originalCreateElement = document.createElement.bind(
+    document,
+  ) as typeof document.createElement;
   let patched = false;
   documentWithCreate.createElement = ((tagName: string, options?: ElementCreationOptions) => {
     const element = originalCreateElement(tagName, options);
@@ -279,7 +283,10 @@ test("ProcessEditorMouseDown uses srcElement when event.target is falsy", async 
     mouseInfo.editor = null;
     mouseInfo.element = null;
     mouseInfo.ignore = false;
-    SC.GetElementPositionWithScroll = (() => ({ left: 0, top: 0 })) as unknown as typeof SC.GetElementPositionWithScroll;
+    SC.GetElementPositionWithScroll = (() => ({
+      left: 0,
+      top: 0,
+    })) as unknown as typeof SC.GetElementPositionWithScroll;
     SC.GridMousePosition = (() => ({ row: 2, col: 2, coord: "B2" })) as typeof SC.GridMousePosition;
     editorOps.MoveECell = (coord: string) => coord;
     editorOps.EditorMouseRange = () => {};
@@ -333,7 +340,10 @@ test("ProcessEditorMouseMove exits when a truthy grid result loses its coord", a
     mouseInfo.mousedowncoord = "A1";
     mouseInfo.mouselastcoord = "A1";
     editor.range.hasrange = false;
-    SC.GetElementPositionWithScroll = (() => ({ left: 0, top: 0 })) as unknown as typeof SC.GetElementPositionWithScroll;
+    SC.GetElementPositionWithScroll = (() => ({
+      left: 0,
+      top: 0,
+    })) as unknown as typeof SC.GetElementPositionWithScroll;
     SC.GridMousePosition = (() => changingResult) as typeof SC.GridMousePosition;
     SC.SetDragAutoRepeat = ((_editor, result) => {
       autoRepeatMouseInfo = result;
@@ -379,7 +389,10 @@ test("ProcessEditorColsizeMouseDown and MouseUp handle missing size target and n
     editor.colpositions = [0, 0, 80, 160, 240];
     editor.context.colwidth = [0, 30, 80, 80, 80];
     restoreCreateElement = makeNextCreatedDivFirstChildNull();
-    SC.GetElementPositionWithScroll = (() => ({ left: 0, top: 0 })) as unknown as typeof SC.GetElementPositionWithScroll;
+    SC.GetElementPositionWithScroll = (() => ({
+      left: 0,
+      top: 0,
+    })) as unknown as typeof SC.GetElementPositionWithScroll;
     SC.SetMouseMoveUp = (() => {}) as typeof SC.SetMouseMoveUp;
     SC.RemoveMouseMoveUp = (() => {}) as typeof SC.RemoveMouseMoveUp;
     SC.setStyles = (() => {
@@ -399,7 +412,9 @@ test("ProcessEditorColsizeMouseDown and MouseUp handle missing size target and n
 
     mouseInfo.mousecoltounhide = 0;
     mouseInfo.mouseresizecolnum = 0;
-    const result = SC.ProcessEditorColsizeMouseUp(syntheticEvent({ clientX: 100 }) as unknown as MouseEvent);
+    const result = SC.ProcessEditorColsizeMouseUp(
+      syntheticEvent({ clientX: 100 }) as unknown as MouseEvent,
+    );
 
     expect(result).toBe(false);
     expect(scheduledCommands).toEqual([]);
@@ -443,7 +458,8 @@ test("ProcessEditorRowsizeMouseDown and MouseUp handle missing size target and n
     editor.context.rowheight = [0, 30, 20, 20, 20];
     editor.context.totalwidth = 400;
     restoreCreateElement = makeNextCreatedDivFirstChildNull();
-    SC.GetSpreadsheetControlObject = (() => fakeControl) as unknown as typeof SC.GetSpreadsheetControlObject;
+    SC.GetSpreadsheetControlObject = (() =>
+      fakeControl) as unknown as typeof SC.GetSpreadsheetControlObject;
     SC.SetMouseMoveUp = (() => {}) as typeof SC.SetMouseMoveUp;
     SC.RemoveMouseMoveUp = (() => {}) as typeof SC.RemoveMouseMoveUp;
     SC.setStyles = (() => {
@@ -463,7 +479,9 @@ test("ProcessEditorRowsizeMouseDown and MouseUp handle missing size target and n
 
     mouseInfo.mouserowtounhide = 0;
     mouseInfo.mouseresizerownum = 0;
-    const result = SC.ProcessEditorRowsizeMouseUp(syntheticEvent({ clientY: 100 }) as unknown as MouseEvent);
+    const result = SC.ProcessEditorRowsizeMouseUp(
+      syntheticEvent({ clientY: 100 }) as unknown as MouseEvent,
+    );
 
     expect(result).toBe(false);
     expect(scheduledCommands).toEqual([]);
@@ -598,7 +616,6 @@ test("EditorProcessKey input state covers guarded non-arrow save path", async ()
   let saveCount = 0;
   // eslint-disable-next-line @typescript-eslint/unbound-method
   const originalSubstr: (start: number, length?: number) => string = String.prototype.substr;
-
 
   try {
     editor.state = "input";

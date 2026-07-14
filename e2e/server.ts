@@ -82,7 +82,9 @@ const server = createServer((request, response) => {
   const path = url.pathname;
 
   if (path === "/normal.html") {
-    response.writeHead(200, { "content-type": mimeTypes[".html"] }).end(fixturePage("/dist/SocialCalc.js", false));
+    response
+      .writeHead(200, { "content-type": mimeTypes[".html"] })
+      .end(fixturePage("/dist/SocialCalc.js", false));
     return;
   }
   if (path === "/minified.html") {

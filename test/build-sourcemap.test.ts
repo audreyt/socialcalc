@@ -99,7 +99,10 @@ function expectRoundTrip(needle: string, expectedRelativeSource: string) {
   const sourcePath = resolveSource(expectedRelativeSource);
   const sourceLines = readFileSync(sourcePath, "utf8").split("\n");
   const sourceMatches = sourceLines.filter((line) => line.includes(needle));
-  expect(sourceMatches, `expected exactly one "${needle}" in ${expectedRelativeSource}`).toHaveLength(1);
+  expect(
+    sourceMatches,
+    `expected exactly one "${needle}" in ${expectedRelativeSource}`,
+  ).toHaveLength(1);
   const expectedOriginalLine = sourceLines.findIndex((line) => line.includes(needle)) + 1;
 
   const original = originalPositionFor(trace, { line: lineIndex + 1, column });
@@ -112,7 +115,9 @@ const sourcemapDescribe = sourcemapTestEnabled ? describe : describe.skip;
 sourcemapDescribe("SOCIALCALC_COVERAGE=1 vp build: dist/SocialCalc.js sourcemap", () => {
   test("bundle ships a sourceMappingURL pointing at SocialCalc.js.map, appended after the UMD close", () => {
     expect(bundleText.endsWith("//# sourceMappingURL=SocialCalc.js.map\n")).toBe(true);
-    expect(bundleText).toContain("return SocialCalc;\n}));\n//# sourceMappingURL=SocialCalc.js.map\n");
+    expect(bundleText).toContain(
+      "return SocialCalc;\n}));\n//# sourceMappingURL=SocialCalc.js.map\n",
+    );
   });
 
   test("map is a valid v3 sourcemap listing every js/*.ts core source relative to dist/", () => {

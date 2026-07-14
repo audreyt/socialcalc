@@ -91,9 +91,7 @@ test("ConstantsSetClasses with no prefix applies the bare default class names (p
   // using the supplied `classname` field (here "" — falsy, so falls back to
   // the item name "defaultInputEcho") and `style` field.
   expect(SC.Constants.defaultInputEchoClass).toBe("defaultInputEcho");
-  expect(SC.Constants.defaultInputEchoStyle).toBe(
-    "filter:alpha(opacity=90);opacity:.9;",
-  );
+  expect(SC.Constants.defaultInputEchoStyle).toBe("filter:alpha(opacity=90);opacity:.9;");
 });
 
 test("ConstantsSetClasses with explicit '' prefix uses item-name fallback identically to undefined", async () => {
@@ -128,9 +126,7 @@ test("ConstantsSetImagePrefix accepts a new prefix that does NOT end in undersco
     // oldHyphen="images/sc-" is replaced with newHyphen="/assets/sc" (plain,
     // no trailing hyphen since the prefix has no underscore). So the
     // "images/sc-unhideleft.gif" URL becomes "/assets/scunhideleft.gif".
-    expect(SC.Constants.defaultUnhideLeftStyle).toContain(
-      "/assets/scunhideleft.gif",
-    );
+    expect(SC.Constants.defaultUnhideLeftStyle).toContain("/assets/scunhideleft.gif");
     expect(SC.Constants.defaultUnhideLeftStyle).not.toContain("images/sc-");
     expect(SC.Constants.defaultUnhideLeftStyle).not.toContain("images/sc_");
   } finally {
@@ -182,10 +178,7 @@ test("RenderCell appends commentClassName when cell has a comment and context.sh
   installBrowserShim();
   const SC = await loadSocialCalc({ browser: true });
   const sheet = new SC.Sheet();
-  await scheduleCommands(SC, sheet, [
-    "set A1 value n 1",
-    "set A1 comment the-comment",
-  ]);
+  await scheduleCommands(SC, sheet, ["set A1 value n 1", "set A1 comment the-comment"]);
 
   const context = new SC.RenderContext(sheet);
   // Force the grid-render path: showGrid true + a distinct commentClassName.
@@ -210,10 +203,7 @@ test("RenderCell appends readonlyNoGridClassName when cell is readonly and conte
   installBrowserShim();
   const SC = await loadSocialCalc({ browser: true });
   const sheet = new SC.Sheet();
-  await scheduleCommands(SC, sheet, [
-    "set A1 value n 1",
-    "set A1 readonly yes",
-  ]);
+  await scheduleCommands(SC, sheet, ["set A1 value n 1", "set A1 readonly yes"]);
 
   const context = new SC.RenderContext(sheet);
   // showGrid stays false (the default) — exercise the no-grid readonly branch.
@@ -235,10 +225,7 @@ test("RenderCell with noElement=true assembles className from cell.cssc via the 
   installBrowserShim();
   const SC = await loadSocialCalc({ browser: true });
   const sheet = new SC.Sheet();
-  await scheduleCommands(SC, sheet, [
-    "set A1 value n 1",
-    "set A1 cssc my-css-class",
-  ]);
+  await scheduleCommands(SC, sheet, ["set A1 value n 1", "set A1 cssc my-css-class"]);
 
   const context = new SC.RenderContext(sheet);
   context.CalculateCellSkipData();
@@ -338,9 +325,7 @@ test("RecalcLoadedSheet with no sheetname and no waitingForLoading skips AddShee
   SC.RecalcLoadedSheet(null, "version:1.5\ncell:A1:t:hi\nsheet:c:1:r:1\n", true, false);
   // No new ""-named (or any) sheet added to the cache.
   expect(scf.SheetCache.sheets[""]).toBeUndefined();
-  expect(Object.keys(scf.SheetCache.sheets).length).toBe(
-    Object.keys(cacheSnapshot).length,
-  );
+  expect(Object.keys(scf.SheetCache.sheets).length).toBe(Object.keys(cacheSnapshot).length);
   // waitingForLoading was cleared (not set) by the routine.
   expect(scf.SheetCache.waitingForLoading).toBeNull();
   SC.RecalcClearTimeout();
@@ -483,10 +468,7 @@ test("EncodeCellAttributes leaves alignvert/padX as def:true when the layout use
 test("DecodeCellAttributes emits 'mod' clear when newattribs.mod.def is true and cell had mod='y'", async () => {
   const SC = await loadSocialCalc();
   const sheet = new SC.Sheet();
-  await scheduleCommands(SC, sheet, [
-    "set A1 value n 1",
-    "set A1 mod y",
-  ]);
+  await scheduleCommands(SC, sheet, ["set A1 value n 1", "set A1 mod y"]);
   expect(sheet.GetAssuredCell("A1").mod).toBe("y");
 
   // Build newattribs by copying the current attributes then flagging mod
@@ -725,15 +707,21 @@ test("RecalcCheckCell C-4069/4074/4075/4081/4082: reversed range walks formula d
   // B1 before C1.  Expected: B1=10*10=100; C1=10+20+100+40=170.
   const SC = await loadSocialCalc();
   const sheet = new SC.Sheet();
-  await scheduleCommands(SC, sheet, [
-    // C1 first — appears first in celllist
-    "set C1 formula SUM(B2:A1)",
-    "set A1 value n 10",
-    "set A2 value n 20",
-    "set B2 value n 40",
-    // B1 last — intermediate formula inside the reversed range
-    "set B1 formula A1*10",
-  ], true, 3000);
+  await scheduleCommands(
+    SC,
+    sheet,
+    [
+      // C1 first — appears first in celllist
+      "set C1 formula SUM(B2:A1)",
+      "set A1 value n 10",
+      "set A2 value n 20",
+      "set B2 value n 40",
+      // B1 last — intermediate formula inside the reversed range
+      "set B1 formula A1*10",
+    ],
+    true,
+    3000,
+  );
   await recalcSheet(SC, sheet, 3000);
   // B1 must have been calculated (A1*10 = 100) before C1 summed it.
   expect(sheet.cells.B1.datavalue).toBe(100);
@@ -749,13 +737,19 @@ test("RecalcCheckCell C-4081: row-only reversed range (A2:B1) walks row-if branc
   // Expected: B1=10*7=70; C1=10+20+70+40=140.
   const SC = await loadSocialCalc();
   const sheet = new SC.Sheet();
-  await scheduleCommands(SC, sheet, [
-    "set C1 formula SUM(A2:B1)",       // C1 first; range is row-reversed only
-    "set A1 value n 10",
-    "set A2 value n 20",
-    "set B2 value n 40",
-    "set B1 formula A1*7",             // B1 last — formula at row 1 inside range
-  ], true, 3000);
+  await scheduleCommands(
+    SC,
+    sheet,
+    [
+      "set C1 formula SUM(A2:B1)", // C1 first; range is row-reversed only
+      "set A1 value n 10",
+      "set A2 value n 20",
+      "set B2 value n 40",
+      "set B1 formula A1*7", // B1 last — formula at row 1 inside range
+    ],
+    true,
+    3000,
+  );
   await recalcSheet(SC, sheet, 3000);
   expect(sheet.cells.B1.datavalue).toBe(70);
   // If L4249 row-if body is emptied, r1/r2 stay unset and B1 is not walked
@@ -772,10 +766,7 @@ test("RecalcCheckCell C-4103: circular reference via range path sets circRef err
   // circularreferencecell / errors fields stay unset.
   const SC = await loadSocialCalc();
   const sheet = new SC.Sheet();
-  await scheduleCommands(SC, sheet, [
-    "set A2 value n 5",
-    "set A1 formula SUM(A1:A2)",
-  ], true, 3000);
+  await scheduleCommands(SC, sheet, ["set A2 value n 5", "set A1 formula SUM(A1:A2)"], true, 3000);
   await recalcSheet(SC, sheet, 3000);
   // circularreferencecell is set ONLY by the RecalcCheckCell circular-ref
   // detectors (range path L4288 or scalar path L4362) — not by evaluation.
@@ -785,10 +776,9 @@ test("RecalcCheckCell C-4103: circular reference via range path sets circRef err
   // And the valuetype should reflect an error after the aborted check.
   // (Some paths leave valuetype as prior value; errors+circularreferencecell
   // are the hard contracts.)
-  expect(
-    String(sheet.cells.A1.valuetype).startsWith("e") ||
-      Boolean(sheet.cells.A1.errors),
-  ).toBe(true);
+  expect(String(sheet.cells.A1.valuetype).startsWith("e") || Boolean(sheet.cells.A1.errors)).toBe(
+    true,
+  );
 });
 
 test("RecalcCheckCell C-4199: circular reference via scalar coord path sets circRef error", async () => {
@@ -797,10 +787,7 @@ test("RecalcCheckCell C-4199: circular reference via scalar coord path sets circ
   // (L4350 block) and set cell.errors + sheet.attribs.circularreferencecell.
   const SC = await loadSocialCalc();
   const sheet = new SC.Sheet();
-  await scheduleCommands(SC, sheet, [
-    "set A1 formula B1",
-    "set B1 formula A1",
-  ], true, 3000);
+  await scheduleCommands(SC, sheet, ["set A1 formula B1", "set B1 formula A1"], true, 3000);
   await recalcSheet(SC, sheet, 3000);
   // At least one of the two cells must carry an error valuetype, and the
   // sheet must record a circular reference cell attribute.
@@ -829,11 +816,17 @@ test("RecalcCheckCell C-4114/4119/4125: sheetref from '!' suppresses foreign coo
   SC.Formula.AddSheetToCache("OtherSheet", otherSave, false);
 
   const sheet = new SC.Sheet();
-  await scheduleCommands(SC, sheet, [
-    "set C1 formula OtherSheet!A1+B1",  // C1 first in celllist
-    "set A1 value n 10",
-    "set B1 formula A1*5",              // B1 last — local formula dep of C1
-  ], true, 3000);
+  await scheduleCommands(
+    SC,
+    sheet,
+    [
+      "set C1 formula OtherSheet!A1+B1", // C1 first in celllist
+      "set A1 value n 10",
+      "set B1 formula A1*5", // B1 last — local formula dep of C1
+    ],
+    true,
+    3000,
+  );
   await recalcSheet(SC, sheet, 3000);
   expect(sheet.cells.B1.datavalue).toBe(50);
   // C1 = OtherSheet!A1(0) + B1(50) = 50.  If B1 was not registered as a local
@@ -1040,9 +1033,7 @@ test("RecalcCheckCell L4357 direct: scalar circ-ref else-append links startcoord
   //   return
   // So errors land on B1, not A1.  Accept either cell having errors, and
   // require the return value + circularreferencecell + calclist link.
-  expect(
-    Boolean(sheet.cells.A1.errors) || Boolean(sheet.cells.B1.errors),
-  ).toBe(true);
+  expect(Boolean(sheet.cells.A1.errors) || Boolean(sheet.cells.B1.errors)).toBe(true);
 });
 test("RecalcCheckCell C-4130/4135: named-range expansion forces intermediate formula deps to calculate first", async () => {
   // Named range 'myRange' covers A1:A2 where A2 is a formula.
@@ -1052,12 +1043,18 @@ test("RecalcCheckCell C-4130/4135: named-range expansion forces intermediate for
   // Expected: A2=10*3=30; C1=10+30=40.
   const SC = await loadSocialCalc();
   const sheet = new SC.Sheet();
-  await scheduleCommands(SC, sheet, [
-    "set C1 formula SUM(myRange)",     // C1 first
-    "set A1 value n 10",
-    "name define myRange A1:A2",
-    "set A2 formula A1*3",             // A2 last — formula inside named range
-  ], true, 3000);
+  await scheduleCommands(
+    SC,
+    sheet,
+    [
+      "set C1 formula SUM(myRange)", // C1 first
+      "set A1 value n 10",
+      "name define myRange A1:A2",
+      "set A2 formula A1*3", // A2 last — formula inside named range
+    ],
+    true,
+    3000,
+  );
   await recalcSheet(SC, sheet, 3000);
   expect(sheet.cells.A2.datavalue).toBe(30);
   // If named-range expansion was a no-op, C1 would not walk A2 and would
@@ -1075,13 +1072,19 @@ test("RecalcCheckCell C-4177: range walk orders intermediate formula deps before
   // normal calclist-append path. See the direct L4357 test above.
   const SC = await loadSocialCalc();
   const sheet = new SC.Sheet();
-  await scheduleCommands(SC, sheet, [
-    "set C1 formula SUM(A1:B2)",       // C1 first
-    "set A1 value n 1",
-    "set A2 value n 2",
-    "set B1 value n 3",
-    "set B2 formula A1+A2",            // B2 last — formula inside the range
-  ], true, 3000);
+  await scheduleCommands(
+    SC,
+    sheet,
+    [
+      "set C1 formula SUM(A1:B2)", // C1 first
+      "set A1 value n 1",
+      "set A2 value n 2",
+      "set B1 value n 3",
+      "set B2 formula A1+A2", // B2 last — formula inside the range
+    ],
+    true,
+    3000,
+  );
   await recalcSheet(SC, sheet, 3000);
   expect(sheet.cells.B2.datavalue).toBe(3);
   // C1 = 1+2+3+3 = 9.  If range walk is broken, C1 sees B2 as empty → 6.
@@ -1108,7 +1111,7 @@ test("RecalcCheckCell C-4177: range walk orders intermediate formula deps before
 test("UndoStack maxUndo=3: 4th push evicts oldest undo data and Undo() refuses to cross boundary", async () => {
   const SC = await loadSocialCalc();
   const undoStack = new SC.UndoStack();
-  undoStack.maxUndo = 3;  // hold at most 3 undoable entries
+  undoStack.maxUndo = 3; // hold at most 3 undoable entries
 
   // Push 4 changes.  Each has a real undo command so we can assert eviction.
   for (let n = 1; n <= 4; n++) {
@@ -1124,10 +1127,10 @@ test("UndoStack maxUndo=3: 4th push evicts oldest undo data and Undo() refuses t
   // L4513: this.stack[this.stack.length - this.maxUndo - 1].undo = []
   //   → stack[4-3-1=0].undo = [] → change1's undo is evicted.
   expect(undoStack.stack.length).toBe(4);
-  expect(undoStack.stack[0].undo).toEqual([]);         // evicted (kills 4315/4320)
-  expect(undoStack.stack[1].undo).toEqual(["undo2"]);  // still present
-  expect(undoStack.stack[2].undo).toEqual(["undo3"]);  // still present
-  expect(undoStack.stack[3].undo).toEqual(["undo4"]);  // still present
+  expect(undoStack.stack[0].undo).toEqual([]); // evicted (kills 4315/4320)
+  expect(undoStack.stack[1].undo).toEqual(["undo2"]); // still present
+  expect(undoStack.stack[2].undo).toEqual(["undo3"]); // still present
+  expect(undoStack.stack[3].undo).toEqual(["undo4"]); // still present
 
   // Kills mutant 4321 (-1 → +1 would clear stack[4-3+1=2]=change3, not change1):
   // If +1 had been used, stack[2].undo would be [] and stack[0].undo would be ["undo1"].
@@ -1140,18 +1143,18 @@ test("UndoStack maxUndo=3: 4th push evicts oldest undo data and Undo() refuses t
   // would fall to 0, which is the evicted-undo boundary.
   // L4548: tos > stack.length - maxUndo - 1  →  tos > 4 - 3 - 1 = 0
   // so tos must be STRICTLY GREATER THAN 0 to allow another undo.
-  expect(undoStack.Undo()).toBe(true);  // tos: 3→2 (kills 4371 — always-true mutant)
+  expect(undoStack.Undo()).toBe(true); // tos: 3→2 (kills 4371 — always-true mutant)
   expect(undoStack.tos).toBe(2);
-  expect(undoStack.Undo()).toBe(true);  // tos: 2→1
+  expect(undoStack.Undo()).toBe(true); // tos: 2→1
   expect(undoStack.tos).toBe(1);
   // tos is now 1; the boundary is stack.length-maxUndo-1 = 0.
   // tos > 0 is true (1 > 0), so one more Undo is allowed.
-  expect(undoStack.Undo()).toBe(true);  // tos: 1→0
+  expect(undoStack.Undo()).toBe(true); // tos: 1→0
   expect(undoStack.tos).toBe(0);
   // tos is now 0; 0 > 0 is false → Undo() must return false (boundary reached).
   // Kills mutant 4375 (>= instead of >): 0 >= 0 would be true, wrongly allowing one more.
   expect(undoStack.Undo()).toBe(false); // boundary hit
-  expect(undoStack.tos).toBe(0);       // tos must not change after refusal
+  expect(undoStack.tos).toBe(0); // tos must not change after refusal
 
   // Redo still works from tos=0.
   expect(undoStack.Redo()).toBe(true);
@@ -1179,7 +1182,7 @@ test("UndoStack maxUndo=3: pushing >maxUndo changes evicts ONLY the oldest entry
   // Push 4th (length=4 > maxUndo=3 → evict stack[0]).
   undoStack.PushChange("c4");
   undoStack.AddUndo("u4");
-  expect(undoStack.stack[0].undo).toEqual([]);    // evicted
+  expect(undoStack.stack[0].undo).toEqual([]); // evicted
   expect(undoStack.stack[1].undo).toEqual(["u2"]);
   expect(undoStack.stack[2].undo).toEqual(["u3"]);
   expect(undoStack.stack[3].undo).toEqual(["u4"]);
@@ -1187,8 +1190,8 @@ test("UndoStack maxUndo=3: pushing >maxUndo changes evicts ONLY the oldest entry
   // Push 5th (length=5 > maxUndo=3 → evict stack[1], which was u2).
   undoStack.PushChange("c5");
   undoStack.AddUndo("u5");
-  expect(undoStack.stack[0].undo).toEqual([]);    // still evicted from before
-  expect(undoStack.stack[1].undo).toEqual([]);    // newly evicted
+  expect(undoStack.stack[0].undo).toEqual([]); // still evicted from before
+  expect(undoStack.stack[1].undo).toEqual([]); // newly evicted
   expect(undoStack.stack[2].undo).toEqual(["u3"]); // still intact
   expect(undoStack.stack[3].undo).toEqual(["u4"]);
   expect(undoStack.stack[4].undo).toEqual(["u5"]);
@@ -1198,10 +1201,10 @@ test("UndoStack maxUndo=3: pushing >maxUndo changes evicts ONLY the oldest entry
   // 4>1 → true (tos→3); 3>1 → true (tos→2); 2>1 → true (tos→1); 1>1 → false.
   // The third Undo() DOES succeed (tos 2→1); the fourth is refused at the boundary.
   // Mutant 4375 (>= instead of >): 1 >= 1 would wrongly allow one extra undo.
-  expect(undoStack.Undo()).toBe(true);   // 4→3
-  expect(undoStack.Undo()).toBe(true);   // 3→2
-  expect(undoStack.Undo()).toBe(true);   // 2→1 (still > boundary)
+  expect(undoStack.Undo()).toBe(true); // 4→3
+  expect(undoStack.Undo()).toBe(true); // 3→2
+  expect(undoStack.Undo()).toBe(true); // 2→1 (still > boundary)
   expect(undoStack.tos).toBe(1);
-  expect(undoStack.Undo()).toBe(false);  // 1 is NOT > 1 → boundary hit (kills 4375)
-  expect(undoStack.tos).toBe(1);         // tos must not change after refusal
+  expect(undoStack.Undo()).toBe(false); // 1 is NOT > 1 → boundary hit (kills 4375)
+  expect(undoStack.tos).toBe(1); // tos must not change after refusal
 });

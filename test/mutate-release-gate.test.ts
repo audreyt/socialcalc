@@ -96,16 +96,24 @@ describe("normalizeReportFileKey", () => {
   });
 
   test("strips an absolute repo-root prefix down to the js/ suffix", () => {
-    expect(normalizeReportFileKey("/Users/au/w/socialcalc/js/formula-parse.ts")).toBe("js/formula-parse.ts");
-    expect(normalizeReportFileKey("/home/runner/work/socialcalc/socialcalc/js/formula-parse.ts")).toBe("js/formula-parse.ts");
+    expect(normalizeReportFileKey("/Users/au/w/socialcalc/js/formula-parse.ts")).toBe(
+      "js/formula-parse.ts",
+    );
+    expect(
+      normalizeReportFileKey("/home/runner/work/socialcalc/socialcalc/js/formula-parse.ts"),
+    ).toBe("js/formula-parse.ts");
   });
 
   test("resolves a file:// URL", () => {
-    expect(normalizeReportFileKey("file:///Users/au/w/socialcalc/js/formula-parse.ts")).toBe("js/formula-parse.ts");
+    expect(normalizeReportFileKey("file:///Users/au/w/socialcalc/js/formula-parse.ts")).toBe(
+      "js/formula-parse.ts",
+    );
   });
 
   test("normalizes backslash-separated (Windows-style) paths", () => {
-    expect(normalizeReportFileKey("C:\\Users\\au\\socialcalc\\js\\formula-parse.ts")).toBe("js/formula-parse.ts");
+    expect(normalizeReportFileKey("C:\\Users\\au\\socialcalc\\js\\formula-parse.ts")).toBe(
+      "js/formula-parse.ts",
+    );
   });
 
   test("leaves a file outside any js/ directory unchanged (never spuriously matches)", () => {
@@ -115,7 +123,15 @@ describe("normalizeReportFileKey", () => {
 
 describe("evaluateFileReport", () => {
   test("passes for a single well-formed file entry matching the expected module", () => {
-    const result = evaluateFileReport(reportFor({ "js/formula-parse.ts": [mutant({ status: "Killed" }), mutant({ id: "2", status: "Survived" })] }), "js/formula-parse.ts");
+    const result = evaluateFileReport(
+      reportFor({
+        "js/formula-parse.ts": [
+          mutant({ status: "Killed" }),
+          mutant({ id: "2", status: "Survived" }),
+        ],
+      }),
+      "js/formula-parse.ts",
+    );
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.total).toBe(2);
@@ -135,9 +151,14 @@ describe("evaluateFileReport", () => {
   });
 
   test("rejects a WRONG MODULE report — the only file key belongs to a different module", () => {
-    const result = evaluateFileReport(killedReport("js/formula-operand.ts", 3), "js/formula-parse.ts");
+    const result = evaluateFileReport(
+      killedReport("js/formula-operand.ts", 3),
+      "js/formula-parse.ts",
+    );
     expect(result.ok).toBe(false);
-    expect(result.detail).toMatch(/does not contain the expected mutated file js\/formula-parse\.ts/);
+    expect(result.detail).toMatch(
+      /does not contain the expected mutated file js\/formula-parse\.ts/,
+    );
     expect(result.detail).toMatch(/js\/formula-operand\.ts/);
   });
 
@@ -155,32 +176,47 @@ describe("evaluateFileReport", () => {
   });
 
   test("rejects a file entry that is not an object", () => {
-    const result = evaluateFileReport({ files: { "js/formula-parse.ts": null } }, "js/formula-parse.ts");
+    const result = evaluateFileReport(
+      { files: { "js/formula-parse.ts": null } },
+      "js/formula-parse.ts",
+    );
     expect(result.ok).toBe(false);
     expect(result.detail).toMatch(/is not an object/);
   });
 
   test("rejects a file entry whose mutants is not an array", () => {
-    const result = evaluateFileReport({ files: { "js/formula-parse.ts": { mutants: "nope" } } }, "js/formula-parse.ts");
+    const result = evaluateFileReport(
+      { files: { "js/formula-parse.ts": { mutants: "nope" } } },
+      "js/formula-parse.ts",
+    );
     expect(result.ok).toBe(false);
     expect(result.detail).toMatch(/has no mutants array/);
   });
 
   test("rejects a mutant with an unrecognized status", () => {
-    const result = evaluateFileReport(reportFor({ "js/formula-parse.ts": [mutant({ status: "Bogus" })] }), "js/formula-parse.ts");
+    const result = evaluateFileReport(
+      reportFor({ "js/formula-parse.ts": [mutant({ status: "Bogus" })] }),
+      "js/formula-parse.ts",
+    );
     expect(result.ok).toBe(false);
     expect(result.detail).toMatch(/has unrecognized status/);
   });
 
   test("rejects a mutant missing mutatorName", () => {
     const badMutant = { ...mutant(), mutatorName: "" };
-    const result = evaluateFileReport(reportFor({ "js/formula-parse.ts": [badMutant] }), "js/formula-parse.ts");
+    const result = evaluateFileReport(
+      reportFor({ "js/formula-parse.ts": [badMutant] }),
+      "js/formula-parse.ts",
+    );
     expect(result.ok).toBe(false);
     expect(result.detail).toMatch(/missing mutatorName/);
   });
 
   test("rejects an EMPTY report (module owns the file, but zero mutants)", () => {
-    const result = evaluateFileReport(reportFor({ "js/formula-parse.ts": [] }), "js/formula-parse.ts");
+    const result = evaluateFileReport(
+      reportFor({ "js/formula-parse.ts": [] }),
+      "js/formula-parse.ts",
+    );
     expect(result.ok).toBe(false);
     expect(result.detail).toMatch(/contains no mutants/);
   });
@@ -188,7 +224,12 @@ describe("evaluateFileReport", () => {
   test("counts Timeout as killed-like alongside Killed, and no other status", () => {
     const result = evaluateFileReport(
       reportFor({
-        "js/formula-parse.ts": [mutant({ status: "Killed" }), mutant({ id: "2", status: "Timeout" }), mutant({ id: "3", status: "NoCoverage" }), mutant({ id: "4", status: "Survived" })],
+        "js/formula-parse.ts": [
+          mutant({ status: "Killed" }),
+          mutant({ id: "2", status: "Timeout" }),
+          mutant({ id: "3", status: "NoCoverage" }),
+          mutant({ id: "4", status: "Survived" }),
+        ],
       }),
       "js/formula-parse.ts",
     );
@@ -202,18 +243,26 @@ describe("evaluateFileReport", () => {
 
 describe("checkBaselineRegistry", () => {
   test("reports no drift when the module sets match exactly", () => {
-    const { missingFromRegistry, staleInRegistry } = checkBaselineRegistry(["js/a.ts", "js/b.ts"], { "js/a.ts": {}, "js/b.ts": {} });
+    const { missingFromRegistry, staleInRegistry } = checkBaselineRegistry(["js/a.ts", "js/b.ts"], {
+      "js/a.ts": {},
+      "js/b.ts": {},
+    });
     expect(missingFromRegistry).toEqual([]);
     expect(staleInRegistry).toEqual([]);
   });
 
   test("reports a module missing from the registry", () => {
-    const { missingFromRegistry } = checkBaselineRegistry(["js/a.ts", "js/b.ts"], { "js/a.ts": {} });
+    const { missingFromRegistry } = checkBaselineRegistry(["js/a.ts", "js/b.ts"], {
+      "js/a.ts": {},
+    });
     expect(missingFromRegistry).toEqual(["js/b.ts"]);
   });
 
   test("reports a stale registry entry for a module no longer mutated", () => {
-    const { staleInRegistry } = checkBaselineRegistry(["js/a.ts"], { "js/a.ts": {}, "js/gone.ts": {} });
+    const { staleInRegistry } = checkBaselineRegistry(["js/a.ts"], {
+      "js/a.ts": {},
+      "js/gone.ts": {},
+    });
     expect(staleInRegistry).toEqual(["js/gone.ts"]);
   });
 });
@@ -253,14 +302,22 @@ describe("reportPathFor (real filesystem, isolated temp cwd)", () => {
       const localDir = join(cwd, "reports", "mutation", "formula-parse");
       mkdirSync(localDir, { recursive: true });
       writeFileSync(join(localDir, "mutation.json"), "{}");
-      const result = reportPathFor("formula-parse", { artifactsDir: "artifacts", isCI: false, cwd });
+      const result = reportPathFor("formula-parse", {
+        artifactsDir: "artifacts",
+        isCI: false,
+        cwd,
+      });
       expect(result).toBe(join(localDir, "mutation.json"));
     });
   });
 
   test("returns null when neither location has a report", () => {
     withTempCwd((cwd) => {
-      const result = reportPathFor("formula-parse", { artifactsDir: "artifacts", isCI: false, cwd });
+      const result = reportPathFor("formula-parse", {
+        artifactsDir: "artifacts",
+        isCI: false,
+        cwd,
+      });
       expect(result).toBeNull();
     });
   });
@@ -276,7 +333,12 @@ describe("evaluateAllModules (composed loop, real filesystem, isolated temp cwd)
     }
   }
 
-  function plantReport(cwd: string, slug: string, json: unknown, { asText }: { asText?: string } = {}) {
+  function plantReport(
+    cwd: string,
+    slug: string,
+    json: unknown,
+    { asText }: { asText?: string } = {},
+  ) {
     const dir = join(cwd, "artifacts", `mutation-report-${slug}`);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "mutation.json"), asText ?? JSON.stringify(json));
@@ -294,11 +356,15 @@ describe("evaluateAllModules (composed loop, real filesystem, isolated temp cwd)
         const slug = file.replace(/^js\//, "").replace(/\.ts$/, "");
         plantReport(cwd, slug, killedReport(file, 10));
       }
-      const { rows, failed } = evaluateAllModules(ALL_MUTATE_FILES, fullMeasuredBaseline(ALL_MUTATE_FILES, 90), {
-        artifactsDir: "artifacts",
-        isCI: true,
-        cwd,
-      });
+      const { rows, failed } = evaluateAllModules(
+        ALL_MUTATE_FILES,
+        fullMeasuredBaseline(ALL_MUTATE_FILES, 90),
+        {
+          artifactsDir: "artifacts",
+          isCI: true,
+          cwd,
+        },
+      );
       expect(failed).toBe(false);
       expect(rows).toHaveLength(ALL_MUTATE_FILES.length);
       expect(rows.every((r) => r.status === "PASS")).toBe(true);
@@ -310,7 +376,11 @@ describe("evaluateAllModules (composed loop, real filesystem, isolated temp cwd)
       const files = ["js/formula-parse.ts", "js/formula-operand.ts"];
       plantReport(cwd, "formula-parse", killedReport("js/formula-operand.ts", 5)); // miswired
       plantReport(cwd, "formula-operand", killedReport("js/formula-operand.ts", 5));
-      const { rows, failed } = evaluateAllModules(files, fullMeasuredBaseline(files), { artifactsDir: "artifacts", isCI: true, cwd });
+      const { rows, failed } = evaluateAllModules(files, fullMeasuredBaseline(files), {
+        artifactsDir: "artifacts",
+        isCI: true,
+        cwd,
+      });
       expect(failed).toBe(true);
       const parseRow = rows.find((r) => r.file === "js/formula-parse.ts");
       expect(parseRow?.status).toBe("FAIL");
@@ -331,7 +401,11 @@ describe("evaluateAllModules (composed loop, real filesystem, isolated temp cwd)
           "js/socialcalc-3.ts": [mutant()],
         }),
       );
-      const { rows, failed } = evaluateAllModules(files, fullMeasuredBaseline(files), { artifactsDir: "artifacts", isCI: true, cwd });
+      const { rows, failed } = evaluateAllModules(files, fullMeasuredBaseline(files), {
+        artifactsDir: "artifacts",
+        isCI: true,
+        cwd,
+      });
       expect(failed).toBe(true);
       expect(rows[0].detail).toMatch(/not owned by this leg/);
     });
@@ -341,7 +415,11 @@ describe("evaluateAllModules (composed loop, real filesystem, isolated temp cwd)
     withTempCwd((cwd) => {
       const files = ["js/formula-parse.ts"];
       plantReport(cwd, "formula-parse", killedReport("js/formula-parse.ts", 5));
-      const { rows, failed } = evaluateAllModules(files, {}, { artifactsDir: "artifacts", isCI: true, cwd });
+      const { rows, failed } = evaluateAllModules(
+        files,
+        {},
+        { artifactsDir: "artifacts", isCI: true, cwd },
+      );
       expect(failed).toBe(true);
       expect(rows[0].detail).toMatch(/missing or malformed measured baseline/);
     });
@@ -351,7 +429,11 @@ describe("evaluateAllModules (composed loop, real filesystem, isolated temp cwd)
     withTempCwd((cwd) => {
       const files = ["js/formula-parse.ts"];
       plantReport(cwd, "formula-parse", killedReport("js/formula-parse.ts", 5));
-      const { rows, failed } = evaluateAllModules(files, { "js/formula-parse.ts": { measured: false } }, { artifactsDir: "artifacts", isCI: true, cwd });
+      const { rows, failed } = evaluateAllModules(
+        files,
+        { "js/formula-parse.ts": { measured: false } },
+        { artifactsDir: "artifacts", isCI: true, cwd },
+      );
       expect(failed).toBe(true);
       expect(rows[0].detail).toMatch(/missing or malformed measured baseline/);
     });
@@ -361,7 +443,11 @@ describe("evaluateAllModules (composed loop, real filesystem, isolated temp cwd)
     withTempCwd((cwd) => {
       const files = ["js/formula-parse.ts"];
       plantReport(cwd, "formula-parse", killedReport("js/formula-parse.ts", 5));
-      const { rows, failed } = evaluateAllModules(files, { "js/formula-parse.ts": { measured: true, break: Number.NaN } }, { artifactsDir: "artifacts", isCI: true, cwd });
+      const { rows, failed } = evaluateAllModules(
+        files,
+        { "js/formula-parse.ts": { measured: true, break: Number.NaN } },
+        { artifactsDir: "artifacts", isCI: true, cwd },
+      );
       expect(failed).toBe(true);
       expect(rows[0].detail).toMatch(/missing or malformed measured baseline/);
     });
@@ -371,7 +457,11 @@ describe("evaluateAllModules (composed loop, real filesystem, isolated temp cwd)
     withTempCwd((cwd) => {
       const files = ["js/formula-parse.ts"];
       plantReport(cwd, "formula-parse", null, { asText: "{ this is not json" });
-      const { rows, failed } = evaluateAllModules(files, fullMeasuredBaseline(files), { artifactsDir: "artifacts", isCI: true, cwd });
+      const { rows, failed } = evaluateAllModules(files, fullMeasuredBaseline(files), {
+        artifactsDir: "artifacts",
+        isCI: true,
+        cwd,
+      });
       expect(failed).toBe(true);
       expect(rows[0].detail).toMatch(/invalid mutation report JSON/);
     });
@@ -383,9 +473,19 @@ describe("evaluateAllModules (composed loop, real filesystem, isolated temp cwd)
       plantReport(
         cwd,
         "formula-parse",
-        reportFor({ "js/formula-parse.ts": [mutant({ status: "Killed" }), mutant({ id: "2", status: "Survived" }), mutant({ id: "3", status: "Survived" })] }),
+        reportFor({
+          "js/formula-parse.ts": [
+            mutant({ status: "Killed" }),
+            mutant({ id: "2", status: "Survived" }),
+            mutant({ id: "3", status: "Survived" }),
+          ],
+        }),
       );
-      const { rows, failed } = evaluateAllModules(files, fullMeasuredBaseline(files, 90), { artifactsDir: "artifacts", isCI: true, cwd });
+      const { rows, failed } = evaluateAllModules(files, fullMeasuredBaseline(files, 90), {
+        artifactsDir: "artifacts",
+        isCI: true,
+        cwd,
+      });
       expect(failed).toBe(true);
       expect(rows[0].status).toBe("FAIL");
       expect(rows[0].detail).toMatch(/33\.33% \(floor 90%/);
@@ -397,8 +497,15 @@ describe("evaluateAllModules (composed loop, real filesystem, isolated temp cwd)
       const files = ["js/formula-parse.ts"];
       const localDir = join(cwd, "reports", "mutation", "formula-parse");
       mkdirSync(localDir, { recursive: true });
-      writeFileSync(join(localDir, "mutation.json"), JSON.stringify(killedReport("js/formula-parse.ts", 5)));
-      const { rows, failed } = evaluateAllModules(files, fullMeasuredBaseline(files), { artifactsDir: "artifacts", isCI: true, cwd });
+      writeFileSync(
+        join(localDir, "mutation.json"),
+        JSON.stringify(killedReport("js/formula-parse.ts", 5)),
+      );
+      const { rows, failed } = evaluateAllModules(files, fullMeasuredBaseline(files), {
+        artifactsDir: "artifacts",
+        isCI: true,
+        cwd,
+      });
       expect(failed).toBe(true);
       expect(rows[0].detail).toBe("no fresh report found for this run");
     });
@@ -411,8 +518,16 @@ describe("evaluateAllModules (composed loop, real filesystem, isolated temp cwd)
       // formula-operand: passes.
       plantReport(cwd, "formula-operand", killedReport("js/formula-operand.ts", 5));
       // formula-ref: below floor.
-      plantReport(cwd, "formula-ref", reportFor({ "js/formula-ref.ts": [mutant({ status: "Survived" })] }));
-      const { rows, failed } = evaluateAllModules(files, fullMeasuredBaseline(files, 90), { artifactsDir: "artifacts", isCI: true, cwd });
+      plantReport(
+        cwd,
+        "formula-ref",
+        reportFor({ "js/formula-ref.ts": [mutant({ status: "Survived" })] }),
+      );
+      const { rows, failed } = evaluateAllModules(files, fullMeasuredBaseline(files, 90), {
+        artifactsDir: "artifacts",
+        isCI: true,
+        cwd,
+      });
       expect(failed).toBe(true);
       expect(rows).toHaveLength(3);
       expect(rows.find((r) => r.file === "js/formula-parse.ts")?.status).toBe("FAIL");

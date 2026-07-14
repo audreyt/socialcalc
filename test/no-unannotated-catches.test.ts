@@ -213,7 +213,6 @@ function markerImmediatelyBefore(src: string, comments: CommentRange[], pos: num
   return sawMarker;
 }
 
-
 const guardedFiles = [
   "iofunctions-coverage.test.ts",
   "control-coverage.test.ts",
@@ -271,7 +270,9 @@ test("no unannotated empty catches or swallowed assertions in owned coverage tes
 
   if (allViolations.length > 0) {
     const summary = allViolations.map((v) => `  ${v.file}:${v.line} — ${v.reason}`).join("\n");
-    throw new Error(`Found ${allViolations.length} unannotated/unsafe empty catch(es):\n${summary}`);
+    throw new Error(
+      `Found ${allViolations.length} unannotated/unsafe empty catch(es):\n${summary}`,
+    );
   }
 
   expect(allViolations).toEqual([]);

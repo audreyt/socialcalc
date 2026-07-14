@@ -61,30 +61,40 @@ function ensureDocumentEvents() {
 }
 
 function teardownEditor(SC: SC, editor: Editor) {
-  { if (editor?.inputEcho?.interval) {
-    clearInterval(editor.inputEcho.interval);
-    editor.inputEcho.interval = null;
-  } }
-  { if (SC.AutoRepeatInfo?.timer) {
-    clearTimeout(SC.AutoRepeatInfo.timer);
-    SC.AutoRepeatInfo.timer = null;
-    SC.AutoRepeatInfo.mouseinfo = null;
-  } }
-  { if (SC.ButtonInfo?.timer) {
-    clearTimeout(SC.ButtonInfo.timer);
-    SC.ButtonInfo.timer = null;
-  } }
-  { if (SC.Keyboard) {
-    SC.Keyboard.focusTable = null;
-    SC.Keyboard.passThru = null;
-  } }
-  { if (editor) {
-    editor.state = "start";
-    if (editor.timeout) {
-      clearTimeout(editor.timeout);
-      editor.timeout = null;
+  {
+    if (editor?.inputEcho?.interval) {
+      clearInterval(editor.inputEcho.interval);
+      editor.inputEcho.interval = null;
     }
-  } }
+  }
+  {
+    if (SC.AutoRepeatInfo?.timer) {
+      clearTimeout(SC.AutoRepeatInfo.timer);
+      SC.AutoRepeatInfo.timer = null;
+      SC.AutoRepeatInfo.mouseinfo = null;
+    }
+  }
+  {
+    if (SC.ButtonInfo?.timer) {
+      clearTimeout(SC.ButtonInfo.timer);
+      SC.ButtonInfo.timer = null;
+    }
+  }
+  {
+    if (SC.Keyboard) {
+      SC.Keyboard.focusTable = null;
+      SC.Keyboard.passThru = null;
+    }
+  }
+  {
+    if (editor) {
+      editor.state = "start";
+      if (editor.timeout) {
+        clearTimeout(editor.timeout);
+        editor.timeout = null;
+      }
+    }
+  }
 }
 
 // A minimal event shape sufficient for the mouse/keyboard handlers under test.
@@ -133,7 +143,9 @@ function fakeEvent(extras: Partial<FakeEvent> = {}): FakeEvent {
 }
 
 function primeGridLayout(editor: Editor) {
-  { editor.CalculateEditorPositions(); }
+  {
+    editor.CalculateEditorPositions();
+  }
   editor.gridposition = editor.gridposition || { left: 0, top: 0 };
   editor.headposition = editor.headposition || { left: 30, top: 30 };
   editor.tablewidth = editor.tablewidth ?? 400;
@@ -195,8 +207,12 @@ test("ScrollTableUpOneRow: rowspan cell straddling pane boundary triggers refres
   editor.context.rowpanes = [{ first: 2, last: 7 }];
   editor.context.colpanes = [{ first: 1, last: 3 }];
   editor.context.CalculateCellSkipData();
-  { editor.context.RenderSheet(null, editor.context.defaultHTMLlinkstyle); }
-  { SC.ScrollTableUpOneRow(editor); }
+  {
+    editor.context.RenderSheet(null, editor.context.defaultHTMLlinkstyle);
+  }
+  {
+    SC.ScrollTableUpOneRow(editor);
+  }
   teardownEditor(SC, editor);
 });
 
@@ -216,8 +232,12 @@ test("ScrollTableDownOneRow: bottom rowspan cell + cellskip refresh loop", async
   editor.context.rowpanes = [{ first: 2, last: 7 }];
   editor.context.colpanes = [{ first: 1, last: 3 }];
   editor.context.CalculateCellSkipData();
-  { editor.context.RenderSheet(null, editor.context.defaultHTMLlinkstyle); }
-  { SC.ScrollTableDownOneRow(editor); }
+  {
+    editor.context.RenderSheet(null, editor.context.defaultHTMLlinkstyle);
+  }
+  {
+    SC.ScrollTableDownOneRow(editor);
+  }
   teardownEditor(SC, editor);
 });
 
@@ -307,10 +327,12 @@ test("InputEcho: constructor applies default class + style branches", async () =
     saved[k] = scc[k as keyof typeof scc];
     (scc as Record<string, unknown>)[k] = "echo-" + k;
   }
-  { const echo = new SC.InputEcho(editor);
-  expect(echo.main.className).toBe("echo-defaultInputEchoClass");
-  expect(echo.hint.className).toBe("echo-defaultInputEchoHintClass");
-  expect(echo.prompt.className).toBe("echo-defaultInputEchoPromptClass"); }
+  {
+    const echo = new SC.InputEcho(editor);
+    expect(echo.main.className).toBe("echo-defaultInputEchoClass");
+    expect(echo.hint.className).toBe("echo-defaultInputEchoHintClass");
+    expect(echo.prompt.className).toBe("echo-defaultInputEchoPromptClass");
+  }
   for (const k of keys) {
     (scc as Record<string, unknown>)[k] = saved[k];
   }
@@ -331,29 +353,39 @@ test("ShowCellHandles: boundary-break branches (controlborder/headposition)", as
   // horizontaltablecontrol.controlborder exceeded → break
   const htc = editor.horizontaltablecontrol as SocialCalc.TableControl;
   htc.controlborder = 100;
-  { SC.ShowCellHandles(editor.cellhandles as SocialCalc.CellHandles, true, false); }
+  {
+    SC.ShowCellHandles(editor.cellhandles as SocialCalc.CellHandles, true, false);
+  }
 
   // headposition.top exceeded → break
   htc.controlborder = 500;
   editor.headposition.top = 200;
-  { SC.ShowCellHandles(editor.cellhandles as SocialCalc.CellHandles, true, false); }
+  {
+    SC.ShowCellHandles(editor.cellhandles as SocialCalc.CellHandles, true, false);
+  }
   editor.headposition.top = 30;
 
   // verticaltablecontrol.controlborder exceeded → break
   const vtc = editor.verticaltablecontrol as SocialCalc.TableControl;
   vtc.controlborder = 100;
-  { SC.ShowCellHandles(editor.cellhandles as SocialCalc.CellHandles, true, false); }
+  {
+    SC.ShowCellHandles(editor.cellhandles as SocialCalc.CellHandles, true, false);
+  }
   vtc.controlborder = 500;
 
   // headposition.left exceeded → break
   editor.headposition.left = 200;
-  { SC.ShowCellHandles(editor.cellhandles as SocialCalc.CellHandles, true, false); }
+  {
+    SC.ShowCellHandles(editor.cellhandles as SocialCalc.CellHandles, true, false);
+  }
   editor.headposition.left = 30;
 
   // doshow=true path with moveshow=true
   vtc.controlborder = 500;
   htc.controlborder = 500;
-  { SC.ShowCellHandles(editor.cellhandles as SocialCalc.CellHandles, true, true); }
+  {
+    SC.ShowCellHandles(editor.cellhandles as SocialCalc.CellHandles, true, true);
+  }
 
   teardownEditor(SC, editor);
 });
@@ -381,40 +413,50 @@ test("CellHandlesMouseMoveOnHandle: editor null / no cellhandles.editor / palett
   SC.KeyboardSetFocus(editor);
 
   // whichhandle==0 (outside radius)
-  { SC.CellHandlesMouseMoveOnHandle(
-    fakeEvent({
-      target: ch.dragpalette,
-      clientX: 5,
-      clientY: 5,
-    }) as unknown as MouseEvent,
-  ); }
+  {
+    SC.CellHandlesMouseMoveOnHandle(
+      fakeEvent({
+        target: ch.dragpalette,
+        clientX: 5,
+        clientY: 5,
+      }) as unknown as MouseEvent,
+    );
+  }
 
   // whichhandle!=0 → clear timer + set new timer
   ch.timer = null;
-  { SC.CellHandlesMouseMoveOnHandle(
-    fakeEvent({
-      target: ch.dragpalette,
-      clientX: 55,
-      clientY: 55,
-    }) as unknown as MouseEvent,
-  ); }
+  {
+    SC.CellHandlesMouseMoveOnHandle(
+      fakeEvent({
+        target: ch.dragpalette,
+        clientX: 55,
+        clientY: 55,
+      }) as unknown as MouseEvent,
+    );
+  }
 
   // mouseDown=true path
   ch.mouseDown = true;
-  { SC.CellHandlesMouseMoveOnHandle(
-    fakeEvent({ target: ch.main, clientX: 50, clientY: 50 }) as unknown as MouseEvent,
-  ); }
+  {
+    SC.CellHandlesMouseMoveOnHandle(
+      fakeEvent({ target: ch.main, clientX: 50, clientY: 50 }) as unknown as MouseEvent,
+    );
+  }
 
   // cellhandles.editor falsy → return
   const savedChEditor = ch.editor;
   ch.editor = null as unknown as SocialCalc.TableEditor;
   SC.KeyboardSetFocus(editor);
-  { SC.CellHandlesMouseMoveOnHandle(fakeEvent() as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMoveOnHandle(fakeEvent() as unknown as MouseEvent);
+  }
   ch.editor = savedChEditor;
 
   // Keyboard.focusTable null → return
   SC.Keyboard.focusTable = null;
-  { SC.CellHandlesMouseMoveOnHandle(fakeEvent() as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMoveOnHandle(fakeEvent() as unknown as MouseEvent);
+  }
   SC.KeyboardSetFocus(editor);
 
   teardownEditor(SC, editor);
@@ -445,21 +487,27 @@ test("CellHandlesMouseDown: whichhandle 0/1/-1 early return paths", async () => 
 
   // whichhandle=0
   ch.mouseDown = false;
-  { SC.CellHandlesMouseDown(
-    fakeEvent({ target: ch.dragpalette, clientX: 500, clientY: 500 }) as unknown as MouseEvent,
-  ); }
+  {
+    SC.CellHandlesMouseDown(
+      fakeEvent({ target: ch.dragpalette, clientX: 500, clientY: 500 }) as unknown as MouseEvent,
+    );
+  }
 
   // whichhandle=1 (center → outer radius)
   ch.mouseDown = false;
-  { SC.CellHandlesMouseDown(
-    fakeEvent({ target: ch.dragpalette, clientX: 50, clientY: 50 }) as unknown as MouseEvent,
-  ); }
+  {
+    SC.CellHandlesMouseDown(
+      fakeEvent({ target: ch.dragpalette, clientX: 50, clientY: 50 }) as unknown as MouseEvent,
+    );
+  }
 
   // whichhandle=-1 (center → inner radius)
   ch.mouseDown = false;
-  { SC.CellHandlesMouseDown(
-    fakeEvent({ target: ch.dragpalette, clientX: 45, clientY: 45 }) as unknown as MouseEvent,
-  ); }
+  {
+    SC.CellHandlesMouseDown(
+      fakeEvent({ target: ch.dragpalette, clientX: 45, clientY: 45 }) as unknown as MouseEvent,
+    );
+  }
 
   teardownEditor(SC, editor);
 });
@@ -477,17 +525,23 @@ test("CellHandlesMouseMove: no-editor / no-result / no-coord auto-repeat branche
   (editor.cellhandles as SocialCalc.CellHandles).startingcoord = "B2";
 
   // !result path
-  { SC.CellHandlesMouseMove(fakeEvent({ clientX: 9999, clientY: 9999 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMove(fakeEvent({ clientX: 9999, clientY: 9999 }) as unknown as MouseEvent);
+  }
 
   // result && !result.coord: hit a header area
   const ch = editor.cellhandles as SocialCalc.CellHandles;
   ch.dragtype = "Fill";
   editor.range2 = { hasrange: true, top: 2, bottom: 2, left: 2, right: 2 };
-  { SC.CellHandlesMouseMove(fakeEvent({ clientX: 50, clientY: 15 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMove(fakeEvent({ clientX: 50, clientY: 15 }) as unknown as MouseEvent);
+  }
 
   // !editor early return
   SC.EditorMouseInfo.editor = null;
-  { SC.CellHandlesMouseMove(fakeEvent({ clientX: 9999, clientY: 9999 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMove(fakeEvent({ clientX: 9999, clientY: 9999 }) as unknown as MouseEvent);
+  }
   SC.EditorMouseInfo.editor = editor;
 
   teardownEditor(SC, editor);
@@ -519,8 +573,7 @@ test("CellHandlesMouseMove: Fill/Move/MoveI filltype clamp + direction branches"
     { coord: "D3", row: 3, col: 4 },
     { coord: "D5", row: 5, col: 4 },
   ];
-  SC.GridMousePosition = () =>
-    positions.shift() as unknown as SocialCalc.GridMousePositionResult;
+  SC.GridMousePosition = () => positions.shift() as unknown as SocialCalc.GridMousePositionResult;
   const anchors: Array<string | undefined> = [];
   editor.RangeAnchor = (coord?: string) => {
     anchors.push(coord);
@@ -531,42 +584,56 @@ test("CellHandlesMouseMove: Fill/Move/MoveI filltype clamp + direction branches"
   ch.dragtype = "Fill";
   ch.filltype = "Down";
   SC.EditorMouseInfo.mouselastcoord = "Z0";
-  { SC.CellHandlesMouseMove(fakeEvent({ clientX: 160, clientY: 50 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMove(fakeEvent({ clientX: 160, clientY: 50 }) as unknown as MouseEvent);
+  }
 
   // Fill, Right, crend.col < crstart.col → clamp
   ch.filltype = "Right";
   SC.EditorMouseInfo.mouselastcoord = "Z0";
-  { SC.CellHandlesMouseMove(fakeEvent({ clientX: 80, clientY: 90 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMove(fakeEvent({ clientX: 80, clientY: 90 }) as unknown as MouseEvent);
+  }
 
   // Fill, null, abs(clientY)>10 → Down
   ch.filltype = null;
   SC.EditorMouseInfo.mouselastcoord = "Z0";
-  { SC.CellHandlesMouseMove(fakeEvent({ clientX: 160, clientY: 130 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMove(fakeEvent({ clientX: 160, clientY: 130 }) as unknown as MouseEvent);
+  }
 
   // Fill, null, abs(clientX)>10 → Right
   ch.filltype = null;
   SC.EditorMouseInfo.mouselastcoord = "Z0";
-  { SC.CellHandlesMouseMove(fakeEvent({ clientX: 240, clientY: 90 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMove(fakeEvent({ clientX: 240, clientY: 90 }) as unknown as MouseEvent);
+  }
 
   // MoveI, Vertical, crend in range → bump
   ch.dragtype = "MoveI";
   ch.filltype = "Vertical";
   editor.range2 = { hasrange: true, top: 2, bottom: 3, left: 3, right: 4 };
   SC.EditorMouseInfo.mouselastcoord = "Z0";
-  { SC.CellHandlesMouseMove(fakeEvent({ clientX: 160, clientY: 70 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMove(fakeEvent({ clientX: 160, clientY: 70 }) as unknown as MouseEvent);
+  }
 
   // MoveI, Horizontal, crend in range → bump
   ch.filltype = "Horizontal";
   editor.range2 = { hasrange: true, top: 2, bottom: 3, left: 3, right: 4 };
   SC.EditorMouseInfo.mouselastcoord = "Z0";
-  { SC.CellHandlesMouseMove(fakeEvent({ clientX: 240, clientY: 90 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMove(fakeEvent({ clientX: 240, clientY: 90 }) as unknown as MouseEvent);
+  }
 
   // Move, new coord → MoveECell + RangeExtend
   ch.dragtype = "Move";
   ch.filltype = null;
   editor.range2 = { hasrange: true, top: 4, bottom: 4, left: 3, right: 3 };
   SC.EditorMouseInfo.mouselastcoord = "Z0";
-  { SC.CellHandlesMouseMove(fakeEvent({ clientX: 240, clientY: 110 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseMove(fakeEvent({ clientX: 240, clientY: 110 }) as unknown as MouseEvent);
+  }
   expect(editor.ecell.coord).toBe("D5");
   expect(positions).toHaveLength(0);
   expect(anchors.at(-1)).toBe("D5");
@@ -594,58 +661,78 @@ test("CellHandlesDragAutoRepeat: Fill clamp + Move/MoveI direction branches", as
   ch.dragtype = "Fill";
   ch.filltype = "Down";
   SC.EditorMouseInfo.mouselastcoord = "Z0";
-  { SC.CellHandlesDragAutoRepeat("C1", "down"); }
+  {
+    SC.CellHandlesDragAutoRepeat("C1", "down");
+  }
 
   // Fill, Right, crend.col < crstart.col → clamp
   ch.filltype = "Right";
   SC.EditorMouseInfo.mouselastcoord = "Z0";
-  { SC.CellHandlesDragAutoRepeat("A4", "right"); }
+  {
+    SC.CellHandlesDragAutoRepeat("A4", "right");
+  }
 
   // Fill, null
   ch.filltype = null;
   SC.EditorMouseInfo.mouselastcoord = "Z0";
-  { SC.CellHandlesDragAutoRepeat("C4", "down"); }
+  {
+    SC.CellHandlesDragAutoRepeat("C4", "down");
+  }
 
   // Fill, newcoord != mouselastcoord
   SC.EditorMouseInfo.mouselastcoord = "C4";
   ch.filltype = null;
-  { SC.CellHandlesDragAutoRepeat("C5", "down"); }
+  {
+    SC.CellHandlesDragAutoRepeat("C5", "down");
+  }
 
   // Move, coord != mouselastcoord
   ch.dragtype = "Move";
   SC.EditorMouseInfo.mouselastcoord = "Z0";
-  { SC.CellHandlesDragAutoRepeat("C5", "up"); }
+  {
+    SC.CellHandlesDragAutoRepeat("C5", "up");
+  }
 
   // MoveC, coord == mouselastcoord
   ch.dragtype = "MoveC";
   SC.EditorMouseInfo.mouselastcoord = "C4";
-  { SC.CellHandlesDragAutoRepeat("C4", "right"); }
+  {
+    SC.CellHandlesDragAutoRepeat("C4", "right");
+  }
 
   // MoveI, Vertical, crend.row in range → bump
   ch.dragtype = "MoveI";
   ch.filltype = "Vertical";
   editor.range2 = { hasrange: true, top: 2, bottom: 4, left: 3, right: 4 };
   SC.EditorMouseInfo.mouselastcoord = "C4";
-  { SC.CellHandlesDragAutoRepeat("C3", "left"); }
+  {
+    SC.CellHandlesDragAutoRepeat("C3", "left");
+  }
 
   // MoveIC, Horizontal, crend.col in range → bump
   ch.dragtype = "MoveIC";
   ch.filltype = "Horizontal";
   editor.range2 = { hasrange: true, top: 2, bottom: 4, left: 3, right: 4 };
   SC.EditorMouseInfo.mouselastcoord = "C4";
-  { SC.CellHandlesDragAutoRepeat("D4", "left"); }
+  {
+    SC.CellHandlesDragAutoRepeat("D4", "left");
+  }
 
   // MoveI, null
   ch.dragtype = "MoveI";
   ch.filltype = null;
   SC.EditorMouseInfo.mouselastcoord = "C4";
-  { SC.CellHandlesDragAutoRepeat("C5", "left"); }
+  {
+    SC.CellHandlesDragAutoRepeat("C5", "left");
+  }
 
   // MoveIC, newcoord != mouselastcoord
   ch.dragtype = "MoveIC";
   ch.filltype = null;
   SC.EditorMouseInfo.mouselastcoord = "A0";
-  { SC.CellHandlesDragAutoRepeat("C5", "left"); }
+  {
+    SC.CellHandlesDragAutoRepeat("C5", "left");
+  }
 
   teardownEditor(SC, editor);
 });
@@ -672,7 +759,9 @@ test("CellHandlesMouseUp: Fill Down/Right + Nothing + result-fallback branches",
   ch.startingcoord = "C3";
   editor.MoveECell("C3");
   editor.range2 = { hasrange: true, top: 3, bottom: 3, left: 3, right: 3 };
-  { SC.CellHandlesMouseUp(fakeEvent({ clientX: 160, clientY: 110 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseUp(fakeEvent({ clientX: 160, clientY: 110 }) as unknown as MouseEvent);
+  }
 
   // Fill, movedmouse=true, filltype=Right
   ch.mouseDown = true;
@@ -682,7 +771,9 @@ test("CellHandlesMouseUp: Fill Down/Right + Nothing + result-fallback branches",
   ch.startingcoord = "C3";
   SC.EditorMouseInfo.editor = editor;
   SC.EditorMouseInfo.ignore = true;
-  { SC.CellHandlesMouseUp(fakeEvent({ clientX: 240, clientY: 90 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseUp(fakeEvent({ clientX: 240, clientY: 90 }) as unknown as MouseEvent);
+  }
 
   // Nothing (movedmouse=false)
   ch.mouseDown = true;
@@ -692,7 +783,9 @@ test("CellHandlesMouseUp: Fill Down/Right + Nothing + result-fallback branches",
   ch.startingcoord = "C3";
   SC.EditorMouseInfo.editor = editor;
   SC.EditorMouseInfo.ignore = true;
-  { SC.CellHandlesMouseUp(fakeEvent({ clientX: 160, clientY: 90 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseUp(fakeEvent({ clientX: 160, clientY: 90 }) as unknown as MouseEvent);
+  }
 
   // Move with movedmouse=true
   ch.mouseDown = true;
@@ -703,7 +796,9 @@ test("CellHandlesMouseUp: Fill Down/Right + Nothing + result-fallback branches",
   editor.range2 = { hasrange: true, top: 3, bottom: 4, left: 3, right: 4 };
   SC.EditorMouseInfo.editor = editor;
   SC.EditorMouseInfo.ignore = true;
-  { SC.CellHandlesMouseUp(fakeEvent({ clientX: 240, clientY: 110 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseUp(fakeEvent({ clientX: 240, clientY: 110 }) as unknown as MouseEvent);
+  }
 
   // MoveI with movedmouse=true
   ch.mouseDown = true;
@@ -714,7 +809,9 @@ test("CellHandlesMouseUp: Fill Down/Right + Nothing + result-fallback branches",
   editor.range2 = { hasrange: true, top: 3, bottom: 4, left: 3, right: 4 };
   SC.EditorMouseInfo.editor = editor;
   SC.EditorMouseInfo.ignore = true;
-  { SC.CellHandlesMouseUp(fakeEvent({ clientX: 240, clientY: 110 }) as unknown as MouseEvent); }
+  {
+    SC.CellHandlesMouseUp(fakeEvent({ clientX: 240, clientY: 110 }) as unknown as MouseEvent);
+  }
 
   SC.EditorMouseInfo.ignore = false;
   teardownEditor(SC, editor);
@@ -743,12 +840,16 @@ test("CreateTableControl: all class/style conditional branches via constants", a
     saved[k] = scc[k as keyof typeof scc];
     (scc as Record<string, unknown>)[k] = "tc-" + k;
   }
-  { const vctrl = new SC.TableControl(editor, true, 400);
-  SC.CreateTableControl(vctrl);
-  editor.verticaltablecontrol = vctrl; }
-  { const hctrl = new SC.TableControl(editor, false, 400);
-  SC.CreateTableControl(hctrl);
-  editor.horizontaltablecontrol = hctrl; }
+  {
+    const vctrl = new SC.TableControl(editor, true, 400);
+    SC.CreateTableControl(vctrl);
+    editor.verticaltablecontrol = vctrl;
+  }
+  {
+    const hctrl = new SC.TableControl(editor, false, 400);
+    SC.CreateTableControl(hctrl);
+    editor.horizontaltablecontrol = hctrl;
+  }
   for (const k of classKeys) {
     (scc as Record<string, unknown>)[k] = saved[k];
   }
@@ -776,7 +877,9 @@ test("CreateTableControl: TCPStrackinglineClass via TCPSDragFunctionStart", asyn
   // The functionobj.control ref is what TCPS uses
   (dobj.functionobj as Record<string, unknown>).control = vctrl;
   const draginfo: Record<string, unknown> = { clientX: 100, clientY: 100, offsetX: 0, offsetY: 0 };
-  { SC.TCPSDragFunctionStart({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj); }
+  {
+    SC.TCPSDragFunctionStart({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj);
+  }
   const hctrl = editor.horizontaltablecontrol as SocialCalc.TableControl;
   const dobjH: SocialCalc.DragRegisteredElement = {
     vertical: false,
@@ -787,7 +890,9 @@ test("CreateTableControl: TCPStrackinglineClass via TCPSDragFunctionStart", asyn
   } as SocialCalc.DragRegisteredElement;
   (dobjH.functionobj as Record<string, unknown>).control = hctrl;
   const draginfoH: Record<string, unknown> = { clientX: 100, clientY: 100, offsetX: 0, offsetY: 0 };
-  { SC.TCPSDragFunctionStart({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCPSDragFunctionStart({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
   (scc as Record<string, unknown>).TCPStrackinglineClass = savedClass;
   (scc as Record<string, unknown>).TCPStrackinglineStyle = savedStyle;
   teardownEditor(SC, editor);
@@ -815,23 +920,33 @@ test("TCPSDragFunctionMove: vertical + horizontal clamp branches", async () => {
   } as SocialCalc.DragRegisteredElement;
   (dobj.functionobj as Record<string, unknown>).control = vctrl;
   const draginfo: Record<string, unknown> = { clientX: 100, clientY: 100, offsetX: 5, offsetY: 10 };
-  { SC.TCPSDragFunctionStart({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj); }
+  {
+    SC.TCPSDragFunctionStart({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj);
+  }
 
   // clientY > max
   (draginfo as Record<string, unknown>).clientY = 999;
-  { SC.TCPSDragFunctionMove({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj); }
+  {
+    SC.TCPSDragFunctionMove({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj);
+  }
   // clientY < min
   (draginfo as Record<string, unknown>).clientY = -999;
-  { SC.TCPSDragFunctionMove({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj); }
+  {
+    SC.TCPSDragFunctionMove({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj);
+  }
   // normal
   (draginfo as Record<string, unknown>).clientY = 150;
-  { SC.TCPSDragFunctionMove({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj); }
+  {
+    SC.TCPSDragFunctionMove({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj);
+  }
 
   // hidden row skip
   (editor.context.sheetobj.rowattribs.hide as Record<string, string>)[150] = "yes";
   (editor.context.sheetobj.rowattribs.hide as Record<string, string>)[151] = "yes";
   (draginfo as Record<string, unknown>).clientY = 148;
-  { SC.TCPSDragFunctionMove({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj); }
+  {
+    SC.TCPSDragFunctionMove({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj);
+  }
   delete (editor.context.sheetobj.rowattribs.hide as Record<string, string>)[150];
   delete (editor.context.sheetobj.rowattribs.hide as Record<string, string>)[151];
 
@@ -854,19 +969,29 @@ test("TCPSDragFunctionMove: vertical + horizontal clamp branches", async () => {
     offsetX: 5,
     offsetY: 10,
   };
-  { SC.TCPSDragFunctionStart({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCPSDragFunctionStart({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
   (draginfoH as Record<string, unknown>).clientX = 999;
-  { SC.TCPSDragFunctionMove({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCPSDragFunctionMove({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
   (draginfoH as Record<string, unknown>).clientX = -999;
-  { SC.TCPSDragFunctionMove({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCPSDragFunctionMove({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
   (draginfoH as Record<string, unknown>).clientX = 150;
-  { SC.TCPSDragFunctionMove({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCPSDragFunctionMove({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
 
   // hidden col skip
   (editor.context.sheetobj.colattribs.hide as Record<string, string>)["D"] = "yes";
   (editor.context.sheetobj.colattribs.hide as Record<string, string>)["E"] = "yes";
   (draginfoH as Record<string, unknown>).clientX = 148;
-  { SC.TCPSDragFunctionMove({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCPSDragFunctionMove({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
   delete (editor.context.sheetobj.colattribs.hide as Record<string, string>)["D"];
   delete (editor.context.sheetobj.colattribs.hide as Record<string, string>)["E"];
 
@@ -895,20 +1020,30 @@ test("TCPSDragFunctionStop: vertical + horizontal clamp + hide-skip branches", a
   } as SocialCalc.DragRegisteredElement;
   (dobj.functionobj as Record<string, unknown>).control = vctrl;
   const draginfo: Record<string, unknown> = { clientX: 100, clientY: 100, offsetX: 5, offsetY: 10 };
-  { SC.TCPSDragFunctionStart({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj); }
+  {
+    SC.TCPSDragFunctionStart({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj);
+  }
 
   (draginfo as Record<string, unknown>).clientY = 999;
-  { SC.TCPSDragFunctionStop({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj); }
+  {
+    SC.TCPSDragFunctionStop({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj);
+  }
   (draginfo as Record<string, unknown>).clientY = -999;
-  { SC.TCPSDragFunctionStop({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj); }
+  {
+    SC.TCPSDragFunctionStop({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj);
+  }
   (draginfo as Record<string, unknown>).clientY = 300;
   editor.context.sheetobj.attribs.lastrow = 3;
-  { SC.TCPSDragFunctionStop({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj); }
+  {
+    SC.TCPSDragFunctionStop({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj);
+  }
   editor.context.sheetobj.attribs.lastrow = 100;
   (editor.context.sheetobj.rowattribs.hide as Record<string, string>)[10] = "yes";
   (editor.context.sheetobj.rowattribs.hide as Record<string, string>)[11] = "yes";
   (draginfo as Record<string, unknown>).clientY = 100;
-  { SC.TCPSDragFunctionStop({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj); }
+  {
+    SC.TCPSDragFunctionStop({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj);
+  }
   delete (editor.context.sheetobj.rowattribs.hide as Record<string, string>)[10];
   delete (editor.context.sheetobj.rowattribs.hide as Record<string, string>)[11];
 
@@ -930,19 +1065,29 @@ test("TCPSDragFunctionStop: vertical + horizontal clamp + hide-skip branches", a
     offsetX: 5,
     offsetY: 10,
   };
-  { SC.TCPSDragFunctionStart({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCPSDragFunctionStart({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
   (draginfoH as Record<string, unknown>).clientX = 999;
-  { SC.TCPSDragFunctionStop({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCPSDragFunctionStop({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
   (draginfoH as Record<string, unknown>).clientX = -999;
-  { SC.TCPSDragFunctionStop({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCPSDragFunctionStop({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
   (draginfoH as Record<string, unknown>).clientX = 300;
   editor.context.sheetobj.attribs.lastcol = 3;
-  { SC.TCPSDragFunctionStop({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCPSDragFunctionStop({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
   editor.context.sheetobj.attribs.lastcol = 100;
   (editor.context.sheetobj.colattribs.hide as Record<string, string>)["D"] = "yes";
   (editor.context.sheetobj.colattribs.hide as Record<string, string>)["E"] = "yes";
   (draginfoH as Record<string, unknown>).clientX = 100;
-  { SC.TCPSDragFunctionStop({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCPSDragFunctionStop({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
   delete (editor.context.sheetobj.colattribs.hide as Record<string, string>)["D"];
   delete (editor.context.sheetobj.colattribs.hide as Record<string, string>)["E"];
 
@@ -980,7 +1125,9 @@ test("TCTDragFunctionStart: v+h class/style + rowpreviewele branches", async () 
   } as SocialCalc.DragRegisteredElement;
   (dobjV.functionobj as Record<string, unknown>).control = vctrl;
   const draginfoV: Record<string, unknown> = { clientX: 200, clientY: 200, offsetX: 0, offsetY: 0 };
-  { SC.TCTDragFunctionStart({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV); }
+  {
+    SC.TCTDragFunctionStart({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV);
+  }
 
   const hctrl = editor.horizontaltablecontrol as SocialCalc.TableControl;
   const dobjH: SocialCalc.DragRegisteredElement = {
@@ -992,7 +1139,9 @@ test("TCTDragFunctionStart: v+h class/style + rowpreviewele branches", async () 
   } as SocialCalc.DragRegisteredElement;
   (dobjH.functionobj as Record<string, unknown>).control = hctrl;
   const draginfoH: Record<string, unknown> = { clientX: 200, clientY: 200, offsetX: 0, offsetY: 0 };
-  { SC.TCTDragFunctionStart({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCTDragFunctionStart({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
 
   for (const [k, v] of Object.entries(saved)) {
     (scc as Record<string, unknown>)[k] = v;
@@ -1025,34 +1174,48 @@ test("TCTDragFunctionMove: vertical+horizontal clamp + first-calc branches", asy
   } as SocialCalc.DragRegisteredElement;
   (dobjV.functionobj as Record<string, unknown>).control = vctrl;
   const draginfoV: Record<string, unknown> = { clientX: 200, clientY: 200, offsetX: 0, offsetY: 0 };
-  { SC.TCTDragFunctionStart({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV); }
+  {
+    SC.TCTDragFunctionStart({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV);
+  }
 
   // clamp high
   (draginfoV as Record<string, unknown>).clientY = 9999;
-  { SC.TCTDragFunctionMove({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV); }
+  {
+    SC.TCTDragFunctionMove({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV);
+  }
   // clamp low
   (draginfoV as Record<string, unknown>).clientY = -9999;
-  { SC.TCTDragFunctionMove({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV); }
+  {
+    SC.TCTDragFunctionMove({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV);
+  }
   // first <= lastnonscrollingrow (lastrow < lastnonscrollingrow makes difference negative → first low)
   (draginfoV as Record<string, unknown>).clientY = 990;
   (draginfoV as Record<string, unknown>).thumbrowshown = -1;
   editor.lastnonscrollingrow = 10;
   editor.context.sheetobj.attribs.lastrow = 5;
-  { SC.TCTDragFunctionMove({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV); }
+  {
+    SC.TCTDragFunctionMove({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV);
+  }
   editor.lastnonscrollingrow = 0;
   // first > lastrow (lastrow small, lastnonscrollingrow = 0)
   (draginfoV as Record<string, unknown>).clientY = 1050;
   (draginfoV as Record<string, unknown>).thumbrowshown = -1;
   editor.context.sheetobj.attribs.lastrow = 5;
-  { SC.TCTDragFunctionMove({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV); }
+  {
+    SC.TCTDragFunctionMove({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV);
+  }
   editor.context.sheetobj.attribs.lastrow = 100;
   // normal: first != thumbrowshown
   (draginfoV as Record<string, unknown>).clientY = 500;
   (draginfoV as Record<string, unknown>).thumbrowshown = -1;
-  { SC.TCTDragFunctionMove({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV); }
+  {
+    SC.TCTDragFunctionMove({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV);
+  }
   // first == thumbrowshown → skip
   (draginfoV as Record<string, unknown>).thumbrowshown = 0;
-  { SC.TCTDragFunctionMove({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV); }
+  {
+    SC.TCTDragFunctionMove({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV);
+  }
 
   // Horizontal
   const hctrl = editor.horizontaltablecontrol as SocialCalc.TableControl;
@@ -1070,24 +1233,36 @@ test("TCTDragFunctionMove: vertical+horizontal clamp + first-calc branches", asy
   } as SocialCalc.DragRegisteredElement;
   (dobjH.functionobj as Record<string, unknown>).control = hctrl;
   const draginfoH: Record<string, unknown> = { clientX: 200, clientY: 200, offsetX: 0, offsetY: 0 };
-  { SC.TCTDragFunctionStart({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCTDragFunctionStart({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
   (draginfoH as Record<string, unknown>).clientX = 9999;
-  { SC.TCTDragFunctionMove({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCTDragFunctionMove({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
   (draginfoH as Record<string, unknown>).clientX = -9999;
-  { SC.TCTDragFunctionMove({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCTDragFunctionMove({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
   // first <= lastnonscrollingcol
   (draginfoH as Record<string, unknown>).clientX = 990;
   editor.lastnonscrollingcol = 10;
   editor.context.sheetobj.attribs.lastcol = 5;
-  { SC.TCTDragFunctionMove({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCTDragFunctionMove({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
   editor.lastnonscrollingcol = 0;
   // first > lastcol
   (draginfoH as Record<string, unknown>).clientX = 1050;
   editor.context.sheetobj.attribs.lastcol = 5;
-  { SC.TCTDragFunctionMove({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCTDragFunctionMove({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
   editor.context.sheetobj.attribs.lastcol = 100;
   (draginfoH as Record<string, unknown>).clientX = 500;
-  { SC.TCTDragFunctionMove({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCTDragFunctionMove({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
 
   teardownEditor(SC, editor);
 });
@@ -1117,24 +1292,36 @@ test("TCTDragFunctionStop: v+h first-calc + clamp branches", async () => {
   } as SocialCalc.DragRegisteredElement;
   (dobjV.functionobj as Record<string, unknown>).control = vctrl;
   const draginfoV: Record<string, unknown> = { clientX: 200, clientY: 200, offsetX: 0, offsetY: 0 };
-  { SC.TCTDragFunctionStart({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV); }
+  {
+    SC.TCTDragFunctionStart({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV);
+  }
 
   // first <= lastnonscrollingrow (lastrow < lastnonscrollingrow → difference negative)
   (draginfoV as Record<string, unknown>).clientY = 990;
   editor.lastnonscrollingrow = 10;
   editor.context.sheetobj.attribs.lastrow = 5;
-  { SC.TCTDragFunctionStop({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV); }
+  {
+    SC.TCTDragFunctionStop({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV);
+  }
   editor.lastnonscrollingrow = 0;
   // first > lastrow
   (draginfoV as Record<string, unknown>).clientY = 1050;
   editor.context.sheetobj.attribs.lastrow = 5;
-  { SC.TCTDragFunctionStart({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV); }
-  { SC.TCTDragFunctionStop({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV); }
+  {
+    SC.TCTDragFunctionStart({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV);
+  }
+  {
+    SC.TCTDragFunctionStop({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV);
+  }
   editor.context.sheetobj.attribs.lastrow = 100;
   // normal
   (draginfoV as Record<string, unknown>).clientY = 500;
-  { SC.TCTDragFunctionStart({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV); }
-  { SC.TCTDragFunctionStop({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV); }
+  {
+    SC.TCTDragFunctionStart({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV);
+  }
+  {
+    SC.TCTDragFunctionStop({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV);
+  }
 
   const hctrl = editor.horizontaltablecontrol as SocialCalc.TableControl;
   hctrl.scrollareaend = 1000;
@@ -1151,23 +1338,35 @@ test("TCTDragFunctionStop: v+h first-calc + clamp branches", async () => {
   } as SocialCalc.DragRegisteredElement;
   (dobjH.functionobj as Record<string, unknown>).control = hctrl;
   const draginfoH: Record<string, unknown> = { clientX: 200, clientY: 200, offsetX: 0, offsetY: 0 };
-  { SC.TCTDragFunctionStart({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCTDragFunctionStart({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
   // first <= lastnonscrollingcol
   (draginfoH as Record<string, unknown>).clientX = 990;
   editor.lastnonscrollingcol = 10;
   editor.context.sheetobj.attribs.lastcol = 5;
-  { SC.TCTDragFunctionStop({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCTDragFunctionStop({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
   editor.lastnonscrollingcol = 0;
   // first > lastcol
   (draginfoH as Record<string, unknown>).clientX = 1050;
   editor.context.sheetobj.attribs.lastcol = 5;
-  { SC.TCTDragFunctionStart({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
-  { SC.TCTDragFunctionStop({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCTDragFunctionStart({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
+  {
+    SC.TCTDragFunctionStop({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
   editor.context.sheetobj.attribs.lastcol = 100;
   // normal
   (draginfoH as Record<string, unknown>).clientX = 500;
-  { SC.TCTDragFunctionStart({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
-  { SC.TCTDragFunctionStop({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH); }
+  {
+    SC.TCTDragFunctionStart({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
+  {
+    SC.TCTDragFunctionStop({} as Event, draginfoH as typeof SocialCalc.DragInfo, dobjH);
+  }
   expect(editor.context.rowpanes.at(-1)?.first).toBeGreaterThan(0);
   expect(editor.context.rowpanes.at(-1)?.first).toBeLessThanOrEqual(100);
   expect(editor.context.colpanes.at(-1)?.first).toBeGreaterThan(0);
@@ -1210,9 +1409,15 @@ test("DragMouseDown: Disabled callback + parent + MouseMove/Up callbacks", async
   );
   const regEl = SC.DragInfo.registeredElements.find((r) => r.element === el);
   if (regEl) regEl.parent = editor.toplevel as HTMLElement;
-  { SC.DragMouseDown(fakeEvent({ clientX: 10, clientY: 10, target: el }) as unknown as MouseEvent); }
-  { SC.DragMouseMove(fakeEvent({ clientX: 20, clientY: 20, target: el }) as unknown as MouseEvent); }
-  { SC.DragMouseUp(fakeEvent({ clientX: 25, clientY: 25, target: el }) as unknown as MouseEvent); }
+  {
+    SC.DragMouseDown(fakeEvent({ clientX: 10, clientY: 10, target: el }) as unknown as MouseEvent);
+  }
+  {
+    SC.DragMouseMove(fakeEvent({ clientX: 20, clientY: 20, target: el }) as unknown as MouseEvent);
+  }
+  {
+    SC.DragMouseUp(fakeEvent({ clientX: 25, clientY: 25, target: el }) as unknown as MouseEvent);
+  }
   expect(downCalls).toBeGreaterThan(0);
   expect(moveCalls).toBeGreaterThan(0);
   expect(upCalls).toBeGreaterThan(0);
@@ -1234,12 +1439,16 @@ test("DragMouseDown: Disabled callback + parent + MouseMove/Up callbacks", async
     } as SocialCalc.DragFunctionObject,
     editor.toplevel as HTMLElement,
   );
-  { SC.DragMouseDown(fakeEvent({ clientX: 10, clientY: 10, target: el3 }) as unknown as MouseEvent); }
+  {
+    SC.DragMouseDown(fakeEvent({ clientX: 10, clientY: 10, target: el3 }) as unknown as MouseEvent);
+  }
   expect(disabledCalls).toBeGreaterThan(0);
 
   // No dobj → return
   SC.DragInfo.registeredElements = [];
-  { SC.DragMouseDown(fakeEvent({ clientX: 10, clientY: 10, target: el }) as unknown as MouseEvent); }
+  {
+    SC.DragMouseDown(fakeEvent({ clientX: 10, clientY: 10, target: el }) as unknown as MouseEvent);
+  }
 
   teardownEditor(SC, editor);
 });
@@ -1277,42 +1486,56 @@ test("ButtonMouseOver/Out: buttonDown + doingHover + MouseOver/Out callback bran
   SC.ButtonInfo.buttonDown = false;
   SC.ButtonInfo.doingHover = false;
   SC.ButtonInfo.buttonElement = null;
-  { SC.ButtonMouseOver(fakeEvent({ target: b1 }) as unknown as MouseEvent); }
+  {
+    SC.ButtonMouseOver(fakeEvent({ target: b1 }) as unknown as MouseEvent);
+  }
   expect(overCalls).toBeGreaterThan(0);
 
   // MouseOver with bobj=null
   SC.ButtonInfo.buttonDown = false;
-  { SC.ButtonMouseOver(
-    fakeEvent({ target: document.createElement("div") }) as unknown as MouseEvent,
-  ); }
+  {
+    SC.ButtonMouseOver(
+      fakeEvent({ target: document.createElement("div") }) as unknown as MouseEvent,
+    );
+  }
 
   // MouseOut with doingHover → reset
   SC.ButtonInfo.buttonDown = false;
   SC.ButtonInfo.doingHover = true;
   SC.ButtonInfo.buttonElement = SC.ButtonInfo.registeredElements[0] ?? null;
-  { SC.ButtonMouseOut(fakeEvent({ target: b1 }) as unknown as MouseEvent); }
+  {
+    SC.ButtonMouseOut(fakeEvent({ target: b1 }) as unknown as MouseEvent);
+  }
   expect(outCalls).toBeGreaterThan(0);
 
   // MouseOut buttonDown true
   SC.ButtonInfo.buttonDown = true;
   SC.ButtonInfo.doingHover = true;
-  { SC.ButtonMouseOut(fakeEvent({ target: b1 }) as unknown as MouseEvent); }
+  {
+    SC.ButtonMouseOut(fakeEvent({ target: b1 }) as unknown as MouseEvent);
+  }
   SC.ButtonInfo.buttonDown = false;
 
   // MouseOut with bobj not found
   SC.ButtonInfo.doingHover = false;
-  { SC.ButtonMouseOut(
-    fakeEvent({ target: document.createElement("div") }) as unknown as MouseEvent,
-  ); }
+  {
+    SC.ButtonMouseOut(
+      fakeEvent({ target: document.createElement("div") }) as unknown as MouseEvent,
+    );
+  }
 
   // MouseOver while buttonDown=true + bobj==buttonElement
   SC.ButtonInfo.buttonDown = true;
   SC.ButtonInfo.buttonElement = SC.ButtonInfo.registeredElements[0] ?? null;
   SC.ButtonInfo.doingHover = false;
-  { SC.ButtonMouseOver(fakeEvent({ target: b1 }) as unknown as MouseEvent); }
+  {
+    SC.ButtonMouseOver(fakeEvent({ target: b1 }) as unknown as MouseEvent);
+  }
 
   // MouseOver while buttonDown=true + bobj!=buttonElement
-  { SC.ButtonMouseOver(fakeEvent({ target: b2 }) as unknown as MouseEvent); }
+  {
+    SC.ButtonMouseOver(fakeEvent({ target: b2 }) as unknown as MouseEvent);
+  }
   SC.ButtonInfo.buttonDown = false;
 
   teardownEditor(SC, editor);
@@ -1354,24 +1577,32 @@ test("ButtonMouseDown: Disabled + Repeat + MouseUp doingHover/normal branches", 
   SC.ButtonInfo.buttonDown = true;
   SC.ButtonInfo.doingHover = true;
   SC.ButtonInfo.buttonElement = ourBtn;
-  { SC.ButtonMouseUp(fakeEvent({ target: b }) as unknown as MouseEvent); }
+  {
+    SC.ButtonMouseUp(fakeEvent({ target: b }) as unknown as MouseEvent);
+  }
   expect(upCalls).toBeGreaterThan(0);
 
   // MouseUp with doingHover=false
   SC.ButtonInfo.buttonDown = true;
   SC.ButtonInfo.doingHover = false;
   SC.ButtonInfo.buttonElement = ourBtn;
-  { SC.ButtonMouseUp(fakeEvent({ target: b }) as unknown as MouseEvent); }
+  {
+    SC.ButtonMouseUp(fakeEvent({ target: b }) as unknown as MouseEvent);
+  }
 
   // MouseUp with buttonDown=false → early return
   SC.ButtonInfo.buttonDown = false;
-  { SC.ButtonMouseUp(fakeEvent({ target: b }) as unknown as MouseEvent); }
+  {
+    SC.ButtonMouseUp(fakeEvent({ target: b }) as unknown as MouseEvent);
+  }
 
   // MouseDown with bobj=null
   SC.ButtonInfo.buttonDown = false;
-  { SC.ButtonMouseDown(
-    fakeEvent({ target: document.createElement("div") }) as unknown as MouseEvent,
-  ); }
+  {
+    SC.ButtonMouseDown(
+      fakeEvent({ target: document.createElement("div") }) as unknown as MouseEvent,
+    );
+  }
 
   // Disabled callback returns true — use a fresh element so LookupElement finds it
   const bDis = document.createElement("div");
@@ -1387,25 +1618,33 @@ test("ButtonMouseDown: Disabled + Repeat + MouseUp doingHover/normal branches", 
     } as SocialCalc.ButtonParamObject,
     { Disabled: () => true } as SocialCalc.ButtonFunctionObject,
   );
-  { SC.ButtonMouseDown(fakeEvent({ target: bDis }) as unknown as MouseEvent); }
+  {
+    SC.ButtonMouseDown(fakeEvent({ target: bDis }) as unknown as MouseEvent);
+  }
 
   // Timer set → clear on MouseUp
   SC.ButtonInfo.timer = window.setTimeout(() => {}, 100);
   SC.ButtonInfo.buttonDown = true;
   SC.ButtonInfo.doingHover = false;
   SC.ButtonInfo.buttonElement = ourBtn;
-  { SC.ButtonMouseUp(fakeEvent({ target: b }) as unknown as MouseEvent); }
+  {
+    SC.ButtonMouseUp(fakeEvent({ target: b }) as unknown as MouseEvent);
+  }
 
   // ButtonRepeat with bobj
   SC.ButtonInfo.buttonElement = ourBtn;
   SC.ButtonInfo.buttonDown = true;
-  { SC.ButtonRepeat(); }
+  {
+    SC.ButtonRepeat();
+  }
   if (SC.ButtonInfo.timer) clearTimeout(SC.ButtonInfo.timer);
   SC.ButtonInfo.timer = null;
 
   // ButtonRepeat with no bobj
   SC.ButtonInfo.buttonElement = null;
-  { SC.ButtonRepeat(); }
+  {
+    SC.ButtonRepeat();
+  }
 
   teardownEditor(SC, editor);
 });
@@ -1428,18 +1667,24 @@ test("ProcessMouseWheel: parentNode walk + WheelMove + preventDefault fallback",
       wheelCalls++;
     },
   } as SocialCalc.MouseWheelFunctionObject);
-  { SC.ProcessMouseWheel(fakeEvent({ target: child, wheelDelta: 120 }) as unknown as Event); }
+  {
+    SC.ProcessMouseWheel(fakeEvent({ target: child, wheelDelta: 120 }) as unknown as Event);
+  }
   expect(wheelCalls).toBeGreaterThan(0);
 
   // passThru → early return
   SC.Keyboard.passThru = {} as unknown as HTMLElement;
-  { SC.ProcessMouseWheel(fakeEvent({ target: child, wheelDelta: 120 }) as unknown as Event); }
+  {
+    SC.ProcessMouseWheel(fakeEvent({ target: child, wheelDelta: 120 }) as unknown as Event);
+  }
   SC.Keyboard.passThru = null;
 
   // No registered element found
-  { SC.ProcessMouseWheel(
-    fakeEvent({ target: document.createElement("div"), wheelDelta: 120 }) as unknown as Event,
-  ); }
+  {
+    SC.ProcessMouseWheel(
+      fakeEvent({ target: document.createElement("div"), wheelDelta: 120 }) as unknown as Event,
+    );
+  }
 
   teardownEditor(SC, editor);
 });
@@ -1454,49 +1699,63 @@ test("ProcessKeyDown: IE path (which=undefined) + specialKeys + controlKeys + pr
   SC.KeyboardSetFocus(control.editor);
 
   // which=undefined → specialKeysCommon path
-  { SC.ProcessKeyDown({
-    which: undefined,
-    keyCode: 37,
-    ctrlKey: false,
-    preventDefault() {},
-    returnValue: true,
-  } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyDown({
+      which: undefined,
+      keyCode: 37,
+      ctrlKey: false,
+      preventDefault() {},
+      returnValue: true,
+    } as unknown as KeyboardEvent);
+  }
 
   // which=undefined, not a special key, no ctrlKey → return true
-  { SC.ProcessKeyDown({
-    which: undefined,
-    keyCode: 65,
-    ctrlKey: false,
-  } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyDown({
+      which: undefined,
+      keyCode: 65,
+      ctrlKey: false,
+    } as unknown as KeyboardEvent);
+  }
 
   // which=undefined → ctrlKey + controlKeysIE
-  { SC.ProcessKeyDown({ which: undefined, keyCode: 65, ctrlKey: true } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyDown({ which: undefined, keyCode: 65, ctrlKey: true } as unknown as KeyboardEvent);
+  }
 
   // which=defined with controlKeysIE
-  { SC.ProcessKeyDown({
-    which: 1,
-    keyCode: 67,
-    ctrlKey: true,
-    metaKey: false,
-  } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyDown({
+      which: 1,
+      keyCode: 67,
+      ctrlKey: true,
+      metaKey: false,
+    } as unknown as KeyboardEvent);
+  }
 
   // which=defined, not special, no ctrlKey → return true
-  { SC.ProcessKeyDown({
-    which: 1,
-    keyCode: 65,
-    ctrlKey: false,
-    metaKey: false,
-  } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyDown({
+      which: 1,
+      keyCode: 65,
+      ctrlKey: false,
+      metaKey: false,
+    } as unknown as KeyboardEvent);
+  }
 
   // _app=true
   const savedApp = SC._app;
   (SC as Record<string, unknown>)._app = true;
-  { SC.ProcessKeyDown({ which: 1, keyCode: 37 } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyDown({ which: 1, keyCode: 37 } as unknown as KeyboardEvent);
+  }
   (SC as Record<string, unknown>)._app = savedApp;
 
   // passThru truthy
   SC.Keyboard.passThru = {} as unknown as HTMLElement;
-  { SC.ProcessKeyDown({ which: 1, keyCode: 37 } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyDown({ which: 1, keyCode: 37 } as unknown as KeyboardEvent);
+  }
   SC.Keyboard.passThru = null;
 
   teardownEditor(SC, control.editor);
@@ -1517,28 +1776,40 @@ test("ProcessKeyPress: Safari + IE + Firefox + repeatingKeyPress branches", asyn
   kt.repeatingKeyPress = false;
   kt.statusFromProcessKey = true;
   kt.chForProcessKey = "[aright]";
-  { SC.ProcessKeyPress({ which: 1, keyCode: 39, charCode: 0 } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyPress({ which: 1, keyCode: 39, charCode: 0 } as unknown as KeyboardEvent);
+  }
 
   // didProcessKey=true, repeatingKeyPress=true → ProcessKey
   kt.repeatingKeyPress = true;
-  { SC.ProcessKeyPress({ which: 1, keyCode: 39, charCode: 0 } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyPress({ which: 1, keyCode: 39, charCode: 0 } as unknown as KeyboardEvent);
+  }
   kt.didProcessKey = false;
   kt.repeatingKeyPress = false;
 
   // which=undefined → String.fromCharCode
-  { SC.ProcessKeyPress({ which: undefined, keyCode: 65, charCode: 0 } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyPress({ which: undefined, keyCode: 65, charCode: 0 } as unknown as KeyboardEvent);
+  }
 
   // which=0 → return false
-  { SC.ProcessKeyPress({ which: 0, keyCode: 0, charCode: 0 } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyPress({ which: 0, keyCode: 0, charCode: 0 } as unknown as KeyboardEvent);
+  }
 
   // passThru
   SC.Keyboard.passThru = {} as unknown as HTMLElement;
-  { SC.ProcessKeyPress({ which: 1, keyCode: 37, charCode: 0 } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyPress({ which: 1, keyCode: 37, charCode: 0 } as unknown as KeyboardEvent);
+  }
   SC.Keyboard.passThru = null;
 
   // _app
   (SC as Record<string, unknown>)._app = true;
-  { SC.ProcessKeyPress({ which: 1, keyCode: 37 } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyPress({ which: 1, keyCode: 37 } as unknown as KeyboardEvent);
+  }
   (SC as Record<string, unknown>)._app = false;
 
   teardownEditor(SC, control.editor);
@@ -1550,68 +1821,84 @@ test("ProcessKeyPress: Safari specialKeys + ignoreKeys + controlKeys + Firefox",
   SC.KeyboardSetFocus(control.editor);
 
   // keyCode == charCode → Safari specialKeysSafari match (63232 = [aup])
-  { SC.ProcessKeyPress({
-    which: 63232,
-    keyCode: 63232,
-    charCode: 63232,
-  } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyPress({
+      which: 63232,
+      keyCode: 63232,
+      charCode: 63232,
+    } as unknown as KeyboardEvent);
+  }
 
   // Safari ignoreKeysSafari (63238 = [f3]) → return true
-  { SC.ProcessKeyPress({
-    which: 63238,
-    keyCode: 63238,
-    charCode: 63238,
-  } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyPress({
+      which: 63238,
+      keyCode: 63238,
+      charCode: 63238,
+    } as unknown as KeyboardEvent);
+  }
 
   // Safari metaKey + controlKeysSafari (97 = [ctrl-a])
-  { SC.ProcessKeyPress({
-    which: 97,
-    keyCode: 97,
-    charCode: 97,
-    metaKey: true,
-    preventDefault() {},
-    returnValue: true,
-  } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyPress({
+      which: 97,
+      keyCode: 97,
+      charCode: 97,
+      metaKey: true,
+      preventDefault() {},
+      returnValue: true,
+    } as unknown as KeyboardEvent);
+  }
 
   // Safari normal char
-  { SC.ProcessKeyPress({
-    which: 97,
-    keyCode: 97,
-    charCode: 97,
-    metaKey: false,
-  } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyPress({
+      which: 97,
+      keyCode: 97,
+      charCode: 97,
+      metaKey: false,
+    } as unknown as KeyboardEvent);
+  }
 
   // Firefox keyCode != charCode, specialKeysFirefox match → return true
-  { SC.ProcessKeyPress({ which: 1, keyCode: 37, charCode: 0 } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyPress({ which: 1, keyCode: 37, charCode: 0 } as unknown as KeyboardEvent);
+  }
 
   // Firefox controlKeysFirefox (which=99)
-  { SC.ProcessKeyPress({
-    which: 99,
-    keyCode: 67,
-    charCode: 0,
-    ctrlKey: true,
-    preventDefault() {},
-    returnValue: true,
-  } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyPress({
+      which: 99,
+      keyCode: 67,
+      charCode: 0,
+      ctrlKey: true,
+      preventDefault() {},
+      returnValue: true,
+    } as unknown as KeyboardEvent);
+  }
 
   // Firefox normal char + no ctrl/meta
-  { SC.ProcessKeyPress({
-    which: 65,
-    keyCode: 0,
-    charCode: 65,
-    ctrlKey: false,
-    metaKey: false,
-  } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyPress({
+      which: 65,
+      keyCode: 0,
+      charCode: 65,
+      ctrlKey: false,
+      metaKey: false,
+    } as unknown as KeyboardEvent);
+  }
 
   // status=false → preventDefault
-  { SC.ProcessKeyPress({
-    which: 97,
-    keyCode: 97,
-    charCode: 97,
-    metaKey: true,
-    preventDefault() {},
-    returnValue: true,
-  } as unknown as KeyboardEvent); }
+  {
+    SC.ProcessKeyPress({
+      which: 97,
+      keyCode: 97,
+      charCode: 97,
+      metaKey: true,
+      preventDefault() {},
+      returnValue: true,
+    } as unknown as KeyboardEvent);
+  }
 
   teardownEditor(SC, control.editor);
 });
@@ -1634,8 +1921,12 @@ test("DragUnregister: element not found in registeredElements", async () => {
     {} as SocialCalc.DragFunctionObject,
     editor.toplevel as HTMLElement,
   );
-  { SC.DragUnregister(el2); }
-  { SC.DragUnregister(el1); }
+  {
+    SC.DragUnregister(el2);
+  }
+  {
+    SC.DragUnregister(el1);
+  }
   teardownEditor(SC, editor);
 });
 
@@ -1657,19 +1948,27 @@ test("InputBoxOnMouseDown: input + inputboxdirect state branches", async () => {
 
   // start → inputboxdirect
   editor.state = "start";
-  { SC.InputBoxOnMouseDown(fakeEvent() as unknown as MouseEvent); }
+  {
+    SC.InputBoxOnMouseDown(fakeEvent() as unknown as MouseEvent);
+  }
 
   // input → inputboxdirect via MoveECell
   editor.state = "input";
-  { SC.InputBoxOnMouseDown(fakeEvent() as unknown as MouseEvent); }
+  {
+    SC.InputBoxOnMouseDown(fakeEvent() as unknown as MouseEvent);
+  }
 
   // inputboxdirect → no-op
   editor.state = "inputboxdirect";
-  { SC.InputBoxOnMouseDown(fakeEvent() as unknown as MouseEvent); }
+  {
+    SC.InputBoxOnMouseDown(fakeEvent() as unknown as MouseEvent);
+  }
 
   // Keyboard.focusTable null
   SC.Keyboard.focusTable = null;
-  { SC.InputBoxOnMouseDown(fakeEvent() as unknown as MouseEvent); }
+  {
+    SC.InputBoxOnMouseDown(fakeEvent() as unknown as MouseEvent);
+  }
   SC.KeyboardSetFocus(editor);
 
   teardownEditor(SC, editor);
@@ -1694,8 +1993,12 @@ test("TCTDragFunctionRowSetStatus: normal path", async () => {
   } as SocialCalc.DragRegisteredElement;
   (dobj.functionobj as Record<string, unknown>).control = vctrl;
   const draginfo: Record<string, unknown> = { clientX: 200, clientY: 200, offsetX: 0, offsetY: 0 };
-  { SC.TCTDragFunctionStart({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj); }
-  { SC.TCTDragFunctionRowSetStatus(draginfo as typeof SocialCalc.DragInfo, editor, 5); }
+  {
+    SC.TCTDragFunctionStart({} as Event, draginfo as typeof SocialCalc.DragInfo, dobj);
+  }
+  {
+    SC.TCTDragFunctionRowSetStatus(draginfo as typeof SocialCalc.DragInfo, editor, 5);
+  }
   teardownEditor(SC, editor);
 });
 
@@ -1714,8 +2017,10 @@ test("InputEcho: DragRegister from constructor + functionbox", async () => {
   const savedFbStyle = (scc as Record<string, unknown>).defaultInputEchoFunctionboxStyle;
   (scc as Record<string, unknown>).defaultInputEchoFunctionboxClass = "echo-fb";
   (scc as Record<string, unknown>).defaultInputEchoFunctionboxStyle = "display:block;";
-  { const echo = new SC.InputEcho(editor);
-  expect(echo).toBeTruthy(); }
+  {
+    const echo = new SC.InputEcho(editor);
+    expect(echo).toBeTruthy();
+  }
   (scc as Record<string, unknown>).defaultInputEchoFunctionboxClass = savedFbClass;
   (scc as Record<string, unknown>).defaultInputEchoFunctionboxStyle = savedFbStyle;
   teardownEditor(SC, editor);

@@ -5,16 +5,71 @@
     "2026-07-13": "All 11 modules measured in isolated per-module Stryker sandboxes (MUTATE_TARGET=js/<module>.ts vp exec stryker run). socialcalcconstants.ts improved from 19.73% (pre-assertion-hardening) to 77.91% after targeted assertion additions for the key category-A gaps (doCanonicalizeSheet boolean, cellDataType dispatch table, ConstantsSetClasses/SetImagePrefix guards). UI modules (socialcalctableeditor, socialcalcspreadsheetcontrol, socialcalcpopup, socialcalcviewer) and socialcalc-3 carry intentionally low floors reflecting current test coverage — these are honest measured baselines, not targets."
   },
   "modules": {
-    "js/formatnumber2.ts":            { "measured": true, "break": 92, "measuredAt": "2026-07-13", "score": "92.95" },
-    "js/socialcalcconstants.ts":      { "measured": true, "break": 77, "measuredAt": "2026-07-13", "score": "77.91" },
-    "js/formula1.ts":                 { "measured": true, "break": 95, "measuredAt": "2026-07-13", "score": "95.64" },
-    "js/formula-parse.ts":            { "measured": true, "break": 97, "measuredAt": "2026-07-13", "score": "97.80" },
-    "js/formula-operand.ts":          { "measured": true, "break": 94, "measuredAt": "2026-07-13", "score": "94.36" },
-    "js/formula-ref.ts":              { "measured": true, "break": 97, "measuredAt": "2026-07-13", "score": "97.22" },
-    "js/socialcalc-3.ts":             { "measured": true, "break": 57, "measuredAt": "2026-07-13", "score": "57.82" },
-    "js/socialcalctableeditor.ts":    { "measured": true, "break": 45, "measuredAt": "2026-07-13", "score": "45.98" },
-    "js/socialcalcpopup.ts":          { "measured": true, "break": 60, "measuredAt": "2026-07-13", "score": "60.68" },
-    "js/socialcalcspreadsheetcontrol.ts": { "measured": true, "break": 54, "measuredAt": "2026-07-13", "score": "54.47" },
-    "js/socialcalcviewer.ts":         { "measured": true, "break": 71, "measuredAt": "2026-07-13", "score": "71.88" }
+    "js/formatnumber2.ts": {
+      "measured": true,
+      "break": 92,
+      "measuredAt": "2026-07-13",
+      "score": "92.95"
+    },
+    "js/socialcalcconstants.ts": {
+      "measured": true,
+      "break": 77,
+      "measuredAt": "2026-07-13",
+      "score": "77.91"
+    },
+    "js/formula1.ts": {
+      "measured": true,
+      "break": 95,
+      "measuredAt": "2026-07-13",
+      "score": "95.64"
+    },
+    "js/formula-parse.ts": {
+      "measured": true,
+      "break": 97,
+      "measuredAt": "2026-07-13",
+      "score": "97.80"
+    },
+    "js/formula-operand.ts": {
+      "measured": true,
+      "break": 94,
+      "measuredAt": "2026-07-13",
+      "score": "94.36"
+    },
+    "js/formula-ref.ts": {
+      "measured": true,
+      "break": 97,
+      "measuredAt": "2026-07-13",
+      "score": "97.22"
+    },
+    "js/socialcalc-3.ts": {
+      "measured": true,
+      "break": 57,
+      "measuredAt": "2026-07-13",
+      "score": "57.82"
+    },
+    "js/socialcalctableeditor.ts": {
+      "measured": true,
+      "break": 45,
+      "measuredAt": "2026-07-13",
+      "score": "45.98"
+    },
+    "js/socialcalcpopup.ts": {
+      "measured": true,
+      "break": 60,
+      "measuredAt": "2026-07-13",
+      "score": "60.68"
+    },
+    "js/socialcalcspreadsheetcontrol.ts": {
+      "measured": true,
+      "break": 54,
+      "measuredAt": "2026-07-13",
+      "score": "54.47"
+    },
+    "js/socialcalcviewer.ts": {
+      "measured": true,
+      "break": 71,
+      "measuredAt": "2026-07-13",
+      "score": "71.88"
+    }
   }
 }

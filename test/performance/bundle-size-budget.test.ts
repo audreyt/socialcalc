@@ -26,10 +26,13 @@ describe("shipping bundle size budget", () => {
     const bundlePath = fileURLToPath(new URL("../../dist/SocialCalc.js", import.meta.url));
     const { size } = statSync(bundlePath);
 
-    expect(size, "dist/SocialCalc.js is empty or missing its build output").toBeGreaterThan(MIN_BYTES);
-    expect(size, `dist/SocialCalc.js grew far past the ${MEASURED_BASELINE_BYTES}-byte baseline`).toBeLessThan(
-      MAX_BYTES,
+    expect(size, "dist/SocialCalc.js is empty or missing its build output").toBeGreaterThan(
+      MIN_BYTES,
     );
+    expect(
+      size,
+      `dist/SocialCalc.js grew far past the ${MEASURED_BASELINE_BYTES}-byte baseline`,
+    ).toBeLessThan(MAX_BYTES);
   });
 
   test("dist/socialcalc.css exists and is non-trivial", () => {

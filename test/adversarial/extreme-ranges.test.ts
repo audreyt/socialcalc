@@ -38,24 +38,24 @@ describe("extreme column/row algebra", () => {
     expectParity(formula, candidateResult.type, oracleResult.type);
   });
 
-  test(
-    "SUM over a bounded-but-large row range completes and is deterministic",
-    async () => {
-      const { candidate, oracle } = await loadPair();
-      const formula = "SUM(A1:A5000)";
-      const candidateResult = candidate.Formula.evaluate_parsed_formula(
-        candidate.Formula.ParseFormulaIntoTokens(formula),
-        new candidate.Sheet(),
-      );
-      const oracleResult = oracle.Formula.evaluate_parsed_formula(
-        oracle.Formula.ParseFormulaIntoTokens(formula),
-        new oracle.Sheet(),
-      );
-      expectParity(formula, { type: candidateResult.type, value: candidateResult.value }, {
+  test("SUM over a bounded-but-large row range completes and is deterministic", async () => {
+    const { candidate, oracle } = await loadPair();
+    const formula = "SUM(A1:A5000)";
+    const candidateResult = candidate.Formula.evaluate_parsed_formula(
+      candidate.Formula.ParseFormulaIntoTokens(formula),
+      new candidate.Sheet(),
+    );
+    const oracleResult = oracle.Formula.evaluate_parsed_formula(
+      oracle.Formula.ParseFormulaIntoTokens(formula),
+      new oracle.Sheet(),
+    );
+    expectParity(
+      formula,
+      { type: candidateResult.type, value: candidateResult.value },
+      {
         type: oracleResult.type,
         value: oracleResult.value,
-      });
-    },
-    8000,
-  );
+      },
+    );
+  }, 8000);
 });

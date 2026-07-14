@@ -15,7 +15,7 @@ function resetFormulaGlobals(SC: typeof globalThis.SocialCalc) {
     SC.RecalcInfo.currentState = 0;
     SC.RecalcInfo.queue = [];
     if (SC.RecalcInfo.recalctimer) {
-      clearTimeout(SC.RecalcInfo.recalctimer)
+      clearTimeout(SC.RecalcInfo.recalctimer);
       SC.RecalcInfo.recalctimer = null;
     }
     SC.RecalcInfo.firstRenderScheduled = false;
@@ -669,7 +669,6 @@ test("DSeries: criterion matches numeric cell, alt TestCriteria passes (L12146 a
   // DSUM with criteria numeric 3 over [5,10] should not match any row.
 });
 
-
 test("DSeries: criteria string '>3' matches via TestCriteria (L12146 alt1 binary-expr alt0/alt1)", async () => {
   const { getDV } = await buildSheet([
     "set A1 text t Num",
@@ -864,7 +863,6 @@ test("SumifsFunction: error in sum range value2 (L12662 alt1 if-true)", async ()
   ]);
   expect(getVT("D1").charAt(0)).toBe("e");
 });
-
 
 // ---------------------------------------------------------------------------
 // A15. TimeFunction: non-numeric resulttype (L12721 alt1 false)

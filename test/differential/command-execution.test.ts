@@ -71,7 +71,9 @@ describe("command execution parity", () => {
         events.push(status);
         previous?.(data, status, arg, params);
       };
-      await waitForStatus(sheet, "cmdend", () => SC.ScheduleSheetCommands(sheet, "set A1 formula 1+1", true));
+      await waitForStatus(sheet, "cmdend", () =>
+        SC.ScheduleSheetCommands(sheet, "set A1 formula 1+1", true),
+      );
       await waitForStatus(sheet, "calcfinished", () => SC.RecalcSheet(sheet));
 
       expect(events).toContain("cmdend");

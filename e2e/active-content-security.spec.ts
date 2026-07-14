@@ -60,7 +60,11 @@ test.describe("active-content characterization (legacy default, untrustedContent
       `set A1 text t <img src="${hostileImageSrc}" onerror="window.__markCharacterizationFired()">`,
     );
     await scheduleCommand(page, "set A1 textvalueformat text-html");
-    await waitFor(page, () => document.querySelector("#containerDiv #cell_A1")?.innerHTML.includes("<img") === true, "SocialCalc-");
+    await waitFor(
+      page,
+      () => document.querySelector("#containerDiv #cell_A1")?.innerHTML.includes("<img") === true,
+      "SocialCalc-",
+    );
 
     const cellHtml = await cellLocator(page, "A1").innerHTML();
     expect(cellHtml).toContain("<img");
@@ -93,10 +97,16 @@ test.describe("opt-in untrusted-content policy: entity-payload sinks stay inert 
 
     await scheduleCommand(page, "set A1 text t javascript&#58;alert(1)");
     await scheduleCommand(page, "set A1 textvalueformat text-url");
-    await waitFor(page, () => document.querySelector("#containerDiv #cell_A1 a") !== null, "SocialCalc-");
+    await waitFor(
+      page,
+      () => document.querySelector("#containerDiv #cell_A1 a") !== null,
+      "SocialCalc-",
+    );
 
     const href = await page.evaluate(
-      () => (document.querySelector("#containerDiv #cell_A1 a") as HTMLAnchorElement | null)?.href ?? null,
+      () =>
+        (document.querySelector("#containerDiv #cell_A1 a") as HTMLAnchorElement | null)?.href ??
+        null,
     );
     expect(href).not.toBeNull();
     expect(href?.toLowerCase().startsWith("javascript:")).toBe(false);
@@ -112,10 +122,16 @@ test.describe("opt-in untrusted-content policy: entity-payload sinks stay inert 
 
     await scheduleCommand(page, "set B1 text t jav&#x61;script:alert(1)");
     await scheduleCommand(page, "set B1 textvalueformat text-image");
-    await waitFor(page, () => document.querySelector("#containerDiv #cell_B1 img") !== null, "SocialCalc-");
+    await waitFor(
+      page,
+      () => document.querySelector("#containerDiv #cell_B1 img") !== null,
+      "SocialCalc-",
+    );
 
     const src = await page.evaluate(
-      () => (document.querySelector("#containerDiv #cell_B1 img") as HTMLImageElement | null)?.src ?? null,
+      () =>
+        (document.querySelector("#containerDiv #cell_B1 img") as HTMLImageElement | null)?.src ??
+        null,
     );
     expect(src).not.toBeNull();
     expect(src?.toLowerCase().startsWith("javascript:")).toBe(false);
@@ -128,7 +144,7 @@ test.describe("opt-in untrusted-content policy: entity-payload sinks stay inert 
     await createControl(page);
     await setUntrustedContent(page, true);
 
-    await scheduleCommand(page, 'set C1 text t x&quot;onmouseover=&quot;alert(1)');
+    await scheduleCommand(page, "set C1 text t x&quot;onmouseover=&quot;alert(1)");
     await scheduleCommand(page, 'set C1 textvalueformat text-custom:<a href="@u">@s</a>');
     await waitFor(
       page,
@@ -159,10 +175,16 @@ test.describe("opt-in untrusted-content policy: entity-payload sinks stay inert 
 
     await scheduleCommand(page, "set D1 text t http://example.com/?a=1&b=2");
     await scheduleCommand(page, "set D1 textvalueformat text-url");
-    await waitFor(page, () => document.querySelector("#containerDiv #cell_D1 a") !== null, "SocialCalc-");
+    await waitFor(
+      page,
+      () => document.querySelector("#containerDiv #cell_D1 a") !== null,
+      "SocialCalc-",
+    );
 
     const href = await page.evaluate(
-      () => (document.querySelector("#containerDiv #cell_D1 a") as HTMLAnchorElement | null)?.href ?? null,
+      () =>
+        (document.querySelector("#containerDiv #cell_D1 a") as HTMLAnchorElement | null)?.href ??
+        null,
     );
     // The DOM's resolved href — not the raw HTML-escaped attribute text —
     // must be byte-identical to the original URL: the browser's own parser

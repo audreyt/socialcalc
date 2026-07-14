@@ -142,9 +142,7 @@ describe("bundle loader and DOM-free fallback wrappers", () => {
 
       SC.GetSpreadsheetControlObject = () => ({ sortrange: "A1", idPrefix: "sort-" });
       installSortDocument();
-      expect(SC.SpreadsheetControlSortSave({} as never, "sort")).toBe(
-        "sort:A1:2:up:::3:down\n",
-      );
+      expect(SC.SpreadsheetControlSortSave({} as never, "sort")).toBe("sort:A1:2:up:::3:down\n");
     } finally {
       restoreGlobalDescriptors(savedGlobals);
     }

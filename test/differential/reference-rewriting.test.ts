@@ -23,7 +23,11 @@ describe("OffsetFormulaCoords parity (copy/fill)", () => {
 
   test("offsetting a reference past column ZZ produces #REF! on both runtimes", async () => {
     const { candidate, oracle } = await loadPair();
-    expectParity("offset(ZZ1,+1,0)", candidate.OffsetFormulaCoords("ZZ1", 1, 0), oracle.OffsetFormulaCoords("ZZ1", 1, 0));
+    expectParity(
+      "offset(ZZ1,+1,0)",
+      candidate.OffsetFormulaCoords("ZZ1", 1, 0),
+      oracle.OffsetFormulaCoords("ZZ1", 1, 0),
+    );
     expect(candidate.OffsetFormulaCoords("ZZ1", 1, 0)).toBe("#REF!");
   });
 });
@@ -55,19 +59,26 @@ describe("ReplaceFormulaCoords parity (move)", () => {
 });
 
 describe("A1 coordinate algebra parity", () => {
-  test.each([1, 2, 26, 27, 28, 100, 701, 702] as const)("rcColname(%i) round-trips through crToCoord", async (col) => {
-    const { candidate, oracle } = await loadPair();
-    const candidateName = candidate.rcColname(col);
-    const oracleName = oracle.rcColname(col);
-    expectParity(`rcColname(${col})`, candidateName, oracleName);
+  test.each([1, 2, 26, 27, 28, 100, 701, 702] as const)(
+    "rcColname(%i) round-trips through crToCoord",
+    async (col) => {
+      const { candidate, oracle } = await loadPair();
+      const candidateName = candidate.rcColname(col);
+      const oracleName = oracle.rcColname(col);
+      expectParity(`rcColname(${col})`, candidateName, oracleName);
 
-    const coord = `${candidateName}1`;
-    expectParity(`crToCoord(${col},1)`, candidate.crToCoord(col, 1), oracle.crToCoord(col, 1));
-    expectParity(`coordToCr(${coord})`, candidate.coordToCr(coord), oracle.coordToCr(coord));
-  });
+      const coord = `${candidateName}1`;
+      expectParity(`crToCoord(${col},1)`, candidate.crToCoord(col, 1), oracle.crToCoord(col, 1));
+      expectParity(`coordToCr(${coord})`, candidate.coordToCr(coord), oracle.coordToCr(coord));
+    },
+  );
 
   test("coordToCr rejects a column run past ZZ instead of hanging on a garbage range", async () => {
     const { candidate, oracle } = await loadPair();
-    expectParity("coordToCr(invalid:bad)", candidate.coordToCr("invalid:bad"), oracle.coordToCr("invalid:bad"));
+    expectParity(
+      "coordToCr(invalid:bad)",
+      candidate.coordToCr("invalid:bad"),
+      oracle.coordToCr("invalid:bad"),
+    );
   });
 });

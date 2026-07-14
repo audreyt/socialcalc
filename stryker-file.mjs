@@ -47,7 +47,11 @@ const commandRegressionTests = [
 ];
 
 // Sheet/cell core behaviour + save/load round trips.
-const sheetCoreTests = ["test/core.test.ts", "test/sheet-coverage-a.test.ts", "test/sheet-coverage-b.test.ts"];
+const sheetCoreTests = [
+  "test/core.test.ts",
+  "test/sheet-coverage-a.test.ts",
+  "test/sheet-coverage-b.test.ts",
+];
 
 // Formula lexer/parser/operand-stack/rewrite tests, verified by name plus
 // grep for ParseFormulaIntoTokens/ConvertInfixToPolish/OperandAs*/
@@ -161,10 +165,34 @@ export const testsByFile = {
   // formula-ref.ts) — a mutant in any of the four can only be killed by
   // tests that exercise the shared SocialCalc.Formula object, so all four
   // share the identical test set.
-  "formula1.ts": [...formulaOnlyTests, ...commandRegressionTests, ...sheetCoreTests, ...differentialTests, ...adversarialTests],
-  "formula-parse.ts": [...formulaOnlyTests, ...commandRegressionTests, ...sheetCoreTests, ...differentialTests, ...adversarialTests],
-  "formula-operand.ts": [...formulaOnlyTests, ...commandRegressionTests, ...sheetCoreTests, ...differentialTests, ...adversarialTests],
-  "formula-ref.ts": [...formulaOnlyTests, ...commandRegressionTests, ...sheetCoreTests, ...differentialTests, ...adversarialTests],
+  "formula1.ts": [
+    ...formulaOnlyTests,
+    ...commandRegressionTests,
+    ...sheetCoreTests,
+    ...differentialTests,
+    ...adversarialTests,
+  ],
+  "formula-parse.ts": [
+    ...formulaOnlyTests,
+    ...commandRegressionTests,
+    ...sheetCoreTests,
+    ...differentialTests,
+    ...adversarialTests,
+  ],
+  "formula-operand.ts": [
+    ...formulaOnlyTests,
+    ...commandRegressionTests,
+    ...sheetCoreTests,
+    ...differentialTests,
+    ...adversarialTests,
+  ],
+  "formula-ref.ts": [
+    ...formulaOnlyTests,
+    ...commandRegressionTests,
+    ...sheetCoreTests,
+    ...differentialTests,
+    ...adversarialTests,
+  ],
 
   // socialcalc-3.ts also owns SafeUrlForRender/EscapeUntrustedHtml (the
   // untrusted-content render-security policy, see socialcalc-3.d.ts) and
@@ -191,7 +219,10 @@ export const testsByFile = {
     "test/hardening-popup-behavior.test.ts",
   ],
   "socialcalcspreadsheetcontrol.ts": [...editorTests, "test/hardening-control-viewer.test.ts"],
-  "socialcalcviewer.ts": ["test/popup-viewer-coverage.test.ts", "test/hardening-control-viewer.test.ts"],
+  "socialcalcviewer.ts": [
+    "test/popup-viewer-coverage.test.ts",
+    "test/hardening-control-viewer.test.ts",
+  ],
 };
 
 // Fail at configuration load time if a source or mapped test was renamed or
@@ -199,12 +230,14 @@ export const testsByFile = {
 // empty/irrelevant test run.
 for (const [file, tests] of Object.entries(testsByFile)) {
   const sourcePath = resolve("js", file);
-  if (!existsSync(sourcePath)) throw new Error(`mutation source mapping points to missing file: ${sourcePath}`);
+  if (!existsSync(sourcePath))
+    throw new Error(`mutation source mapping points to missing file: ${sourcePath}`);
   if (!Array.isArray(tests) || tests.length === 0) {
     throw new Error(`mutation source mapping has no tests: ${file}`);
   }
   for (const test of tests) {
-    if (!existsSync(resolve(test))) throw new Error(`mutation test mapping points to missing file: ${test}`);
+    if (!existsSync(resolve(test)))
+      throw new Error(`mutation test mapping points to missing file: ${test}`);
   }
 }
 

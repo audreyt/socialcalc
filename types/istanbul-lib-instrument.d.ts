@@ -19,11 +19,7 @@ declare module "istanbul-lib-instrument" {
      *  @param filename - path used as the coverage key / SF row
      *  @param inputSourceMap - optional source map object mapping `code` back to original source
      */
-    instrumentSync(
-      code: string,
-      filename: string,
-      inputSourceMap?: object,
-    ): string;
+    instrumentSync(code: string, filename: string, inputSourceMap?: object): string;
   }
 
   export function createInstrumenter(opts?: InstrumenterOptions): Instrumenter;

@@ -32,7 +32,9 @@ describe("known intended differences", () => {
 
       const { format, value } = entry.probe;
       const candidateResult = candidate.FormatNumber.formatNumberWithFormat(value, format);
-      expect(candidateResult, `candidate should NOT throw for ${entry.id}`).toBe(entry.expected.candidateReturns);
+      expect(candidateResult, `candidate should NOT throw for ${entry.id}`).toBe(
+        entry.expected.candidateReturns,
+      );
 
       let oracleThrew = false;
       try {
@@ -40,7 +42,9 @@ describe("known intended differences", () => {
       } catch {
         oracleThrew = true;
       }
-      expect(oracleThrew, `oracle@3.0.8 throw expectation for ${entry.id}`).toBe(entry.expected.oracleThrows);
+      expect(oracleThrew, `oracle@3.0.8 throw expectation for ${entry.id}`).toBe(
+        entry.expected.oracleThrows,
+      );
     });
   }
 

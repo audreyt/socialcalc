@@ -83,7 +83,11 @@ function normalizeReport(report) {
 }
 
 function coveredSet(values) {
-  return new Set(Object.entries(values).filter(([, count]) => count > 0).map(([id]) => id));
+  return new Set(
+    Object.entries(values)
+      .filter(([, count]) => count > 0)
+      .map(([id]) => id),
+  );
 }
 
 function metricSets(entry) {

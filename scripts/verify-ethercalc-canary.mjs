@@ -81,7 +81,9 @@ function run(cmd, args, options = {}) {
 function must(cmd, args, options, label) {
   const result = run(cmd, args, options);
   if (result.status !== 0) {
-    throw new Error(`${label ?? `${cmd} ${args.join(" ")}`} failed (exit ${result.status}):\n${result.stdout}\n${result.stderr}`);
+    throw new Error(
+      `${label ?? `${cmd} ${args.join(" ")}`} failed (exit ${result.status}):\n${result.stdout}\n${result.stderr}`,
+    );
   }
   return result;
 }
@@ -105,17 +107,29 @@ function sha256OfFile(filePath) {
 function extractTarMember(tarballPath, memberPath) {
   const result = spawnSync("tar", ["-xzOf", tarballPath, memberPath], { encoding: "buffer" });
   if (result.error || result.status !== 0) {
-    throw new Error(`tar extract of ${memberPath} failed: ${result.stderr?.toString() ?? result.error}`);
+    throw new Error(
+      `tar extract of ${memberPath} failed: ${result.stderr?.toString() ?? result.error}`,
+    );
   }
   return result.stdout;
 }
 
 function summarizeVitestOutput(stdout) {
   const plain = stripVTControlCharacters(stdout);
-  const match = plain.match(/Tests\s+(\d+) passed(?:\s*\|\s*(\d+) failed)?(?:\s*\|\s*(\d+) skipped)?\s*\((\d+)\)/);
-  if (!match) throw new Error(`could not find a "Tests ... passed (N)" summary line in vitest output:\n${plain}`);
+  const match = plain.match(
+    /Tests\s+(\d+) passed(?:\s*\|\s*(\d+) failed)?(?:\s*\|\s*(\d+) skipped)?\s*\((\d+)\)/,
+  );
+  if (!match)
+    throw new Error(
+      `could not find a "Tests ... passed (N)" summary line in vitest output:\n${plain}`,
+    );
   const [, passed, failed = "0", skipped = "0", total] = match;
-  return { passed: Number(passed), failed: Number(failed), skipped: Number(skipped), total: Number(total) };
+  return {
+    passed: Number(passed),
+    failed: Number(failed),
+    skipped: Number(skipped),
+    total: Number(total),
+  };
 }
 
 async function main() {
@@ -141,22 +155,47 @@ async function main() {
       const size = readFileSync(tarballPath).length;
       return `${tarballPath} (${size} bytes)`;
     });
-    const candidateSha256 = step("candidate tarball sha256 (for the release report)", () => sha256OfFile(tarballPath));
+    const candidateSha256 = step("candidate tarball sha256 (for the release report)", () =>
+      sha256OfFile(tarballPath),
+    );
 
     // 2. Fetch the pinned, immutable EtherCalc commit — full checkout (not
     //    just the headless subdir), because `bun install --frozen-lockfile`
     //    validates the whole workspace against the whole lockfile. Network
     //    happens here, and only here (this + step 5's install). ------------
-    step(`clone pinned EtherCalc commit ${ETHERCALC_PINNED_SHA.slice(0, 12)} into an isolated temp dir`, () => {
-      must("git", ["init", "-q", ethercalcDir], {}, "git init");
-      must("git", ["remote", "add", "origin", ETHERCALC_REPO], { cwd: ethercalcDir }, "git remote add origin");
-      must("git", ["fetch", "--depth", "1", "origin", ETHERCALC_PINNED_SHA], { cwd: ethercalcDir }, "git fetch pinned SHA");
-      must("git", ["checkout", "-q", "FETCH_HEAD"], { cwd: ethercalcDir }, "git checkout FETCH_HEAD");
-      return ethercalcDir;
-    });
+    step(
+      `clone pinned EtherCalc commit ${ETHERCALC_PINNED_SHA.slice(0, 12)} into an isolated temp dir`,
+      () => {
+        must("git", ["init", "-q", ethercalcDir], {}, "git init");
+        must(
+          "git",
+          ["remote", "add", "origin", ETHERCALC_REPO],
+          { cwd: ethercalcDir },
+          "git remote add origin",
+        );
+        must(
+          "git",
+          ["fetch", "--depth", "1", "origin", ETHERCALC_PINNED_SHA],
+          { cwd: ethercalcDir },
+          "git fetch pinned SHA",
+        );
+        must(
+          "git",
+          ["checkout", "-q", "FETCH_HEAD"],
+          { cwd: ethercalcDir },
+          "git checkout FETCH_HEAD",
+        );
+        return ethercalcDir;
+      },
+    );
 
     step("provenance: checked-out commit matches the pinned SHA exactly", () => {
-      const actual = must("git", ["rev-parse", "HEAD"], { cwd: ethercalcDir }, "git rev-parse HEAD").stdout.trim();
+      const actual = must(
+        "git",
+        ["rev-parse", "HEAD"],
+        { cwd: ethercalcDir },
+        "git rev-parse HEAD",
+      ).stdout.trim();
       if (actual !== ETHERCALC_PINNED_SHA) {
         throw new Error(`checked out ${actual}, expected pinned ${ETHERCALC_PINNED_SHA}`);
       }
@@ -166,16 +205,28 @@ async function main() {
     const lockfilePath = path.join(ethercalcDir, "bun.lock");
     const headlessDir = path.join(ethercalcDir, HEADLESS_SUBDIR);
     step(`pinned commit ships a root bun.lock and ${HEADLESS_SUBDIR} in the expected shape`, () => {
-      if (!existsSync(lockfilePath)) throw new Error(`pinned EtherCalc commit is missing root bun.lock`);
-      for (const rel of ["package.json", "scripts/build.js", "src/index.ts", "src/dom-shim.ts", "test/smoke.test.ts"]) {
+      if (!existsSync(lockfilePath))
+        throw new Error(`pinned EtherCalc commit is missing root bun.lock`);
+      for (const rel of [
+        "package.json",
+        "scripts/build.js",
+        "src/index.ts",
+        "src/dom-shim.ts",
+        "test/smoke.test.ts",
+      ]) {
         if (!existsSync(path.join(headlessDir, rel))) {
-          throw new Error(`pinned EtherCalc commit is missing ${HEADLESS_SUBDIR}/${rel} - package layout changed, update this script's pin/adapter`);
+          throw new Error(
+            `pinned EtherCalc commit is missing ${HEADLESS_SUBDIR}/${rel} - package layout changed, update this script's pin/adapter`,
+          );
         }
       }
       return headlessDir;
     });
 
-    const lockfileShaBefore = step("bun.lock sha256 before install (baseline for the frozen-lockfile proof)", () => sha256OfFile(lockfilePath));
+    const lockfileShaBefore = step(
+      "bun.lock sha256 before install (baseline for the frozen-lockfile proof)",
+      () => sha256OfFile(lockfilePath),
+    );
 
     // 3. Install with bun --frozen-lockfile at the checkout ROOT — this is
     //    EtherCalc's own package manager and its own exact locked toolchain
@@ -191,25 +242,44 @@ async function main() {
     //    if the lockfile would need any change, so success here is itself
     //    proof the entire non-candidate tree matches the pinned commit's
     //    own recorded resolutions. ------------------------------------------
-    step("bun install --frozen-lockfile resolves EtherCalc's own pinned toolchain (root, not this repo's package manager)", () => {
-      must("bun", ["install", "--frozen-lockfile"], { cwd: ethercalcDir }, "bun install --frozen-lockfile");
-      return ethercalcDir;
-    });
+    step(
+      "bun install --frozen-lockfile resolves EtherCalc's own pinned toolchain (root, not this repo's package manager)",
+      () => {
+        must(
+          "bun",
+          ["install", "--frozen-lockfile"],
+          { cwd: ethercalcDir },
+          "bun install --frozen-lockfile",
+        );
+        return ethercalcDir;
+      },
+    );
 
-    step("provenance: bun.lock is byte-identical after install (frozen — nothing was re-resolved)", () => {
-      const after = sha256OfFile(lockfilePath);
-      if (after !== lockfileShaBefore) {
-        throw new Error(`bun.lock changed during install (before=${lockfileShaBefore} after=${after}) - frozen-lockfile should have failed instead of silently re-resolving`);
-      }
-      return after;
-    });
+    step(
+      "provenance: bun.lock is byte-identical after install (frozen — nothing was re-resolved)",
+      () => {
+        const after = sha256OfFile(lockfilePath);
+        if (after !== lockfileShaBefore) {
+          throw new Error(
+            `bun.lock changed during install (before=${lockfileShaBefore} after=${after}) - frozen-lockfile should have failed instead of silently re-resolving`,
+          );
+        }
+        return after;
+      },
+    );
 
     const installedSocialcalcDir = path.join(headlessDir, "node_modules/socialcalc");
-    step("locked npm-resolved socialcalc version was installed (about to be replaced by the real candidate)", () => {
-      if (!existsSync(installedSocialcalcDir)) throw new Error(`expected ${installedSocialcalcDir} after frozen-lockfile install`);
-      const pkg = JSON.parse(readFileSync(path.join(installedSocialcalcDir, "package.json"), "utf8"));
-      return `locked version ${pkg.version} (npm registry, about to be discarded)`;
-    });
+    step(
+      "locked npm-resolved socialcalc version was installed (about to be replaced by the real candidate)",
+      () => {
+        if (!existsSync(installedSocialcalcDir))
+          throw new Error(`expected ${installedSocialcalcDir} after frozen-lockfile install`);
+        const pkg = JSON.parse(
+          readFileSync(path.join(installedSocialcalcDir, "package.json"), "utf8"),
+        );
+        return `locked version ${pkg.version} (npm registry, about to be discarded)`;
+      },
+    );
 
     // 4. Extract the ACTUAL candidate tarball and replace the locked
     //    node_modules/socialcalc directory with its exact contents — never
@@ -223,21 +293,33 @@ async function main() {
       return pkgDir;
     });
 
-    step("replace node_modules/socialcalc with the extracted candidate (file-swap, not a manifest edit)", () => {
-      rmSync(installedSocialcalcDir, { recursive: true, force: true });
-      cpSync(path.join(extractDir, "package"), installedSocialcalcDir, { recursive: true });
-      const pkg = JSON.parse(readFileSync(path.join(installedSocialcalcDir, "package.json"), "utf8"));
-      return `now version ${pkg.version} (the actual candidate)`;
-    });
+    step(
+      "replace node_modules/socialcalc with the extracted candidate (file-swap, not a manifest edit)",
+      () => {
+        rmSync(installedSocialcalcDir, { recursive: true, force: true });
+        cpSync(path.join(extractDir, "package"), installedSocialcalcDir, { recursive: true });
+        const pkg = JSON.parse(
+          readFileSync(path.join(installedSocialcalcDir, "package.json"), "utf8"),
+        );
+        return `now version ${pkg.version} (the actual candidate)`;
+      },
+    );
 
-    step("swapped node_modules/socialcalc/dist/SocialCalc.js is byte-identical to the candidate tarball", () => {
-      const installedHash = sha256OfFile(path.join(installedSocialcalcDir, "dist/SocialCalc.js"));
-      const tarballMemberHash = sha256(extractTarMember(tarballPath, "package/dist/SocialCalc.js"));
-      if (installedHash !== tarballMemberHash) {
-        throw new Error(`swapped socialcalc dist (${installedHash}) does not match the packed candidate tarball (${tarballMemberHash})`);
-      }
-      return installedHash;
-    });
+    step(
+      "swapped node_modules/socialcalc/dist/SocialCalc.js is byte-identical to the candidate tarball",
+      () => {
+        const installedHash = sha256OfFile(path.join(installedSocialcalcDir, "dist/SocialCalc.js"));
+        const tarballMemberHash = sha256(
+          extractTarMember(tarballPath, "package/dist/SocialCalc.js"),
+        );
+        if (installedHash !== tarballMemberHash) {
+          throw new Error(
+            `swapped socialcalc dist (${installedHash}) does not match the packed candidate tarball (${tarballMemberHash})`,
+          );
+        }
+        return installedHash;
+      },
+    );
 
     // 5. Regenerate the embedded headless bundle FROM the candidate - the
     //    real adapter step this whole canary exists to exercise. Uses the
@@ -254,20 +336,33 @@ async function main() {
     //    against the pinned, frozen-lockfile toolchain plus the swapped-in
     //    candidate. --------------------------------------------------------
     step("headless package typecheck passes against the candidate", () => {
-      must("bun", ["run", "--cwd", HEADLESS_SUBDIR, "typecheck"], { cwd: ethercalcDir }, "bun run --cwd packages/socialcalc-headless typecheck");
+      must(
+        "bun",
+        ["run", "--cwd", HEADLESS_SUBDIR, "typecheck"],
+        { cwd: ethercalcDir },
+        "bun run --cwd packages/socialcalc-headless typecheck",
+      );
     });
 
     // 7. The package's real current headless suite - fail on ANY test/build
     //    error. Not hardcoded to 16: whatever the pinned commit's own "test"
     //    script currently runs is what must pass in full. --------------------
-    const testSummary = step("headless suite (the package's own current test script) passes in full", () => {
-      const result = must("bun", ["run", "--cwd", HEADLESS_SUBDIR, "test"], { cwd: ethercalcDir }, "bun run --cwd packages/socialcalc-headless test");
-      const summary = summarizeVitestOutput(result.stdout);
-      if (summary.failed > 0 || summary.total === 0) {
-        throw new Error(`headless suite did not pass cleanly: ${JSON.stringify(summary)}`);
-      }
-      return `${summary.passed}/${summary.total} passed, 0 failed`;
-    });
+    const testSummary = step(
+      "headless suite (the package's own current test script) passes in full",
+      () => {
+        const result = must(
+          "bun",
+          ["run", "--cwd", HEADLESS_SUBDIR, "test"],
+          { cwd: ethercalcDir },
+          "bun run --cwd packages/socialcalc-headless test",
+        );
+        const summary = summarizeVitestOutput(result.stdout);
+        if (summary.failed > 0 || summary.total === 0) {
+          throw new Error(`headless suite did not pass cleanly: ${JSON.stringify(summary)}`);
+        }
+        return `${summary.passed}/${summary.total} passed, 0 failed`;
+      },
+    );
 
     console.log("");
     console.log("=== ethercalc release canary report ===");
@@ -289,7 +384,9 @@ async function main() {
   }
 
   console.log("");
-  console.log(`${checks.filter((c) => c.ok).length}/${checks.length} ethercalc-canary checks passed`);
+  console.log(
+    `${checks.filter((c) => c.ok).length}/${checks.length} ethercalc-canary checks passed`,
+  );
 }
 
 main().catch((error) => {

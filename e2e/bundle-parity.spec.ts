@@ -22,7 +22,9 @@ import type { BundleName } from "./fixtures/editor";
 
 for (const bundle of Object.keys(BUNDLE_PATHS) as BundleName[]) {
   test.describe(`${bundle} bundle`, () => {
-    test(`initializes, edits a cell by real click+keyboard, and recalculates a formula`, async ({ page }) => {
+    test(`initializes, edits a cell by real click+keyboard, and recalculates a formula`, async ({
+      page,
+    }) => {
       await gotoBundle(page, bundle);
       await createControl(page);
       await expect(cellLocator(page, "A1")).toBeVisible();
@@ -32,7 +34,11 @@ for (const bundle of Object.keys(BUNDLE_PATHS) as BundleName[]) {
       await clickCell(page, "B1");
       await typeAndCommit(page, "=A1+1");
 
-      await waitFor(page, (idPrefix) => window.__scControls[idPrefix].sheet.cells.B1?.datavalue === 10, "SocialCalc-");
+      await waitFor(
+        page,
+        (idPrefix) => window.__scControls[idPrefix].sheet.cells.B1?.datavalue === 10,
+        "SocialCalc-",
+      );
       expect(await cellValue(page, "B1")).toBe(10);
     });
 
@@ -40,10 +46,24 @@ for (const bundle of Object.keys(BUNDLE_PATHS) as BundleName[]) {
       await gotoBundle(page, bundle);
       await createControl(page);
 
-      await page.evaluate((idPrefix) => window.__scControls[idPrefix].editor.EditorScheduleSheetCommands("set A1 value n 123", true), "SocialCalc-");
-      await waitFor(page, (idPrefix) => window.__scControls[idPrefix].sheet.cells.A1?.datavalue === 123, "SocialCalc-");
+      await page.evaluate(
+        (idPrefix) =>
+          window.__scControls[idPrefix].editor.EditorScheduleSheetCommands(
+            "set A1 value n 123",
+            true,
+          ),
+        "SocialCalc-",
+      );
+      await waitFor(
+        page,
+        (idPrefix) => window.__scControls[idPrefix].sheet.cells.A1?.datavalue === 123,
+        "SocialCalc-",
+      );
 
-      const save = await page.evaluate((idPrefix) => window.__scControls[idPrefix].CreateSheetSave(), "SocialCalc-");
+      const save = await page.evaluate(
+        (idPrefix) => window.__scControls[idPrefix].CreateSheetSave(),
+        "SocialCalc-",
+      );
       expect(save).toContain("cell:A1:v:123");
 
       const reloaded = await page.evaluate(

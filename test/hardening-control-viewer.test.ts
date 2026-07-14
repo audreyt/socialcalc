@@ -109,13 +109,15 @@ function fakeEvent(target: HTMLElement | null): Event {
   return { target } as unknown as Event;
 }
 
-
 // ---------------------------------------------------------------------------
 // Control helpers
 // ---------------------------------------------------------------------------
 
 let controlSeq = 0;
-function newControl(SC: typeof SocialCalc, idPrefix?: string): {
+function newControl(
+  SC: typeof SocialCalc,
+  idPrefix?: string,
+): {
   control: SocialCalc.SpreadsheetControl;
   container: HTMLElement;
 } {
@@ -135,10 +137,15 @@ function waitEditor(
   const matches = typeof wantStatus === "function" ? wantStatus : (s: string) => s === wantStatus;
   // Promise.withResolvers is available at runtime (Bun) but not in es2022
   // lib types; use a typed wrapper to bridge the gap.
-  const PR = Promise as unknown as { withResolvers: <T>() => { promise: Promise<T>; resolve: (v: T) => void } };
+  const PR = Promise as unknown as {
+    withResolvers: <T>() => { promise: Promise<T>; resolve: (v: T) => void };
+  };
   const { promise, resolve } = PR.withResolvers<void>();
   const key = `tmpc_${Math.random().toString(36).slice(2)}`;
-  const cb = editor.StatusCallback as unknown as Record<string, { func: (e: unknown, s: string) => void; params: unknown }>;
+  const cb = editor.StatusCallback as unknown as Record<
+    string,
+    { func: (e: unknown, s: string) => void; params: unknown }
+  >;
   const timer = setTimeout(() => {
     delete cb[key];
     resolve();
@@ -156,7 +163,11 @@ function waitEditor(
   return promise;
 }
 
-async function execAndWait(control: SocialCalc.SpreadsheetControl, combo: string, sstr = ""): Promise<void> {
+async function execAndWait(
+  control: SocialCalc.SpreadsheetControl,
+  combo: string,
+  sstr = "",
+): Promise<void> {
   const p = waitEditor(control.editor);
   control.ExecuteCommand(combo, sstr);
   await p;
@@ -169,7 +180,10 @@ function seedSelect(id: string, values: string[], selected = 0): HTMLSelectEleme
   sel.id = id;
   // The fake DOM defines `options` as a getter returning `__options`,
   // so we must write to `__options` directly, not to `.options`.
-  const selExt = sel as unknown as { __options: { text: string; value: string }[]; __selectedIndex: number };
+  const selExt = sel as unknown as {
+    __options: { text: string; value: string }[];
+    __selectedIndex: number;
+  };
   selExt.__options = [];
   selExt.__selectedIndex = selected;
   for (const v of values) {
@@ -394,12 +408,7 @@ test("Repeating macro: DoRepeatingMacro executes the scheduled sheet command", a
   viewer.sheet.ParseSheetSave("version:1.5\ncell:A1:t:before-tick\nsheet:c:1:r:1");
   viewer.repeatingMacroCommands = "set A1 text t ticked-by-macro";
   SC.SheetCommandInfo.CmdExtensionCallbacks = {};
-  await waitForStatus(
-    viewer.sheet,
-    "cmdend",
-    () => SC.SpreadsheetViewerDoRepeatingMacro(),
-    3000,
-  );
+  await waitForStatus(viewer.sheet, "cmdend", () => SC.SpreadsheetViewerDoRepeatingMacro(), 3000);
   expect(viewer.sheet.GetAssuredCell("A1").datavalue).toBe("ticked-by-macro");
   expect(viewer.repeatingMacroTimer).toBeNull();
 });
@@ -653,7 +662,9 @@ test("DoOnResize: needresize=true updates view elements and calls ResizeTableEdi
   let lastW = 0;
   let lastH = 0;
   const origResize = viewer.editor.ResizeTableEditor.bind(viewer.editor);
-  const editorExt = viewer.editor as unknown as { ResizeTableEditor: (width: number, height: number) => void };
+  const editorExt = viewer.editor as unknown as {
+    ResizeTableEditor: (width: number, height: number) => void;
+  };
   editorExt.ResizeTableEditor = (w: number, h: number) => {
     resizeCalls++;
     lastW = w;
@@ -680,7 +691,9 @@ test("DoOnResize: no-change early-returns without resizing", async () => {
   SC.InitializeSpreadsheetViewer(viewer, host, 300, 400, 20);
   let resizeCalls = 0;
   const origResize = viewer.editor.ResizeTableEditor.bind(viewer.editor);
-  const editorExt = viewer.editor as unknown as { ResizeTableEditor: (width: number, height: number) => void };
+  const editorExt = viewer.editor as unknown as {
+    ResizeTableEditor: (width: number, height: number) => void;
+  };
   editorExt.ResizeTableEditor = () => {
     resizeCalls++;
   };
@@ -704,7 +717,9 @@ test("DoOnResize: _app mode skips ResizeTableEditor (app-scroll branch)", async 
     viewerExt.views = { v1: { element: viewEl } };
     let resizeCalls = 0;
     const origResize = viewer.editor.ResizeTableEditor.bind(viewer.editor);
-    const editorExt = viewer.editor as unknown as { ResizeTableEditor: (width: number, height: number) => void };
+    const editorExt = viewer.editor as unknown as {
+      ResizeTableEditor: (width: number, height: number) => void;
+    };
     editorExt.ResizeTableEditor = () => {
       resizeCalls++;
     };
@@ -869,17 +884,15 @@ test("DecodeSpreadsheetSave: no MIME-Version header returns empty parts", async 
 test("DecodeSpreadsheetSave: MIME-Version present but no Content-Type boundary returns empty parts", async () => {
   const SC = await fresh();
   const viewer = new SC.SpreadsheetViewer("vp-dec5-");
-  expect(SC.SpreadsheetViewerDecodeSpreadsheetSave(viewer, "MIME-Version: 1.0\nhello\n")).toEqual({});
+  expect(SC.SpreadsheetViewerDecodeSpreadsheetSave(viewer, "MIME-Version: 1.0\nhello\n")).toEqual(
+    {},
+  );
 });
 
 test("DecodeSpreadsheetSave: boundary declared but no top boundary line returns empty parts", async () => {
   const SC = await fresh();
   const viewer = new SC.SpreadsheetViewer("vp-dec6-");
-  const noTop = makeSave([
-    "MIME-Version: 1.0",
-    "Content-Type: multipart/mixed; boundary=XX",
-    "",
-  ]);
+  const noTop = makeSave(["MIME-Version: 1.0", "Content-Type: multipart/mixed; boundary=XX", ""]);
   expect(SC.SpreadsheetViewerDecodeSpreadsheetSave(viewer, noTop)).toEqual({});
 });
 
@@ -916,7 +929,6 @@ test("DecodeSpreadsheetSave: top boundary present but no blank line after it ret
 // (buildSave) always emits well-formed terminators — driving a real partial
 // body would belong in a Playwright integration test against the shipping
 // bundle.
-
 
 // ===========================================================================
 // CONTROL TESTS — js/socialcalcspreadsheetcontrol.ts
@@ -956,17 +968,15 @@ test("Control DecodeSpreadsheetSave: no MIME-Version returns empty parts", async
 test("Control DecodeSpreadsheetSave: MIME-Version but no Content-Type boundary returns empty parts", async () => {
   const SC = await fresh();
   const { control } = newControl(SC, "ctrl-dec4-");
-  expect(SC.SpreadsheetControlDecodeSpreadsheetSave(control, "MIME-Version: 1.0\nhello\n")).toEqual({});
+  expect(SC.SpreadsheetControlDecodeSpreadsheetSave(control, "MIME-Version: 1.0\nhello\n")).toEqual(
+    {},
+  );
 });
 
 test("Control DecodeSpreadsheetSave: boundary declared but no top boundary line returns empty parts", async () => {
   const SC = await fresh();
   const { control } = newControl(SC, "ctrl-dec5-");
-  const noTop = makeSave([
-    "MIME-Version: 1.0",
-    "Content-Type: multipart/mixed; boundary=XX",
-    "",
-  ]);
+  const noTop = makeSave(["MIME-Version: 1.0", "Content-Type: multipart/mixed; boundary=XX", ""]);
   expect(SC.SpreadsheetControlDecodeSpreadsheetSave(control, noTop)).toEqual({});
 });
 
@@ -1045,9 +1055,17 @@ test("DoSum: with range produces sum formula for the range", async () => {
   const SC = await fresh();
   const { control } = newControl(SC, "ctrl-sum-");
   // Seed some numeric values
-  await scheduleCommands(SC, control.sheet, ["set A1 value n 10", "set A2 value n 20", "set A3 value n 30"]);
+  await scheduleCommands(SC, control.sheet, [
+    "set A1 value n 10",
+    "set A2 value n 20",
+    "set A3 value n 30",
+  ]);
   // Pin the source-cell types used by DoSum's row/range walk.
-  for (const [coord, value] of [["A1", 10], ["A2", 20], ["A3", 30]] as const) {
+  for (const [coord, value] of [
+    ["A1", 10],
+    ["A2", 20],
+    ["A3", 30],
+  ] as const) {
     const cell = control.sheet.GetAssuredCell(coord);
     cell.datatype = "v";
     cell.valuetype = "n";
@@ -1072,7 +1090,10 @@ test("DoSum: without range scans upward for contiguous numeric cells", async () 
   const SC = await fresh();
   const { control } = newControl(SC, "ctrl-sum2-");
   await scheduleCommands(SC, control.sheet, ["set A1 value n 5", "set A2 value n 15"]);
-  for (const [coord, value] of [["A1", 5], ["A2", 15]] as const) {
+  for (const [coord, value] of [
+    ["A1", 5],
+    ["A2", 15],
+  ] as const) {
     const cell = control.sheet.GetAssuredCell(coord);
     cell.datatype = "v";
     cell.valuetype = "n";
@@ -1501,7 +1522,9 @@ test("SettingsSwitch: 'sheet' target shows sheet table, hides cell table", async
   cellToolbar.style.display = "block";
   document.body.appendChild(cellToolbar);
   // Need views.settings for SettingsControlSetCurrentPanel
-  const viewsExt = control as unknown as { views: Record<string, { values: Record<string, unknown> }> };
+  const viewsExt = control as unknown as {
+    views: Record<string, { values: Record<string, unknown> }>;
+  };
   viewsExt.views = viewsExt.views || {};
   viewsExt.views.settings = { values: { sheetspanel: {}, cellspanel: {} } };
   SC.SpreadsheetControlSettingsSwitch("sheet");
@@ -1530,7 +1553,9 @@ test("SettingsSwitch: 'cell' target shows cell table, hides sheet table", async 
   cellToolbar.id = control.idPrefix + "cellsettingstoolbar";
   cellToolbar.style.display = "none";
   document.body.appendChild(cellToolbar);
-  const viewsExt = control as unknown as { views: Record<string, { values: Record<string, unknown> }> };
+  const viewsExt = control as unknown as {
+    views: Record<string, { values: Record<string, unknown> }>;
+  };
   viewsExt.views = viewsExt.views || {};
   viewsExt.views.settings = { values: { sheetspanel: {}, cellspanel: {} } };
   SC.SpreadsheetControlSettingsSwitch("cell");
@@ -1718,13 +1743,17 @@ test("CtrlSEditorDone: with text saves to OtherSaveParts; empty text deletes", a
   SC.OtherSaveParts["editpart"] = "old";
   // Create the editbox and textarea
   SC.CtrlSEditor("editpart");
-  const ta = document.getElementById("socialcalc-editbox-textarea") as unknown as HTMLTextAreaElement;
+  const ta = document.getElementById(
+    "socialcalc-editbox-textarea",
+  ) as unknown as HTMLTextAreaElement;
   (ta as unknown as { value: string }).value = "new content";
   SC.CtrlSEditorDone("socialcalc-editbox", "editpart");
   expect(SC.OtherSaveParts["editpart"]).toBe("new content");
   // Now delete it
   SC.CtrlSEditor("editpart");
-  const ta2 = document.getElementById("socialcalc-editbox-textarea") as unknown as HTMLTextAreaElement;
+  const ta2 = document.getElementById(
+    "socialcalc-editbox-textarea",
+  ) as unknown as HTMLTextAreaElement;
   (ta2 as unknown as { value: string }).value = "";
   SC.CtrlSEditorDone("socialcalc-editbox", "editpart");
   expect(SC.OtherSaveParts["editpart"]).toBeUndefined();
@@ -1840,7 +1869,6 @@ test("SettingsControlOnchangeBorder: unchecked checkbox clears border DOM state"
 // ---------------------------------------------------------------------------
 // C18. SettingControlReset
 // ---------------------------------------------------------------------------
-
 
 // ---------------------------------------------------------------------------
 // C19. SpreadsheetControlStatuslineCallback

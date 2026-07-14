@@ -96,7 +96,10 @@ if (!existsSync(mapPath) || !existsSync(bundlePath)) {
       `  Run \`SOCIALCALC_COVERAGE=1 vp build\` first so build.ts composes the sourcemap.`,
   );
 }
-if (!existsSync(browserDir) || readdirSync(browserDir).filter((f) => f.endsWith(".json")).length === 0) {
+if (
+  !existsSync(browserDir) ||
+  readdirSync(browserDir).filter((f) => f.endsWith(".json")).length === 0
+) {
   fail(
     `missing browser coverage at ${browserDir}.\n` +
       `  Run \`SOCIALCALC_BROWSER_COVERAGE=1 vp exec playwright test\` first.`,
@@ -127,7 +130,9 @@ const ast = parse(bundleCode, {
   for (const s of bundleMap.sources ?? []) {
     const sp = resolve(dirname(bundlePath), s);
     if (!existsSync(sp)) {
-      fail(`sourcemap source ${s} resolves to ${sp}, which does not exist on disk — dist/SocialCalc.js.map is stale.`);
+      fail(
+        `sourcemap source ${s} resolves to ${sp}, which does not exist on disk — dist/SocialCalc.js.map is stale.`,
+      );
     }
   }
   // Locating "SC.CreateSheetSave = function" inside the bundle independently
@@ -357,18 +362,16 @@ checkOne(GLOBAL_KEY, globalMap, thresholdContract.mergedGlobal);
 
 // Per-file: glob-matched per-file floors.
 for (const [globPattern, floors] of Object.entries(thresholdContract.perFile)) {
-  const matchFiles = filtered
-    .files()
-    .filter(
-      (f) => {
-        const r = relative(repoRoot, f).replace(/\\/g, "/");
-        return r === globPattern || r.endsWith("/" + globPattern);
-      },
-    );
+  const matchFiles = filtered.files().filter((f) => {
+    const r = relative(repoRoot, f).replace(/\\/g, "/");
+    return r === globPattern || r.endsWith("/" + globPattern);
+  });
   if (matchFiles.length === 0) {
     // A per-file floor for a module that has no source in the bundle would be
     // a misconfiguration — fail loud so the contract stays honest.
-    violations.push(`ERROR: per-file threshold "${globPattern}" matched zero merged files (no such js/*.ts source).`);
+    violations.push(
+      `ERROR: per-file threshold "${globPattern}" matched zero merged files (no such js/*.ts source).`,
+    );
     continue;
   }
   const m = createCoverageMap();
@@ -391,7 +394,8 @@ if (excluded.length > 0) {
 if (processedSpecTitles.length > 0) {
   console.log(`\nmerged ${processedSpecTitles.length} spec(s):`);
   for (const t of processedSpecTitles.slice(0, 50)) console.log(`  - ${t}`);
-  if (processedSpecTitles.length > 50) console.log(`  ... and ${processedSpecTitles.length - 50} more`);
+  if (processedSpecTitles.length > 50)
+    console.log(`  ... and ${processedSpecTitles.length - 50} more`);
 }
 
 console.log(`\nper-file merged result:`);
@@ -447,7 +451,9 @@ function assertMonotonic(unit, result, tracked) {
       const next = Array.isArray(after[id]) ? after[id] : [after[id] ?? 0];
       for (let i = 0; i < prior.length; i++) {
         if ((next[i] ?? 0) < prior[i]) {
-          fail(`merged coverage lowered ${label} hit ${file}:${id}[${i}] from ${prior[i]} to ${next[i]}`);
+          fail(
+            `merged coverage lowered ${label} hit ${file}:${id}[${i}] from ${prior[i]} to ${next[i]}`,
+          );
         }
       }
     }

@@ -71,7 +71,12 @@ describe("insert/delete parity", () => {
     installHeadlessEditorMock(oracle);
     const result = await runDifferentialCommands(
       { candidate, oracle },
-      [`set sheet lastcol ${MAX_COL}`, "set ZY1 formula ZZ1", "set ZZ1 value n 0", "fillright ZY1:ZZ1 formulas"],
+      [
+        `set sheet lastcol ${MAX_COL}`,
+        "set ZY1 formula ZZ1",
+        "set ZZ1 value n 0",
+        "fillright ZY1:ZZ1 formulas",
+      ],
       ["ZZ1"],
     );
     expect(result.candidate).toStrictEqual(result.oracle);
@@ -84,7 +89,11 @@ describe("undo/redo parity", () => {
     const { candidate, oracle } = await loadPair();
     for (const SC of [candidate, oracle]) {
       const sheet = new SC.Sheet();
-      await scheduleCommands(SC, sheet, ["set A1 formula B1+C1", "set B1 value n 2", "set C1 value n 3"]);
+      await scheduleCommands(SC, sheet, [
+        "set A1 formula B1+C1",
+        "set B1 value n 2",
+        "set C1 value n 3",
+      ]);
       await scheduleCommands(SC, sheet, "deletecol B");
       expect(sheet.cells.A1?.formula).toBe("#REF!+B1");
 
@@ -100,7 +109,11 @@ describe("undo/redo parity", () => {
     const { candidate, oracle } = await loadPair();
     const snapshots: Array<Record<string, unknown>> = [];
     for (const SC of [candidate, oracle]) {
-      const sheet = await runCommands(SC, ["set A1 value n 1", "set B1 formula A1+1", "insertcol A"]);
+      const sheet = await runCommands(SC, [
+        "set A1 value n 1",
+        "set B1 formula A1+1",
+        "insertcol A",
+      ]);
       await sheetUndo(SC, sheet);
       await sheetRedo(SC, sheet);
       await sheetUndo(SC, sheet);

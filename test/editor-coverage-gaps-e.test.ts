@@ -65,30 +65,40 @@ function ensureDocumentEvents() {
 }
 
 function teardownEditor(SC: SC, editor: Editor) {
-  { if (editor?.inputEcho?.interval) {
-    clearInterval(editor.inputEcho.interval);
-    editor.inputEcho.interval = null;
-  } }
-  { if (SC.AutoRepeatInfo?.timer) {
-    clearTimeout(SC.AutoRepeatInfo.timer);
-    SC.AutoRepeatInfo.timer = null;
-    SC.AutoRepeatInfo.mouseinfo = null;
-  } }
-  { if (SC.ButtonInfo?.timer) {
-    clearTimeout(SC.ButtonInfo.timer);
-    SC.ButtonInfo.timer = null;
-  } }
-  { if (SC.Keyboard) {
-    SC.Keyboard.focusTable = null;
-    SC.Keyboard.passThru = null;
-  } }
-  { if (editor) {
-    editor.state = "start";
-    if (editor.timeout) {
-      clearTimeout(editor.timeout);
-      editor.timeout = null;
+  {
+    if (editor?.inputEcho?.interval) {
+      clearInterval(editor.inputEcho.interval);
+      editor.inputEcho.interval = null;
     }
-  } }
+  }
+  {
+    if (SC.AutoRepeatInfo?.timer) {
+      clearTimeout(SC.AutoRepeatInfo.timer);
+      SC.AutoRepeatInfo.timer = null;
+      SC.AutoRepeatInfo.mouseinfo = null;
+    }
+  }
+  {
+    if (SC.ButtonInfo?.timer) {
+      clearTimeout(SC.ButtonInfo.timer);
+      SC.ButtonInfo.timer = null;
+    }
+  }
+  {
+    if (SC.Keyboard) {
+      SC.Keyboard.focusTable = null;
+      SC.Keyboard.passThru = null;
+    }
+  }
+  {
+    if (editor) {
+      editor.state = "start";
+      if (editor.timeout) {
+        clearTimeout(editor.timeout);
+        editor.timeout = null;
+      }
+    }
+  }
 }
 
 // A minimal event shape sufficient for the mouse/keyboard handlers under test.
@@ -137,7 +147,9 @@ function fakeEvent(extras: Partial<FakeEvent> = {}): FakeEvent {
 }
 
 function primeGridLayout(editor: Editor) {
-  { editor.CalculateEditorPositions(); }
+  {
+    editor.CalculateEditorPositions();
+  }
   editor.gridposition = editor.gridposition || { left: 0, top: 0 };
   editor.headposition = editor.headposition || { left: 30, top: 30 };
   editor.tablewidth = editor.tablewidth ?? 400;
@@ -329,14 +341,18 @@ test("ctrlkeyFunction [ctrl-s]: nontextvalueformat truthy + edit: path with Ctrl
   (globalThis as unknown as { setTimeout: (fn: () => void) => number }).setTimeout = (
     fn: () => void,
   ) => {
-    { fn(); }
+    {
+      fn();
+    }
     return 0;
   };
 
   const origPrompt = (globalThis as unknown as { prompt: () => string }).prompt;
   (globalThis as unknown as { prompt: () => string }).prompt = () => "edit:somecommand";
 
-  { editor.ctrlkeyFunction(editor, "[ctrl-s]"); }
+  {
+    editor.ctrlkeyFunction(editor, "[ctrl-s]");
+  }
 
   (globalThis as unknown as { setTimeout: typeof setTimeout }).setTimeout = origSetTimeout;
   (globalThis as unknown as { prompt: () => string }).prompt = origPrompt;
@@ -375,14 +391,18 @@ test("ctrlkeyFunction [ctrl-s]: cmd: path schedules command", async () => {
   (globalThis as unknown as { setTimeout: (fn: () => void) => number }).setTimeout = (
     fn: () => void,
   ) => {
-    { fn(); }
+    {
+      fn();
+    }
     return 0;
   };
 
   const origPrompt = (globalThis as unknown as { prompt: () => string }).prompt;
   (globalThis as unknown as { prompt: () => string }).prompt = () => "cmd:recl A1";
 
-  { editor.ctrlkeyFunction(editor, "[ctrl-s]"); }
+  {
+    editor.ctrlkeyFunction(editor, "[ctrl-s]");
+  }
 
   (globalThis as unknown as { setTimeout: typeof setTimeout }).setTimeout = origSetTimeout;
   (globalThis as unknown as { prompt: () => string }).prompt = origPrompt;
@@ -421,14 +441,18 @@ test("ctrlkeyFunction [ctrl-s]: plain nontextvalueformat with range", async () =
   (globalThis as unknown as { setTimeout: (fn: () => void) => number }).setTimeout = (
     fn: () => void,
   ) => {
-    { fn(); }
+    {
+      fn();
+    }
     return 0;
   };
 
   const origPrompt = (globalThis as unknown as { prompt: () => string }).prompt;
   (globalThis as unknown as { prompt: () => string }).prompt = () => "0.00";
 
-  { editor.ctrlkeyFunction(editor, "[ctrl-s]"); }
+  {
+    editor.ctrlkeyFunction(editor, "[ctrl-s]");
+  }
 
   (globalThis as unknown as { setTimeout: typeof setTimeout }).setTimeout = origSetTimeout;
   (globalThis as unknown as { prompt: () => string }).prompt = origPrompt;
@@ -1673,7 +1697,9 @@ test("TCTDragFunctionStart: pre-existing thumbstatus with rowmsgele + rowpreview
 
   // First call: no pre-existing thumbstatus — creates thumbstatus with
   // rowmsgele and rowpreviewele set from the innerHTML table structure.
-  { SC.TCTDragFunctionStart({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV); }
+  {
+    SC.TCTDragFunctionStart({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV);
+  }
 
   // The thumbstatus from the first call has rowmsgele and rowpreviewele.
   // Second call: the pre-existing thumbstatus (from the first call) is
@@ -1681,7 +1707,9 @@ test("TCTDragFunctionStart: pre-existing thumbstatus with rowmsgele + rowpreview
   // removed, then a new one is created. The coverage target is the
   // rowmsgele/rowpreviewele null-set at 9574-9576.
   const firstThumbStatus = draginfoV.thumbstatus;
-  { SC.TCTDragFunctionStart({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV); }
+  {
+    SC.TCTDragFunctionStart({} as Event, draginfoV as typeof SocialCalc.DragInfo, dobjV);
+  }
 
   // After the second call, a new thumbstatus should exist (different from first).
   expect(draginfoV.thumbstatus).toBeTruthy();

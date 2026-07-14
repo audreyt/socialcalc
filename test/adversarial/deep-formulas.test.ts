@@ -40,24 +40,24 @@ describe("deep formula bounds", () => {
     expect(candidateResult.value).toBe(501);
   });
 
-  test(
-    "5,000 levels of parenthesized arithmetic complete without hanging (hang-guard timeout)",
-    async () => {
-      const { candidate } = await loadPair();
-      const formula = nestedArithmetic(5000);
-      const sheet = new candidate.Sheet();
-      sheet.GetAssuredCell("A1").datavalue = 1;
-      sheet.GetAssuredCell("A1").valuetype = "n";
-      const result = evaluateFormula(candidate, formula, sheet);
-      expect(result.value).toBe(5001);
-    },
-    5000,
-  );
+  test("5,000 levels of parenthesized arithmetic complete without hanging (hang-guard timeout)", async () => {
+    const { candidate } = await loadPair();
+    const formula = nestedArithmetic(5000);
+    const sheet = new candidate.Sheet();
+    sheet.GetAssuredCell("A1").datavalue = 1;
+    sheet.GetAssuredCell("A1").valuetype = "n";
+    const result = evaluateFormula(candidate, formula, sheet);
+    expect(result.value).toBe(5001);
+  }, 5000);
 
   test("100 levels of nested IF resolve to the innermost branch on both runtimes", async () => {
     const { candidate, oracle } = await loadPair();
     const formula = nestedIf(100);
-    expectParity("100-deep nested IF", evaluateFormula(candidate, formula), evaluateFormula(oracle, formula));
+    expectParity(
+      "100-deep nested IF",
+      evaluateFormula(candidate, formula),
+      evaluateFormula(oracle, formula),
+    );
   });
 
   test("a wide SUM over 500 cells evaluates to the exact expected total", async () => {

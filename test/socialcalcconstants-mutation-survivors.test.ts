@@ -65,9 +65,7 @@ test("s_CHindicatorOperationLookup maps every CellHandles drag operation to its 
 test("s_CHindicatorDirectionLookup maps every drag direction to its label suffix", async () => {
   const SC = await loadSocialCalc();
   const lookup = SC.Constants.s_CHindicatorDirectionLookup;
-  expect(Object.keys(lookup).sort()).toEqual(
-    ["Down", "Horizontal", "Right", "Vertical"].sort(),
-  );
+  expect(Object.keys(lookup).sort()).toEqual(["Down", "Horizontal", "Right", "Vertical"].sort());
   expect(lookup.Down).toBe(" Down");
   expect(lookup.Right).toBe(" Right");
   expect(lookup.Horizontal).toBe(" Horizontal");
@@ -222,7 +220,7 @@ test("ConstantsSetClasses skips defaults that are neither string nor object type
   }
 });
 
-test("ConstantsSetClasses with no argument falls back to an empty prefix instead of literal \"undefined\"", async () => {
+test('ConstantsSetClasses with no argument falls back to an empty prefix instead of literal "undefined"', async () => {
   const SC = await loadSocialCalc();
   // prefix = prefix || ""  — called with zero arguments, `prefix` starts undefined.
   // A LogicalOperator mutant (|| -> &&) or an EqualsInitializer mutant that drops
@@ -310,7 +308,8 @@ test("ConstantsSetImagePrefix hyphen-form pass fires and rewrites sc-*.gif backg
   // test, no case in this file ever set *both* the old and new prefix to end in
   // "_", so the positive/fire branch of this guard was proven-never-tested.
   SC.Constants.defaultImagePrefix = "sc_";
-  (SC.Constants as Record<string, unknown>).__testMarker = "url(sc-lockbg.gif) url(sc-commentbg.gif)";
+  (SC.Constants as Record<string, unknown>).__testMarker =
+    "url(sc-lockbg.gif) url(sc-commentbg.gif)";
   try {
     SC.ConstantsSetImagePrefix("xx_");
     expect((SC.Constants as Record<string, unknown>).__testMarker).toBe(

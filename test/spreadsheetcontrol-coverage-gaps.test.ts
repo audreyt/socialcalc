@@ -23,13 +23,17 @@ const __origSetInterval = globalThis.setInterval;
 
 afterEach(() => {
   for (const id of __liveIntervals) {
-    { clearInterval(id as ReturnType<typeof setInterval>); }
+    {
+      clearInterval(id as ReturnType<typeof setInterval>);
+    }
   }
   __liveIntervals.clear();
-  { const SC = (globalThis as unknown as { SocialCalc?: unknown }).SocialCalc;
-  if (SC && typeof SC === "object" && "Keyboard" in SC) {
-    (SC as unknown as { Keyboard: { focusTable: unknown } }).Keyboard.focusTable = null;
-  } }
+  {
+    const SC = (globalThis as unknown as { SocialCalc?: unknown }).SocialCalc;
+    if (SC && typeof SC === "object" && "Keyboard" in SC) {
+      (SC as unknown as { Keyboard: { focusTable: unknown } }).Keyboard.focusTable = null;
+    }
+  }
   cancelActiveTrackedTimers();
 });
 
@@ -132,11 +136,7 @@ type SC = {
   CtrlSEditor: (w: string) => void;
   ButtonInfo?: { registeredElements?: Array<{ functionobj?: { Disabled?: () => boolean } }> };
   FormatNumber: {
-    formatNumberWithFormat: (
-      value: number,
-      format: string,
-      suffix: string,
-    ) => string;
+    formatNumberWithFormat: (value: number, format: string, suffix: string) => string;
   };
 };
 
@@ -287,7 +287,9 @@ test("Audit tab: UNDONE STEPS branch (i == tos+1)", async () => {
   const auditTabIdx = control.tabnums.audit;
   const onclick = control.tabs[auditTabIdx].onclick;
   expect(onclick).toBeDefined();
-  { onclick!(control, "audit"); }
+  {
+    onclick!(control, "audit");
+  }
 });
 
 // -------------------------------------------------------------------
@@ -373,7 +375,9 @@ test("InitializeSpreadsheetControl: formulabutton with skipImagePrefix", async (
   container.id = "skipimg-container";
   (document as unknown as { body: { appendChild: (n: Node) => void } }).body.appendChild(container);
 
-  { control.InitializeSpreadsheetControl(container, 400, 600, 20); }
+  {
+    control.InitializeSpreadsheetControl(container, 400, 600, 20);
+  }
 });
 
 // -------------------------------------------------------------------
@@ -390,7 +394,9 @@ test("Formulabutton/findbutton Disabled callbacks", async () => {
   if (buttonInfo && Array.isArray(buttonInfo.registeredElements)) {
     for (const be of buttonInfo.registeredElements) {
       if (be && be.functionobj && typeof be.functionobj.Disabled === "function") {
-        { be.functionobj.Disabled(); }
+        {
+          be.functionobj.Disabled();
+        }
       }
     }
   }
@@ -418,7 +424,9 @@ test("InitializeSpreadsheetControl: tab with oncreate callback", async () => {
   container.id = "onctab-container";
   (document as unknown as { body: { appendChild: (n: Node) => void } }).body.appendChild(container);
 
-  { control.InitializeSpreadsheetControl(container, 400, 600, 20); }
+  {
+    control.InitializeSpreadsheetControl(container, 400, 600, 20);
+  }
   expect(oncreateCalled).toBe(true);
 });
 
@@ -442,14 +450,18 @@ test("mousedown/mouseover listeners on spreadsheetDiv", async () => {
   // Call mousedown listeners
   if (listeners?.mousedown) {
     for (const fn of listeners.mousedown) {
-      { fn(); }
+      {
+        fn();
+      }
     }
   }
 
   // Call mouseover listeners
   if (listeners?.mouseover) {
     for (const fn of listeners.mouseover) {
-      { fn(); }
+      {
+        fn();
+      }
     }
   }
 
@@ -524,13 +536,17 @@ test("LoadColumnChoosers: named range and oldindex branches", async () => {
     0,
   );
 
-  { SC.LoadColumnChoosers(control); }
+  {
+    SC.LoadColumnChoosers(control);
+  }
 
   // Case 2: sortrange is a named range but LookupName returns non-range type
   control.sortrange = "NOTRANGE";
   control.sheet.names["NOTRANGE"] = { definition: "not_a_range" };
 
-  { SC.LoadColumnChoosers(control); }
+  {
+    SC.LoadColumnChoosers(control);
+  }
 
   // Case 3: sortrange with ":" (direct range) and oldindex > 0 for all selectors
   control.sortrange = "A1:C3";
@@ -542,12 +558,16 @@ test("LoadColumnChoosers: named range and oldindex branches", async () => {
   const ls = document.getElementById(idp + "lastsort") as unknown as { __selectedIndex: number };
   ls.__selectedIndex = 1;
 
-  { SC.LoadColumnChoosers(control); }
+  {
+    SC.LoadColumnChoosers(control);
+  }
 
   // Case 4: oldindex = 0 for minor/last (false branch of oldindex > 0)
   ns.__selectedIndex = 0;
   ls.__selectedIndex = 0;
-  { SC.LoadColumnChoosers(control); }
+  {
+    SC.LoadColumnChoosers(control);
+  }
 });
 
 // -------------------------------------------------------------------
@@ -607,7 +627,9 @@ test("DoCmd: ok-setsort with obj.blur", async () => {
     },
   };
 
-  { SC.DoCmd(obj, "ok-setsort"); }
+  {
+    SC.DoCmd(obj, "ok-setsort");
+  }
   expect(blurred).toBe(true);
 });
 
@@ -653,8 +675,10 @@ test("DoCmd: dosort with checked=false branches", async () => {
 
   control.sortrange = "A1:B2";
 
-  { SC.DoCmd(null, "dosort");
-  await waitEditor(control.editor); }
+  {
+    SC.DoCmd(null, "dosort");
+    await waitEditor(control.editor);
+  }
 });
 
 // -------------------------------------------------------------------
@@ -677,14 +701,18 @@ test("DoCmd: dosort with named range (no colon)", async () => {
   control.sortrange = "SORTNAMED";
   control.sheet.names["SORTNAMED"] = { definition: "A1:B2" };
 
-  { SC.DoCmd(null, "dosort");
-  await waitEditor(control.editor); }
+  {
+    SC.DoCmd(null, "dosort");
+    await waitEditor(control.editor);
+  }
 
   // Also test dosort where nrange.type != "range" (early return)
   control.sortrange = "BADNAME";
   control.sheet.names["BADNAME"] = { definition: "not_a_range" };
 
-  { SC.DoCmd(null, "dosort"); }
+  {
+    SC.DoCmd(null, "dosort");
+  }
 });
 
 // -------------------------------------------------------------------
@@ -710,8 +738,10 @@ test("DoCmd: swapcolors with no default color/bgcolor", async () => {
   control.editor.ecell.row = 1;
   control.editor.ecell.col = 1;
 
-  { SC.DoCmd(null, "swapcolors");
-  await waitEditor(control.editor); }
+  {
+    SC.DoCmd(null, "swapcolors");
+    await waitEditor(control.editor);
+  }
 });
 
 // -------------------------------------------------------------------
@@ -729,8 +759,10 @@ test("DoCmd: obj.blur at end of DoCmd", async () => {
     },
   };
 
-  { SC.DoCmd(obj, "recalc");
-  await waitEditor(control.editor); }
+  {
+    SC.DoCmd(obj, "recalc");
+    await waitEditor(control.editor);
+  }
   expect(blurred).toBe(true);
 });
 
@@ -742,7 +774,9 @@ test("DoFunctionList: covers binary expression", async () => {
   const { control } = await newControl(SC);
   SC.SetSpreadsheetControlObject(control);
 
-  { SC.SpreadsheetControl.DoFunctionList(); }
+  {
+    SC.SpreadsheetControl.DoFunctionList();
+  }
 });
 
 // -------------------------------------------------------------------
@@ -768,7 +802,9 @@ test("DoLink: switch default, quote-prefixed text, MakePageLink", async () => {
   const origCallback = callbackHost.Callbacks.MakePageLink;
   callbackHost.Callbacks.MakePageLink = () => "http://wiki/page";
 
-  { SC.SpreadsheetControl.DoLink(); }
+  {
+    SC.SpreadsheetControl.DoLink();
+  }
 
   // Clean up dialog
   const dlg = document.getElementById(control.idPrefix + "linkdialog");
@@ -819,8 +855,10 @@ test("SortSave: checked=false branches", async () => {
 
   control.sortrange = "A1:B2";
 
-  { const result = SC.SpreadsheetControlSortSave(control.editor, "sort");
-  expect(typeof result).toBe("string"); }
+  {
+    const result = SC.SpreadsheetControlSortSave(control.editor, "sort");
+    expect(typeof result).toBe("string");
+  }
 });
 
 // -------------------------------------------------------------------
@@ -854,7 +892,9 @@ test("NamesChangedName: name with no desc/definition", async () => {
     }
   }
 
-  { SC.SpreadsheetControlNamesChangedName(); }
+  {
+    SC.SpreadsheetControlNamesChangedName();
+  }
 });
 
 // -------------------------------------------------------------------
@@ -941,7 +981,11 @@ test("PopupChangeCallback uses format number formatter for both preview values",
   const formatCalls: Array<{ value: number; format: string; suffix: string }> = [];
   const originalFormat = SC.FormatNumber.formatNumberWithFormat;
   try {
-    SC.FormatNumber.formatNumberWithFormat = ((value: number, format: string, suffix: string): string => {
+    SC.FormatNumber.formatNumberWithFormat = ((
+      value: number,
+      format: string,
+      suffix: string,
+    ): string => {
       formatCalls.push({ value, format, suffix });
       return `FMT(${value}):${format}`;
     }) as typeof originalFormat;
@@ -991,10 +1035,12 @@ test("PopupListGetValue: no value returns def:true", async () => {
   const cellPanel = control.views.settings.values!.cellspanel;
 
   // Popup.GetValue returns null/undefined → returns {def: true, val: 0}
-  { const result = SC.SettingsControls.PopupListGetValue(cellPanel, "cfontlook");
-  if (result) {
-    expect(result.def).toBe(true);
-  } }
+  {
+    const result = SC.SettingsControls.PopupListGetValue(cellPanel, "cfontlook");
+    if (result) {
+      expect(result.def).toBe(true);
+    }
+  }
 });
 
 // -------------------------------------------------------------------
@@ -1008,14 +1054,18 @@ test("BorderSideSetValue: null value and missing element", async () => {
   const cellPanel = control.views.settings.values!.cellspanel as unknown as { cbt: { id: string } };
 
   // Case 1: null value → alert path (line 19198)
-  { SC.SettingsControls.BorderSideSetValue(cellPanel, "cbt", null); }
+  {
+    SC.SettingsControls.BorderSideSetValue(cellPanel, "cbt", null);
+  }
 
   // Case 2: value provided but element not found → return (line 19220)
   const idstart = cellPanel.cbt.id;
   const existing = document.getElementById(idstart + "-onoff-bcb");
   if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
 
-  { SC.SettingsControls.BorderSideSetValue(cellPanel, "cbt", { val: "1px solid rgb(0,0,0)" }); }
+  {
+    SC.SettingsControls.BorderSideSetValue(cellPanel, "cbt", { val: "1px solid rgb(0,0,0)" });
+  }
 });
 
 // -------------------------------------------------------------------
@@ -1033,14 +1083,18 @@ test("CtrlSEditor: empty whichpart listing path", async () => {
   otherSaveParts.OtherSaveParts["part1"] = "content1\n";
   otherSaveParts.OtherSaveParts["part2"] = "content2\n";
   // Call with empty whichpart — hits the listing path (false branch of length > 0).
-  { SC.CtrlSEditor(""); }
+  {
+    SC.CtrlSEditor("");
+  }
 
   // Clean up the editbox
   const editbox = document.getElementById("socialcalc-editbox");
   if (editbox && editbox.parentNode) editbox.parentNode.removeChild(editbox);
 
   // Also test with a whichpart that doesn't exist (empty string fallback to "")
-  { SC.CtrlSEditor("nonexistent"); }
+  {
+    SC.CtrlSEditor("nonexistent");
+  }
   const editbox2 = document.getElementById("socialcalc-editbox");
   if (editbox2 && editbox2.parentNode) editbox2.parentNode.removeChild(editbox2);
 });
@@ -1098,7 +1152,9 @@ test("DoCmd: ok-setsort with 'all' value", async () => {
   ]);
   await recalcSheet(SC, control.sheet as unknown as Parameters<typeof recalcSheet>[1]);
 
-  { SC.DoCmd(null, "ok-setsort"); }
+  {
+    SC.DoCmd(null, "ok-setsort");
+  }
 });
 
 // -------------------------------------------------------------------
@@ -1147,7 +1203,9 @@ test("DoCmd: ok-setsort with named range value", async () => {
   (sortlist as unknown as { __selectedIndex: number }).__selectedIndex = 2; // named range value
   (document as unknown as { body: { appendChild: (n: Node) => void } }).body.appendChild(sortlist);
 
-  { SC.DoCmd(null, "ok-setsort"); }
+  {
+    SC.DoCmd(null, "ok-setsort");
+  }
 });
 
 // -------------------------------------------------------------------
@@ -1169,5 +1227,7 @@ test("DoCmd: dosort A1:A1 early return", async () => {
   // sortrange is A1:A1 → early return
   control.sortrange = "A1:A1";
 
-  { SC.DoCmd(null, "dosort"); }
+  {
+    SC.DoCmd(null, "dosort");
+  }
 });

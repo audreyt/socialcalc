@@ -60,30 +60,40 @@ function ensureDocumentEvents() {
 }
 
 function teardownEditor(SC: SC, editor: Editor) {
-  { if (editor?.inputEcho?.interval) {
-    clearInterval(editor.inputEcho.interval);
-    editor.inputEcho.interval = null;
-  } }
-  { if (SC.AutoRepeatInfo?.timer) {
-    clearTimeout(SC.AutoRepeatInfo.timer);
-    SC.AutoRepeatInfo.timer = null;
-    SC.AutoRepeatInfo.mouseinfo = null;
-  } }
-  { if (SC.ButtonInfo?.timer) {
-    clearTimeout(SC.ButtonInfo.timer);
-    SC.ButtonInfo.timer = null;
-  } }
-  { if (SC.Keyboard) {
-    SC.Keyboard.focusTable = null;
-    SC.Keyboard.passThru = null;
-  } }
-  { if (editor) {
-    editor.state = "start";
-    if (editor.timeout) {
-      clearTimeout(editor.timeout);
-      editor.timeout = null;
+  {
+    if (editor?.inputEcho?.interval) {
+      clearInterval(editor.inputEcho.interval);
+      editor.inputEcho.interval = null;
     }
-  } }
+  }
+  {
+    if (SC.AutoRepeatInfo?.timer) {
+      clearTimeout(SC.AutoRepeatInfo.timer);
+      SC.AutoRepeatInfo.timer = null;
+      SC.AutoRepeatInfo.mouseinfo = null;
+    }
+  }
+  {
+    if (SC.ButtonInfo?.timer) {
+      clearTimeout(SC.ButtonInfo.timer);
+      SC.ButtonInfo.timer = null;
+    }
+  }
+  {
+    if (SC.Keyboard) {
+      SC.Keyboard.focusTable = null;
+      SC.Keyboard.passThru = null;
+    }
+  }
+  {
+    if (editor) {
+      editor.state = "start";
+      if (editor.timeout) {
+        clearTimeout(editor.timeout);
+        editor.timeout = null;
+      }
+    }
+  }
 }
 
 type FakeEvent = {
@@ -131,7 +141,9 @@ function fakeEvent(extras: Partial<FakeEvent> = {}): FakeEvent {
 }
 
 function primeGridLayout(editor: Editor) {
-  { editor.CalculateEditorPositions(); }
+  {
+    editor.CalculateEditorPositions();
+  }
   editor.gridposition = editor.gridposition || { left: 0, top: 0 };
   editor.headposition = editor.headposition || { left: 30, top: 30 };
   editor.tablewidth = editor.tablewidth ?? 400;
@@ -205,11 +217,9 @@ test("CellHandlesMouseMove: Fill else-branch X-delta ≤ 10 → filltype stays n
   // We use a coord that differs from "A1" so the outer if at 5029 is false, reaching the else block.
   const origGMP = SC.GridMousePosition;
   SC.GridMousePosition = () =>
-    ({ coord: "B2", col: 2, row: 2 } as SocialCalc.GridMousePositionResult);
+    ({ coord: "B2", col: 2, row: 2 }) as SocialCalc.GridMousePositionResult;
 
-  SC.CellHandlesMouseMove(
-    fakeEvent({ clientX: 13, clientY: 10 }) as unknown as MouseEvent,
-  );
+  SC.CellHandlesMouseMove(fakeEvent({ clientX: 13, clientY: 10 }) as unknown as MouseEvent);
 
   // filltype should remain null: deltaY=0 ≤ 10, deltaX=3 ≤ 10 → neither branch sets it.
   expect(cellHandlesRec.filltype).toBeNull();
