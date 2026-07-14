@@ -427,6 +427,14 @@ Stryker covers all eleven shipping modules with no mutator exclusions.
 subsets. `.github/workflows/mutation.yml` derives its full matrix from
 `ALL_MUTATE_FILES`; do not hand-copy the module list into the workflow.
 
+The native `@stryker-mutator/vitest-runner` is required. It keeps isolated
+workers alive and selects tests with per-test mutation coverage. Do not restore
+the command runner: rebuilding and rerunning the full owned subset per mutant
+pushes large modules beyond the release timeout. Since shipping sources are
+concatenated into a `vm.Script` bundle, `vitest.related` must remain `false`;
+`stryker.config.mjs` forwards the owned test list through
+`SOCIALCALC_MUTATION_TESTS` for `vite.config.ts` to use as `test.include`.
+
 Modes:
 
 ```bash

@@ -111,7 +111,7 @@ Build, tests, and coverage
   `vp run test:coverage` diagnostic and as the unit half of merged
   Vitest+Chromium coverage. The shared release floors remain
   98/80/98/98 for unit V8 and 98/84/98/98 after the browser merge.
-- Added `bun run test:bun`, which runs the same 2,940-test corpus in isolated
+- Added `bun run test:bun`, which runs the same 2,938-test corpus in isolated
   native Bun workers. Bun coverage is not the release gate because it does not
   collect the `vm.Script`-loaded UMD or expose statement/branch counters.
 
@@ -120,6 +120,10 @@ Mutation and formal verification
   `js/*.ts` modules with no mutator exclusions. Pull requests run the three
   release-critical formula modules; scheduled and release runs use an
   independently gated per-module matrix.
+- Replaced the per-mutant command runner with Stryker's native Vitest runner
+  and per-test coverage. Per-module test ownership still comes from
+  `stryker-file.mjs`; the release matrix now completes inside its timeout
+  instead of rebuilding and rerunning the entire owned subset for every mutant.
 - Recorded honest, run-backed integer floors for every module:
   formula-parse 97, formula-ref 97, formula1 95, formula-operand 94,
   formatnumber2 92, socialcalcconstants 77, socialcalcviewer 71,

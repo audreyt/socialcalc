@@ -50,16 +50,11 @@
 //
 // 4. Legacy full-sandbox run (`bun run mutate`, no MUTATE_SCOPE/
 //    MUTATE_TARGET) — mutates every file in ALL_MUTATE_FILES in one
-//    sandboxed process against the whole `vp test` suite per mutant. Report-
-//    only (`break: null`): an 11-module combined run can't honestly map to
-//    any single module's registered floor. Kept available for an occasional
-//    manual "mutate literally everything, don't care about attribution or
-//    wall time" run. `vp run mutate:all` (scripts/mutate-all.mjs) is the
-//    supported way to get full-11 coverage locally without CI: it loops
-//    mode 1 over ALL_MUTATE_FILES sequentially, one module + its own test
-//    subset at a time, reporting sequentially instead of in a parallel
-//    matrix, but still faster than this legacy mode since each module only
-//    pays for its own test subset, not the whole suite.
+//    sandboxed process against the whole Vitest suite. Report-only
+//    (`break: null`): an 11-module combined run can't honestly map to any
+//    single module's registered floor. `vp run mutate:all`
+//    (scripts/mutate-all.mjs) remains the supported way to get full-11
+//    coverage locally with per-module reports.
 //
 // Filtered test subsets keep sandboxed per-file runs attributable without
 // weakening the isolation guarantee.
@@ -125,45 +120,17 @@ const testsFilter =
   process.env.MUTATE_TESTS?.trim() ??
   (isCriticalScope ? criticalTests.join(" ") : target ? targetTests.join(" ") : undefined);
 
-// Small env-parsing helper shared by the two concurrency knobs below: a
-// missing/non-numeric/non-positive override silently falls back to the
-// measured default rather than producing `--maxWorkers=NaN` or a zero/
-// negative Stryker `concurrency` (either of which would hang or no-op).
 function parsePositiveInt(value, fallback) {
   const n = Number(value);
   return Number.isInteger(n) && n > 0 ? n : fallback;
 }
 
-// Vitest's own "forks" pool defaults to using nearly every logical core for
-// a single `vp test run` invocation. Stryker's `concurrency` below then runs
-// several such invocations at once (one per in-flight mutant), so an
-// uncapped pool means `concurrency` invocations each trying to claim
-// (cores - 1) workers — e.g. 4 concurrent runs x up to 17 forks each on an
-// 18-core box, ~4x oversubscription.
-//
-// Measured 2026-07-12 against socialcalc-3.ts's 34-file/444-test subset on
-// an 18-logical-core host: a solo run with an uncapped pool took 7.9s; the
-// identical command run 4-way concurrent with an uncapped pool never
-// completed a single mutant inside the 60s+timeoutFactor budget and looped
-// on TimeoutDecorator restarts indefinitely — a timeout storm, not a slow
-// pass (see stryker.log from the 2026-07-12 20:36 socialcalc-3.ts run).
-// Capping each invocation's own pool at --maxWorkers=2 fixed it: 4-way
-// concurrent completed in ~21-23s each (8 threads/18 cores), 8-way
-// concurrent completed in ~31-33s each (16 threads/18 cores, still
-// comfortably under budget) — confirming real headroom past 4-way once
-// each invocation's internal fan-out is capped.
-//
-// Both this and `concurrency` below are env-overridable
-// (TEST_RUNNER_MAX_WORKERS, STRYKER_CONCURRENCY) so a smaller/larger CI
-// runner — or a future remeasurement — can retune without editing this
-// file. Keep their product comfortably under the host's logical core count;
-// the 2x4=8 default was measured safe on 18 cores with real headroom to
-// spare, so it is not a knife-edge tuning.
-const TEST_RUNNER_MAX_WORKERS = parsePositiveInt(process.env.TEST_RUNNER_MAX_WORKERS, 2);
-
-const testCommand = testsFilter
-  ? `vp test run --maxWorkers=${TEST_RUNNER_MAX_WORKERS} ${testsFilter}`
-  : `vp test --maxWorkers=${TEST_RUNNER_MAX_WORKERS}`;
+const testFiles = testsFilter?.split(/\s+/u).filter(Boolean);
+if (testFiles?.length) {
+  // vite.config.ts reads this before the Vitest runner creates its test
+  // project. JSON avoids shell parsing and keeps wildcard entries intact.
+  process.env.SOCIALCALC_MUTATION_TESTS = JSON.stringify(testFiles);
+}
 
 // Scope label used to namespace reports/ and the incremental cache so
 // critical/per-file/legacy-full runs never clobber or cross-pollinate each
@@ -208,33 +175,34 @@ function measuredBreakFor(file) {
 export default {
   mutate,
 
-  testRunner: "command",
-  commandRunner: {
-    command: `vp build && ${testCommand}`,
+  // The native runner keeps one Vitest worker alive, activates mutants in
+  // process, and uses per-test coverage to run only tests that reached each
+  // mutant. The command runner restarted `vp build && vp test` for every
+  // mutant; large modules projected beyond 30 hours and could never satisfy
+  // the release job's three-hour timeout.
+  testRunner: "vitest",
+  vitest: {
+    configFile: "vite.config.ts",
+    // Shipping sources are concatenated into a generated vm.Script bundle, so
+    // Vitest's import graph cannot infer source-to-test relationships.
+    related: false,
   },
-  coverageAnalysis: "off",
+  coverageAnalysis: "perTest",
 
   // Stryker's sandbox preprocessor calls the removed
   // `ts.parseConfigFileTextToJson` API against whatever `tsconfigFile`
   // resolves to (default "tsconfig.json") on every sandboxed run, which
   // crashes under typescript@7 (see js/formula1.ts-era note: the whole TS7
   // programmatic API was dropped, only `tsc` CLI ships now). We don't use
-  // the `@stryker-mutator/typescript-checker` plugin (coverageAnalysis is
-  // "off" and there's no `checkers` entry below), so nothing else reads
+  // the `@stryker-mutator/typescript-checker` plugin (there is no `checkers`
+  // entry below), so nothing else reads
   // this option — point it at a file that doesn't exist so the sandbox
   // preprocessor's existence guard (`project.files.get(...)`) short-circuits
   // and skips the broken rewrite entirely.
   tsconfigFile: "tsconfig.stryker-disabled.json",
 
-  // Isolated sandboxes only; never mutate the caller's working tree.
-  // Default 4 matches the concurrency this repo's existing measured
-  // baselines (CRITICAL_BREAK_THRESHOLD above, the timeout-storm diagnosis
-  // itself) were taken at, so running with no overrides reproduces exactly
-  // what was measured. 8-way concurrency was also measured safe on an
-  // 18-logical-core host once TEST_RUNNER_MAX_WORKERS caps each invocation
-  // (see that const's comment) — override via STRYKER_CONCURRENCY on a host
-  // with cores to spare. Keep TEST_RUNNER_MAX_WORKERS * concurrency
-  // comfortably under the host's logical core count.
+  // Isolated sandboxes only; never mutate the caller's working tree. The
+  // Vitest runner uses one test thread per Stryker worker.
   concurrency: parsePositiveInt(process.env.STRYKER_CONCURRENCY, 4),
 
   reporters: ["clear-text", "progress", "html", "json"],

@@ -321,6 +321,12 @@ Stryker mutates all eleven shipping modules with no mutator exclusions.
 String, regex, CSS, and format-table mutations remain observable behavior and
 are scored rather than filtered.
 
+The native Stryker Vitest runner keeps isolated workers alive and uses per-test
+coverage; it does not restart a build and full owned-test command for every
+mutant. Because shipping sources are concatenated into a `vm.Script` bundle,
+source-to-test selection comes from `stryker-file.mjs`, not Vitest's import
+graph.
+
 Modes:
 
 - `MUTATE_SCOPE=critical vp run mutate`: PR gate for `formula-parse.ts`,

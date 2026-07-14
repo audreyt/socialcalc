@@ -7,6 +7,10 @@ const v8Mode = process.env.SOCIALCALC_COVERAGE === "1";
 const istanbulMode = !v8Mode;
 if (istanbulMode) process.env.SOCIALCALC_COVERAGE_ISTANBUL = "1";
 
+const mutationTestFiles = process.env.SOCIALCALC_MUTATION_TESTS
+  ? (JSON.parse(process.env.SOCIALCALC_MUTATION_TESTS) as string[])
+  : undefined;
+
 const focusedTestRun = process.argv.some(
   (argument) =>
     argument === "-t" ||
@@ -90,6 +94,6 @@ export default defineConfig({
           },
         },
     globalSetup: istanbulMode ? ["./test/global-setup.ts"] : undefined,
-    include: ["test/**/*.test.ts"],
+    include: mutationTestFiles ?? ["test/**/*.test.ts"],
   },
 });
