@@ -177,7 +177,7 @@ retains one candidate artifact.
 
 | Command                             | Contract                                                                                     |
 | ----------------------------------- | -------------------------------------------------------------------------------------------- |
-| `vp build`                          | Build the ordered UMD bundle and CSS.                                                        |
+| `vp build`                          | Build the ordered UMD bundle and CSS; canonicalize tracked `dist/SocialCalc.js`.             |
 | `vp build --minify`                 | Build normal and minified UMD bundles.                                                       |
 | `vp check --fix`                    | Apply repository formatting and safe lint fixes, then typecheck.                             |
 | `vp check`                          | Check formatting, warning-free type-aware lint, and types without modifying files.           |

@@ -37,6 +37,9 @@ jobs:
       - name: Build
         run: vp build
 
+      - name: Check generated bundle formatting
+        run: vp fmt dist/SocialCalc.js --check
+
       - name: Test
         run: vp test
 

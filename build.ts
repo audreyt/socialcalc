@@ -12,6 +12,7 @@
 
 import type { MinifyResult, Plugin } from "vite-plus";
 import { minify, transformWithOxc } from "vite-plus";
+import { execFileSync } from "node:child_process";
 import { existsSync, unlinkSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
@@ -31,6 +32,7 @@ const root = fileURLToPath(new URL(".", import.meta.url));
 const jsDir = join(root, "js");
 const cssDir = join(root, "css");
 const distDir = join(root, "dist");
+const bundlePath = join(distDir, "SocialCalc.js");
 const bundleMapPath = join(distDir, "SocialCalc.js.map");
 const bundleInstrumentedPath = join(distDir, "SocialCalc.instrumented.js");
 
@@ -537,6 +539,23 @@ export function socialCalcBuildPlugin(): Plugin {
         fileName: "socialcalc.css",
         source: await concatCss(cssDir, cssFiles),
       });
+    },
+    async closeBundle() {
+      // The shipping bundle is generated, not hand-maintained, but it is still
+      // tracked and checked by `vp check`. Run the same Vite+ formatter after
+      // ordinary builds so a fresh checkout and a fresh build are canonical.
+      // Coverage builds retain their pre-format text because the composed map
+      // addresses those exact generated lines and columns.
+      if (coverageMode) return;
+      const vpBin = fileURLToPath(new URL("./node_modules/vite-plus/bin/vp", import.meta.url));
+      execFileSync(process.execPath, [vpBin, "fmt", "dist/SocialCalc.js", "--write"], {
+        cwd: root,
+        stdio: "inherit",
+      });
+      // Oxfmt intentionally preserves whitespace inside license comments.
+      // Remove line-end whitespace without changing any comment text.
+      const formatted = await readFile(bundlePath, "utf8");
+      await writeFile(bundlePath, formatted.replace(/[ \t]+$/gmu, ""));
     },
   };
 }

@@ -99,8 +99,9 @@ Build, tests, and coverage
   Existing coverage-only catches were replaced with observable state, command,
   callback, DOM, and error assertions.
 - Made `vp check` the non-mutating CI and release gate for formatting,
-  warning-free type-aware lint, and types. The release tree was normalized with
-  `vp check --fix`, so formatting drift now fails before packaging.
+  warning-free type-aware lint, and types. Ordinary builds now canonicalize
+  generated `dist/SocialCalc.js` with the same formatter and verify it after
+  generation; coverage builds retain exact pre-format text for source maps.
 - Made Istanbul the default `vp test` coverage gate. Vitest global setup builds
   a fresh counter-instrumented UMD before workers start, and the full suite now
   enforces 100% statements, branches, functions, and lines across all eleven

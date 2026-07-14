@@ -88,11 +88,13 @@ const EXPECTED_TARBALL_MEMBERS = [
   "js/socialcalcviewer.d.ts",
 ];
 // Component size ceilings are explicit package-contract values, not snapshots.
-// Baselines measured 2026-07-12: normal 720,971 raw / 132,153 gzip;
-// minified 411,929 raw / 101,593 gzip; CSS 2,688 raw / 958 gzip.
-// Combined baseline measured the same day: 1,297,564 raw member bytes and
-// 273,824 bytes for the already-gzip tarball.
-const MAX_NORMAL_RAW_BYTES = 780_000;
+// Baselines measured 2026-07-14 after canonical formatting: normal 827,394
+// raw / 138,508 gzip; minified 411,911 raw / 101,624 gzip; CSS 2,688 raw /
+// 958 gzip; combined package members 1,407,094 raw; tarball 280,801. The
+// normal raw ceiling was raised only for Oxfmt's deterministic whitespace;
+// executable shape and minified size remain independently pinned. Combined
+// release-package ceilings remain unchanged.
+const MAX_NORMAL_RAW_BYTES = 850_000;
 const MAX_MINIFIED_RAW_BYTES = 450_000;
 const MAX_CSS_RAW_BYTES = 6_000;
 const MAX_NORMAL_GZIP_BYTES = 152_000;

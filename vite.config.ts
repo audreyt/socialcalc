@@ -27,6 +27,7 @@ export default defineConfig({
       input: socialCalcBuildInput,
     },
   },
+  fmt: {},
   lint: {
     ignorePatterns: ["dist/**"],
     options: {
