@@ -89,8 +89,8 @@ const EXPECTED_TARBALL_MEMBERS = [
 ];
 // Component size ceilings are explicit package-contract values, not snapshots.
 // Baselines measured 2026-07-14 after canonical formatting: normal 827,394
-// raw / 138,508 gzip; minified 411,911 raw / 101,624 gzip; CSS 2,688 raw /
-// 958 gzip; combined package members 1,407,094 raw; tarball 280,801. The
+// raw / 138,391 gzip; minified 411,911 raw / 101,624 gzip; CSS 2,688 raw /
+// 958 gzip; combined package members 1,407,094 raw; tarball 280,694. The
 // normal raw ceiling was raised only for Oxfmt's deterministic whitespace;
 // executable shape and minified size remain independently pinned. Combined
 // release-package ceilings remain unchanged.

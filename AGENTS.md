@@ -132,6 +132,9 @@ file is current.
 - Ordinary builds run `vp fmt --write dist/SocialCalc.js` from the build
   plugin. Coverage builds must not: post-mapping formatting would invalidate
   generated line/column mappings.
+- The `dist/SocialCalc.js` formatter override preserves single quotes because
+  EtherCalc's pinned headless adapter rewrites the legacy UMD `globalThis`
+  expression verbatim. The EtherCalc canary is the behavioral guard.
 - Normal builds must not ship a coverage map/comment.
 - `dist/**` is ignored by lint because diagnostics must be fixed at the source.
 - If the ordered source list changes, verify browser-global and CommonJS bundle

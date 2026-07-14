@@ -27,7 +27,16 @@ export default defineConfig({
       input: socialCalcBuildInput,
     },
   },
-  fmt: {},
+  fmt: {
+    overrides: [
+      {
+        files: ["dist/SocialCalc.js"],
+        // EtherCalc's headless adapter rewrites this legacy UMD expression
+        // verbatim. Preserve the bundle's historical quote form.
+        options: { singleQuote: true },
+      },
+    ],
+  },
   lint: {
     ignorePatterns: ["dist/**"],
     options: {
