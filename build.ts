@@ -13,7 +13,7 @@
 import type { MinifyResult, Plugin } from "vite-plus";
 import { minify, transformWithOxc } from "vite-plus";
 import { existsSync, unlinkSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -25,12 +25,14 @@ import {
 } from "@jridgewell/gen-mapping";
 import { eachMapping, originalPositionFor, TraceMap } from "@jridgewell/trace-mapping";
 import type { SourceMapInput } from "@jridgewell/trace-mapping";
+import { createInstrumenter } from "istanbul-lib-instrument";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const jsDir = join(root, "js");
 const cssDir = join(root, "css");
 const distDir = join(root, "dist");
 const bundleMapPath = join(distDir, "SocialCalc.js.map");
+const bundleInstrumentedPath = join(distDir, "SocialCalc.instrumented.js");
 
 // Coverage-only: set by `test:coverage` (`SOCIALCALC_COVERAGE=1 vp build`)
 // so `vp test --coverage` can remap executed dist/SocialCalc.js ranges back
@@ -41,6 +43,14 @@ const bundleMapPath = join(distDir, "SocialCalc.js.map");
 // see it. dist/SocialCalc.js.map is also never listed in package.json
 // "files" and is gitignored, so it can't ship even if this flag leaks.
 const coverageMode = process.env.SOCIALCALC_COVERAGE === "1";
+// Explicit Istanbul build mode remains available for tools that need the
+// artifact outside Vitest. The default `vp test` path calls
+// `writeSocialCalcIstanbulBundle()` from its global setup instead, so tests
+// never consume a stale ignored file. Either path instruments each core source
+// into dist/SocialCalc.instrumented.js and writes counters to
+// globalThis.__VITEST_COVERAGE__. The clean SocialCalc.js stays unchanged;
+// normal builds delete stale instrumented output.
+const istanbulMode = process.env.SOCIALCALC_COVERAGE_ISTANBUL === "1";
 
 export const socialCalcBuildInput = "virtual:socialcalc-build";
 const resolvedBuildInput = `\0${socialCalcBuildInput}`;
@@ -214,10 +224,17 @@ interface CoreSourceMap {
 
 interface CoreSource {
   code: string;
+  /** Istanbul-instrumented version of `code`; set when requested by `modes`. */
+  instrumentedCode?: string;
   map?: CoreSourceMap;
 }
 
-async function readJsSource(name: string): Promise<CoreSource> {
+interface BuildModes {
+  coverageMode: boolean;
+  istanbulMode: boolean;
+}
+
+async function readJsSource(name: string, modes: BuildModes): Promise<CoreSource> {
   const resolved = resolveJsSource(name);
   const sourcePath = join(jsDir, resolved);
   const text = await readFile(sourcePath, "utf8");
@@ -229,9 +246,10 @@ async function readJsSource(name: string): Promise<CoreSource> {
   }
 
   const { body, preamble } = splitLeadingCommentPreamble(text);
+  const needsSourcemap = modes.coverageMode || modes.istanbulMode;
   const transformed = await transformWithOxc(body, sourcePath, {
     target: "esnext",
-    ...(coverageMode ? { sourcemap: true } : {}),
+    ...(needsSourcemap ? { sourcemap: true } : {}),
   });
   for (const warning of transformed.warnings) {
     console.warn(warning);
@@ -243,15 +261,58 @@ async function readJsSource(name: string): Promise<CoreSource> {
     },
     compress: false,
     mangle: false,
-    ...(coverageMode ? { sourcemap: true } : {}),
+    ...(needsSourcemap ? { sourcemap: true } : {}),
   });
   const code = preamble + assertMinified(sourcePath, normalized);
-  if (!coverageMode) {
+  if (!modes.coverageMode && !modes.istanbulMode) {
     return { code };
   }
   if (!normalized.map || !transformed.map) {
-    console.warn(`No source map produced for ${sourcePath}; coverage will not attribute to this file.`);
+    console.warn(
+      `No source map produced for ${sourcePath}; coverage will not attribute to this file.`,
+    );
     return { code };
+  }
+
+  // Istanbul-instrumented code: instrument a SEPARATE full-file transform
+  // (see below) so istanbul's injected counters write coverage data to
+  // `globalThis.__VITEST_COVERAGE__` — the same variable vitest's istanbul
+  // provider's worker-side `takeCoverage()` reads from. Use
+  // `coverageGlobalScope: "globalThis"` and `coverageGlobalScopeFunc: false`
+  // to match how the provider instruments its own files, avoiding a `new
+  // Function("return this")()` call that would break in strict contexts.
+  let instrumentedCode: string | undefined;
+  if (modes.istanbulMode) {
+    // Istanbul's `instrumentSync` records line/column metadata straight from
+    // its `inputSourceMap`. The plain path above feeds it `transformed`
+    // (derived from `body` — the preamble-STRIPPED text), so every reported
+    // line is shifted by this file's preamble length. To carry true on-disk
+    // js/*.ts coordinates, re-transform the FULL original `text` and feed that
+    // code+map to the instrumenter instead. The instrumented bundle is
+    // coverage-only (gitignored, never shipped), so preamble byte-fidelity
+    // there is irrelevant; the clean bundle and the v8 composed-map path
+    // below are untouched and stay byte-identical to a non-coverage build.
+    const fullTransformed = await transformWithOxc(text, sourcePath, {
+      target: "esnext",
+      sourcemap: true,
+    });
+    for (const warning of fullTransformed.warnings) {
+      console.warn(warning);
+    }
+    const instrumenter = createInstrumenter({
+      esModules: false,
+      compact: false,
+      coverageVariable: "__VITEST_COVERAGE__",
+      coverageGlobalScope: "globalThis",
+      coverageGlobalScopeFunc: false,
+    });
+    // No `preamble +` prefix here: the full-file transform already includes
+    // the leading comment preamble, so prepending it would double-prepend.
+    instrumentedCode = instrumenter.instrumentSync(
+      fullTransformed.code,
+      sourcePath,
+      fullTransformed.map as unknown as object,
+    );
   }
 
   // Original line where `body` starts, so mapped positions land on the
@@ -287,18 +348,24 @@ async function readJsSource(name: string): Promise<CoreSource> {
       name: segment.name ?? original.name,
     });
   });
-  if (entries.length === 0) {
-    console.warn(`Composed source map for ${sourcePath} produced no mappings; coverage will not attribute to this file.`);
+  if (entries.length === 0 && !modes.istanbulMode) {
+    console.warn(
+      `Composed source map for ${sourcePath} produced no mappings; coverage will not attribute to this file.`,
+    );
     return { code };
   }
 
   return {
     code,
-    map: {
-      relativeSource: relative(distDir, sourcePath).split("\\").join("/"),
-      originalText: text,
-      entries,
-    },
+    instrumentedCode,
+    map:
+      entries.length > 0
+        ? {
+            relativeSource: relative(distDir, sourcePath).split("\\").join("/"),
+            originalText: text,
+            entries,
+          }
+        : undefined,
   };
 }
 
@@ -308,15 +375,15 @@ async function concatCss(dir: string, files: readonly string[]): Promise<string>
 }
 
 // Concatenates the UMD wrappers + core sources into the final bundle text
-// (byte-identical layout regardless of coverageMode:
-// `${umdWrapperTop}\n${file0}\n${file1}\n...\n${fileN}\n${umdWrapperBottom}`)
-// while building one combined sourcemap — only when coverageMode is on —
-// that traces every emitted range back through each file's own composed
-// mapping to js/*.ts.
+// (`${umdWrapperTop}\n${file0}\n${file1}\n...\n${fileN}\n${umdWrapperBottom}`).
+// Coverage mode additionally composes a sourcemap from generated ranges back
+// to js/*.ts. Istanbul mode additionally assembles a counter-instrumented UMD
+// from each file's `instrumentedCode`.
 async function assembleBundle(
   files: readonly string[],
-): Promise<{ js: string; map?: string }> {
-  const sources = await Promise.all(files.map((name) => readJsSource(name)));
+  modes: BuildModes,
+): Promise<{ js: string; map?: string; instrumentedJs?: string }> {
+  const sources = await Promise.all(files.map((name) => readJsSource(name, modes)));
   const combined = new GenMapping({ file: "SocialCalc.js" });
 
   let js = umdWrapperTop;
@@ -333,7 +400,12 @@ async function assembleBundle(
         const generated = { line: lineCursor + entry.generatedLine, column: entry.generatedColumn };
         const original = { line: entry.originalLine, column: entry.originalColumn };
         if (entry.name) {
-          maybeAddMapping(combined, { generated, source: mapping.relativeSource, original, name: entry.name });
+          maybeAddMapping(combined, {
+            generated,
+            source: mapping.relativeSource,
+            original,
+            name: entry.name,
+          });
         } else {
           maybeAddMapping(combined, { generated, source: mapping.relativeSource, original });
         }
@@ -348,10 +420,40 @@ async function assembleBundle(
   }
   appendChunk(umdWrapperBottom);
 
-  if (!coverageMode || allMappings(combined).length === 0) {
-    return { js };
+  // Concatenate the Istanbul-instrumented sources under the same UMD wrappers;
+  // executing this bundle writes counters to globalThis.__VITEST_COVERAGE__.
+  let instrumentedJs: string | undefined;
+  if (modes.istanbulMode && sources.every((s) => s.instrumentedCode !== undefined)) {
+    instrumentedJs = umdWrapperTop;
+    for (const source of sources) {
+      instrumentedJs += "\n";
+      instrumentedJs += source.instrumentedCode!;
+    }
+    instrumentedJs += "\n";
+    instrumentedJs += umdWrapperBottom;
   }
-  return { js, map: JSON.stringify(toEncodedMap(combined)) };
+
+  if (!modes.coverageMode || allMappings(combined).length === 0) {
+    return { js, instrumentedJs };
+  }
+  return { js, map: JSON.stringify(toEncodedMap(combined)), instrumentedJs };
+}
+
+/**
+ * Builds the coverage-only UMD used by the default test runner. This bypasses
+ * the shipping build mode deliberately: `vp test` must never depend on a stale
+ * ignored artifact, while ordinary `vp build` must remain byte-clean.
+ */
+export async function writeSocialCalcIstanbulBundle(): Promise<void> {
+  const assembled = await assembleBundle(coreFiles, {
+    coverageMode: false,
+    istanbulMode: true,
+  });
+  if (assembled.instrumentedJs === undefined) {
+    throw new Error("Failed to assemble dist/SocialCalc.instrumented.js");
+  }
+  await mkdir(distDir, { recursive: true });
+  await writeFile(bundleInstrumentedPath, assembled.instrumentedJs);
 }
 
 export function socialCalcBuildPlugin(): Plugin {
@@ -382,7 +484,7 @@ export function socialCalcBuildPlugin(): Plugin {
         delete bundle[fileName];
       }
 
-      const assembled = await assembleBundle(coreFiles);
+      const assembled = await assembleBundle(coreFiles, { coverageMode, istanbulMode });
       // The minified build is derived from the undecorated bundle text —
       // it never carries a sourceMappingURL comment or a map, whether or
       // not coverageMode is on.
@@ -415,6 +517,19 @@ export function socialCalcBuildPlugin(): Plugin {
         // stale, unreferenced .map next to a SocialCalc.js that no longer
         // points at it.
         unlinkSync(bundleMapPath);
+      }
+
+      if (assembled.instrumentedJs !== undefined) {
+        this.emitFile({
+          type: "asset",
+          fileName: "SocialCalc.instrumented.js",
+          source: assembled.instrumentedJs,
+        });
+      } else if (existsSync(bundleInstrumentedPath)) {
+        // A non-istanbul build: delete any instrumented bundle left on disk by
+        // an earlier `SOCIALCALC_COVERAGE_ISTANBUL=1` build so dist/ never
+        // carries a stale bundle that doesn't match the current sources.
+        unlinkSync(bundleInstrumentedPath);
       }
 
       this.emitFile({

@@ -158,12 +158,17 @@ Do not skip a focused behavior check merely because typecheck or lint is green.
 
 ## Tests and credibility
 
-`vp test` runs files importing from `vite-plus/test`. The package script
-`vp run test` builds first; a bare `vp test` expects a current bundle.
+`vp test` runs files importing from `vite-plus/test`. Its global setup builds a
+fresh Istanbul-instrumented UMD before workers start and the full-suite command
+enforces 100/100/100/100. The package script `vp run test` builds the plain
+shipping bundle first, then runs that same gate. Focused file/name/shard runs
+still build the current instrumented bundle but disable full-suite coverage
+unless `--coverage` is explicit.
 
-`test/helpers/socialcalc.ts` compiles the roughly 720 KB generated UMD once with
+`test/helpers/socialcalc.ts` compiles the selected roughly 720 KB UMD once with
 `vm.Script` per isolated Vitest worker and shares one SocialCalc instance within
-that file. Consequences:
+that file. Default tests load `dist/SocialCalc.instrumented.js`; explicit
+`SOCIALCALC_COVERAGE=1` V8 runs load `dist/SocialCalc.js`. Consequences:
 
 - Install and restore mutable globals/callbacks in that file's hooks.
 - Await editor/sheet status transitions; do not assume a scheduled command is
@@ -208,6 +213,9 @@ explanation; placeholder `noop`/`TODO` comments are violations.
 
 - **Vitest unit/integration:** pure helpers, sheet commands, save/load,
   fake-DOM-compatible UI state.
+- **Native Bun compatibility:** `bun run test:bun` runs `test/` in isolated
+  workers. Bun does not collect the `vm.Script` UMD and exposes no
+  statement/branch metrics, so it is not a coverage or release gate.
 - **Differential oracle:** candidate vs pinned `socialcalc@3.0.8` for formulas,
   formatting, commands, references, names, and serialization. Known intended
   differences must be explicit executable fixtures.
@@ -225,26 +233,38 @@ explanation; placeholder `noop`/`TODO` comments are violations.
 
 ## Coverage
 
-### Unit/source-attributed mode
+### Default Istanbul gate
 
 ```bash
-SOCIALCALC_COVERAGE=1 vp build
-SOCIALCALC_COVERAGE=1 vp test --coverage
+vp test
 ```
 
-The normal script is:
+`test/global-setup.ts` calls `writeSocialCalcIstanbulBundle()` before workers
+start. `build.ts` instruments each original `js/*.ts` source, assembles
+`dist/SocialCalc.instrumented.js` under the normal UMD wrapper, and writes
+counters to `globalThis.__VITEST_COVERAGE__`. The default gate includes the
+eleven shipping modules plus the three LemmaScript facades and requires
+100/100/100/100.
+
+The instrumented bundle is gitignored and never shipped. Ordinary `vp build`
+deletes stale instrumented output. Do not make tests depend on an artifact from
+a previous command.
+
+### Explicit V8/source-attributed mode
 
 ```bash
 vp run test:coverage
 ```
 
-The build emits `dist/SocialCalc.js.map` and a `sourceMappingURL` comment.
-Vitest/V8 coverage from the `vm.Script` bundle is remapped to original
-`js/*.ts`. Plain builds remove the stale map and comment.
+This sets `SOCIALCALC_COVERAGE=1` for both build and test. The build emits
+`dist/SocialCalc.js.map` plus a `sourceMappingURL` comment; Vitest/V8 coverage
+from the `vm.Script` bundle is remapped to original `js/*.ts`. Plain builds
+remove the stale map and comment.
 
-`vite.config.ts` intentionally does **not** set `coverage.include`. The shipping
-set is established by loaded bundle sources plus the shared exclusions. A wrong
-include glob can silently zero every source or reintroduce non-shipping files.
+The V8 configuration intentionally does **not** set `coverage.include`. Its
+shipping set is established by loaded bundle sources plus the shared
+exclusions. A wrong include glob can silently zero every source or reintroduce
+non-shipping files.
 
 ### Merged unit + Chromium mode
 
@@ -265,10 +285,12 @@ The merger must fail when:
 - any merged file/metric is less than unit-only coverage; or
 - a global/per-file floor is missed.
 
-`coverage-thresholds.mjs` is the only threshold/filter source. Do not duplicate
-numbers in `vite.config.ts` or the merger.
+`coverage-thresholds.mjs` is the only threshold/filter source for V8 and merged
+browser coverage. Do not duplicate those numbers in `vite.config.ts` or the
+merger. Istanbul's separate exact-coverage contract is the explicit 100s in
+`vite.config.ts`.
 
-Current floors:
+Current V8 floors:
 
 - unit global: statements 98, branches 80, functions 98, lines 98;
 - merged global: statements 98, branches 84, functions 98, lines 98;

@@ -10,6 +10,6 @@
     "checkJs": false,
     "allowJs": false
   },
-  "include": ["build.ts"],
+  "include": ["build.ts", "types/**/*.d.ts"],
   "exclude": ["js/**/*.js", "node_modules", "dist"]
 }

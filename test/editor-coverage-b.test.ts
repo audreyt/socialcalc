@@ -871,7 +871,11 @@ test("TableControl: CreateTableControl with scroll-area buttons fired", async ()
   // MouseDown succeeds.
   const thrown = mouseDownOutcomes.filter((o) => o.threw);
   expect(thrown).toHaveLength(2);
-  expect(thrown.every((o) => /reading 'length'/.test(o.message ?? ""))).toBe(true);
+  expect(
+    thrown.every((outcome) =>
+      /reading 'length'|undefined is not an object.*length/.test(outcome.message ?? ""),
+    ),
+  ).toBe(true);
   expect(mouseDownOutcomes.length).toBeGreaterThan(thrown.length);
 });
 
@@ -987,30 +991,40 @@ test("EditorGetStatuslineString: range with single cell (no sum path)", async ()
   expect(s).toBe("A1 &nbsp; ");
 });
 
-test("Safari userAgent → CreateTableEditor installs before-paste listeners", async () => {
+test("Safari userAgent reports a missing root before-paste listener API", async () => {
   const SC = await loadSocialCalc({ browser: true });
-  // Spoof navigator to Safari 5 (has Safari/ but not Chrome/).
-  const win = (globalThis as any).window;
-  const oldUA = win.navigator.userAgent;
-  win.navigator.userAgent = "Mozilla/5.0 (Macintosh) AppleWebKit/533.16 Safari/533.16";
-  (globalThis as any).navigator = win.navigator;
-  win.addEventListener = win.addEventListener || function () {};
-  win.removeEventListener = win.removeEventListener || function () {};
-  // Inside the SocialCalc UMD closure, the module-level `window` binding was
-  // captured once at load time (the `root`/globalThis argument), which is a
-  // different object from the `windowObject` the shim installs at
-  // `(globalThis as any).window`; stubbing methods on the latter here does
-  // not reach the former, so the Safari-only
-  // window.removeEventListener("beforepaste", ...) call in CreateTableEditor
-  // deterministically throws.
-  expect(() => {
-    const sheet = new SC.Sheet();
-    const ctx = new SC.RenderContext(sheet);
-    const editor = new SC.TableEditor(ctx);
-    SC.CreateTableEditor(editor, 300, 200);
-  }).toThrow(/removeEventListener/);
-  win.navigator.userAgent = oldUA;
-  (globalThis as any).navigator = win.navigator;
+  const windowObject = globalThis.window;
+  const navigatorObject = windowObject.navigator;
+  const originalUserAgent = Object.getOwnPropertyDescriptor(navigatorObject, "userAgent");
+  const root = globalThis as typeof globalThis & {
+    removeEventListener?: typeof removeEventListener;
+  };
+  const originalRootRemoveEventListener = root.removeEventListener;
+  Object.defineProperty(navigatorObject, "userAgent", {
+    configurable: true,
+    value: "Mozilla/5.0 (Macintosh) AppleWebKit/533.16 Safari/533.16",
+  });
+  globalThis.navigator = navigatorObject;
+  Reflect.deleteProperty(root, "removeEventListener");
+
+  try {
+    expect(() => {
+      const sheet = new SC.Sheet();
+      const context = new SC.RenderContext(sheet);
+      const editor = new SC.TableEditor(context);
+      SC.CreateTableEditor(editor, 300, 200);
+    }).toThrow(/removeEventListener/);
+  } finally {
+    if (originalUserAgent) {
+      Object.defineProperty(navigatorObject, "userAgent", originalUserAgent);
+    } else {
+      Reflect.deleteProperty(navigatorObject, "userAgent");
+    }
+    globalThis.navigator = navigatorObject;
+    if (originalRootRemoveEventListener) {
+      Reflect.set(root, "removeEventListener", originalRootRemoveEventListener);
+    }
+  }
 });
 
 test("ctrl-V / ctrl-C timeout callbacks invoked directly", async () => {

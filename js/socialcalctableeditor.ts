@@ -1567,21 +1567,21 @@ TableEditorSC.ProcessEditorMouseDown = function (e: any) {
   mouseinfo.editor = editor; // remember for later
 
   if (result.rowheader) {
-    if (result.rowselect) TableEditorSC.ProcessEditorRowselectMouseDown(e, ele, result);
-    else TableEditorSC.ProcessEditorRowsizeMouseDown(e, ele, result);
+    if (result.rowselect) TableEditorSC.ProcessEditorRowselectMouseDown(event, ele, result);
+    else TableEditorSC.ProcessEditorRowsizeMouseDown(event, ele, result);
     return;
   }
 
   if (result.colheader) {
-    if (result.colselect) TableEditorSC.ProcessEditorColselectMouseDown(e, ele, result);
-    else TableEditorSC.ProcessEditorColsizeMouseDown(e, ele, result);
+    if (result.colselect) TableEditorSC.ProcessEditorColselectMouseDown(event, ele, result);
+    else TableEditorSC.ProcessEditorColsizeMouseDown(event, ele, result);
     return;
   }
 
   if (!result.coord) return; // not us
 
   if (!range.hasrange) {
-    if (e.shiftKey) editor.RangeAnchor();
+    if (event.shiftKey) editor.RangeAnchor();
   }
   coord = editor.MoveECell(result.coord);
   // eddy ProcessEditorMouseDown {
@@ -1604,7 +1604,7 @@ TableEditorSC.ProcessEditorMouseDown = function (e: any) {
   // }
 
   if (range.hasrange) {
-    if (e.shiftKey) editor.RangeExtend();
+    if (event.shiftKey) editor.RangeExtend();
     else editor.RangeRemove();
   }
 
@@ -1706,7 +1706,7 @@ TableEditorSC.ProcessEditorMouseMove = function (e: any) {
   if (!result.coord) return;
 
   if (result.coord != mouseinfo.mouselastcoord) {
-    if (!e.shiftKey && !editor.range.hasrange) {
+    if (!event.shiftKey && !editor.range.hasrange) {
       editor.RangeAnchor(mouseinfo.mousedowncoord);
     }
     editor.MoveECell(result.coord);
@@ -1952,6 +1952,7 @@ TableEditorSC.ProcessEditorRowselectMouseMove = function (e: any) {
 
 /** @param {any} e */
 TableEditorSC.ProcessEditorRowselectMouseUp = function (e: any) {
+  var event = e || window.event;
   var mouseinfo = TableEditorSC.EditorMouseInfo;
   var editor = mouseinfo.editor;
   if (!editor) return; // not us, ignore
@@ -1959,7 +1960,7 @@ TableEditorSC.ProcessEditorRowselectMouseUp = function (e: any) {
     TableEditorSC.ProcessEditorRowselectMouseMove,
     TableEditorSC.ProcessEditorRowselectMouseUp,
     editor.toplevel,
-    e,
+    event,
   );
   return;
 };
@@ -2008,6 +2009,7 @@ TableEditorSC.ProcessEditorColselectMouseMove = function (e: any) {
 
 /** @param {any} e */
 TableEditorSC.ProcessEditorColselectMouseUp = function (e: any) {
+  var event = e || window.event;
   var mouseinfo = TableEditorSC.EditorMouseInfo;
   var editor = mouseinfo.editor;
   if (!editor) return; // not us, ignore
@@ -2015,7 +2017,7 @@ TableEditorSC.ProcessEditorColselectMouseUp = function (e: any) {
     TableEditorSC.ProcessEditorColselectMouseMove,
     TableEditorSC.ProcessEditorColselectMouseUp,
     editor.toplevel,
-    e,
+    event,
   );
   return;
 };
@@ -4235,6 +4237,16 @@ TableEditorSC.ScrollTableDownOneRow = function (editor: any) {
   }
 
   return tableobj;
+};
+
+/** @param {any} editor */
+TableEditorSC.ScrollTableLeftOneCol = function (editor: any) {
+  return TableEditorSC.ScrollRelative(editor, false, -1);
+};
+
+/** @param {any} editor */
+TableEditorSC.ScrollTableRightOneCol = function (editor: any) {
+  return TableEditorSC.ScrollRelative(editor, false, 1);
 };
 
 // *************************************

@@ -1,27 +1,23 @@
 // Focused tooling test for the Chromium Playwright V8 coverage pipeline
 // (scripts/merge-browser-coverage.mjs + e2e/fixtures/editor.ts's `coverage`
-// auto-fixture). Proves end-to-end that a real-browser-only observable
-// statement in js/socialcalctableeditor.ts — uncovered by every unit test
-// because the FakeDocument shim doesn't drive the live-layout path the
-// statement sits on — soundly maps through dist/SocialCalc.js's composed
-// sourcemap to the correct TS source line AND changes merged coverage for
-// that exact statement from 0 → >0.
+// auto-fixture). Proves end-to-end that a statement exercised in a real
+// browser soundly maps through dist/SocialCalc.js's composed sourcemap to the
+// correct js/socialcalctableeditor.ts source line, and that merging the
+// browser result adds its hit count to the unit result.
 //
 // The chosen anchor is `TableEditorSC.TableEditor.prototype.FitToEditTable =
-// function (...)` at js/socialcalctableeditor.ts:555. The body of that
-// prototype passthrough (`TableEditorSC.FitToEditTable(this)`) only fires when
-// InitializeSpreadsheetControl's real-DOM render path calls
-// CalculateEditorPositions, which reads `getBoundingClientRect` — a method
-// FakeElement/FakeDocument deliberately stub with constant offsets and never
-// invoke through the live layout step. Unit tests therefore hit 0 on this
-// statement; a real Chromium drive through createControl hits 1. The merged
-// union has hits > 0. That is the contract this test defends.
+// function (...)` in js/socialcalctableeditor.ts. InitializeSpreadsheetControl's
+// real-DOM render path calls this passthrough via CalculateEditorPositions,
+// which reads getBoundingClientRect. The unit suite now also drives the
+// passthrough with its deterministic fake-layout fixtures, so this test must
+// not assume the unit hit count is zero. Instead, it proves that Chromium
+// reports a hit at the exact mapped source line and that CoverageMap.merge
+// raises the unit count by the browser count.
 //
-// This is NOT a "file exists in coverage map" check. The assertion is on hit
-// counts at an exact source line:column: unit-only hits == 0 (before browser)
-// and browser-only hits >= 1 (after converting V8 ranges through the
-// sourcemap), so the same statement's count moving 0 → ≥1 under the union is
-// the proof that real coverage changed, not that a file appeared.
+// This is NOT a "file exists in coverage map" check. The assertions use hit
+// counts at an exact source line: browser-only hits >= 1, the bundle position
+// resolves to that same TypeScript line, and merged hits are greater than the
+// unit-only baseline.
 //
 // Skipped automatically when Chromium is unavailable (e.g. a unit-only CI
 // runner without `playwright install chromium`): the gate that owns this
@@ -225,32 +221,27 @@ function findStatementAtLine(fileCoverage: { statementMap: Record<string, { star
 
 const mappingDescribe = mappingTestEnabled ? describe : describe.skip;
 mappingDescribe("Chromium Playwright V8 → Istanbul → js/*.ts mapping (focused tooling)", () => {
-  test("FitToEditTable is uncovered by unit-only coverage (FakeDocument doesn't drive the live layout path)", () => {
+  test("FitToEditTable has a unit baseline for the browser merge delta", () => {
     if (!chromiumAvailable()) {
       test.skip("Chromium is unavailable");
       return;
     }
-    // Precondition: this test relies on `vp test --coverage` (the path that
-    // emits coverage-final.json) having produced a unit-only result. If it's
-    // absent (e.g. this file run in isolation), the assertion below would be
     if (!existsSync(unitFinalPath)) {
-      console.warn(
-        `[browser-coverage-mapping] ${unitFinalPath} missing — run \`SOCIALCALC_COVERAGE=1 vp test --coverage\` first; this assertion only has teeth alongside the unit-only result.`,
+      throw new Error(
+        `${unitFinalPath} missing — run \`SOCIALCALC_COVERAGE=1 vp test --coverage\` before the mapping test`,
       );
-      return;
     }
     const unitMap: CoverageMap = createCoverageMap(JSON.parse(readFileSync(unitFinalPath, "utf8")));
     const teKey = unitMap.files().find((f) => f.endsWith(expectedSourceFileSuffix));
     expect(teKey, `${expectedSourceFileSuffix} present in unit coverage`).toBeDefined();
-    const fc = unitMap.fileCoverageFor(teKey!);
-    const stmt = findStatementAtLine(fc, anchorSourceLine);
+    const stmt = findStatementAtLine(unitMap.fileCoverageFor(teKey!), anchorSourceLine);
     expect(
       stmt.hits,
-      `unit-only hits for FitToEditTable (line ${anchorSourceLine}) — expected 0, meaning the live-DOM layout path is unreachable by unit tests`,
-    ).toBe(0);
+      `unit-only hits for FitToEditTable (line ${anchorSourceLine}) provide the baseline for the browser merge delta`,
+    ).toBeGreaterThan(0);
   });
 
-  test("real Chromium coverage of the bundle soundly remaps to the correct TS source line via the sourcemap, and the merged count rises 0 → >0", async () => {
+  test("real Chromium coverage soundly remaps to the correct TS source line and raises the merged hit count", async () => {
     if (!chromiumAvailable()) {
       test.skip("Chromium is unavailable");
       return;
@@ -343,12 +334,16 @@ mappingDescribe("Chromium Playwright V8 → Istanbul → js/*.ts mapping (focuse
     expect(orig.source, "sourcemap source root for the anchor").toContain(expectedSourceFileSuffix);
     expect(orig.line, "sourcemap-resolved line for the anchor").toBe(anchorSourceLine);
 
-    // (C) Merging with unit coverage changes the count from 0 → >0 (the
-    // contract: "changes coverage, not just file existence"). Build the
-    // union with the SAME CoverageMap.merge the merge script uses.
+    // (C) Merging with unit coverage raises the count by adding a real
+    // browser hit. Build the union with the SAME CoverageMap.merge the merge
+    // script uses.
     let merged: CoverageMap;
+    let unitHits = 0;
     if (existsSync(unitFinalPath)) {
       merged = createCoverageMap(JSON.parse(readFileSync(unitFinalPath, "utf8")));
+      const teUnitKey = merged.files().find((f) => f.endsWith(expectedSourceFileSuffix));
+      expect(teUnitKey, `${expectedSourceFileSuffix} present in unit coverage`).toBeDefined();
+      unitHits = findStatementAtLine(merged.fileCoverageFor(teUnitKey!), anchorSourceLine).hits;
     } else {
       merged = createCoverageMap({});
     }
@@ -359,7 +354,7 @@ mappingDescribe("Chromium Playwright V8 → Istanbul → js/*.ts mapping (focuse
     const mergedStmt = findStatementAtLine(mergedFc, anchorSourceLine);
     expect(
       mergedStmt.hits,
-      `merged hits for FitToEditTable (line ${anchorSourceLine}) — expected >= 1, proving the browser coverage raised the count above the unit-only 0`,
-    ).toBeGreaterThanOrEqual(1);
+      `merged hits for FitToEditTable (line ${anchorSourceLine}) — expected the browser result to raise the unit-only count`,
+    ).toBeGreaterThan(unitHits);
   }, 60_000);
 });

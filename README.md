@@ -182,12 +182,13 @@ retains one candidate artifact.
 | `vp run typecheck`                  | Run the ordinary `tsc --noEmit` project check.                                               |
 | `vp run typecheck:strict`           | Check the narrower strict build configuration.                                               |
 | `vp lint`                           | Run warning-free, type-aware lint plus typechecking.                                         |
-| `vp test`                           | Run the Vitest suite against the already-built bundle.                                       |
-| `vp run test`                       | Build first, then run the Vitest suite.                                                      |
+| `vp test`                           | Build a fresh instrumented UMD, run Vitest, and enforce 100/100/100/100 Istanbul coverage.   |
+| `vp run test`                       | Build the plain shipping bundle first, then run the default Istanbul test gate.              |
+| `bun run test:bun`                  | Run the same corpus in isolated native Bun workers; no authoritative coverage aggregate.     |
 | `vp run check:test-credibility`     | Reject tautologies and unexplained code-free catches in tracked Vitest and Playwright tests. |
 | `vp run check:coverage-attribution` | Prove source-map attribution remains monotonic and does not duplicate the bundle.            |
-| `vp run test:coverage`              | Run source-attributed unit coverage with global and per-file floors.                         |
-| `vp run test:coverage:merged`       | Merge unit coverage with real Chromium V8 coverage and enforce the merged floors.            |
+| `vp run test:coverage`              | Run the explicit source-attributed V8 diagnostic with shared release floors.                 |
+| `vp run test:coverage:merged`       | Merge unit V8 coverage with real Chromium V8 coverage and enforce the merged floors.         |
 | `vp run test:browser`               | Run Playwright against Chromium, Firefox, and WebKit.                                        |
 | `vp run test:package-contract`      | Pack and exercise the exact npm consumer contract.                                           |
 | `vp run test:ethercalc-canary`      | Networked release-only canary against the pinned EtherCalc checkout.                         |
@@ -202,28 +203,34 @@ ordered source list, prefers `.ts` implementations, strips types with Oxc,
 preserves license preambles, and wraps the result as UMD. Its wrapper strings
 are inline because they are not standalone source modules.
 
-Normal coverage builds append a source-map reference to the generated UMD so
-coverage from `vm.Script` can be attributed back to `js/*.ts`. Plain builds
-remove stale coverage maps. The shared thresholds live in
-`coverage-thresholds.mjs`:
+Default `vp test` global setup builds `dist/SocialCalc.instrumented.js` from
+the current source tree before workers start. The shared loader executes that
+UMD through `vm.Script`; Istanbul collects its source counters and enforces
+**100 / 100 / 100 / 100** statements, branches, functions, and lines across
+all eleven shipping modules and the three LemmaScript facades.
 
-- unit global floors: **98 / 80 / 98 / 98** for statements, branches,
-  functions, and lines;
+`vp run test:coverage` remains the explicit V8 diagnostic. Its build appends a
+source-map reference to the generated UMD so V8 ranges can be attributed back
+to `js/*.ts`; plain builds remove stale coverage maps and instrumented bundles.
+The V8 and merged-browser thresholds live in `coverage-thresholds.mjs`:
+
+- unit V8 global floors: **98 / 80 / 98 / 98**;
 - merged unit + Chromium floors: **98 / 84 / 98 / 98**;
 - per-file floors for the seven critical shipping sources listed there.
 
-Do not set `coverage.include` casually: source discovery relies on what the
-bundle loads plus the shared exclusion contract, and an incorrect include glob
-can silently zero or reintroduce files.
+Bun runs the complete corpus through `bun run test:bun`, but Bun's native
+coverage does not collect the `vm.Script` UMD and has no statement or branch
+metrics. It is an execution-compatibility check, not the release coverage gate.
 
 ### Test architecture
 
 Vitest files import from `vite-plus/test`. `test/helpers/socialcalc.ts` compiles
 the generated UMD bundle once per isolated test worker and shares one SocialCalc
-instance within that file. Tests must install and restore mutable state in their
-own hooks. Do not restore cache-busting dynamic imports: Vite transforms each
-query as another copy of the roughly 720 KB bundle and can exhaust worker
-memory.
+instance within that file. Default runs load the fresh instrumented UMD; explicit
+`SOCIALCALC_COVERAGE=1` V8 runs load the plain UMD plus its sourcemap. Tests must
+install and restore mutable state in their own hooks. Do not restore
+cache-busting dynamic imports: Vite transforms each query as another copy of the
+roughly 720 KB bundle and can exhaust worker memory.
 
 Use the narrowest layer that proves the behavior:
 

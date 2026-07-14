@@ -4712,8 +4712,7 @@ SC.SafeUrlForRender = function(rawurl, policy = SocialCalc.Callbacks.securityPol
 	const scheme = schemeMatch[1].toLowerCase() + ":";
 	if (scheme === "data:") {
 		const afterScheme = stripped.slice(schemeMatch[0].length);
-		const mimeMatch = afterScheme.match(/^([^,;]*)/);
-		const mime = mimeMatch ? mimeMatch[1].toLowerCase() : "";
+		const mime = afterScheme.match(/^([^,;]*)/)[1].toLowerCase();
 		if (!mime) return null;
 		const allowedDataMimeTypes = policy.allowedDataMimeTypes;
 		for (let i = 0; i < allowedDataMimeTypes.length; i++) {
@@ -6526,18 +6525,18 @@ TableEditorSC.ProcessEditorMouseDown = function(e) {
 	if (!result) return;
 	mouseinfo.editor = editor;
 	if (result.rowheader) {
-		if (result.rowselect) TableEditorSC.ProcessEditorRowselectMouseDown(e, ele, result);
-		else TableEditorSC.ProcessEditorRowsizeMouseDown(e, ele, result);
+		if (result.rowselect) TableEditorSC.ProcessEditorRowselectMouseDown(event, ele, result);
+		else TableEditorSC.ProcessEditorRowsizeMouseDown(event, ele, result);
 		return;
 	}
 	if (result.colheader) {
-		if (result.colselect) TableEditorSC.ProcessEditorColselectMouseDown(e, ele, result);
-		else TableEditorSC.ProcessEditorColsizeMouseDown(e, ele, result);
+		if (result.colselect) TableEditorSC.ProcessEditorColselectMouseDown(event, ele, result);
+		else TableEditorSC.ProcessEditorColsizeMouseDown(event, ele, result);
 		return;
 	}
 	if (!result.coord) return;
 	if (!range.hasrange) {
-		if (e.shiftKey) editor.RangeAnchor();
+		if (event.shiftKey) editor.RangeAnchor();
 	}
 	coord = editor.MoveECell(result.coord);
 	if (TableEditorSC._app == true) {
@@ -6552,7 +6551,7 @@ TableEditorSC.ProcessEditorMouseDown = function(e) {
 		return;
 	}
 	if (range.hasrange) {
-		if (e.shiftKey) editor.RangeExtend();
+		if (event.shiftKey) editor.RangeExtend();
 		else editor.RangeRemove();
 	}
 	mouseinfo.mousedowncoord = coord;
@@ -6619,7 +6618,7 @@ TableEditorSC.ProcessEditorMouseMove = function(e) {
 	TableEditorSC.SetDragAutoRepeat(editor, null);
 	if (!result.coord) return;
 	if (result.coord != mouseinfo.mouselastcoord) {
-		if (!e.shiftKey && !editor.range.hasrange) {
+		if (!event.shiftKey && !editor.range.hasrange) {
 			editor.RangeAnchor(mouseinfo.mousedowncoord);
 		}
 		editor.MoveECell(result.coord);
@@ -6759,10 +6758,11 @@ TableEditorSC.ProcessEditorRowselectMouseMove = function(e) {
 	return;
 };
 TableEditorSC.ProcessEditorRowselectMouseUp = function(e) {
+	var event = e || window.event;
 	var mouseinfo = TableEditorSC.EditorMouseInfo;
 	var editor = mouseinfo.editor;
 	if (!editor) return;
-	TableEditorSC.RemoveMouseMoveUp(TableEditorSC.ProcessEditorRowselectMouseMove, TableEditorSC.ProcessEditorRowselectMouseUp, editor.toplevel, e);
+	TableEditorSC.RemoveMouseMoveUp(TableEditorSC.ProcessEditorRowselectMouseMove, TableEditorSC.ProcessEditorRowselectMouseUp, editor.toplevel, event);
 	return;
 };
 TableEditorSC.ProcessEditorColselectMouseDown = function(e, ele, result) {
@@ -6795,10 +6795,11 @@ TableEditorSC.ProcessEditorColselectMouseMove = function(e) {
 	return;
 };
 TableEditorSC.ProcessEditorColselectMouseUp = function(e) {
+	var event = e || window.event;
 	var mouseinfo = TableEditorSC.EditorMouseInfo;
 	var editor = mouseinfo.editor;
 	if (!editor) return;
-	TableEditorSC.RemoveMouseMoveUp(TableEditorSC.ProcessEditorColselectMouseMove, TableEditorSC.ProcessEditorColselectMouseUp, editor.toplevel, e);
+	TableEditorSC.RemoveMouseMoveUp(TableEditorSC.ProcessEditorColselectMouseMove, TableEditorSC.ProcessEditorColselectMouseUp, editor.toplevel, event);
 	return;
 };
 TableEditorSC.ProcessEditorRowsizeMouseDown = function(e, ele, result) {
@@ -8200,6 +8201,12 @@ TableEditorSC.ScrollTableDownOneRow = function(editor) {
 		tbodyobj.replaceChild(newrow, oldchild);
 	}
 	return tableobj;
+};
+TableEditorSC.ScrollTableLeftOneCol = function(editor) {
+	return TableEditorSC.ScrollRelative(editor, false, -1);
+};
+TableEditorSC.ScrollTableRightOneCol = function(editor) {
+	return TableEditorSC.ScrollRelative(editor, false, 1);
 };
 TableEditorSC.InputBox = function(element, editor) {
 	if (!element) return;

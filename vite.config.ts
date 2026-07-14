@@ -3,6 +3,22 @@ import { defineConfig } from "vite-plus";
 import { socialCalcBuildInput, socialCalcBuildPlugin } from "./build";
 import { thresholdContract } from "./coverage-thresholds.mjs";
 
+const v8Mode = process.env.SOCIALCALC_COVERAGE === "1";
+const istanbulMode = !v8Mode;
+if (istanbulMode) process.env.SOCIALCALC_COVERAGE_ISTANBUL = "1";
+
+const focusedTestRun = process.argv.some(
+  (argument) =>
+    argument === "-t" ||
+    argument === "--testNamePattern" ||
+    argument === "--test-name-pattern" ||
+    argument === "--changed" ||
+    argument.startsWith("--changed=") ||
+    argument === "--shard" ||
+    argument.startsWith("--shard=") ||
+    /(?:^|[/\\])(?:test|e2e)[/\\].+\.(?:test|spec)\.[cm]?[jt]sx?$/.test(argument),
+);
+
 export default defineConfig({
   build: {
     emptyOutDir: false,
@@ -21,43 +37,49 @@ export default defineConfig({
   },
   plugins: [socialCalcBuildPlugin()],
   test: {
-    coverage: {
-      // Shared shipping coverage contract: same exclude/thresholds as the
-      // merged unit+browser gate in scripts/merge-browser-coverage.mjs
-      // (both import {@link thresholdContract}), so the unit-only Vitest gate
-      // and the merged gate can never drift. See coverage-thresholds.ts for
-      // the rationale and the honest measured baseline.
-      //
-      // NOTE: `coverage.include` is intentionally NOT set here — Vitest
-      // treats `coverage.include` as a filter on which source files to
-      // count coverage for. The shipping gate counts js/*.ts only BECAUSE
-      // `coverage.exclude` drops test/lemma/scripts and only js/*.ts is ever
-      // loaded into a Script during tests. Setting `coverage.include` would
-      // silently re-include js/*.ts (no effect) or, if set wrong
-      // (e.g. `test/**`), zero out every source file's coverage.
-      exclude: thresholdContract.exclude,
-      // `json` writes coverage-final.json (Istanbul format), which
-      // scripts/merge-browser-coverage.mjs reads back to merge with Chromium's
-      // V8 coverage. `text`/`lcov` give the visible unit-only report.
-      reporter: ["text", "lcov", "json"],
-      thresholds: {
-        statements: thresholdContract.global.statements,
-        branches: thresholdContract.global.branches,
-        functions: thresholdContract.global.functions,
-        lines: thresholdContract.global.lines,
-        ...Object.fromEntries(
-          Object.entries(thresholdContract.perFile).map(([file, t]) => [
-            file,
-            {
-              statements: t.statements,
-              branches: t.branches,
-              functions: t.functions,
-              lines: t.lines,
-            },
-          ]),
-        ),
-      },
-    },
+    coverage: istanbulMode
+      ? {
+          // The default gate uses source counters injected into a fresh UMD by
+          // test/global-setup.ts. SocialCalc is a vm.Script-loaded global
+          // script, so Vitest cannot instrument the shipping sources through
+          // its normal module transform.
+          enabled: !focusedTestRun,
+          provider: "istanbul" as const,
+          include: ["js/**/*.ts", "lemma/**/*.ts"],
+          exclude: ["test/**", "dist/**", "**/*.d.ts", "**/*.lean", "**/*.dfy", "**/*.mjs"],
+          reporter: ["text", "lcov"],
+          thresholds: {
+            statements: 100,
+            branches: 100,
+            functions: 100,
+            lines: 100,
+          },
+        }
+      : {
+          // Explicit SOCIALCALC_COVERAGE=1 retains the V8+sourcemap diagnostic
+          // and the shared shipping threshold contract used by merged browser
+          // coverage. JSON is required by merge-browser-coverage.mjs.
+          exclude: thresholdContract.exclude,
+          reporter: ["text", "lcov", "json"],
+          thresholds: {
+            statements: thresholdContract.global.statements,
+            branches: thresholdContract.global.branches,
+            functions: thresholdContract.global.functions,
+            lines: thresholdContract.global.lines,
+            ...Object.fromEntries(
+              Object.entries(thresholdContract.perFile).map(([file, t]) => [
+                file,
+                {
+                  statements: t.statements,
+                  branches: t.branches,
+                  functions: t.functions,
+                  lines: t.lines,
+                },
+              ]),
+            ),
+          },
+        },
+    globalSetup: istanbulMode ? ["./test/global-setup.ts"] : undefined,
     include: ["test/**/*.test.ts"],
   },
 });

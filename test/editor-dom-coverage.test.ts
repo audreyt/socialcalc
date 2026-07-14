@@ -1570,6 +1570,86 @@ test("ctrlkeyFunction [ctrl-v]: range + single-cell-clipsheet (7995-7996)", asyn
   expect(scheduledCmd).toBe("paste B1:D3 formulas");
 });
 
+
+test("ctrlkeyFunction [ctrl-v]: timer callback reads value, blurs, hides, and schedules paste", async () => {
+  const SC = await loadSocialCalc({ browser: true });
+  const { control } = await newControl(SC, "ctrlv-timer");
+  const editor = control.editor;
+  const sheet = editor.context.sheetobj;
+
+  await scheduleCommands(SC, sheet, ["set A1 text t start"]);
+  editor.ecell = { coord: "A1", row: 1, col: 1 };
+  editor.noEdit = false;
+  editor.ECellReadonly = () => false;
+  editor.range = {
+    hasrange: false,
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  } as SocialCalc.EditorRange;
+
+  let valueRead = false;
+  let blurCount = 0;
+  let scheduled = "";
+  let pastedValue = "";
+  const pasteTextarea = {
+    get value() {
+      valueRead = true;
+      return pastedValue;
+    },
+    set value(value: string) {
+      pastedValue = value;
+    },
+    style: { display: "none", left: "0px", top: "0px" },
+    blur() {
+      blurCount += 1;
+    },
+    focus() {},
+    select() {},
+  } as unknown as HTMLTextAreaElement;
+  editor.pasteTextarea = pasteTextarea;
+
+  const oldSchedule = editor.EditorScheduleSheetCommands;
+  const oldPasteClipboard = editor.pastescclipboard;
+  const originalSetTimeout = globalThis.setTimeout;
+  const originalWindowSetTimeout = globalThis.window?.setTimeout;
+  let captured: (() => void) | null = null;
+  const captureTimeout = (callback: () => void) => {
+    captured = callback;
+    return 0;
+  };
+
+  editor.EditorScheduleSheetCommands = (command: string) => {
+    scheduled = command;
+  };
+  editor.pastescclipboard = true;
+  globalThis.setTimeout = captureTimeout as typeof setTimeout;
+  if (globalThis.window) {
+    globalThis.window.setTimeout = captureTimeout as typeof setTimeout;
+  }
+
+  try {
+    editor.ctrlkeyFunction(editor, "[ctrl-v]");
+    pastedValue = "value from paste";
+    if (typeof captured !== "function") {
+      throw new Error("ctrl-v did not schedule its paste callback");
+    }
+    (captured as () => void)();
+
+    expect(valueRead).toBe(true);
+    expect(blurCount).toBe(1);
+    expect(editor.pasteTextarea.style.display).toBe("none");
+    expect(scheduled).toContain("paste A1 formulas");
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+    if (globalThis.window && originalWindowSetTimeout) {
+      globalThis.window.setTimeout = originalWindowSetTimeout;
+    }
+    editor.EditorScheduleSheetCommands = oldSchedule;
+    editor.pastescclipboard = oldPasteClipboard;
+  }
+});
 test("ctrlkeyFunction [ctrl-s]: plain-format response with range (8035-8036)", async () => {
   const SC = await loadSocialCalc({ browser: true });
   const { control } = await newControl(SC, "ctrls-root");

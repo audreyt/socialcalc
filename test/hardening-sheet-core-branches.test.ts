@@ -631,7 +631,7 @@ test("encodeForSave / decodeFromSave non-string inputs round-trip as identity, n
 // ===========================================================================
 
 test("DetermineValueType classifies http(s) URLs, HTML fragments, dates, and fractions into their valuetype buckets", async () => {
-  const SC = await loadSocialCalc();
+  const SC = await loadSocialCalc({ browser: true });
   // URL types: "tl" link type
   expect(SC.DetermineValueType("https://example.test/path").type).toBe("tl");
   expect(SC.DetermineValueType("http://example.test/x").type).toBe("tl");

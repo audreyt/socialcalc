@@ -47,6 +47,8 @@
     "typecheck:strict": "tsc --noEmit -p tsconfig.strict.json",
     "test": "vp build && vp test",
     "test:coverage": "SOCIALCALC_COVERAGE=1 vp build && SOCIALCALC_COVERAGE=1 vp test --coverage",
+    "test:coverage:istanbul": "vp test",
+    "test:bun": "SOCIALCALC_COVERAGE_ISTANBUL=1 vp build && SOCIALCALC_COVERAGE_ISTANBUL=1 bun test ./test --isolate --parallel=4",
     "check:coverage-attribution": "node scripts/verify-coverage-attribution.mjs",
     "test:package-contract": "node scripts/verify-package-contract.mjs",
     "check:test-credibility": "node scripts/check-test-credibility.mjs",
@@ -73,17 +75,19 @@
     "test:browser:coverage": "SOCIALCALC_BROWSER_COVERAGE=1 vp exec playwright test"
   },
   "devDependencies": {
+    "@babel/parser": "7.29.2",
     "@jridgewell/gen-mapping": "0.3.13",
     "@jridgewell/trace-mapping": "0.3.31",
     "@playwright/test": "^1.61.1",
     "@stryker-mutator/core": "^9.6.1",
     "@types/node": "24",
+    "@vitest/coverage-istanbul": "4.1.10",
     "@vitest/coverage-v8": "4.1.10",
+    "istanbul-lib-instrument": "^6.0.3",
     "jquery": "^4.0.0",
     "lemmascript": "0.5.13",
     "typescript": "^7.0.2",
-    "vite-plus": "^0.2.4",
-    "@babel/parser": "7.29.2"
+    "vite-plus": "^0.2.4"
   },
   "overrides": {
     "@babel/core": "7.29.7",

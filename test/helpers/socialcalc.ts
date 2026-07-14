@@ -2,7 +2,11 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { Script } from "node:vm";
 
-const bundlePath = fileURLToPath(new URL("../../dist/SocialCalc.js", import.meta.url));
+const bundleFile =
+  process.env.SOCIALCALC_COVERAGE === "1"
+    ? "../../dist/SocialCalc.js"
+    : "../../dist/SocialCalc.instrumented.js";
+const bundlePath = fileURLToPath(new URL(bundleFile, import.meta.url));
 const bundleScript = new Script(readFileSync(bundlePath, "utf8"), { filename: bundlePath });
 
 // Coverage tests intentionally reach internal UMD surfaces beyond the public declarations.

@@ -245,6 +245,7 @@ describe("untrusted mode: URL and image scheme allowlist", () => {
       "",
     );
     expect(svgOut).toBe("data:image/svg+xml,&lt;svg onload=alert(1)&gt;");
+    expect(SC.SafeUrlForRender("data:,payload")).toBeNull();
   });
 
   test("text-custom template markup is escaped without a sanitizer, even though @u is rejected", async () => {

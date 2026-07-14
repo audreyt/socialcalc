@@ -98,12 +98,17 @@ Build, tests, and coverage
   unexplained code-free catches across tracked Vitest and Playwright tests.
   Existing coverage-only catches were replaced with observable state, command,
   callback, DOM, and error assertions.
-- Added original-source sourcemaps for coverage builds and a round-trip
-  attribution guard. Unit coverage enforces global floors of
-  98/80/98/98 (statements/branches/functions/lines); merged Vitest + Chromium
-  coverage enforces 98/84/98/98, with per-file floors for seven critical
-  shipping sources. Coverage JSON is rejected unless its bundle source is
-  present and byte-identical to the built artifact.
+- Made Istanbul the default `vp test` coverage gate. Vitest global setup builds
+  a fresh counter-instrumented UMD before workers start, and the full suite now
+  enforces 100% statements, branches, functions, and lines across all eleven
+  shipping `js/*.ts` modules and the three LemmaScript facades.
+- Retained source-attributed V8 coverage as the explicit
+  `vp run test:coverage` diagnostic and as the unit half of merged
+  Vitest+Chromium coverage. The shared release floors remain
+  98/80/98/98 for unit V8 and 98/84/98/98 after the browser merge.
+- Added `bun run test:bun`, which runs the same 2,940-test corpus in isolated
+  native Bun workers. Bun coverage is not the release gate because it does not
+  collect the `vm.Script`-loaded UMD or expose statement/branch counters.
 
 Mutation and formal verification
 - Expanded Stryker from seven partially measured files to all eleven shipping

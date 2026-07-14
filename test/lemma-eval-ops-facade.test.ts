@@ -55,6 +55,16 @@ describe("lemma/eval-ops lattice laws (Dafny/Lean surface)", () => {
     expect(concatType(TY_T, TY_T)).toBe(TY_T);
     expect(concatType(TY_N, TY_N)).toBe(TY_T);
   });
+
+  test("value type adapters cover text, blank, number, and unknown errors", () => {
+    expect(fromValueType("e#NAME?")).toBe(ERR_VALUE);
+    expect(fromValueType("t")).toBe(TY_T);
+    expect(fromValueType("b")).toBe(2);
+    expect(fromValueType("n")).toBe(TY_N);
+    expect(toValueType(TY_T)).toBe("t");
+    expect(toValueType(2)).toBe("b");
+    expect(toValueType(TY_N)).toBe("n");
+  });
 });
 
 describe("lemma/eval-ops vs shipping EvaluatePolish", () => {

@@ -214,8 +214,10 @@ test("TableEditor: prototype passthrough methods", async () => {
   // always invoked with that undefined event, which throws a specific,
   // deterministic TypeError reading `.stopPropagation` off `undefined`
   // before either call can complete.
-  expect(() => editor.SetMouseMoveUp()).toThrow(/Cannot read propert(y|ies) of undefined.*stopPropagation/);
-  expect(() => editor.RemoveMouseMoveUp()).toThrow(/Cannot read propert(y|ies) of undefined.*stopPropagation/);
+  const missingEventPattern =
+    /Cannot read propert(?:y|ies) of undefined.*stopPropagation|undefined is not an object.*event\.stopPropagation/;
+  expect(() => editor.SetMouseMoveUp()).toThrow(missingEventPattern);
+  expect(() => editor.RemoveMouseMoveUp()).toThrow(missingEventPattern);
   expect(editor.context).toBeDefined();
 });
 

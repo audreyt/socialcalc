@@ -2,6 +2,7 @@
 /package-lock.json
 /dist/SocialCalc.min.js
 /dist/SocialCalc.js.map
+/dist/SocialCalc.instrumented.js
 /coverage/
 /coverage-browser-v8/
 /coverage-merged/

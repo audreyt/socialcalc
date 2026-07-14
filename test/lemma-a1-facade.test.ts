@@ -83,6 +83,7 @@ describe("lemma/a1 facade laws (Dafny/Lean surface)", () => {
     expect(crToCoord(1, 1)).toBe("A1");
     expect(crToCoord(27, 2)).toBe("AA2");
     expect(crToCoord(702, 10)).toBe("ZZ10");
+    expect(crToCoord(0, 0)).toBe("A1");
   });
 
   test("offsetRelativeA1 overflow becomes #REF!", () => {

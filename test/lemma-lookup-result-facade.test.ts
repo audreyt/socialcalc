@@ -3,8 +3,11 @@ import { describe, expect, test } from "vite-plus/test";
 import {
   incorrectRowError,
   lookupInRow,
+  lookupResultInEntries,
   lookupResultType,
   missingRowError,
+  parsePipeRow,
+  preferExact,
   resolveToken,
   selectRow,
   typeChar0,
@@ -53,6 +56,22 @@ describe("lemma/lookup-result pure core (Dafny/Lean surface)", () => {
     expect(lookupInRow("n", "x", "|n:n|")).toBe("e#VALUE!");
     // malformed (no closing pipe after match)
     expect(lookupInRow("n", "n", "|n:1")).toBe(incorrectRowError("|n:1"));
+  });
+
+  test("preferExact and entry-list lookup preserve exact-before-wildcard precedence", () => {
+    expect(preferExact(true, true)).toBe(0);
+    expect(preferExact(false, true)).toBe(1);
+    expect(preferExact(false, false)).toBe(2);
+    const entries = parsePipeRow("noise|n:n|malformed|e*:2|");
+    expect(entries).toEqual([
+      { key: "n", val: "n" },
+      { key: "e*", val: "2" },
+    ]);
+    expect(lookupResultInEntries("n", "e#REF!", entries)).toBe("e#REF!");
+  });
+
+  test("wildcard match with a malformed row reports the row-level error", () => {
+    expect(lookupInRow("n", "e#REF!", "|e*:2")).toBe(incorrectRowError("|e*:2"));
   });
 });
 

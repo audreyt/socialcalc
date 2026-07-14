@@ -5770,8 +5770,7 @@ SC.SafeUrlForRender = function (
 
   if (scheme === "data:") {
     const afterScheme = stripped.slice(schemeMatch[0].length);
-    const mimeMatch = afterScheme.match(/^([^,;]*)/);
-    const mime = mimeMatch ? mimeMatch[1].toLowerCase() : "";
+    const mime = afterScheme.match(/^([^,;]*)/)![1].toLowerCase();
     if (!mime) return null;
     const allowedDataMimeTypes = policy.allowedDataMimeTypes;
     for (let i = 0; i < allowedDataMimeTypes.length; i++) {
