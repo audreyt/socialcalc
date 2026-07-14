@@ -448,6 +448,11 @@ vp run mutate:all
 vp run mutate:release-gate
 ```
 
+Range-restricted `mutate:file` runs are exploratory only. They use
+`reports/mutation/<module>-partial/`, a separate incremental cache, and no
+break floor. Never copy or rename a partial report into a full-module path:
+the release gate requires complete exact-module evidence.
+
 - Critical PR scope: `formula-parse.ts`, `formula-operand.ts`,
   `formula-ref.ts`; measured break threshold 95.
 - Full scope: one isolated matrix leg for each module, using that module's

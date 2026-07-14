@@ -144,7 +144,12 @@ if (testFiles?.length) {
 // Scope label used to namespace reports/ and the incremental cache so
 // critical/per-file/legacy-full runs never clobber or cross-pollinate each
 // other's state.
-const scopeLabel = isCriticalScope ? "critical" : target ? basename(target, ".ts") : "full";
+const isPartialRange = process.env.MUTATE_PARTIAL_RANGE === "1";
+const scopeLabel = isCriticalScope
+  ? "critical"
+  : target
+    ? `${basename(target, ".ts")}${isPartialRange ? "-partial" : ""}`
+    : "full";
 
 // Measured 2026-07-12 on the exact 3-file critical scope (formula-parse.ts,
 // formula-operand.ts, formula-ref.ts), against the deterministic 23-file
@@ -228,7 +233,11 @@ export default {
   thresholds: {
     high: 90,
     low: 70,
-    break: isCriticalScope ? CRITICAL_BREAK_THRESHOLD : target ? measuredBreakFor(target) : null,
+    break: isCriticalScope
+      ? CRITICAL_BREAK_THRESHOLD
+      : target && !isPartialRange
+        ? measuredBreakFor(target)
+        : null,
   },
 
   // Formula RATE solver can take a few hundred ms, so keep headroom.

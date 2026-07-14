@@ -335,6 +335,8 @@ Modes:
 - `MUTATE_TARGET=js/<module>.ts vp run mutate`: one module with its owned tests.
 - `vp run mutate:all`: all eleven modules sequentially.
 - `vp run mutate:file js/<module>.ts [start-end]`: sandboxed local iteration.
+  A line-range run writes to `<module>-partial`, disables the full-module
+  break floor, and cannot be used as release evidence.
 - `vp run mutate:release-gate`: validate fresh reports and measured baselines
   for every module.
 

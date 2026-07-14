@@ -276,9 +276,9 @@ if (isMain) {
   const relativeTarget = relative(process.cwd(), absolute);
   const mutateSpec = range ? `${relativeTarget}:${range}` : relativeTarget;
 
-  // Incremental file keyed per target so iterating on one file does not
-  // invalidate cached mutants for others.
-  const incrementalFile = `.stryker-tmp/incremental-${basename(absolute)}.json`;
+  // Partial experiments must not overwrite a full-module cache: a range can
+  // contain a different mutant set while sharing the same source bytes.
+  const incrementalFile = `.stryker-tmp/incremental-${basename(absolute, ".ts")}${range ? "-partial" : ""}.json`;
 
   const child = spawn(
     "vp",
@@ -287,6 +287,8 @@ if (isMain) {
       stdio: "inherit",
       env: {
         ...process.env,
+        MUTATE_TARGET: relativeTarget,
+        MUTATE_PARTIAL_RANGE: range ? "1" : "",
         MUTATE_TESTS: tests.join(" "),
       },
     },

@@ -124,6 +124,9 @@ Mutation and formal verification
   coverage. `formatnumber2.ts` and `socialcalcconstants.ts` retain isolated
   command runs so top-level tables and defaults are rebuilt for each mutant.
   Per-module test ownership still comes from `stryker-file.mjs`.
+- Corrected `mutate:file` so targeted runs use the selected module's runner and
+  owned tests. Range-only experiments now use separate `-partial` reports and
+  caches with no break floor, so they cannot overwrite full-module evidence.
 - Recorded honest, run-backed integer floors for every module:
   formula-parse 97, formula-ref 97, formula1 95, formula-operand 94,
   formatnumber2 94, socialcalcconstants 94, socialcalcviewer 71,

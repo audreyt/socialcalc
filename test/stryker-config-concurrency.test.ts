@@ -8,6 +8,7 @@ const CONFIG_ENV_KEYS = [
   "MUTATE_SCOPE",
   "MUTATE_TARGET",
   "MUTATE_TESTS",
+  "MUTATE_PARTIAL_RANGE",
   "SOCIALCALC_MUTATION_RUN",
   "SOCIALCALC_MUTATION_TESTS",
   "STRYKER_CONCURRENCY",
@@ -21,6 +22,10 @@ interface StrykerOptionsShape {
   testRunner: string;
   vitest: { configFile: string; related: boolean };
   commandRunner?: { command: string };
+  htmlReporter: { fileName: string };
+  incrementalFile: string;
+  jsonReporter: { fileName: string };
+  thresholds: { break: number | null };
 }
 
 interface LoadedConfig {
@@ -102,6 +107,18 @@ describe("stryker.config.mjs hybrid runner", () => {
     expect(config.commandRunner).toBeUndefined();
     expect(mutationTestFiles).toContain("test/popup-viewer-coverage.test.ts");
     expect(mutationTestFiles).not.toContain("test/formula-ref-mutation-survivors.test.ts");
+  });
+
+  test("partial ranges use isolated reports and no full-module break floor", async () => {
+    const { config } = await loadConfig({
+      MUTATE_TARGET: "js/formula1.ts",
+      MUTATE_PARTIAL_RANGE: "1",
+    });
+    expect(config.testRunner).toBe("vitest");
+    expect(config.thresholds.break).toBeNull();
+    expect(config.htmlReporter.fileName).toBe("reports/mutation/formula1-partial/index.html");
+    expect(config.jsonReporter.fileName).toBe("reports/mutation/formula1-partial/mutation.json");
+    expect(config.incrementalFile).toBe(".stryker-tmp/incremental-formula1-partial.json");
   });
 
   test.each(["js/formatnumber2.ts", "js/socialcalcconstants.ts"])(
