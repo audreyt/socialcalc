@@ -1,122 +1,324 @@
-# Agent notes
+# SocialCalc maintainer guide
 
-## Source and quality-gate operations
+This file is the operational map for future maintainers and coding agents. Read
+it before changing source, tests, build logic, package metadata, formal facades,
+or release workflows.
 
-SocialCalc's shipping implementation is assembled from global-script TypeScript,
-not ES modules. `build.ts` exports the Vite plugin configured by
-`vite.config.ts`; it owns the ordered source list, prefers sibling `.ts`
-implementations, strips types with Oxc, and emits `dist/SocialCalc.js` plus
-`dist/socialcalc.css`; `vp build --minify` additionally emits
-`dist/SocialCalc.min.js`. Its UMD wrappers are inline strings because they are
-not standalone modules. Edit `js/` and `css/` sources, never generated `dist/`.
+## Non-negotiable invariants
 
-Normal source-only changes use this matrix:
+1. **Shipping code is ordered global-script TypeScript, not ES modules.** The
+   files under `js/` share one factory-local `SocialCalc` namespace. Preserve
+   source order and global bindings.
+2. **Edit sources, never generated output by hand.** `build.ts` owns the bundle.
+   Change `js/*.ts` or `css/socialcalc.css`, run the build, and commit any
+   changed tracked `dist/SocialCalc.js` / `dist/socialcalc.css` output.
+3. **Use Vite+ as the project interface.** Package operations use `vp install`,
+   `vp add`, `vp remove`, and `vp update`; commands use `vp run` / `vp exec`.
+   Do not introduce direct `bun install`, `bun add`, `npm install`, or `bunx`
+   workflows. Bun 1.3.14 is pinned through `devEngines` and managed by Vite+.
+4. **Tests assert behavior.** No tautologies, swallowed errors, source-text
+   checks for runtime behavior, arbitrary sleeps, or mocks that merely replay
+   the implementation. Use the credibility guard.
+5. **Default rendering compatibility is intentional.** The untrusted-content
+   policy is opt-in and off by default. Security fixes must preserve the legacy
+   path unless the change explicitly revises that public contract.
+6. **No warning suppressions.** `vp lint` is type-aware, typechecking, and
+   warning-denying. Fix diagnostics; do not add `oxlint-disable`, `@ts-ignore`,
+   blanket `eslint-disable`, or equivalent debt markers.
+7. **Release evidence must be real.** Coverage and mutation floors come from
+   measured runs. Missing reports, unmeasured baselines, skipped scripts, and
+   placeholder values are failures, not acceptable fallbacks.
+8. **Do not tag or publish casually.** A tag only builds a candidate. npm
+   publishing is a separate, manual, environment-gated workflow dispatch.
 
-| Change                                | Required checks                                                                    |
-| ------------------------------------- | ---------------------------------------------------------------------------------- |
-| Ordinary `js/` or build-source change | `vp build`, `vp run typecheck`, `vp lint`, then the focused Vite+ tests            |
-| Formula-reference rewrite             | The matrix below, plus the focused command tests                                   |
-| LemmaScript facade                    | The facade matrix below; optional full Lean build when sibling repos are available |
+## Repository map and ownership
 
-`vp run typecheck` is the ordinary `tsc --noEmit` compiler check from
-`tsconfig.json`. `vp run typecheck:strict` is a separate narrower check:
-`tsconfig.strict.json` includes only `build.ts` and disallows JavaScript input.
+| Path                                                        | Ownership and role                                                                                    |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `js/*.ts`                                                   | Hand-maintained shipping implementation; global scripts in build order.                               |
+| `js/*.d.ts`                                                 | Hand-maintained public/ambient declarations. Keep runtime and declarations aligned.                   |
+| `css/socialcalc.css`                                        | Hand-maintained stylesheet source.                                                                    |
+| `build.ts`                                                  | Vite plugin, ordered source list, Oxc transforms, sourcemaps, UMD wrappers, CSS/minification outputs. |
+| `vite.config.ts`                                            | Build plugin wiring, Vitest discovery, lint policy, unit coverage floors.                             |
+| `coverage-thresholds.mjs` / `.d.ts`                         | Single coverage contract shared by Vitest and browser-coverage merge.                                 |
+| `dist/SocialCalc.js`                                        | Tracked generated normal UMD bundle. Regenerate; never hand-edit.                                     |
+| `dist/socialcalc.css`                                       | Tracked generated CSS. Regenerate; never hand-edit.                                                   |
+| `dist/SocialCalc.d.ts`                                      | Tracked declaration aggregator referencing public `js/*.d.ts`. Do not delete it.                      |
+| `dist/SocialCalc.min.js`                                    | Generated, Git-ignored release artifact. `prepack` recreates it.                                      |
+| `dist/SocialCalc.js.map`                                    | Coverage-only, Git-ignored sourcemap. Plain builds remove stale copies.                               |
+| `test/`                                                     | Vitest behavior, regression, differential, adversarial, performance, package, and gate tests.         |
+| `test/helpers/socialcalc.ts`                                | Shared UMD loader and fake-DOM foundation. Changes have suite-wide blast radius.                      |
+| `test/fixtures/oracle-3.0.8/`                               | Pinned, offline compatibility oracle. Never fetch or rewrite it during tests.                         |
+| `e2e/`                                                      | Real-browser Playwright fixtures and tests for DOM, layout, interaction, security, and bundle parity. |
+| `scripts/`                                                  | Standalone package, coverage, mutation, credibility, canary, registry, and workflow guards.           |
+| `lemma/*.ts`                                                | Hand-maintained exported facades mirroring selected pure shipping policies.                           |
+| `lemma/*.dfy`                                               | Hand-maintained proof-bearing Dafny models.                                                           |
+| `lemma/*.proof.lean`, `lemma/a1.spec.lean`                  | Hand-maintained Lean proof/support files.                                                             |
+| `lemma/*.dfy.gen`, `lemma/*.types.lean`, `lemma/*.def.lean` | Generated formal artifacts.                                                                           |
+| `stryker-mutation-baseline.json`                            | Measured per-module mutation floors; never invent values.                                             |
+| `stryker-mutation-disposition.json`                         | Source-specific critical-mutant proofs, not an exclusion list.                                        |
+| `docs/security-sink-inventory.md`                           | Enumerated sheet-derived rendering sinks and policy coverage.                                         |
+| `docs/security-disposition.json`                            | Accepted dependency advisories, owners, reachability, and expiry conditions.                          |
+| `.github/workflows/release.yml`                             | Tag candidate DAG and separately gated manual publish path.                                           |
 
-Use `vp install`, `vp add`, `vp remove`, and `vp update` as the package-management
-surface. Vite+ delegates to the Bun version pinned in `devEngines`; direct
-`bun install`/`bun add` commands are not the project workflow.
+## Toolchain and setup
 
-The package ships both normal and minified UMD bundles. `prepack` always runs
-`vp build --minify`; `dist/SocialCalc.min.js` is gitignored and must never be
-hand-maintained. Before a package release, run `vp pm pack --out <temporary.tgz>`
-and verify the archive contains `package/dist/SocialCalc.min.js`.
+- Node consumer floor: `>=22`; CI tests packed tarballs under Node 22 and 24.
+- Bun package manager: 1.3.14, provisioned by Vite+.
+- TypeScript: lockfile resolution, currently 7.0.2.
+- LemmaScript/lsc: 0.5.13.
+- Dafny in CI: 4.9.0.
+- Lean: 4.24.0.
+- Lake solvers: Z3 4.15.4 and cvc5 1.3.1.
 
-`vp lint` is the Vite+ lint/type-aware gate. `vite.config.ts` enables
-`typeAware`, `typeCheck`, and `denyWarnings`, so the bare command performs full
-type-aware linting, typechecks, and fails on warnings. It ignores `dist/**`
-because generated artifacts must be corrected in their `js/` source.
-Do not add `oxlint-disable`, `@ts-ignore`, or other suppressions to hide a
-source diagnostic.
+Release-equivalent install:
 
-`vp test` is the test gate; test files import APIs from `vite-plus/test`.
-`test/helpers/socialcalc.ts` compiles the generated UMD bundle once with
-`vm.Script` and shares one SocialCalc instance within each isolated Vitest file
-worker. Install per-file state in that file's hooks. Do not restore
-cache-busting dynamic imports: Vite transforms each query as a separate copy of
-the ~720 KB bundle and exhausts worker memory.
+```bash
+vp install --frozen-lockfile
+```
 
-## LemmaScript operations
+Ordinary local install after an intentional dependency change:
 
-Shipping `js/*.ts` files are global scripts and cannot be extracted directly by
-LemmaScript. The exported facades in `lemma/` mirror selected pure shipping
-behavior. Dafny and Lean proofs apply to those facades; Vite+ tests cross-check
-facade outputs against shipping oracles. This is a formal boundary around the
-named pure policies, not a proof of the complete global-script or DOM system.
-`LemmaScript-files.txt` is the manifest of the three facade inputs:
+```bash
+vp install
+```
 
-- `lemma/a1.ts`: A1 clamp/coordinate algebra, absolute-reference helpers, and
-  overflow `#REF!` policy — 26 Dafny VCs.
-- `lemma/eval-ops.ts`: `/` and `&` type/error-propagation lattice — 4 VCs.
-- `lemma/lookup-result.ts`: token resolution and exact-before-wildcard-before-
-  miss precedence — 3 VCs. The full pipe-table row scan remains runtime-tested.
+When changing dependencies, use the Vite+ package commands, inspect the lockfile
+movement, run the appropriate audit, and update `docs/security-disposition.json`
+if a documented dependency path or expiry condition changed.
 
-The verified count is **33 VCs (26 + 4 + 3)**. The proof-bearing `.dfy` files
-are checked by Dafny; direct reproduction is:
-`dafny verify lemma/a1.dfy lemma/eval-ops.dfy lemma/lookup-result.dfy`.
+## Build model
 
-### Artifact ownership
+`build.ts` exports the plugin consumed by `vite.config.ts`. It:
 
-| Files                                                       | Ownership                                   |
-| ----------------------------------------------------------- | ------------------------------------------- |
-| `lemma/*.ts`, `LemmaScript-files.txt`                       | Hand-maintained facade sources and manifest |
-| `lemma/*.dfy`                                               | Hand-maintained proof-bearing Dafny models  |
-| `lemma/*.proof.lean`, `lemma/a1.spec.lean`                  | Hand-maintained Lean proof/support files    |
-| `lemma/*.dfy.gen`, `lemma/*.types.lean`, `lemma/*.def.lean` | Generated from facades                      |
+- owns the exact ordered shipping source list;
+- prefers sibling `.ts` implementations;
+- strips types with Oxc without turning files into modules;
+- preserves each source's license preamble;
+- serializes inline UMD open/close wrappers;
+- emits `dist/SocialCalc.js` and `dist/socialcalc.css`;
+- emits `dist/SocialCalc.min.js` when `--minify` is requested; and
+- emits a source map only when `SOCIALCALC_COVERAGE=1`.
 
-After a facade edit, run its focused Vite+ oracle test, then
-`vp run verify:dafny:regen` (three-way merge) and `vp run verify:dafny`.
-Run `vp run verify:lean` for Lean generation/non-empty assertions; run
-`vp run verify:lean:build` only when `../velvet`, `../loom`, and
-`../LemmaScript` are present. `vp run verify:both` is Dafny check plus Lean
-generation/non-empty smoke, not `lake build`. Plain `verify:dafny:gen` creates
-`.dfy.gen` files but does not update checked proof-bearing `.dfy`; never
-routinely copy `.dfy.gen` over `.dfy`.
+The UMD exposes `root.SocialCalc` in a browser and `module.exports` in CommonJS.
+There is deliberately no AMD branch. `package.json` is explicitly CommonJS;
+native ESM uses the default import only.
 
-Prerequisites and pins: package LemmaScript/lsc is `0.5.13`; CI installs Dafny
-`4.9.0`; Lean is `4.24.0`; Lake pins Z3 `4.15.4` and cvc5 `1.3.1` and
-downloads them as needed. Full Lake builds assume sibling checkouts at
-`../velvet` (with `../loom` pulled through its lemma layout) and
-`../LemmaScript`. CI intentionally splits Dafny verification from Lean
-generation and does not run the sibling-dependent Lake build.
+Normal build:
 
-### Facade-to-shipping tests
+```bash
+vp build
+```
 
-- `test/lemma-a1-facade.test.ts` compares A1 helpers with `rcColname`,
-  `crToCoord`, `OffsetFormulaCoords`, and `AdjustFormulaCoords`.
-- `test/lemma-eval-ops-facade.test.ts` compares `/` and `&` policies with
-  `evaluate_parsed_formula`.
-- `test/lemma-lookup-result-facade.test.ts` compares facade table selection with
-  `Formula.LookupResultType`; its complete row scans remain runtime coverage.
+Release/package build:
 
-## TypeScript status
+```bash
+vp build --minify
+```
 
-Core modules currently intended for typechecking include `formatnumber2.ts`,
-`formula-parse.ts`, `formula-operand.ts`, `formula-ref.ts`, `formula1.ts`,
-`socialcalcconstants.ts`, `socialcalc-3.ts`, `socialcalcspreadsheetcontrol.ts`,
-`socialcalctableeditor.ts`, `socialcalcviewer.ts`, and `socialcalcpopup.ts`.
-Keep this status honest: do not claim a finished typed rewrite when compiler or
-lint diagnostics remain. Tighten remaining `any` bridges and public `*.d.ts`
-coverage only when a runtime surface requires it.
+`prepack` always runs the minifying build. Never assume an existing minified
+file is current.
+
+### Build verification traps
+
+- A plausible-looking aggregate coverage report does not prove source-map
+  correctness. `test/build-sourcemap.test.ts` round-trips unique generated
+  anchors to exact source lines and columns.
+- Coverage source-map generated lines must account for preserved license
+  preambles. A per-file preamble offset can produce convincing but wrong
+  attribution.
+- Normal builds must not ship a coverage map/comment.
+- `dist/**` is ignored by lint because diagnostics must be fixed at the source.
+- If the ordered source list changes, verify browser-global and CommonJS bundle
+  shape, package contents, minified parity, sourcemaps, and licenses.
+
+## Required checks by change
+
+Run focused behavior first. Run broader gates after the change works.
+
+| Change                                    | Required checks                                                                                                                      |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Documentation only                        | `vp fmt --check <files>` plus every command/config fact referenced by the edit.                                                      |
+| Ordinary `js/` change                     | `vp build`, focused Vitest file(s), `vp run typecheck`, `vp lint`.                                                                   |
+| Public declaration change                 | `vp run typecheck`, `vp lint`, `vp run test:package-contract`; add a packed-consumer type assertion when the public surface changes. |
+| `build.ts` / source ordering / UMD change | `vp run typecheck:strict`, `vp build`, coverage attribution tests, bundle serialization/parity tests, package contract.              |
+| Formula-reference rewrite                 | The dedicated formula matrix below plus command-level scenarios.                                                                     |
+| Security policy or sink                   | Security unit tests, sink inventory review, Chromium active-content test, full browser suite if DOM behavior changed.                |
+| Popup/editor UI behavior                  | Focused hardening test plus the relevant Playwright interaction.                                                                     |
+| Test helper/fake DOM                      | All directly dependent test files, credibility guard, then the full Vitest suite.                                                    |
+| Coverage config/merge                     | Unit coverage, mapping/guard tests, merged coverage, and a deliberate negative threshold/source-integrity probe.                     |
+| Mutation config/baseline/disposition      | Workflow verifier, disposition verifier/tests, targeted Stryker run when measurement changes, and release-gate validation.           |
+| Lemma facade                              | Focused facade-oracle test, Dafny regeneration/check, Lean generation smoke.                                                         |
+| Package manifest/dependency               | Frozen install, typecheck/lint, package contract, audit, deterministic pack if release-facing.                                       |
+| Workflow                                  | `actionlint` plus the local workflow verifier/script that exercises the changed contract.                                            |
+| Release candidate                         | Full tag DAG: core, merged coverage, full mutation, three browsers, EtherCalc canary, package contract, deterministic pack.          |
+
+Do not run a full Stryker matrix as routine verification for an unrelated edit.
+Do not skip a focused behavior check merely because typecheck or lint is green.
+
+## Tests and credibility
+
+`vp test` runs files importing from `vite-plus/test`. The package script
+`vp run test` builds first; a bare `vp test` expects a current bundle.
+
+`test/helpers/socialcalc.ts` compiles the roughly 720 KB generated UMD once with
+`vm.Script` per isolated Vitest worker and shares one SocialCalc instance within
+that file. Consequences:
+
+- Install and restore mutable globals/callbacks in that file's hooks.
+- Await editor/sheet status transitions; do not assume a scheduled command is
+  synchronous when `editor.busy` may defer it.
+- Do not add query-string cache busting or repeated dynamic bundle imports.
+  Vite treats every query as another transformed bundle copy and can exhaust
+  worker memory.
+- A fake DOM is not evidence for browser HTML entity decoding, layout, native
+  URL properties, focus, selection, keyboard/mouse dispatch, or image events.
+  Use Playwright for those contracts.
+- If a fake-DOM capability is broadly legitimate, add it to the shared shim and
+  replace shim-crash expectations with real behavior. Do not encode missing
+  shim methods as product behavior.
+
+### Behavior-test standard
+
+Every test must fail on a plausible bug and assert an observable contract:
+return value, cell/formula/name state, emitted command, callback, DOM state,
+status transition, error identity, package member, hash, or process result.
+
+Avoid:
+
+- `expect(true).toBe(true)` and equivalent tautologies;
+- empty catches or catches that swallow an assertion;
+- source-text assertions for runtime behavior;
+- `not.toThrow()` when a stronger result/state assertion is available;
+- arbitrary sleeps instead of status/selector polling;
+- expected values copied from the same mutable constant/object under test; and
+- tests whose only purpose is to execute lines without pinning behavior.
+
+Run:
+
+```bash
+vp run check:test-credibility
+```
+
+The guard scans Git-tracked `test/**/*.test.ts` and `e2e/**/*.spec.ts`. A
+code-free cleanup catch is allowed only when comments provide a substantive
+explanation; placeholder `noop`/`TODO` comments are violations.
+
+### Test layers
+
+- **Vitest unit/integration:** pure helpers, sheet commands, save/load,
+  fake-DOM-compatible UI state.
+- **Differential oracle:** candidate vs pinned `socialcalc@3.0.8` for formulas,
+  formatting, commands, references, names, and serialization. Known intended
+  differences must be explicit executable fixtures.
+- **Adversarial/performance:** bounded deep/wide formulas, malformed saves,
+  extreme ranges, cycles, prototype-like keys, idempotency, byte-size budgets,
+  and deliberately loose wall-clock budgets.
+- **Playwright:** Chromium/Firefox/WebKit, normal/minified bundles, real DOM and
+  interaction. Retries are zero, workers are one, and page errors, unhandled
+  rejections, console errors, and unexpected dialogs fail the spec.
+- **Package contract:** fresh tarball in a real `node_modules/socialcalc`
+  consumer layout across CJS, ESM-default, browser-global, declarations, and
+  command/formula/save-load behavior.
+- **EtherCalc canary:** networked, release-only, pinned EtherCalc commit and
+  lockfile. Never add it to ordinary `vp test`.
+
+## Coverage
+
+### Unit/source-attributed mode
+
+```bash
+SOCIALCALC_COVERAGE=1 vp build
+SOCIALCALC_COVERAGE=1 vp test --coverage
+```
+
+The normal script is:
+
+```bash
+vp run test:coverage
+```
+
+The build emits `dist/SocialCalc.js.map` and a `sourceMappingURL` comment.
+Vitest/V8 coverage from the `vm.Script` bundle is remapped to original
+`js/*.ts`. Plain builds remove the stale map and comment.
+
+`vite.config.ts` intentionally does **not** set `coverage.include`. The shipping
+set is established by loaded bundle sources plus the shared exclusions. A wrong
+include glob can silently zero every source or reintroduce non-shipping files.
+
+### Merged unit + Chromium mode
+
+```bash
+vp run test:coverage:merged
+```
+
+This sequence builds coverage/minified artifacts, runs unit coverage, runs the
+mapping and merger guards, collects Chromium V8 coverage, and merges both into
+`coverage-merged/`.
+
+The merger must fail when:
+
+- browser coverage omits the exact source bytes;
+- source bytes differ from the built bundle;
+- converted coverage has zero usable ranges;
+- malformed JSON appears;
+- any merged file/metric is less than unit-only coverage; or
+- a global/per-file floor is missed.
+
+`coverage-thresholds.mjs` is the only threshold/filter source. Do not duplicate
+numbers in `vite.config.ts` or the merger.
+
+Current floors:
+
+- unit global: statements 98, branches 80, functions 98, lines 98;
+- merged global: statements 98, branches 84, functions 98, lines 98;
+- per-file: the seven entries in `thresholdContract.perFile`.
+
+`check:coverage-attribution` protects against the generated bundle being counted
+as a second source and against non-monotonic attribution. Preserve exact-line
+round-trip tests when source line counts shift; tests locate unique anchors
+rather than hard-coding current line numbers.
+
+## Rendering security
+
+The historical default is intentionally trusted-content mode:
+
+```js
+SocialCalc.Callbacks.untrustedContent === false;
+```
+
+When set to `true`:
+
+- raw HTML sinks are escaped or passed through
+  `securityPolicy.sanitizeHtml`;
+- ordinary URLs use `allowedUrlSchemes`;
+- `data:` URLs use only `allowedDataMimeTypes` and are rejected by default;
+- formula-widget `cell_html` rendering is disabled; and
+- rejected content becomes inert escaped text rather than throwing.
+
+`SafeUrlForRender` returns HTML-attribute-escaped content. Its return value is
+for markup parsed as HTML, not for persistence or direct assignment to
+`Element.href` / `.src`. HTML entity decoding is a browser behavior; preserve
+real Chromium tests for entity-encoded schemes and attribute injection.
+
+Security work must update all three surfaces together:
+
+1. `docs/security-sink-inventory.md`;
+2. `test/render-security-policy.test.ts`; and
+3. `e2e/active-content-security.spec.ts` when browser parsing matters.
+
+Keep default-mode byte compatibility tests. Never market the opt-in policy as a
+host-wide sanitizer: hosts still own CSP, callback outputs outside enumerated
+sinks, sanitizer correctness, and trust decisions.
 
 ## Formula-reference compatibility
 
-The pure helpers in `js/formula-ref.ts` (emitted into `dist/SocialCalc.js`) are
-the implementation oracle for `OffsetFormulaCoords`, `AdjustFormulaCoords`,
-`ReplaceFormulaCoords`, and A1 coordinate algebra unless a command-level
-spreadsheet scenario proves the current behavior wrong. `js/socialcalc-3.ts`
-contains command handling and call sites.
+The pure helpers in `js/formula-ref.ts` are the shipping oracle for
+`OffsetFormulaCoords`, `AdjustFormulaCoords`, `ReplaceFormulaCoords`, and A1
+coordinate algebra unless a command-level spreadsheet scenario proves current
+behavior wrong. Command handling lives in `js/socialcalc-3.ts`.
 
-Required formula-reference matrix:
+Required matrix:
 
 ```bash
 vp build
@@ -125,9 +327,11 @@ vp run typecheck
 vp lint
 ```
 
-Use `ScheduleSheetCommands`/`loadSocialCalc()` command-level tests for copy,
-paste, fill, insert, delete, and undo behavior; direct helper tests alone are
-not enough. Relevant tests are:
+Use `ScheduleSheetCommands` / `loadSocialCalc()` scenarios for copy, paste,
+fill, move, insert, delete, sort, and undo. Direct helper tests alone are not
+enough.
+
+Primary evidence:
 
 - `test/fixtures/formula-rewrite-cases.json`
 - `test/formula-rewrite-cases.test.ts`
@@ -140,13 +344,202 @@ Compatibility rules:
 
 - `$` markers lock copy/fill references, not structural insert/delete.
 - Sheet-qualified ranges intentionally keep `sheetref` sticky through `:`.
-- SocialCalc's supported maximum column is `ZZ` (702); shifts past it become
-  `#REF!`, rather than silently clamping to `ZZ`.
-- Rectangular fill series need per-column/per-row increments, interactive
-  `range2` state must be captured before clearing, and delete undo must restore
-  changed named-reference definitions as well as formulas.
-- Treat lowercase/parser-normalization and no-op paste normalization as policy
+- Maximum column is `ZZ` (702); shifts past it become `#REF!`.
+- Rectangular fills increment independently per row/column.
+- Interactive fills capture `range2` before clearing it.
+- Delete undo restores changed named-reference definitions and formulas.
+- Lowercase/parser normalization and no-op paste normalization are policy
   questions until a concrete spreadsheet behavior fails.
 
-Promote model output only as exact fixtures or regression tests with calls,
-commands, and expected outputs; prose alone is not evidence.
+Promote model output only as exact fixtures or regressions with calls,
+commands, and expected outputs. Prose is not evidence.
+
+## LemmaScript operations
+
+Shipping `js/*.ts` files are global scripts and cannot be extracted directly by
+LemmaScript. The exported facades in `lemma/` mirror selected pure shipping
+behavior. Dafny/Lean apply to the facades; Vitest cross-checks them against the
+shipping bundle.
+
+`LemmaScript-files.txt` contains:
+
+- `lemma/a1.ts`: A1 coordinate/clamp algebra, absolute helpers, overflow
+  `#REF!` policy — 26 Dafny VCs;
+- `lemma/eval-ops.ts`: `/` and `&` error/type lattice — 4 VCs;
+- `lemma/lookup-result.ts`: token resolution and exact-before-wildcard-before-
+  miss precedence — 3 VCs. Full row scanning stays runtime-tested.
+
+Total: **33 VCs (26 + 4 + 3)**.
+
+After a facade edit:
+
+1. run its focused `test/lemma-*-facade.test.ts` oracle test;
+2. run `vp run verify:dafny:regen` (three-way merge);
+3. run `vp run verify:dafny`;
+4. run `vp run verify:lean`;
+5. run `vp run verify:lean:build` only when sibling repositories exist.
+
+`vp run verify:both` is Dafny plus Lean generation/non-empty smoke, not a Lake
+build. Plain `verify:dafny:gen` does not update proof-bearing `.dfy` files.
+Never routinely copy `.dfy.gen` over `.dfy`.
+
+Facade oracle mapping:
+
+- A1: `rcColname`, `crToCoord`, `OffsetFormulaCoords`,
+  `AdjustFormulaCoords`;
+- eval ops: shipping `evaluate_parsed_formula`;
+- lookup result: shipping `Formula.LookupResultType` plus complete row-scan
+  runtime tests.
+
+## Mutation testing
+
+Stryker covers all eleven shipping modules with no mutator exclusions.
+`stryker-file.mjs` is the source of truth for target modules and owned test
+subsets. `.github/workflows/mutation.yml` derives its full matrix from
+`ALL_MUTATE_FILES`; do not hand-copy the module list into the workflow.
+
+Modes:
+
+```bash
+MUTATE_SCOPE=critical vp run mutate
+MUTATE_TARGET=js/formula-ref.ts vp run mutate
+vp run mutate:file js/formula-ref.ts 100-220
+vp run mutate:all
+vp run mutate:release-gate
+```
+
+- Critical PR scope: `formula-parse.ts`, `formula-operand.ts`,
+  `formula-ref.ts`; measured break threshold 95.
+- Full scope: one isolated matrix leg for each module, using that module's
+  measured integer floor from `stryker-mutation-baseline.json`.
+- Release enforcement: all eleven fresh reports must exist, identify the exact
+  expected module, contain valid statuses, and meet measured floors.
+- Scheduled/full runs upload every report with matrix `fail-fast: false`.
+- In-place mutation is unsupported. Do not add it back.
+
+Baseline policy: `break = Math.floor(actual measured score)`. Never hand-set a
+floor without a fresh exact-module run. The current scores/floors are documented
+in README and the registry.
+
+Disposition policy:
+
+- A disposition key is the stable `(file, mutatorName, location, replacement)`
+  tuple, never a Stryker run-local numeric ID alone.
+- Justification must prove equivalence/unreachability against current source.
+- Registry entries missing from a fresh report are stale and fail validation.
+- A disposition still present as `Killed` is not stale; the proof remains valid
+  and may document incidental killing by another test.
+- Do not fabricate a tuple from prose or an unavailable report.
+
+Reports live under `reports/mutation/<scope>/` and are generated evidence, not
+shipping artifacts.
+
+## TypeScript and declarations
+
+All eleven core implementation modules are intended to typecheck:
+
+- `formatnumber2.ts`
+- `formula-parse.ts`
+- `formula-operand.ts`
+- `formula-ref.ts`
+- `formula1.ts`
+- `socialcalcconstants.ts`
+- `socialcalc-3.ts`
+- `socialcalcspreadsheetcontrol.ts`
+- `socialcalctableeditor.ts`
+- `socialcalcviewer.ts`
+- `socialcalcpopup.ts`
+
+Keep this statement honest. Tighten `any` bridges when a runtime/public surface
+requires it; do not claim an ES-module rewrite or complete public typing that
+does not exist. Public declaration edits require a packed external TypeScript
+consumer check with `skipLibCheck=false`, which the package contract supplies.
+
+If typechecking suddenly reports thousands of missing `SocialCalc` namespace
+errors, first check that tracked `dist/SocialCalc.d.ts` still exists. It is the
+aggregator that references every ambient `js/*.d.ts` file and is included by
+both tsconfig files.
+
+## Package and release operations
+
+The package ships a pinned 17-member tarball contract. `package.json.files` and
+`scripts/verify-package-contract.mjs` each hold deliberate expected manifests;
+update both in the same reviewed change when the published file set changes.
+Do not derive expected members from the manifest under test.
+
+Run:
+
+```bash
+vp run test:package-contract
+vp pm pack --out /tmp/socialcalc-candidate.tgz
+```
+
+The contract verifies:
+
+- exact members and component/package size ceilings;
+- explicit CommonJS type and Node floor;
+- root CommonJS, deep minified CommonJS, native ESM default import;
+- normal/minified browser globals and API-shape parity;
+- strict external declarations;
+- command, formula, recalc, save, and load behavior; and
+- deterministic metadata/timestamps needed for pack-twice identity.
+
+### Release workflow
+
+A `v*` tag runs five independent required gates:
+
+1. core: typecheck, strict typecheck, lint, build, Vitest, credibility, Dafny,
+   Lean generation, blocking high/critical audit;
+2. merged source coverage;
+3. full eleven-module mutation matrix and release-gate aggregation;
+4. Chromium/Firefox/WebKit Playwright;
+5. pinned EtherCalc candidate-tarball canary.
+
+`package` needs all five. It reruns the package contract, packs twice, rejects
+non-identical archives, retains one, records SHA-256 and npm integrity, archives
+the moderate audit snapshot, and uploads one release artifact.
+
+A tag push **never publishes**. Manual publish requires:
+
+- dispatch against the real tag with input `PUBLISH`;
+- npm Trusted Publisher registration for this repository and `release.yml`;
+- protected `npm-publish` GitHub Environment reviewers; and
+- GitHub Release immutability enabled.
+
+The publish job re-verifies artifact filename/tag/commit/version/hash/integrity,
+stages a draft GitHub Release, verifies the uploaded asset, publishes the exact
+tarball with OIDC provenance, publishes and checks the immutable release, then
+runs a fresh registry-install smoke across CJS root, minified CJS, and ESM
+default delivery.
+
+Do not replace this path with a local `npm publish`. Do not delete the GitHub
+Release if a post-publish immutability check fails: npm publication is already
+irreversible, and deleting the release would destroy evidence.
+
+### Dependency audit
+
+`vp pm audit --level high` is release-blocking. `vp pm audit --level low` is the
+full review input. Two moderate dev-only findings are currently accepted in
+`docs/security-disposition.json`; each has an owner and time/upstream-triggered
+expiry. Re-audit whenever dependencies change or an expiry condition fires.
+No advisory package is included in the npm tarball.
+
+GitHub Actions must remain pinned to exact commit SHAs with version comments,
+least-privilege permissions, explicit timeouts, and release concurrency that is
+not cancelled. Run `actionlint` after workflow edits.
+
+## Commit and worktree hygiene
+
+- Treat unexpected modifications as concurrent user work. Never reset, clean,
+  stash, or commit them without establishing ownership.
+- Commit only the files/hunks required by the current task. Generated bundle
+  changes can coexist with unrelated source work; stage deliberately.
+- Do not use a dirty old branch as release truth. Fetch and compare with
+  `origin/main`; perform release changes in a clean worktree based on the exact
+  intended commit.
+- Regenerate tracked distribution output from the exact source tree being
+  committed. Do not smuggle unrelated generated drift into a focused commit.
+- Keep `Changes.txt`, `README.md`, package version, tag, and release artifact
+  version aligned.
+- Before calling a release ready, verify the gates that the release workflow
+  will actually execute. A local subset is not equivalent to the tag DAG.

@@ -6,75 +6,141 @@ with the original 2007–2010 development log preserved verbatim at the bottom.
 
 
 ==============================================================================
-v3.1.0 — Unreleased (changes since v3.0.8; snapshot 2026-07-12)
+v3.1.0 — 2026-07-14
 ==============================================================================
 
-Toolchain and testing
-- Switched the JavaScript test regime from `bun test` to Vite+ (`vp test`) and
-  its `vite-plus/test` Vitest API, including package scripts, mutation runs,
-  coverage reporting, and CI.
-- Moved the ordered global-script bundle onto `vp build`. `build.ts` is now a
-  Vite plugin that uses Oxc for TypeScript erasure, preserves each source's
-  leading license preamble, emits CSS, and optionally emits
-  `SocialCalc.min.js` for `vp build --minify`.
-- Added `dist/SocialCalc.min.js` to the published package as an additive browser
-  distribution artifact. `prepack` regenerates it with `vp build --minify`;
-  package CI verifies the tarball member. This new distribution surface is a
-  minor-version change.
-- Standardized dependency and script entry points on Vite+: `vp install`,
-  `vp run`, `vp exec`, and `vp node` now drive local development, mutation
-  testing, and both CI workflows. Bun remains the package manager pinned and
-  provisioned by Vite+ rather than a directly invoked project command.
-- The test harness now compiles the UMD bundle once per isolated test worker,
-  preserves host global descriptors around the browser shim, and reuses the
-  SocialCalc instance within a file. This avoids query-expanded bundle copies
-  and keeps the full suite fast and memory-bounded.
+Highlights
+- Added an opt-in rendering policy for untrusted workbooks while preserving
+  byte-compatible legacy rendering by default. Hosts can enable
+  `SocialCalc.Callbacks.untrustedContent`, supply an HTML sanitizer, and
+  configure URL-scheme and `data:` MIME allowlists.
+- Added `dist/SocialCalc.min.js` as a supported browser/CommonJS distribution
+  artifact. The package now declares its CommonJS type explicitly and supports
+  Node.js 22 and 24 as its CI-tested runtime range (`engines.node` is `>=22`).
+- Replaced assumed release quality with executable gates: tarball-first package
+  checks, source-attributed unit and browser coverage, real-browser tests,
+  differential/adversarial/performance tests, test-credibility checks, mutation
+  floors for all eleven shipping modules, a pinned EtherCalc canary, and a
+  deterministic, provenance-aware release pipeline.
+
+Compatibility and runtime fixes
+- `EvaluatePolish` now distinguishes genuine NaN results from numeric overflow
+  before normalizing the computed value, restoring the correct NaN error text.
+- `RecalcLoadedSheet` no longer throws when neither an explicit sheet name nor
+  a queued cache name is available.
+- `InitializeSpreadsheetControl` returns after reporting a missing parent node
+  instead of falling through and assigning the null parent.
+- Popup dispatch now treats an unknown or handler-less type as a no-op, matching
+  the other popup dispatchers instead of throwing from `Popup.Reset`.
+- Popup RGB parsing preserves signs, clamps channels to 0–255, truncates
+  fractional channels consistently, and always emits two hex digits per
+  channel; malformed or non-finite inputs normalize safely.
+- `setemailparameters` now completes the editor busy/deferred-command cycle
+  even when an `EMAILIF`/`EMAILONEDITIF` trigger sends no email or throws, while
+  avoiding a duplicate completion when a real send already supplied one.
 - Removed an undeclared no-op assignment in partial AM/PM format parsing that
-  throws under strict Node execution while preserving the existing token
-  swallowing behavior.
-- Added a Stryker mutation-testing gate with no mutator exclusions
-  (StringLiteral/Regex mutants are real, observable behaviour and are
-  scored, not filtered). All 11 shipping modules are now individually
-  measured (2026-07-13) and registered in `stryker-mutation-baseline.json`
-  with conservative integer-floor break thresholds:
-  formula-parse.ts 97%, formula-ref.ts 97%, formula1.ts 95%,
-  formula-operand.ts 94%, formatnumber2.ts 92%,
-  socialcalcconstants.ts 77% (improved from 19.73% after targeted assertion
-  additions for category-A gaps — doCanonicalizeSheet, cellDataType dispatch
-  table, ConstantsSetClasses/SetImagePrefix guards), socialcalcviewer.ts 71%,
-  socialcalcpopup.ts 60%, socialcalc-3.ts 57%,
-  socialcalcspreadsheetcontrol.ts 54%, socialcalctableeditor.ts 45%.
-  UI and core-engine floors are intentionally honest low-water marks, not
-  targets; the baseline is a ratchet, never a ceiling.
-  `MUTATE_SCOPE=critical` mutates the 3 release-critical formula modules
-  (`formula-parse.ts`, `formula-operand.ts`, `formula-ref.ts`) against a
-  deterministic 23-file test subset — measured 95.00% (1440 mutants, 2026-07-12),
-  break threshold 95. `MUTATE_TARGET` gates one module at a time against its
-  own test subset; `.github/workflows/mutation.yml` runs this as a per-module
-  CI matrix (`mutate-full`). `release-gate` (`scripts/mutate-release-gate.mjs`,
-  `vp run mutate:release-gate`) refuses to pass unless every module has a
-  fresh report and a real measured, passing baseline — no placeholder number is
-  ever treated as evidence. `vp run mutate:all` runs the full 11 sequentially
-  for local use.
+  threw under strict Node execution without contributing to the result.
+- Removed 19 provably unreachable defensive coverage records (16 branch arms
+  and 3 statements): redundant numeric/type checks, repeated clamps,
+  regex-impossible fallbacks, guaranteed `split`/`createElement` fallbacks,
+  and an exhaustive parser tail condition.
 
 Security
-- Added an opt-in, off-by-default policy for rendering sheets from
-  untrusted/third-party sources (`SocialCalc.Callbacks.untrustedContent`,
-  default `false`; legacy default output is unaffected). When enabled, raw
-  HTML cell content, wiki-callback output, and text-custom format templates
-  are HTML-escaped (or passed through an optional host
-  `SocialCalc.Callbacks.securityPolicy.sanitizeHtml` callback), and
-  link/image/data URLs are validated against
-  `securityPolicy.allowedUrlSchemes` / `allowedDataMimeTypes` allowlists. See
-  `docs/security-sink-inventory.md` for the full enumerated sink list and
-  `README.md`'s "Trust boundary and host security" section for usage.
-- Fixed `RecalcLoadedSheet` throwing when neither a sheet name nor a cached
-  `SheetCache.waitingForLoading` name was available (e.g. a `start_wait`
-  timer tick with no host `LoadSheet` callback and nothing queued): it no
-  longer coerces a missing name into `""` and hands it to
-  `NormalizeSheetName`/`AddSheetToCache`, which previously threw a
-  deterministic `TypeError`; it now skips the cache-add step entirely.
+- `SocialCalc.Callbacks.untrustedContent` defaults to `false`, preserving the
+  historical trusted-workbook behavior. When enabled, raw HTML formats,
+  text-custom templates, wiki callback output, and other sheet-derived HTML
+  sinks are escaped or passed through the host's
+  `securityPolicy.sanitizeHtml` callback.
+- URL rendering validates non-`data:` URLs against
+  `securityPolicy.allowedUrlSchemes`; `data:` URLs use the separate
+  `allowedDataMimeTypes` allowlist and are rejected by default.
+- Disabled formula-widget `cell_html` rendering in untrusted-content mode
+  because its sheet-authored event-capable markup cannot be safely escaped
+  field by field.
+- Closed an HTML entity-decoding bypass in `SafeUrlForRender`: entity-encoded
+  scheme characters and quote characters can no longer become active
+  `javascript:` URLs or injected attributes after browser HTML parsing.
+- Added DOM-level Chromium assertions for every enumerated active-content sink
+  and documented the sink inventory in `docs/security-sink-inventory.md`.
 
+Packaging and consumer contract
+- `package.json` now declares `"type": "commonjs"`. Supported entry points are
+  CommonJS `require("socialcalc")`, native ESM default import, browser-global
+  loading of `dist/SocialCalc.js`, and their minified-bundle equivalents.
+  Native ESM named imports remain intentionally unsupported.
+- `prepack` always runs `vp build --minify`; the minified bundle is generated
+  and gitignored rather than hand-maintained.
+- Added `vp run test:package-contract`, which packs a fresh candidate and pins
+  the exact 17-member tarball allowlist. It exercises root CommonJS, deep
+  minified CommonJS, native ESM default import, both browser-global bundles,
+  strict external TypeScript consumption, command/formula/save-load behavior,
+  delivery-path API-shape parity, and component/package size ceilings.
+- Added Node 22/24 packed-tarball compatibility jobs and a release-only
+  EtherCalc canary against a pinned EtherCalc checkout and lockfile.
+
+Build, tests, and coverage
+- Moved the ordered global-script build and test lifecycle to Vite+.
+  `build.ts` is the Vite plugin, strips global-script TypeScript with Oxc,
+  preserves source license preambles, emits the UMD bundle and CSS, and emits
+  the minified UMD when requested.
+- Migrated tests to `vite-plus/test`. The shared harness compiles the generated
+  bundle once per isolated Vitest worker instead of creating query-expanded
+  copies of the approximately 720 KB bundle.
+- Added a pinned, offline `socialcalc@3.0.8` oracle and differential coverage
+  for formulas, formatting, commands, references, names, save/load/export, and
+  headless initialization. Added bounded malformed-input, extreme-range,
+  circular-reference, prototype-key, idempotency, bundle-size, and recalc-time
+  checks.
+- Added deterministic Playwright coverage across Chromium, Firefox, and WebKit
+  for the normal and minified UMD bundles, with page-error, rejection,
+  console-error, and unexpected-dialog failures surfaced directly.
+- Added `check:test-credibility`, which rejects tautological assertions and
+  unexplained code-free catches across tracked Vitest and Playwright tests.
+  Existing coverage-only catches were replaced with observable state, command,
+  callback, DOM, and error assertions.
+- Added original-source sourcemaps for coverage builds and a round-trip
+  attribution guard. Unit coverage enforces global floors of
+  98/80/98/98 (statements/branches/functions/lines); merged Vitest + Chromium
+  coverage enforces 98/84/98/98, with per-file floors for seven critical
+  shipping sources. Coverage JSON is rejected unless its bundle source is
+  present and byte-identical to the built artifact.
+
+Mutation and formal verification
+- Expanded Stryker from seven partially measured files to all eleven shipping
+  `js/*.ts` modules with no mutator exclusions. Pull requests run the three
+  release-critical formula modules; scheduled and release runs use an
+  independently gated per-module matrix.
+- Recorded honest, run-backed integer floors for every module:
+  formula-parse 97, formula-ref 97, formula1 95, formula-operand 94,
+  formatnumber2 92, socialcalcconstants 77, socialcalcviewer 71,
+  socialcalcpopup 60, socialcalc-3 57, socialcalcspreadsheetcontrol 54, and
+  socialcalctableeditor 45. Missing reports or unmeasured baselines fail the
+  release gate rather than receiving placeholder scores.
+- Hardened mutation-report identity/status validation and the critical-mutant
+  disposition registry; equivalent-mutant claims remain explicit,
+  source-specific proofs rather than exclusions.
+- Retained the three LemmaScript facades and their shipping-oracle tests:
+  A1/reference algebra (26 Dafny VCs), evaluation operators (4), and lookup
+  precedence (3), for 33 checked Dafny verification conditions in total.
+
+Release engineering and dependencies
+- Release tags run independent core, merged-coverage, full-mutation,
+  three-browser, and EtherCalc-canary gates. Packaging waits for all five,
+  runs the package contract, packs twice and byte-compares the archives,
+  records SHA-256 and npm integrity, and uploads one exact candidate artifact.
+- Publishing is manual and environment-gated. It re-verifies tag, commit,
+  version, filename, checksum, and integrity; stages and verifies a draft
+  GitHub Release; publishes the exact tarball with npm Trusted Publishing/OIDC
+  provenance; requires the GitHub Release to report immutable; then performs a
+  fresh registry-install command/formula/save-load smoke test.
+- Pinned third-party GitHub Actions to exact commits and applied
+  least-privilege permissions, explicit timeouts, and non-cancelling release
+  concurrency.
+- Reduced the development dependency audit from six findings
+  (2 high, 3 moderate, 1 low) to two accepted moderate, development-only
+  findings. Their dependency paths, reachability, mitigations, ownership, and
+  re-audit conditions are recorded in `docs/security-disposition.json`; no
+  advisory package is shipped in the npm tarball.
 
 ==============================================================================
 v3.0.8 — 2026-07-09
