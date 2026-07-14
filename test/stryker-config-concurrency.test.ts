@@ -9,6 +9,7 @@ const CONFIG_ENV_KEYS = [
   "MUTATE_TARGET",
   "MUTATE_TESTS",
   "MUTATE_PARTIAL_RANGE",
+  "SOCIALCALC_COVERAGE",
   "SOCIALCALC_MUTATION_RUN",
   "SOCIALCALC_MUTATION_TESTS",
   "STRYKER_CONCURRENCY",
@@ -16,6 +17,7 @@ const CONFIG_ENV_KEYS = [
 ] as const;
 
 interface StrykerOptionsShape {
+  buildCommand: string;
   concurrency: number;
   coverageAnalysis: string;
   mutate: string[];
@@ -68,12 +70,13 @@ async function loadConfig(
 }
 
 describe("stryker.config.mjs hybrid runner", () => {
-  test("legacy all-files scope uses the rebuilding command runner", async () => {
+  test("legacy all-files scope builds once before using the command runner", async () => {
     const { config, mutationRun, mutationTestFiles } = await loadConfig({});
     expect(config).toMatchObject({
+      buildCommand: "vp build",
       testRunner: "command",
       coverageAnalysis: "off",
-      commandRunner: { command: expect.stringMatching(/^vp build && vp test --maxWorkers=2$/) },
+      commandRunner: { command: "vp test --maxWorkers=2" },
       concurrency: 4,
     });
     expect(mutationRun).toBe("1");
@@ -109,25 +112,36 @@ describe("stryker.config.mjs hybrid runner", () => {
     expect(mutationTestFiles).not.toContain("test/formula-ref-mutation-survivors.test.ts");
   });
 
-  test("partial ranges use isolated reports and no full-module break floor", async () => {
+  test("partial ranges use isolated reports, caches, and no full-module floor", async () => {
     const { config } = await loadConfig({
       MUTATE_TARGET: "js/formula1.ts",
-      MUTATE_PARTIAL_RANGE: "1",
+      MUTATE_PARTIAL_RANGE: "100-220",
+    });
+    const { config: otherRange } = await loadConfig({
+      MUTATE_TARGET: "js/formula1.ts",
+      MUTATE_PARTIAL_RANGE: "221-240",
     });
     expect(config.testRunner).toBe("vitest");
     expect(config.thresholds.break).toBeNull();
     expect(config.htmlReporter.fileName).toBe("reports/mutation/formula1-partial/index.html");
     expect(config.jsonReporter.fileName).toBe("reports/mutation/formula1-partial/mutation.json");
-    expect(config.incrementalFile).toBe(".stryker-tmp/incremental-formula1-partial.json");
+    expect(config.incrementalFile).toBe(
+      ".stryker-tmp/incremental-formula1-partial-100-220-build-once-v1.json",
+    );
+    expect(otherRange.incrementalFile).toBe(
+      ".stryker-tmp/incremental-formula1-partial-221-240-build-once-v1.json",
+    );
+    expect(otherRange.incrementalFile).not.toBe(config.incrementalFile);
   });
 
   test.each(["js/formatnumber2.ts", "js/socialcalcconstants.ts"])(
-    "%s rebuilds its top-level initializers for every mutant",
+    "%s re-evaluates its top-level initializers in a fresh test process",
     async (mutationTarget) => {
       const { config } = await loadConfig({ MUTATE_TARGET: mutationTarget });
+      expect(config.buildCommand).toBe("vp build");
       expect(config.testRunner).toBe("command");
       expect(config.coverageAnalysis).toBe("off");
-      expect(config.commandRunner?.command).toMatch(/^vp build && vp test run --maxWorkers=2 /);
+      expect(config.commandRunner?.command).toMatch(/^vp test run --maxWorkers=2 /);
     },
   );
 

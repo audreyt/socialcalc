@@ -121,18 +121,25 @@ Mutation and formal verification
   release-critical formula modules; scheduled and release runs use an
   independently gated per-module matrix.
 - Moved runtime mutation testing to Stryker's native Vitest runner and per-test
-  coverage. `formatnumber2.ts` and `socialcalcconstants.ts` retain isolated
-  command runs so top-level tables and defaults are rebuilt for each mutant.
-  Per-module test ownership still comes from `stryker-file.mjs`.
+  coverage, with one all-mutant UMD build per sandbox. `formatnumber2.ts` and
+  `socialcalcconstants.ts` retain isolated command runs so each active mutant
+  re-evaluates top-level tables and defaults in a fresh process without racing
+  on shared generated output. Per-module test ownership still comes from
+  `stryker-file.mjs`.
 - Corrected `mutate:file` so targeted runs use the selected module's runner and
-  owned tests. Range-only experiments now use separate `-partial` reports and
-  caches with no break floor, so they cannot overwrite full-module evidence.
+  owned tests. Range-only experiments use separate `-partial` reports and
+  exact-range, versioned caches with no break floor, so they cannot overwrite
+  full-module evidence or reuse an incompatible mutant set or runner lifecycle.
+- Extended `socialcalcconstants.ts` parity coverage to every remaining
+  string-valued data leaf and both image-prefix suffix directions. Its fresh
+  exact-module score reached 99.85%; an exact-range follow-up killed the final
+  old-prefix survivor.
 - Recorded honest, run-backed integer floors for every module:
-  formula-parse 97, formula-ref 97, formula1 95, formula-operand 94,
-  formatnumber2 94, socialcalcconstants 94, socialcalcviewer 71,
-  socialcalcpopup 61, socialcalc-3 57, socialcalcspreadsheetcontrol 53, and
-  socialcalctableeditor 45. Missing reports or unmeasured baselines fail the
-  release gate rather than receiving placeholder scores.
+  socialcalcconstants 99, formula-parse 97, formula-ref 97, formula1 95,
+  formula-operand 94, formatnumber2 93, socialcalcviewer 71, socialcalcpopup 61,
+  socialcalc-3 57, socialcalcspreadsheetcontrol 53, and socialcalctableeditor 45.
+  Missing reports or unmeasured baselines fail the release gate rather than
+  receiving placeholder scores.
 - Hardened mutation-report identity/status validation and the critical-mutant
   disposition registry; equivalent-mutant claims remain explicit,
   source-specific proofs rather than exclusions.

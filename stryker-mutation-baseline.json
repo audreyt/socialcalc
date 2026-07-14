@@ -3,20 +3,20 @@
   "$floorPolicy": "break is always the conservative integer floor of the actual measured score (Math.floor), never rounded up and never hand-inflated. Example: 94.21% → break:94, 53.80% → break:53. This ensures a score regression of less than 1% passes the gate while any real regression larger than 1pp triggers a failure, and avoids any ambiguity about rounding direction.",
   "$measurementHistory": {
     "2026-07-13": "All 11 modules measured in isolated per-module Stryker sandboxes (MUTATE_TARGET=js/<module>.ts vp exec stryker run). socialcalcconstants.ts improved from 19.73% (pre-assertion-hardening) to 77.91% after targeted assertion additions for the key category-A gaps (doCanonicalizeSheet boolean, cellDataType dispatch table, ConstantsSetClasses/SetImagePrefix guards). UI modules (socialcalctableeditor, socialcalcspreadsheetcontrol, socialcalcpopup, socialcalcviewer) and socialcalc-3 carry intentionally low floors reflecting current test coverage — these are honest measured baselines, not targets.",
-    "2026-07-14": "Remeasured exact-module reports after adopting the hybrid runner. Runtime-heavy modules use native Vitest per-test coverage; formatnumber2.ts and socialcalcconstants.ts retain isolated command runs because their top-level initializers must be rebuilt for each active mutant. Current-source command reports raised both initializer-heavy floors to 94. Fresh native reports raised socialcalcpopup.ts to 61 and set socialcalcspreadsheetcontrol.ts to 53; the other completed floors were unchanged. formula1.ts retained its prior measured floor pending a clean native run after its bounded adversarial timeout is widened under mutation load."
+    "2026-07-14": "Adopted the hybrid runner, then corrected its command path to build one all-mutant UMD per sandbox. Rebuilding per mutant had raced on shared output and produced unstable false kills. Two fresh exact formatnumber2.ts runs were status-identical at 93.78%. A fresh exact socialcalcconstants.ts run reached 99.85% after recursive oracle-backed data assertions; a targeted exact-range run then killed its final old-prefix survivor. Registered conservative integer floors are 93 and 99 respectively. Fresh native reports raised socialcalcpopup.ts to 61 and set socialcalcspreadsheetcontrol.ts to 53; other native-runner floors were unchanged."
   },
   "modules": {
     "js/formatnumber2.ts": {
       "measured": true,
-      "break": 94,
+      "break": 93,
       "measuredAt": "2026-07-14",
-      "score": "94.21"
+      "score": "93.78"
     },
     "js/socialcalcconstants.ts": {
       "measured": true,
-      "break": 94,
+      "break": 99,
       "measuredAt": "2026-07-14",
-      "score": "94.26"
+      "score": "99.85"
     },
     "js/formula1.ts": {
       "measured": true,

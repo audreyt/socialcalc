@@ -11,8 +11,9 @@ const mutationTestFiles = process.env.SOCIALCALC_MUTATION_TESTS
   ? (JSON.parse(process.env.SOCIALCALC_MUTATION_TESTS) as string[])
   : undefined;
 
+const mutationRun = process.env.SOCIALCALC_MUTATION_RUN === "1";
 const focusedTestRun =
-  process.env.SOCIALCALC_MUTATION_RUN === "1" ||
+  mutationRun ||
   process.argv.some(
     (argument) =>
       argument === "-t" ||
@@ -95,7 +96,7 @@ export default defineConfig({
             ),
           },
         },
-    globalSetup: istanbulMode ? ["./test/global-setup.ts"] : undefined,
+    globalSetup: istanbulMode && !mutationRun ? ["./test/global-setup.ts"] : undefined,
     include: mutationTestFiles ?? ["test/**/*.test.ts"],
   },
 });

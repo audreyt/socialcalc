@@ -13,14 +13,13 @@
 // the oracle's frozen value and the comparison fails — exactly the same mechanism
 // the existing test/differential/*.test.ts corpus already relies on for parity.
 //
-// Empirically confirmed (scripted diff, not assumed) that every key in every block
-// asserted below is byte-identical between the current candidate and the oracle: the
-// literal Constants data table has not changed since 3.0.8, only some of the
-// *functions* around it have (see socialcalcconstants-mutation-survivors.test.ts's
-// ConstantsSetImagePrefix coverage). Comparisons are scoped per named block (matching
-// this repo's differential-testing convention of specific observable fields rather
-// than one opaque whole-object diff) so a genuine future divergence in one block
-// fails with a localized, readable key list instead of a giant unreadable dump.
+// Empirically confirmed (scripted diff, not assumed) that every string-valued
+// data leaf asserted below is byte-identical between the current candidate and
+// oracle: the Constants data table has not changed since 3.0.8, only some of the
+// *functions* around it have (see socialcalcconstants-mutation-survivors.test.ts).
+// Named prefix groups retain focused assertions for readable failures; a
+// path-keyed recursive comparison covers the remaining nested/default strings
+// without turning the check into an opaque whole-object snapshot.
 //
 // doCanonicalizeSheet, cellDataType, and ConstantsDefaultClasses are pinned directly
 // (with behavioral proof for doCanonicalizeSheet) in
@@ -40,6 +39,49 @@ function pickByPrefix(source: unknown, prefix: string): Record<string, unknown> 
   }
   return picked;
 }
+
+const NAMED_STRING_PREFIXES = [
+  "SCFormat",
+  "s_parseerr",
+  "s_calcerr",
+  "s_FormatNumber_",
+  "s_loc_",
+  "s_fdef_",
+  "s_farg_",
+] as const;
+
+function pickRemainingStringLeaves(source: unknown): Record<string, string> {
+  const picked: Record<string, string> = {};
+
+  function visit(value: unknown, path: string): void {
+    if (typeof value === "string") {
+      if (!NAMED_STRING_PREFIXES.some((prefix) => path.startsWith(prefix))) {
+        picked[path] = value;
+      }
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => visit(item, `${path}[${index}]`));
+      return;
+    }
+    if (typeof value === "object" && value !== null) {
+      for (const [key, item] of Object.entries(value)) {
+        visit(item, path ? `${path}.${key}` : key);
+      }
+    }
+  }
+
+  visit(source, "");
+  return picked;
+}
+
+test("remaining Constants string data leaves match the oracle 3.0.8 baseline byte-for-byte", async () => {
+  const SC = await loadSocialCalc();
+  const Oracle = loadOracleSocialCalc();
+  const candidate = pickRemainingStringLeaves(SC.Constants);
+  expect(Object.keys(candidate).length).toBe(188);
+  expect(candidate).toEqual(pickRemainingStringLeaves(Oracle.Constants));
+});
 
 test("SCFormat* settings-dropdown data strings match the oracle 3.0.8 baseline byte-for-byte", async () => {
   const SC = await loadSocialCalc();

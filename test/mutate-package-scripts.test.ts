@@ -75,10 +75,12 @@ describe("mutate package scripts for vp run", () => {
         .trimEnd()
         .split("\n");
       expect(target).toBe("js/formula1.ts");
-      expect(partialRange).toBe("1");
+      expect(partialRange).toBe("1815-1821");
       expect(tests).toContain("test/formula-coverage.test.ts");
       expect(args).toContain("--mutate js/formula1.ts:1815-1821");
-      expect(args).toContain("--incrementalFile .stryker-tmp/incremental-formula1-partial.json");
+      expect(args).toContain(
+        "--incrementalFile .stryker-tmp/incremental-formula1-partial-1815-1821-build-once-v1.json",
+      );
     } finally {
       rmSync(temp, { force: true, recursive: true });
     }

@@ -321,12 +321,13 @@ Stryker mutates all eleven shipping modules with no mutator exclusions.
 String, regex, CSS, and format-table mutations remain observable behavior and
 are scored rather than filtered.
 
-The native Stryker Vitest runner keeps isolated workers alive and uses per-test
-coverage for runtime mutants. `formatnumber2.ts` and
-`socialcalcconstants.ts` use isolated command runs so their top-level tables
-and defaults are rebuilt with each active mutant. Because shipping sources are
-concatenated into a `vm.Script` bundle, source-to-test selection comes from
-`stryker-file.mjs`, not Vitest's import graph.
+Stryker builds one all-mutant UMD in each sandbox. The native Vitest runner
+keeps isolated workers alive and uses per-test coverage for runtime mutants.
+`formatnumber2.ts` and `socialcalcconstants.ts` use isolated command runs so
+each active mutant re-evaluates their top-level tables and defaults in a fresh
+test process without rebuilding or racing on the bundle. Because shipping
+sources are concatenated into a `vm.Script` bundle, source-to-test selection
+comes from `stryker-file.mjs`, not Vitest's import graph.
 
 Modes:
 
@@ -335,22 +336,22 @@ Modes:
 - `MUTATE_TARGET=js/<module>.ts vp run mutate`: one module with its owned tests.
 - `vp run mutate:all`: all eleven modules sequentially.
 - `vp run mutate:file js/<module>.ts [start-end]`: sandboxed local iteration.
-  A line-range run writes to `<module>-partial`, disables the full-module
-  break floor, and cannot be used as release evidence.
+  A line-range run writes to `<module>-partial`, uses an exact-range cache,
+  disables the full-module break floor, and cannot be release evidence.
 - `vp run mutate:release-gate`: validate fresh reports and measured baselines
   for every module.
 
-Current measured baselines (latest exact-module run on 2026-07-13 or
+Current registered baselines (exact-module measurements on 2026-07-13 or
 2026-07-14):
 
 | Module                            |  Score | Floor |
 | --------------------------------- | -----: | ----: |
+| `socialcalcconstants.ts`          | 99.85% |    99 |
 | `formula-parse.ts`                | 97.80% |    97 |
 | `formula-ref.ts`                  | 97.22% |    97 |
 | `formula1.ts`                     | 95.64% |    95 |
 | `formula-operand.ts`              | 94.36% |    94 |
-| `socialcalcconstants.ts`          | 94.26% |    94 |
-| `formatnumber2.ts`                | 94.21% |    94 |
+| `formatnumber2.ts`                | 93.78% |    93 |
 | `socialcalcviewer.ts`             | 71.88% |    71 |
 | `socialcalcpopup.ts`              | 61.90% |    61 |
 | `socialcalc-3.ts`                 | 57.51% |    57 |

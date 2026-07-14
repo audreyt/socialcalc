@@ -2,7 +2,7 @@
 //
 // Four modes, selected by env var:
 //
-// 1. Per-file full-scope run (`MUTATE_TARGET=js/<source>.ts bun run mutate`)
+// 1. Per-file full-scope run (`MUTATE_TARGET=js/<source>.ts vp run mutate`)
 //    — mutates exactly one module from ALL_MUTATE_FILES against the FULL
 //    test subset stryker-file.mjs's `testsByFile` maps to that module (not
 //    a stripped-down slice — the same set `vp run mutate:file` would use).
@@ -18,7 +18,7 @@
 //    stryker-mutation-baseline.json: a module with no recorded, actually-
 //    measured baseline gets `break: null` (report-only — Stryker still
 //    runs and scores it, it just can't fail the build on a number nobody
-//    ever measured). Only after a real `MUTATE_TARGET=<module> bun run
+//    ever measured). Only after a real `MUTATE_TARGET=<module> vp run
 //    mutate` run establishes a floor does that module's registry entry
 //    flip to `measured: true` with a concrete number, and only then does
 //    it gate. scripts/mutate-release-gate.mjs (run in CI on a `v*` tag
@@ -28,7 +28,7 @@
 //    a regressed one; 80 is never treated as if it were evidence. Reports
 //    go to `reports/mutation/<module-basename>/`.
 //
-// 2. Focused critical-baseline run (`MUTATE_SCOPE=critical bun run mutate`)
+// 2. Focused critical-baseline run (`MUTATE_SCOPE=critical vp run mutate`)
 //    — mutates only CRITICAL_FILES (the 3 modules with the tightest
 //    correctness bar: formula lexer/parser, operand-stack coercions, and
 //    formula-reference rewrite algebra) against the deterministic union of
@@ -40,15 +40,16 @@
 //    the measurement note, never a guess). Reports go to
 //    `reports/mutation/critical/`.
 //
-// 3. Per-file sandboxed iteration (`vp run mutate:file <path>`) — stryker-file.mjs
-//    sets MUTATE_TESTS to the subset that exercises the target module. The
-//    sandbox is intentional: source mutations must never touch the caller's
-//    working tree or leak between test processes.
+// 3. Per-file sandboxed iteration (`vp run mutate:file <path>`) —
+//    stryker-file.mjs forwards MUTATE_TARGET and MUTATE_TESTS so the selected
+//    module uses the same runner and owned tests as a matrix leg. A line range
+//    also sets MUTATE_PARTIAL_RANGE, which moves reports and incremental state
+//    under `<module>-partial` and disables the full-module break floor.
 //
 //    No inPlace mode is supported. In-place mutation is unsafe for this
 //    concatenated global-script build and is prohibited by the mutation gate.
 //
-// 4. Legacy full-sandbox run (`bun run mutate`, no MUTATE_SCOPE/
+// 4. Legacy full-sandbox run (`vp run mutate`, no MUTATE_SCOPE/
 //    MUTATE_TARGET) — mutates every file in ALL_MUTATE_FILES in one
 //    sandboxed process against the whole Vitest suite. Report-only
 //    (`break: null`): an 11-module combined run can't honestly map to any
@@ -62,7 +63,7 @@
 import { readFileSync } from "node:fs";
 import { basename, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { testsByFile, ALL_MUTATE_FILES } from "./stryker-file.mjs";
+import { testsByFile, ALL_MUTATE_FILES, mutationIncrementalFile } from "./stryker-file.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // Per-module measured baseline registry — see its own $description for the
@@ -141,15 +142,12 @@ if (testFiles?.length) {
   process.env.SOCIALCALC_MUTATION_TESTS = JSON.stringify(testFiles);
 }
 
-// Scope label used to namespace reports/ and the incremental cache so
-// critical/per-file/legacy-full runs never clobber or cross-pollinate each
-// other's state.
-const isPartialRange = process.env.MUTATE_PARTIAL_RANGE === "1";
-const scopeLabel = isCriticalScope
-  ? "critical"
-  : target
-    ? `${basename(target, ".ts")}${isPartialRange ? "-partial" : ""}`
-    : "full";
+// Scope labels namespace reports while the exact range additionally namespaces
+// incremental state, so different partial mutant sets cannot cross-pollinate.
+const partialRange = process.env.MUTATE_PARTIAL_RANGE?.trim() || undefined;
+const isPartialRange = partialRange !== undefined;
+const cacheScope = isCriticalScope ? "critical" : target ? basename(target, ".ts") : "full";
+const scopeLabel = `${cacheScope}${isPartialRange ? "-partial" : ""}`;
 
 // Measured 2026-07-12 on the exact 3-file critical scope (formula-parse.ts,
 // formula-operand.ts, formula-ref.ts), against the deterministic 23-file
@@ -188,17 +186,21 @@ function measuredBreakFor(file) {
 /** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 export default {
   mutate,
+  // Build the all-mutant switch bundle once after Stryker instruments the
+  // sandbox. Per-mutant test processes only read it; rebuilding concurrently
+  // raced on dist/SocialCalc.instrumented.js and made kill results unstable.
+  buildCommand: "vp build",
 
   // The native runner keeps one Vitest worker alive and uses per-test coverage
   // for runtime mutants. formatnumber2.ts and socialcalcconstants.ts retain the
-  // command runner because their top-level tables/defaults must be rebuilt and
-  // re-evaluated with each active mutant; switching a mutant after bundle
+  // command runner because each active mutant must re-evaluate their top-level
+  // tables/defaults in a fresh process; switching a mutant after bundle
   // initialization produces false survivors. The legacy all-files mode also
   // uses the command runner because it includes those modules.
   testRunner: useCommandRunner ? "command" : "vitest",
   commandRunner: useCommandRunner
     ? {
-        command: `vp build && ${testCommand}`,
+        command: testCommand,
       }
     : undefined,
   vitest: {
@@ -245,7 +247,7 @@ export default {
   timeoutFactor: 2,
 
   incremental: true,
-  incrementalFile: `.stryker-tmp/incremental-${scopeLabel}.json`,
+  incrementalFile: mutationIncrementalFile(cacheScope, partialRange),
   tempDirName: ".stryker-tmp",
 
   logLevel: "info",

@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { Script } from "node:vm";
 
 const bundleFile =
-  process.env.SOCIALCALC_COVERAGE === "1"
+  process.env.SOCIALCALC_COVERAGE === "1" || process.env.SOCIALCALC_MUTATION_RUN === "1"
     ? "../../dist/SocialCalc.js"
     : "../../dist/SocialCalc.instrumented.js";
 const bundlePath = fileURLToPath(new URL(bundleFile, import.meta.url));

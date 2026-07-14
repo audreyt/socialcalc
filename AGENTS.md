@@ -427,16 +427,18 @@ Stryker covers all eleven shipping modules with no mutator exclusions.
 subsets. `.github/workflows/mutation.yml` derives its full matrix from
 `ALL_MUTATE_FILES`; do not hand-copy the module list into the workflow.
 
-The native `@stryker-mutator/vitest-runner` is required for runtime mutants; it
-keeps isolated workers alive and selects tests with per-test mutation coverage.
-`formatnumber2.ts` and `socialcalcconstants.ts` deliberately retain the command
-runner because their top-level tables/defaults must be rebuilt with each active
-mutant. Do not add other modules to the command-runner set without evidence:
-rerunning the full owned subset per mutant pushes large modules beyond the
-release timeout. Since shipping sources are concatenated into a `vm.Script`
-bundle, `vitest.related` must remain `false`; `stryker.config.mjs` forwards the
-owned test list through `SOCIALCALC_MUTATION_TESTS` for `vite.config.ts` to use
-as `test.include`.
+Stryker builds one all-mutant UMD after instrumenting each sandbox. The native
+`@stryker-mutator/vitest-runner` keeps isolated workers alive and selects tests
+with per-test mutation coverage. `formatnumber2.ts` and
+`socialcalcconstants.ts` deliberately retain the command runner so every active
+mutant re-evaluates their top-level tables/defaults in a fresh process. Never
+rebuild the shared bundle per mutant: concurrent command runners race on the
+same output and produce false kill results. Do not add other modules to the
+command-runner set without evidence; rerunning the full owned subset per mutant
+pushes large modules toward the release timeout. Since shipping sources are
+concatenated into a `vm.Script` bundle, `vitest.related` must remain `false`;
+`stryker.config.mjs` forwards the owned test list through
+`SOCIALCALC_MUTATION_TESTS` for `vite.config.ts` to use as `test.include`.
 
 Modes:
 
@@ -449,9 +451,12 @@ vp run mutate:release-gate
 ```
 
 Range-restricted `mutate:file` runs are exploratory only. They use
-`reports/mutation/<module>-partial/`, a separate incremental cache, and no
+`reports/mutation/<module>-partial/`, an exact-range incremental cache, and no
 break floor. Never copy or rename a partial report into a full-module path:
 the release gate requires complete exact-module evidence.
+`MUTATION_CACHE_SCHEMA` in `stryker-file.mjs` namespaces incremental results;
+bump it whenever runner/build lifecycle changes are not represented by source
+or test diffs.
 
 - Critical PR scope: `formula-parse.ts`, `formula-operand.ts`,
   `formula-ref.ts`; measured break threshold 95.

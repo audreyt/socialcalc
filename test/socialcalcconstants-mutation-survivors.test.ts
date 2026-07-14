@@ -287,11 +287,14 @@ test("ConstantsSetImagePrefix hyphen-form pass only fires when the old prefix ac
   // *already-rewritten* string on the same substring and further corrupt it.
   SC.Constants.defaultImagePrefix = "ab";
   (SC.Constants as Record<string, unknown>).__testMarker = "Xab";
+  (SC.Constants as Record<string, unknown>).__hyphenMarker = "a-suffix";
   try {
     SC.ConstantsSetImagePrefix("abab");
     expect((SC.Constants as Record<string, unknown>).__testMarker).toBe("Xabab");
+    expect((SC.Constants as Record<string, unknown>).__hyphenMarker).toBe("a-suffix");
   } finally {
     delete (SC.Constants as Record<string, unknown>).__testMarker;
+    delete (SC.Constants as Record<string, unknown>).__hyphenMarker;
   }
 });
 
@@ -332,6 +335,20 @@ test("ConstantsSetImagePrefix hyphen-form pass fires for a synthetic non-default
   try {
     SC.ConstantsSetImagePrefix("bb_");
     expect((SC.Constants as Record<string, unknown>).__testMarker).toBe("bb-suffix");
+  } finally {
+    delete (SC.Constants as Record<string, unknown>).__testMarker;
+  }
+});
+
+test("ConstantsSetImagePrefix preserves a new prefix without a trailing underscore", async () => {
+  const SC = await loadSocialCalc();
+
+  SC.Constants.defaultImagePrefix = "aa_";
+  (SC.Constants as Record<string, unknown>).__testMarker = "url(aa-lock.gif)";
+  try {
+    SC.ConstantsSetImagePrefix("cdn/path");
+    expect((SC.Constants as Record<string, unknown>).__testMarker).toBe("url(cdn/pathlock.gif)");
+    expect(SC.Constants.defaultImagePrefix).toBe("cdn/path");
   } finally {
     delete (SC.Constants as Record<string, unknown>).__testMarker;
   }

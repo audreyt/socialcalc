@@ -57,14 +57,14 @@ function killedReport(file: string, count: number) {
 }
 
 describe("validMeasuredBaseline", () => {
-  test("accepts measured:true with a finite in-range break", () => {
-    expect(validMeasuredBaseline({ measured: true, break: 90 })).toBe(true);
-    expect(validMeasuredBaseline({ measured: true, break: 0 })).toBe(true);
-    expect(validMeasuredBaseline({ measured: true, break: 100 })).toBe(true);
+  test("accepts measured:true with a finite in-range break and measured mutant count", () => {
+    expect(validMeasuredBaseline({ measured: true, break: 90, minimumMutants: 1 })).toBe(true);
+    expect(validMeasuredBaseline({ measured: true, break: 0, minimumMutants: 2 })).toBe(true);
+    expect(validMeasuredBaseline({ measured: true, break: 100, minimumMutants: 3 })).toBe(true);
   });
 
   test("rejects measured:false", () => {
-    expect(validMeasuredBaseline({ measured: false, break: 90 })).toBe(false);
+    expect(validMeasuredBaseline({ measured: false, break: 90, minimumMutants: 1 })).toBe(false);
   });
 
   test("rejects a missing entry entirely", () => {
@@ -72,17 +72,32 @@ describe("validMeasuredBaseline", () => {
   });
 
   test("rejects a non-numeric break", () => {
-    expect(validMeasuredBaseline({ measured: true, break: "90" })).toBe(false);
+    expect(validMeasuredBaseline({ measured: true, break: "90", minimumMutants: 1 })).toBe(false);
   });
 
   test("rejects a non-finite break (NaN/Infinity)", () => {
-    expect(validMeasuredBaseline({ measured: true, break: Number.NaN })).toBe(false);
-    expect(validMeasuredBaseline({ measured: true, break: Number.POSITIVE_INFINITY })).toBe(false);
+    expect(validMeasuredBaseline({ measured: true, break: Number.NaN, minimumMutants: 1 })).toBe(
+      false,
+    );
+    expect(
+      validMeasuredBaseline({
+        measured: true,
+        break: Number.POSITIVE_INFINITY,
+        minimumMutants: 1,
+      }),
+    ).toBe(false);
   });
 
   test("rejects a break outside 0..100", () => {
-    expect(validMeasuredBaseline({ measured: true, break: -1 })).toBe(false);
-    expect(validMeasuredBaseline({ measured: true, break: 101 })).toBe(false);
+    expect(validMeasuredBaseline({ measured: true, break: -1, minimumMutants: 1 })).toBe(false);
+    expect(validMeasuredBaseline({ measured: true, break: 101, minimumMutants: 1 })).toBe(false);
+  });
+
+  test("rejects a missing, zero, negative, or non-integer mutant count", () => {
+    expect(validMeasuredBaseline({ measured: true, break: 90 })).toBe(false);
+    expect(validMeasuredBaseline({ measured: true, break: 90, minimumMutants: 0 })).toBe(false);
+    expect(validMeasuredBaseline({ measured: true, break: 90, minimumMutants: -1 })).toBe(false);
+    expect(validMeasuredBaseline({ measured: true, break: 90, minimumMutants: 1.5 })).toBe(false);
   });
 });
 
@@ -344,9 +359,12 @@ describe("evaluateAllModules (composed loop, real filesystem, isolated temp cwd)
     writeFileSync(join(dir, "mutation.json"), asText ?? JSON.stringify(json));
   }
 
-  function fullMeasuredBaseline(files: string[], breakScore = 90) {
-    const modules: Record<string, { measured: boolean; break: number }> = {};
-    for (const f of files) modules[f] = { measured: true, break: breakScore };
+  function fullMeasuredBaseline(files: string[], breakScore = 90, minimumMutants = 10) {
+    const modules: Record<string, { measured: boolean; break: number; minimumMutants: number }> =
+      {};
+    for (const f of files) {
+      modules[f] = { measured: true, break: breakScore, minimumMutants };
+    }
     return modules;
   }
 
@@ -371,12 +389,44 @@ describe("evaluateAllModules (composed loop, real filesystem, isolated temp cwd)
     });
   });
 
+  test("PARTIAL REPORT — a smaller mutant set cannot satisfy full-module evidence", () => {
+    withTempCwd((cwd) => {
+      const files = ["js/formula-parse.ts"];
+      plantReport(cwd, "formula-parse", killedReport("js/formula-parse.ts", 2));
+      const { rows, failed } = evaluateAllModules(files, fullMeasuredBaseline(files, 90, 10), {
+        artifactsDir: "artifacts",
+        isCI: true,
+        cwd,
+      });
+      expect(failed).toBe(true);
+      expect(rows[0].status).toBe("FAIL");
+      expect(rows[0].detail).toMatch(
+        /has 2 mutants; complete measured baseline requires at least 10/,
+      );
+    });
+  });
+
+  test("SOURCE GROWTH — a larger mutant set may satisfy the measured minimum", () => {
+    withTempCwd((cwd) => {
+      const files = ["js/formula-parse.ts"];
+      plantReport(cwd, "formula-parse", killedReport("js/formula-parse.ts", 12));
+      const { rows, failed } = evaluateAllModules(files, fullMeasuredBaseline(files, 90, 10), {
+        artifactsDir: "artifacts",
+        isCI: true,
+        cwd,
+      });
+      expect(failed).toBe(false);
+      expect(rows[0].status).toBe("PASS");
+      expect(rows[0].detail).toMatch(/12 mutants/);
+    });
+  });
+
   test("WRONG MODULE — one leg's uploaded report is actually evidence for a different module", () => {
     withTempCwd((cwd) => {
       const files = ["js/formula-parse.ts", "js/formula-operand.ts"];
       plantReport(cwd, "formula-parse", killedReport("js/formula-operand.ts", 5)); // miswired
       plantReport(cwd, "formula-operand", killedReport("js/formula-operand.ts", 5));
-      const { rows, failed } = evaluateAllModules(files, fullMeasuredBaseline(files), {
+      const { rows, failed } = evaluateAllModules(files, fullMeasuredBaseline(files, 90, 5), {
         artifactsDir: "artifacts",
         isCI: true,
         cwd,
@@ -445,7 +495,13 @@ describe("evaluateAllModules (composed loop, real filesystem, isolated temp cwd)
       plantReport(cwd, "formula-parse", killedReport("js/formula-parse.ts", 5));
       const { rows, failed } = evaluateAllModules(
         files,
-        { "js/formula-parse.ts": { measured: true, break: Number.NaN } },
+        {
+          "js/formula-parse.ts": {
+            measured: true,
+            break: Number.NaN,
+            minimumMutants: 5,
+          },
+        },
         { artifactsDir: "artifacts", isCI: true, cwd },
       );
       expect(failed).toBe(true);
@@ -481,7 +537,7 @@ describe("evaluateAllModules (composed loop, real filesystem, isolated temp cwd)
           ],
         }),
       );
-      const { rows, failed } = evaluateAllModules(files, fullMeasuredBaseline(files, 90), {
+      const { rows, failed } = evaluateAllModules(files, fullMeasuredBaseline(files, 90, 3), {
         artifactsDir: "artifacts",
         isCI: true,
         cwd,
@@ -523,7 +579,9 @@ describe("evaluateAllModules (composed loop, real filesystem, isolated temp cwd)
         "formula-ref",
         reportFor({ "js/formula-ref.ts": [mutant({ status: "Survived" })] }),
       );
-      const { rows, failed } = evaluateAllModules(files, fullMeasuredBaseline(files, 90), {
+      const baseline = fullMeasuredBaseline(files, 90, 1);
+      baseline["js/formula-operand.ts"].minimumMutants = 5;
+      const { rows, failed } = evaluateAllModules(files, baseline, {
         artifactsDir: "artifacts",
         isCI: true,
         cwd,

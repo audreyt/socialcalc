@@ -13,9 +13,10 @@
 import type { MinifyResult, Plugin } from "vite-plus";
 import { minify, transformWithOxc } from "vite-plus";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { existsSync, unlinkSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   allMappings,
@@ -29,6 +30,7 @@ import type { SourceMapInput } from "@jridgewell/trace-mapping";
 import { createInstrumenter } from "istanbul-lib-instrument";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
+const requireFromBuild = createRequire(import.meta.url);
 const jsDir = join(root, "js");
 const cssDir = join(root, "css");
 const distDir = join(root, "dist");
@@ -547,7 +549,8 @@ export function socialCalcBuildPlugin(): Plugin {
       // Coverage builds retain their pre-format text because the composed map
       // addresses those exact generated lines and columns.
       if (coverageMode) return;
-      const vpBin = fileURLToPath(new URL("./node_modules/vite-plus/bin/vp", import.meta.url));
+      const vpPackageDir = dirname(requireFromBuild.resolve("vite-plus/package.json"));
+      const vpBin = join(vpPackageDir, "bin/vp");
       execFileSync(process.execPath, [vpBin, "fmt", "dist/SocialCalc.js", "--write"], {
         cwd: root,
         stdio: "inherit",

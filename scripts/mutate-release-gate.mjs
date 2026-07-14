@@ -2,10 +2,11 @@
 // Release gate for the full (all-11-module) mutation scope: refuses to pass
 // unless EVERY module in ALL_MUTATE_FILES (stryker-file.mjs) has both (a) a
 // registered, actually-measured baseline in stryker-mutation-baseline.json
-// (measured:true with a finite break number in the 0..100 range — never a
-// placeholder) and (b) a fresh mutation.json from this run whose score meets
-// that registered floor. A missing report, a missing/false/malformed baseline,
-// an empty/malformed report, and a score below its floor are all hard
+// (`measured:true`, a finite break number in the 0..100 range, and the
+// measured full-module mutant count as a minimum) and (b) a fresh
+// mutation.json whose count is at least that complete-module measurement and
+// whose score meets the registered floor. A missing report, a
+// partial/empty/malformed report, and a score below its floor are all hard
 // failures — "report-only" is not "passing", and 80 is never used as a
 // stand-in for evidence. Never treat an unmeasured/guessed number as
 // evidence.
@@ -29,7 +30,7 @@
 //     (matches .github/workflows/mutation.yml's mutate-full upload naming +
 //     the release-gate job's download-artifact step, for CI)
 //   reports/mutation/<slug>/mutation.json
-//     (matches `bun run mutate:all`'s local sequential layout)
+//     (matches `vp run mutate:all`'s local sequential layout)
 // In CI (GITHUB_ACTIONS=true) the local fallback is never used: only the
 // artifact downloaded fresh for this exact run counts as evidence, never a
 // stale on-disk report left over from a previous checkout state.
@@ -77,7 +78,9 @@ export function validMeasuredBaseline(entry) {
     typeof entry.break === "number" &&
     Number.isFinite(entry.break) &&
     entry.break >= 0 &&
-    entry.break <= 100
+    entry.break <= 100 &&
+    Number.isInteger(entry.minimumMutants) &&
+    entry.minimumMutants > 0
   );
 }
 
@@ -229,7 +232,7 @@ export function evaluateAllModules(allMutateFiles, baselineModules, { artifactsD
         file,
         status: "FAIL",
         detail:
-          "missing or malformed measured baseline — requires measured:true and a finite numeric break in the 0..100 range; run MUTATE_TARGET=<module> bun run mutate (or bun run mutate:all) and ratchet stryker-mutation-baseline.json before release",
+          "missing or malformed measured baseline — requires measured:true, a finite numeric break in the 0..100 range, and a positive integer minimumMutants count; run MUTATE_TARGET=<module> vp run mutate (or vp run mutate:all) and ratchet stryker-mutation-baseline.json before release",
       });
       failed = true;
       continue;
@@ -252,6 +255,16 @@ export function evaluateAllModules(allMutateFiles, baselineModules, { artifactsD
     }
 
     const { total, score } = evaluated;
+    if (total < entry.minimumMutants) {
+      rows.push({
+        file,
+        status: "FAIL",
+        detail: `${file} mutation report has ${total} mutants; complete measured baseline requires at least ${entry.minimumMutants}`,
+      });
+      failed = true;
+      continue;
+    }
+
     const ok = score >= entry.break;
     if (!ok) failed = true;
     rows.push({

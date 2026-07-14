@@ -248,6 +248,15 @@ for (const [file, tests] of Object.entries(testsByFile)) {
 // from, or silently omit, an entry in the test-ownership map above.
 export const ALL_MUTATE_FILES = Object.keys(testsByFile).map((f) => `js/${f}`);
 
+// Bump when the mutation runner/build lifecycle changes in a way Stryker's
+// source/test diff cannot detect. This prevents reuse of incompatible results.
+export const MUTATION_CACHE_SCHEMA = "build-once-v1";
+
+export function mutationIncrementalFile(scope, range) {
+  const rangeSuffix = range ? `-partial-${range.replaceAll(/[^0-9A-Za-z_-]/gu, "-")}` : "";
+  return `.stryker-tmp/incremental-${scope}${rangeSuffix}-${MUTATION_CACHE_SCHEMA}.json`;
+}
+
 // Only run the CLI logic when this file is the process entrypoint
 // (`node stryker-file.mjs <path>` / `vp run mutate:file <path>`) — not when
 // stryker.config.mjs imports `testsByFile` above for the critical scope.
@@ -276,9 +285,10 @@ if (isMain) {
   const relativeTarget = relative(process.cwd(), absolute);
   const mutateSpec = range ? `${relativeTarget}:${range}` : relativeTarget;
 
-  // Partial experiments must not overwrite a full-module cache: a range can
-  // contain a different mutant set while sharing the same source bytes.
-  const incrementalFile = `.stryker-tmp/incremental-${basename(absolute, ".ts")}${range ? "-partial" : ""}.json`;
+  // Partial experiments must not overwrite a full-module cache or another
+  // range's cache: ranges can contain different mutant sets while sharing the
+  // same source bytes. The schema also isolates incompatible runner lifecycles.
+  const incrementalFile = mutationIncrementalFile(basename(absolute, ".ts"), range);
 
   const child = spawn(
     "vp",
@@ -288,7 +298,7 @@ if (isMain) {
       env: {
         ...process.env,
         MUTATE_TARGET: relativeTarget,
-        MUTATE_PARTIAL_RANGE: range ? "1" : "",
+        MUTATE_PARTIAL_RANGE: range ?? "",
         MUTATE_TESTS: tests.join(" "),
       },
     },
