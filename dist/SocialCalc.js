@@ -20626,4 +20626,3 @@ SocialCalc.SpreadsheetViewerDecodeSpreadsheetSave = function(spreadsheet, str) {
     // Just return a value to define the module export.
     return SocialCalc;
 }));
-//# sourceMappingURL=SocialCalc.js.map
