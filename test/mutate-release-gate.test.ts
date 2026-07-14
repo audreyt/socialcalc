@@ -1,17 +1,13 @@
 // Fixture-driven coverage for scripts/mutate-release-gate.mjs's evidence
-// validation: every scenario here builds its own synthetic Stryker-shaped
-// report / baseline registry in an isolated temp directory and asserts on
-// the gate's returned behavior (rows/failed/score), never on the script's
-// own source text. Deliberately never touches the real
-// stryker-mutation-baseline.json or a real reports/mutation/**/mutation.json
-// (gitignored, not guaranteed to exist, and this repo's rule against running
-// Stryker means nothing here may regenerate one) — ALL_MUTATE_FILES is
-// still imported for real (so "all 11 shipping modules" is the actual
-// current module set), but every baseline entry and report file used below
-// is fabricated per test.
+// validation: synthetic scenarios build isolated Stryker-shaped reports and
+// assert on returned behavior, never script source text. One contract test
+// reads the real baseline registry so a schema change cannot make every release
+// entry invalid; generated reports remain out of scope and are never required.
+// ALL_MUTATE_FILES is imported for real, so "all 11 shipping modules" always
+// means the current shipping set.
 
 import { describe, expect, test } from "vite-plus/test";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -24,6 +20,17 @@ import {
   validMeasuredBaseline,
 } from "../scripts/mutate-release-gate.mjs";
 import { ALL_MUTATE_FILES } from "../stryker-file.mjs";
+
+interface BaselineEntry {
+  measured: boolean;
+  minimumMutants: number;
+  break: number;
+  score: string;
+}
+
+const baselineRegistry = JSON.parse(
+  readFileSync(new URL("../stryker-mutation-baseline.json", import.meta.url), "utf8"),
+) as { modules: Record<string, BaselineEntry> };
 
 interface Mutant {
   id: string;
@@ -98,6 +105,25 @@ describe("validMeasuredBaseline", () => {
     expect(validMeasuredBaseline({ measured: true, break: 90, minimumMutants: 0 })).toBe(false);
     expect(validMeasuredBaseline({ measured: true, break: 90, minimumMutants: -1 })).toBe(false);
     expect(validMeasuredBaseline({ measured: true, break: 90, minimumMutants: 1.5 })).toBe(false);
+  });
+});
+
+describe("repository mutation baseline", () => {
+  test("tracks every shipping module with a release-eligible measured entry", () => {
+    const { missingFromRegistry, staleInRegistry } = checkBaselineRegistry(
+      ALL_MUTATE_FILES,
+      baselineRegistry.modules,
+    );
+    expect(missingFromRegistry).toEqual([]);
+    expect(staleInRegistry).toEqual([]);
+
+    for (const file of ALL_MUTATE_FILES) {
+      const entry = baselineRegistry.modules[file];
+      expect(validMeasuredBaseline(entry)).toBe(true);
+      const score = Number(entry.score);
+      expect(Number.isFinite(score)).toBe(true);
+      expect(entry.break).toBe(Math.floor(score));
+    }
   });
 });
 

@@ -134,12 +134,16 @@ Mutation and formal verification
   string-valued data leaf and both image-prefix suffix directions. Its fresh
   exact-module score reached 99.85%; an exact-range follow-up killed the final
   old-prefix survivor.
+- Remeasured `formula1.ts` at 61.44% under the corrected build-once lifecycle,
+  invalidating its prior 95 floor. Its initializer-heavy survivor backlog
+  remains visible and scored rather than excluded.
 - Recorded honest, run-backed integer floors for every module:
-  socialcalcconstants 99, formula-parse 97, formula-ref 97, formula1 95,
-  formula-operand 94, formatnumber2 93, socialcalcviewer 71, socialcalcpopup 61,
+  socialcalcconstants 100, formula-parse 97, formula-ref 97, formula-operand 94,
+  formatnumber2 93, socialcalcviewer 71, socialcalcpopup 61, formula1 61,
   socialcalc-3 57, socialcalcspreadsheetcontrol 53, and socialcalctableeditor 45.
   Missing reports or unmeasured baselines fail the release gate rather than
-  receiving placeholder scores.
+  receiving placeholder scores. Each baseline also pins the measured
+  full-module mutant count so narrowed reports cannot pass as complete evidence.
 - Hardened mutation-report identity/status validation and the critical-mutant
   disposition registry; equivalent-mutant claims remain explicit,
   source-specific proofs rather than exclusions.

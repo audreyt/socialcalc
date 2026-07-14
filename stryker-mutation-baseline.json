@@ -2,72 +2,83 @@
   "$description": "Per-module measured mutation-score baseline registry for the full/per-file gate (stryker.config.mjs's MUTATE_TARGET mode, .github/workflows/mutation.yml's mutate-full matrix, scripts/mutate-release-gate.mjs). A module stays { \"measured\": false } — report-only, no break gate in stryker.config.mjs, and a hard release-gate failure in CI — until an actual `MUTATE_TARGET=js/<module>.ts vp run mutate` run (or `vp run mutate:all`, which runs every module) establishes its floor; only then does an entry get { \"measured\": true, \"break\": <int>, \"measuredAt\": \"<date>\", \"score\": \"<percent at measurement>\" } with a real, ratcheted number. Never hand-set \"break\" without a fresh run backing it — that is exactly the 'unmeasured placeholder called a gate' this registry exists to prevent. The module key set here MUST exactly equal stryker-file.mjs's ALL_MUTATE_FILES (scripts/mutate-release-gate.mjs enforces this on every run) so a module can never be silently dropped from — or silently added to without evidence — the release gate.",
   "$floorPolicy": "break is always the conservative integer floor of the actual measured score (Math.floor), never rounded up and never hand-inflated. Example: 94.21% → break:94, 53.80% → break:53. This ensures a score regression of less than 1% passes the gate while any real regression larger than 1pp triggers a failure, and avoids any ambiguity about rounding direction.",
   "$measurementHistory": {
-    "2026-07-13": "All 11 modules measured in isolated per-module Stryker sandboxes (MUTATE_TARGET=js/<module>.ts vp exec stryker run). socialcalcconstants.ts improved from 19.73% (pre-assertion-hardening) to 77.91% after targeted assertion additions for the key category-A gaps (doCanonicalizeSheet boolean, cellDataType dispatch table, ConstantsSetClasses/SetImagePrefix guards). UI modules (socialcalctableeditor, socialcalcspreadsheetcontrol, socialcalcpopup, socialcalcviewer) and socialcalc-3 carry intentionally low floors reflecting current test coverage — these are honest measured baselines, not targets.",
-    "2026-07-14": "Adopted the hybrid runner, then corrected its command path to build one all-mutant UMD per sandbox. Rebuilding per mutant had raced on shared output and produced unstable false kills. Two fresh exact formatnumber2.ts runs were status-identical at 93.78%. A fresh exact socialcalcconstants.ts run reached 99.85% after recursive oracle-backed data assertions; a targeted exact-range run then killed its final old-prefix survivor. Registered conservative integer floors are 93 and 99 respectively. Fresh native reports raised socialcalcpopup.ts to 61 and set socialcalcspreadsheetcontrol.ts to 53; other native-runner floors were unchanged."
+    "2026-07-13": "All 11 modules were first measured in isolated per-module Stryker sandboxes. UI modules and socialcalc-3.ts carry honest low baselines that reflect current tests, not target quality.",
+    "2026-07-14": "Corrected the hybrid runner to build one all-mutant UMD per sandbox; rebuilding shared output during mutant runs had produced unstable false kills. Fresh exact release reports set every score, floor, and minimumMutants value below. formula1.ts remeasured at 61.44% under the corrected lifecycle, invalidating its prior 95 floor; initializer-heavy survivors remain scored, not excluded. socialcalcconstants.ts reached 100.00% after recursive oracle-backed assertions. Two exact formatnumber2.ts runs were status-identical at 93.78%."
   },
   "modules": {
     "js/formatnumber2.ts": {
       "measured": true,
+      "minimumMutants": 1399,
       "break": 93,
       "measuredAt": "2026-07-14",
       "score": "93.78"
     },
     "js/socialcalcconstants.ts": {
       "measured": true,
-      "break": 99,
+      "minimumMutants": 679,
+      "break": 100,
       "measuredAt": "2026-07-14",
-      "score": "99.85"
+      "score": "100.00"
     },
     "js/formula1.ts": {
       "measured": true,
-      "break": 95,
-      "measuredAt": "2026-07-13",
-      "score": "95.64"
+      "minimumMutants": 6213,
+      "break": 61,
+      "measuredAt": "2026-07-14",
+      "score": "61.44"
     },
     "js/formula-parse.ts": {
       "measured": true,
+      "minimumMutants": 636,
       "break": 97,
       "measuredAt": "2026-07-14",
       "score": "97.80"
     },
     "js/formula-operand.ts": {
       "measured": true,
+      "minimumMutants": 337,
       "break": 94,
       "measuredAt": "2026-07-14",
       "score": "94.36"
     },
     "js/formula-ref.ts": {
       "measured": true,
+      "minimumMutants": 467,
       "break": 97,
       "measuredAt": "2026-07-14",
       "score": "97.22"
     },
     "js/socialcalc-3.ts": {
       "measured": true,
+      "minimumMutants": 7273,
       "break": 57,
       "measuredAt": "2026-07-14",
-      "score": "57.51"
+      "score": "57.39"
     },
     "js/socialcalctableeditor.ts": {
       "measured": true,
+      "minimumMutants": 5711,
       "break": 45,
       "measuredAt": "2026-07-14",
-      "score": "45.30"
+      "score": "45.28"
     },
     "js/socialcalcpopup.ts": {
       "measured": true,
+      "minimumMutants": 937,
       "break": 61,
       "measuredAt": "2026-07-14",
       "score": "61.90"
     },
     "js/socialcalcspreadsheetcontrol.ts": {
       "measured": true,
+      "minimumMutants": 2987,
       "break": 53,
       "measuredAt": "2026-07-14",
       "score": "53.80"
     },
     "js/socialcalcviewer.ts": {
       "measured": true,
+      "minimumMutants": 384,
       "break": 71,
       "measuredAt": "2026-07-14",
       "score": "71.88"

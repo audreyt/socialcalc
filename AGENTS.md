@@ -463,13 +463,16 @@ or test diffs.
 - Full scope: one isolated matrix leg for each module, using that module's
   measured integer floor from `stryker-mutation-baseline.json`.
 - Release enforcement: all eleven fresh reports must exist, identify the exact
-  expected module, contain valid statuses, and meet measured floors.
+  expected module, contain valid statuses, meet the measured floor, and contain
+  at least that baseline's `minimumMutants` complete-module count.
 - Scheduled/full runs upload every report with matrix `fail-fast: false`.
 - In-place mutation is unsupported. Do not add it back.
 
 Baseline policy: `break = Math.floor(actual measured score)`. Never hand-set a
 floor without a fresh exact-module run. The current scores/floors are documented
 in README and the registry.
+`minimumMutants` is the mutant total from that same exact report; update it only
+from a fresh full-module measurement, never a range-restricted experiment.
 
 Disposition policy:
 

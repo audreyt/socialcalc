@@ -344,25 +344,30 @@ Modes:
 Current registered baselines (exact-module measurements on 2026-07-13 or
 2026-07-14):
 
-| Module                            |  Score | Floor |
-| --------------------------------- | -----: | ----: |
-| `socialcalcconstants.ts`          | 99.85% |    99 |
-| `formula-parse.ts`                | 97.80% |    97 |
-| `formula-ref.ts`                  | 97.22% |    97 |
-| `formula1.ts`                     | 95.64% |    95 |
-| `formula-operand.ts`              | 94.36% |    94 |
-| `formatnumber2.ts`                | 93.78% |    93 |
-| `socialcalcviewer.ts`             | 71.88% |    71 |
-| `socialcalcpopup.ts`              | 61.90% |    61 |
-| `socialcalc-3.ts`                 | 57.51% |    57 |
-| `socialcalcspreadsheetcontrol.ts` | 53.80% |    53 |
-| `socialcalctableeditor.ts`        | 45.30% |    45 |
+| Module                            |   Score | Floor | Mutants |
+| --------------------------------- | ------: | ----: | ------: |
+| `socialcalcconstants.ts`          | 100.00% |   100 |     679 |
+| `formula-parse.ts`                |  97.80% |    97 |     636 |
+| `formula-ref.ts`                  |  97.22% |    97 |     467 |
+| `formula-operand.ts`              |  94.36% |    94 |     337 |
+| `formatnumber2.ts`                |  93.78% |    93 |   1,399 |
+| `socialcalcviewer.ts`             |  71.88% |    71 |     384 |
+| `socialcalcpopup.ts`              |  61.90% |    61 |     937 |
+| `formula1.ts`                     |  61.44% |    61 |   6,213 |
+| `socialcalc-3.ts`                 |  57.39% |    57 |   7,273 |
+| `socialcalcspreadsheetcontrol.ts` |  53.80% |    53 |   2,987 |
+| `socialcalctableeditor.ts`        |  45.28% |    45 |   5,711 |
 
-Floors are the integer floor of a real isolated measurement. They are honest
-ratchets, not claims that low UI scores are desirable. Reports live under
-`reports/mutation/<scope>/`. Equivalent critical mutants require explicit,
-source-specific proofs in `stryker-mutation-disposition.json`; the registry is
-not an exclusion list.
+The corrected build-once lifecycle invalidated the prior `formula1.ts` floor of
+95: its fresh exact report scored 61.44%. Initializer-heavy survivors remain in
+the report as an explicit backlog; they are not filtered or dispositioned away.
+
+Floors are the integer floor of a real isolated measurement. `minimumMutants`
+pins each report's complete-module denominator, so a narrowed report cannot
+pass. These are honest ratchets, not claims that low scores are desirable.
+Reports live under `reports/mutation/<scope>/`. Equivalent critical mutants
+require explicit, source-specific proofs in `stryker-mutation-disposition.json`;
+the registry is not an exclusion list.
 
 ## Release process
 
