@@ -39,6 +39,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, cpSync } from
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { stripVTControlCharacters } from "node:util";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
@@ -110,8 +111,9 @@ function extractTarMember(tarballPath, memberPath) {
 }
 
 function summarizeVitestOutput(stdout) {
-  const match = stdout.match(/Tests\s+(\d+) passed(?:\s*\|\s*(\d+) failed)?(?:\s*\|\s*(\d+) skipped)?\s*\((\d+)\)/);
-  if (!match) throw new Error(`could not find a "Tests ... passed (N)" summary line in vitest output:\n${stdout}`);
+  const plain = stripVTControlCharacters(stdout);
+  const match = plain.match(/Tests\s+(\d+) passed(?:\s*\|\s*(\d+) failed)?(?:\s*\|\s*(\d+) skipped)?\s*\((\d+)\)/);
+  if (!match) throw new Error(`could not find a "Tests ... passed (N)" summary line in vitest output:\n${plain}`);
   const [, passed, failed = "0", skipped = "0", total] = match;
   return { passed: Number(passed), failed: Number(failed), skipped: Number(skipped), total: Number(total) };
 }
