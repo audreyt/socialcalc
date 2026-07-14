@@ -16,11 +16,11 @@ name: Mutation
 #   individually as a GitHub Actions matrix — one job per module, each
 #   mutating only that module against the exact test subset
 #   stryker-file.mjs's `testsByFile` maps to it, not the whole suite. This
-#   is comprehensive (every module gated), attributable, and bounded by the
-#   native Vitest runner's per-test coverage instead of restarting a complete
-#   build and test command for every mutant. `mutate-discover` derives the
-#   matrix directly from
-#   stryker-file.mjs's ALL_MUTATE_FILES (never hand-duplicated here, so a
+#   is comprehensive (every module gated), attributable, and bounded: runtime
+#   modules use native Vitest per-test coverage, while formatnumber2.ts and
+#   socialcalcconstants.ts use isolated command runs so top-level initializers
+#   are re-evaluated per mutant. `mutate-discover` derives the matrix directly
+#   from stryker-file.mjs's ALL_MUTATE_FILES (never hand-duplicated here, so a
 #   module can't be silently dropped from the gate); `mutate-full` runs
 #   each leg with fail-fast disabled so every module's report uploads
 #   regardless of any other module's outcome. Each leg's break threshold

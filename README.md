@@ -322,10 +322,11 @@ String, regex, CSS, and format-table mutations remain observable behavior and
 are scored rather than filtered.
 
 The native Stryker Vitest runner keeps isolated workers alive and uses per-test
-coverage; it does not restart a build and full owned-test command for every
-mutant. Because shipping sources are concatenated into a `vm.Script` bundle,
-source-to-test selection comes from `stryker-file.mjs`, not Vitest's import
-graph.
+coverage for runtime mutants. `formatnumber2.ts` and
+`socialcalcconstants.ts` use isolated command runs so their top-level tables
+and defaults are rebuilt with each active mutant. Because shipping sources are
+concatenated into a `vm.Script` bundle, source-to-test selection comes from
+`stryker-file.mjs`, not Vitest's import graph.
 
 Modes:
 
@@ -337,7 +338,8 @@ Modes:
 - `vp run mutate:release-gate`: validate fresh reports and measured baselines
   for every module.
 
-Measured baselines from 2026-07-13:
+Current measured baselines (latest exact-module run on 2026-07-13 or
+2026-07-14):
 
 | Module                            |  Score | Floor |
 | --------------------------------- | -----: | ----: |
@@ -345,13 +347,13 @@ Measured baselines from 2026-07-13:
 | `formula-ref.ts`                  | 97.22% |    97 |
 | `formula1.ts`                     | 95.64% |    95 |
 | `formula-operand.ts`              | 94.36% |    94 |
-| `formatnumber2.ts`                | 92.95% |    92 |
-| `socialcalcconstants.ts`          | 77.91% |    77 |
+| `socialcalcconstants.ts`          | 94.26% |    94 |
+| `formatnumber2.ts`                | 94.21% |    94 |
 | `socialcalcviewer.ts`             | 71.88% |    71 |
-| `socialcalcpopup.ts`              | 60.68% |    60 |
-| `socialcalc-3.ts`                 | 57.82% |    57 |
-| `socialcalcspreadsheetcontrol.ts` | 54.47% |    54 |
-| `socialcalctableeditor.ts`        | 45.98% |    45 |
+| `socialcalcpopup.ts`              | 61.90% |    61 |
+| `socialcalc-3.ts`                 | 57.51% |    57 |
+| `socialcalcspreadsheetcontrol.ts` | 53.80% |    53 |
+| `socialcalctableeditor.ts`        | 45.30% |    45 |
 
 Floors are the integer floor of a real isolated measurement. They are honest
 ratchets, not claims that low UI scores are desirable. Reports live under

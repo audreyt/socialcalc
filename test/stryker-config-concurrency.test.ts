@@ -1,5 +1,5 @@
-// Config-load coverage for the native Stryker/Vitest runner. The config reads
-// its scope and concurrency from process.env at module-load time, so each case
+// Config-load coverage for the hybrid Stryker runner. The config reads its
+// scope and concurrency from process.env at module-load time, so each case
 // imports a fresh module under an isolated environment snapshot.
 
 import { describe, expect, test } from "vite-plus/test";
@@ -8,8 +8,10 @@ const CONFIG_ENV_KEYS = [
   "MUTATE_SCOPE",
   "MUTATE_TARGET",
   "MUTATE_TESTS",
+  "SOCIALCALC_MUTATION_RUN",
   "SOCIALCALC_MUTATION_TESTS",
   "STRYKER_CONCURRENCY",
+  "TEST_RUNNER_MAX_WORKERS",
 ] as const;
 
 interface StrykerOptionsShape {
@@ -18,12 +20,13 @@ interface StrykerOptionsShape {
   mutate: string[];
   testRunner: string;
   vitest: { configFile: string; related: boolean };
-  commandRunner?: unknown;
+  commandRunner?: { command: string };
 }
 
 interface LoadedConfig {
   config: StrykerOptionsShape;
   mutationTestFiles: string[] | undefined;
+  mutationRun: string | undefined;
 }
 
 async function loadConfig(
@@ -46,7 +49,11 @@ async function loadConfig(
     const mutationTestFiles = process.env.SOCIALCALC_MUTATION_TESTS
       ? (JSON.parse(process.env.SOCIALCALC_MUTATION_TESTS) as string[])
       : undefined;
-    return { config: mod.default, mutationTestFiles };
+    return {
+      config: mod.default,
+      mutationTestFiles,
+      mutationRun: process.env.SOCIALCALC_MUTATION_RUN,
+    };
   } finally {
     for (const key of CONFIG_ENV_KEYS) {
       if (saved[key] === undefined) delete process.env[key];
@@ -55,21 +62,27 @@ async function loadConfig(
   }
 }
 
-describe("stryker.config.mjs native Vitest runner", () => {
-  test("uses per-test Vitest mutation coverage without a per-mutant command", async () => {
-    const { config, mutationTestFiles } = await loadConfig({});
+describe("stryker.config.mjs hybrid runner", () => {
+  test("legacy all-files scope uses the rebuilding command runner", async () => {
+    const { config, mutationRun, mutationTestFiles } = await loadConfig({});
     expect(config).toMatchObject({
-      testRunner: "vitest",
-      coverageAnalysis: "perTest",
-      vitest: { configFile: "vite.config.ts", related: false },
+      testRunner: "command",
+      coverageAnalysis: "off",
+      commandRunner: { command: expect.stringMatching(/^vp build && vp test --maxWorkers=2$/) },
       concurrency: 4,
     });
-    expect(config.commandRunner).toBeUndefined();
+    expect(mutationRun).toBe("1");
     expect(mutationTestFiles).toBeUndefined();
   });
 
   test("critical scope selects the three formula modules and their focused tests", async () => {
     const { config, mutationTestFiles } = await loadConfig({ MUTATE_SCOPE: "critical" });
+    expect(config).toMatchObject({
+      testRunner: "vitest",
+      coverageAnalysis: "perTest",
+      vitest: { configFile: "vite.config.ts", related: false },
+    });
+    expect(config.commandRunner).toBeUndefined();
     expect(config.mutate).toEqual([
       "js/formula-parse.ts",
       "js/formula-operand.ts",
@@ -85,9 +98,21 @@ describe("stryker.config.mjs native Vitest runner", () => {
       MUTATE_TARGET: "js/socialcalcviewer.ts",
     });
     expect(config.mutate).toEqual(["js/socialcalcviewer.ts"]);
+    expect(config.testRunner).toBe("vitest");
+    expect(config.commandRunner).toBeUndefined();
     expect(mutationTestFiles).toContain("test/popup-viewer-coverage.test.ts");
     expect(mutationTestFiles).not.toContain("test/formula-ref-mutation-survivors.test.ts");
   });
+
+  test.each(["js/formatnumber2.ts", "js/socialcalcconstants.ts"])(
+    "%s rebuilds its top-level initializers for every mutant",
+    async (mutationTarget) => {
+      const { config } = await loadConfig({ MUTATE_TARGET: mutationTarget });
+      expect(config.testRunner).toBe("command");
+      expect(config.coverageAnalysis).toBe("off");
+      expect(config.commandRunner?.command).toMatch(/^vp build && vp test run --maxWorkers=2 /);
+    },
+  );
 
   test("an explicit MUTATE_TESTS list wins over the scope mapping", async () => {
     const { mutationTestFiles } = await loadConfig({
@@ -106,5 +131,19 @@ describe("stryker.config.mjs native Vitest runner", () => {
 
     const nonNumeric = await loadConfig({ STRYKER_CONCURRENCY: "not-a-number" });
     expect(nonNumeric.config.concurrency).toBe(4);
+  });
+  test("TEST_RUNNER_MAX_WORKERS only changes command-runner child pools", async () => {
+    const command = await loadConfig({
+      MUTATE_TARGET: "js/formatnumber2.ts",
+      TEST_RUNNER_MAX_WORKERS: "6",
+    });
+    expect(command.config.commandRunner?.command).toMatch(/--maxWorkers=6\b/);
+
+    const native = await loadConfig({
+      MUTATE_TARGET: "js/socialcalcviewer.ts",
+      TEST_RUNNER_MAX_WORKERS: "6",
+    });
+    expect(native.config.testRunner).toBe("vitest");
+    expect(native.config.commandRunner).toBeUndefined();
   });
 });

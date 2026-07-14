@@ -7,6 +7,8 @@ import { describe, test } from "vite-plus/test";
 
 import { expectParity, loadPair } from "../helpers/differential";
 
+const EXTREME_RANGE_TIMEOUT_MS = process.env.SOCIALCALC_MUTATION_RUN === "1" ? 30_000 : 8000;
+
 describe("extreme column/row algebra", () => {
   test.each([0, -1, -100, 703, 1000, 10000] as const)(
     "rcColname(%i) is deterministic and does not throw on either runtime",
@@ -38,24 +40,28 @@ describe("extreme column/row algebra", () => {
     expectParity(formula, candidateResult.type, oracleResult.type);
   });
 
-  test("SUM over a bounded-but-large row range completes and is deterministic", async () => {
-    const { candidate, oracle } = await loadPair();
-    const formula = "SUM(A1:A5000)";
-    const candidateResult = candidate.Formula.evaluate_parsed_formula(
-      candidate.Formula.ParseFormulaIntoTokens(formula),
-      new candidate.Sheet(),
-    );
-    const oracleResult = oracle.Formula.evaluate_parsed_formula(
-      oracle.Formula.ParseFormulaIntoTokens(formula),
-      new oracle.Sheet(),
-    );
-    expectParity(
-      formula,
-      { type: candidateResult.type, value: candidateResult.value },
-      {
-        type: oracleResult.type,
-        value: oracleResult.value,
-      },
-    );
-  }, 8000);
+  test(
+    "SUM over a bounded-but-large row range completes and is deterministic",
+    async () => {
+      const { candidate, oracle } = await loadPair();
+      const formula = "SUM(A1:A5000)";
+      const candidateResult = candidate.Formula.evaluate_parsed_formula(
+        candidate.Formula.ParseFormulaIntoTokens(formula),
+        new candidate.Sheet(),
+      );
+      const oracleResult = oracle.Formula.evaluate_parsed_formula(
+        oracle.Formula.ParseFormulaIntoTokens(formula),
+        new oracle.Sheet(),
+      );
+      expectParity(
+        formula,
+        { type: candidateResult.type, value: candidateResult.value },
+        {
+          type: oracleResult.type,
+          value: oracleResult.value,
+        },
+      );
+    },
+    EXTREME_RANGE_TIMEOUT_MS,
+  );
 });

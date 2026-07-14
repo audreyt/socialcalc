@@ -11,17 +11,19 @@ const mutationTestFiles = process.env.SOCIALCALC_MUTATION_TESTS
   ? (JSON.parse(process.env.SOCIALCALC_MUTATION_TESTS) as string[])
   : undefined;
 
-const focusedTestRun = process.argv.some(
-  (argument) =>
-    argument === "-t" ||
-    argument === "--testNamePattern" ||
-    argument === "--test-name-pattern" ||
-    argument === "--changed" ||
-    argument.startsWith("--changed=") ||
-    argument === "--shard" ||
-    argument.startsWith("--shard=") ||
-    /(?:^|[/\\])(?:test|e2e)[/\\].+\.(?:test|spec)\.[cm]?[jt]sx?$/.test(argument),
-);
+const focusedTestRun =
+  process.env.SOCIALCALC_MUTATION_RUN === "1" ||
+  process.argv.some(
+    (argument) =>
+      argument === "-t" ||
+      argument === "--testNamePattern" ||
+      argument === "--test-name-pattern" ||
+      argument === "--changed" ||
+      argument.startsWith("--changed=") ||
+      argument === "--shard" ||
+      argument.startsWith("--shard=") ||
+      /(?:^|[/\\])(?:test|e2e)[/\\].+\.(?:test|spec)\.[cm]?[jt]sx?$/.test(argument),
+  );
 
 export default defineConfig({
   build: {

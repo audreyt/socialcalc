@@ -125,6 +125,15 @@ function parsePositiveInt(value, fallback) {
   return Number.isInteger(n) && n > 0 ? n : fallback;
 }
 
+const COMMAND_RUNNER_TARGETS = new Set(["js/formatnumber2.ts", "js/socialcalcconstants.ts"]);
+const useCommandRunner = !isCriticalScope && (!target || COMMAND_RUNNER_TARGETS.has(target));
+const TEST_RUNNER_MAX_WORKERS = parsePositiveInt(process.env.TEST_RUNNER_MAX_WORKERS, 2);
+const testCommand = testsFilter
+  ? `vp test run --maxWorkers=${TEST_RUNNER_MAX_WORKERS} ${testsFilter}`
+  : `vp test --maxWorkers=${TEST_RUNNER_MAX_WORKERS}`;
+
+process.env.SOCIALCALC_MUTATION_RUN = "1";
+
 const testFiles = testsFilter?.split(/\s+/u).filter(Boolean);
 if (testFiles?.length) {
   // vite.config.ts reads this before the Vitest runner creates its test
@@ -175,19 +184,25 @@ function measuredBreakFor(file) {
 export default {
   mutate,
 
-  // The native runner keeps one Vitest worker alive, activates mutants in
-  // process, and uses per-test coverage to run only tests that reached each
-  // mutant. The command runner restarted `vp build && vp test` for every
-  // mutant; large modules projected beyond 30 hours and could never satisfy
-  // the release job's three-hour timeout.
-  testRunner: "vitest",
+  // The native runner keeps one Vitest worker alive and uses per-test coverage
+  // for runtime mutants. formatnumber2.ts and socialcalcconstants.ts retain the
+  // command runner because their top-level tables/defaults must be rebuilt and
+  // re-evaluated with each active mutant; switching a mutant after bundle
+  // initialization produces false survivors. The legacy all-files mode also
+  // uses the command runner because it includes those modules.
+  testRunner: useCommandRunner ? "command" : "vitest",
+  commandRunner: useCommandRunner
+    ? {
+        command: `vp build && ${testCommand}`,
+      }
+    : undefined,
   vitest: {
     configFile: "vite.config.ts",
     // Shipping sources are concatenated into a generated vm.Script bundle, so
     // Vitest's import graph cannot infer source-to-test relationships.
     related: false,
   },
-  coverageAnalysis: "perTest",
+  coverageAnalysis: useCommandRunner ? "off" : "perTest",
 
   // Stryker's sandbox preprocessor calls the removed
   // `ts.parseConfigFileTextToJson` API against whatever `tsconfigFile`
@@ -202,7 +217,8 @@ export default {
   tsconfigFile: "tsconfig.stryker-disabled.json",
 
   // Isolated sandboxes only; never mutate the caller's working tree. The
-  // Vitest runner uses one test thread per Stryker worker.
+  // native Vitest runner uses one test thread per Stryker worker; command
+  // targets cap each child Vitest pool separately.
   concurrency: parsePositiveInt(process.env.STRYKER_CONCURRENCY, 4),
 
   reporters: ["clear-text", "progress", "html", "json"],
