@@ -221,7 +221,10 @@ jobs:
       matrix:
         file: ${{ fromJson(needs.mutate-discover.outputs.files) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    # formula1.ts has 6,213 mutants and exceeds three hours under native
+    # per-test coverage. Use GitHub's hosted-runner maximum so the measured
+    # report, rather than a timeout, decides the release gate.
+    timeout-minutes: 360
     steps:
       - name: Checkout
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
