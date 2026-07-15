@@ -378,13 +378,16 @@ jobs:
           TARBALL="dist-release/socialcalc-$VERSION.tgz"
           mv "$FIRST" "$TARBALL"
           rm -f "$SECOND"
+          MEMBERS="dist-release/package-members.txt"
+          tar -tzf "$TARBALL" > "$MEMBERS"
           for member in package/dist/SocialCalc.js package/dist/SocialCalc.min.js \
                         package/dist/SocialCalc.d.ts package/dist/socialcalc.css; do
-            tar -tzf "$TARBALL" | grep -qx "$member" || {
+            grep -Fxq "$member" "$MEMBERS" || {
               echo "::error::packed tarball missing expected member: $member"
               exit 1
             }
           done
+          rm -f "$MEMBERS"
           echo "Pack is deterministic (sha256=$SHA1 both times); retained one tarball."
           echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
 

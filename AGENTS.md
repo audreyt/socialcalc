@@ -551,6 +551,9 @@ A `v*` tag runs five independent required gates:
 `package` needs all five. It reruns the package contract, packs twice, rejects
 non-identical archives, retains one, records SHA-256 and npm integrity, archives
 the moderate audit snapshot, and uploads one release artifact.
+The pack step runs with `set -o pipefail`: materialize `tar -tzf` output before
+`grep -q`. Piping `tar` directly into an early-exiting grep gives `tar` a broken
+pipe and falsely reports an existing member as missing.
 
 A tag push **never publishes**. Manual publish requires:
 

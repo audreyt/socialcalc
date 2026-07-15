@@ -156,6 +156,9 @@ Release engineering and dependencies
   three-browser, and EtherCalc-canary gates. Packaging waits for all five,
   runs the package contract, packs twice and byte-compares the archives,
   records SHA-256 and npm integrity, and uploads one exact candidate artifact.
+- Package-member verification now materializes the tar listing before fixed
+  string checks, avoiding a `pipefail`/early-`grep` broken pipe that falsely
+  reported present members as missing.
 - Publishing is manual and environment-gated. It re-verifies tag, commit,
   version, filename, checksum, and integrity; stages and verifies a draft
   GitHub Release; publishes the exact tarball with npm Trusted Publishing/OIDC
