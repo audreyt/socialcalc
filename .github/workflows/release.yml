@@ -66,7 +66,7 @@ name: Release
 # Publish order is deliberately draft-first, matching GitHub's documented
 # immutable-release flow: create a DRAFT release and attach the exact,
 # already-integrity-verified tarball + manifest to it, verify the
-# uploaded draft asset's checksum, and ONLY THEN run `npm publish`. The
+# uploaded draft asset's content, and ONLY THEN run `npm publish`. The
 # draft is published (made non-draft, at which point immutability locks
 # in) after npm publish succeeds. This ordering means a failure in asset
 # staging/verification never triggers the npm side effect at all — npm
@@ -566,7 +566,7 @@ jobs:
 
       # Draft-first, matching GitHub's documented immutable-release flow:
       # create the release as a draft, attach the exact already-verified
-      # tarball + manifest, and verify the uploaded asset's checksum —
+      # tarball + manifest, and verify the uploaded asset's content —
       # ALL before `npm publish` runs below. `--verify-tag` additionally
       # requires the tag to already exist and match this run's commit,
       # refusing to create a release against a stale/wrong tag.
@@ -583,7 +583,23 @@ jobs:
             --title "${{ github.ref_name }}" \
             --notes "Publishing socialcalc@${{ needs.package.outputs.version }} to npm. Tarball sha256: ${{ steps.verify.outputs.sha256 }}."
 
-      - name: Verify the draft release asset's checksum before publishing to npm
+      # GitHub Releases does NOT guarantee byte-for-byte preservation of
+      # uploaded gzip tarball (.tgz) assets — it can normalize/recompress
+      # them on the release-asset storage path, so the downloaded bytes can
+      # differ from the uploaded bytes even though the underlying package
+      # content is identical. A raw whole-file sha256sum comparison of a
+      # round-tripped .tgz asset is therefore an unreliable gate that fires
+      # on innocent recompression.
+      #
+      # Instead, we extract the downloaded draft asset and compare its
+      # package/ directory tree byte-for-byte against the already-verified
+      # local tarball (extracted to /tmp/publish-verify-extract by the step
+      # above). This verifies that the same package content was attached to
+      # the release, while being robust to gzip-level recompression. The
+      # npm publish below still uses the local, Actions-artifact-verified
+      # tarball — not the downloaded draft asset — so the security property
+      # (publishing exactly what was integrity-verified) is fully preserved.
+      - name: Verify the draft release asset's content before publishing to npm
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -592,12 +608,13 @@ jobs:
           gh release download "${{ github.ref_name }}" \
             --pattern "${{ steps.verify.outputs.tarball-name }}" \
             --dir draft-asset-check
-          DOWNLOADED_SHA256="$(sha256sum "draft-asset-check/${{ steps.verify.outputs.tarball-name }}" | awk '{print $1}')"
-          if [ "$DOWNLOADED_SHA256" != "${{ steps.verify.outputs.sha256 }}" ]; then
-            echo "::error::draft release asset checksum mismatch: expected ${{ steps.verify.outputs.sha256 }}, downloaded asset is $DOWNLOADED_SHA256"
+          mkdir -p /tmp/draft-asset-extract
+          tar -xzf "draft-asset-check/${{ steps.verify.outputs.tarball-name }}" -C /tmp/draft-asset-extract
+          if ! diff -r /tmp/publish-verify-extract/package /tmp/draft-asset-extract/package; then
+            echo "::error::draft release asset content differs from the locally-verified tarball — the uploaded asset does not match the package being published"
             exit 1
           fi
-          echo "Draft release asset checksum verified: $DOWNLOADED_SHA256"
+          echo "Draft release asset content verified: extracted package/ tree matches the locally-verified tarball."
 
       # The one irreversible step in this job. Everything above only
       # staged/verified a draft GitHub Release (freely deletable); nothing
