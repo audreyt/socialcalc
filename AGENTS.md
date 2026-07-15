@@ -15,7 +15,7 @@ or release workflows.
 3. **Use Vite+ as the project interface.** Package operations use `vp install`,
    `vp add`, `vp remove`, and `vp update`; commands use `vp run` / `vp exec`.
    Do not introduce direct `bun install`, `bun add`, `npm install`, or `bunx`
-   workflows. Bun 1.3.14 is pinned through `devEngines` and managed by Vite+.
+   workflows. Bun 1.3.14 is pinned by `bun.lock` and managed by Vite+; `devEngines.packageManager` keeps `name: "bun"` with `onFail: "ignore"` so npm publish does not reject it under `EBADDEVENGINES` (npm only supports `onFail` values `warn`, `error`, `ignore`; the previous `download` was unsupported and treated as `error`).
 4. **Tests assert behavior.** No tautologies, swallowed errors, source-text
    checks for runtime behavior, arbitrary sleeps, or mocks that merely replay
    the implementation. Use the credibility guard.

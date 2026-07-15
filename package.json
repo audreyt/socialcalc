@@ -99,7 +99,11 @@
     "packageManager": {
       "name": "bun",
       "version": "1.3.14",
-      "onFail": "download"
+      "onFail": "ignore"
+    },
+    "runtime": {
+      "name": "node",
+      "onFail": "error"
     }
   },
   "engines": {

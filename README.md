@@ -166,8 +166,8 @@ retains one candidate artifact.
   Vitest, formatting, linting, and the managed Node/Bun toolchain.
 - Install the lockfile with `vp install --frozen-lockfile` for release-equivalent
   work, or `vp install` during ordinary local development.
-- Bun 1.3.14 is pinned through `devEngines`; use `vp install`, `vp add`,
-  `vp remove`, and `vp update` instead of direct `bun` package commands.
+- Bun 1.3.14 is pinned by `bun.lock` and managed by Vite+; use `vp install`,
+  `vp add`, `vp remove`, and `vp update` instead of direct `bun` package commands.
 - Dafny on `PATH` for Dafny checks; CI uses Dafny 4.9.0.
 - Full Lean builds additionally need Lean 4.24.0 and sibling checkouts at
   `../velvet`, `../loom`, and `../LemmaScript`. Lake pins Z3 4.15.4 and cvc5
