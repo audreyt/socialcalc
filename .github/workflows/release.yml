@@ -551,9 +551,9 @@ jobs:
 
           echo "Verified $TARBALL: file/tag/commit match this run, sha256+integrity match the manifest, packed package.json version ($TARBALL_PKG_VERSION) matches the tag."
           {
-            echo "tarball-path=dist-release/$TARBALL"
+            echo "tarball-path=./dist-release/$TARBALL"
             echo "tarball-name=$TARBALL"
-            echo "manifest-path=dist-release/$MANIFEST"
+            echo "manifest-path=./dist-release/$MANIFEST"
             echo "manifest-name=$MANIFEST"
             echo "sha256=$ACTUAL_SHA256"
           } >> "$GITHUB_OUTPUT"
