@@ -417,6 +417,16 @@ After a facade edit:
 build. Plain `verify:dafny:gen` does not update proof-bearing `.dfy` files.
 Never routinely copy `.dfy.gen` over `.dfy`.
 
+`verify:dafny:regen`, `verify:lean:gen`, and `verify:lean`'s non-empty-artifact
+assertion are all driven by `scripts/lemmascript-manifest.mjs`, which reads
+`LemmaScript-files.txt` once and loops over every listed facade — adding a
+facade to that file is enough; no package.json script or
+`.github/workflows/lemmascript.yml` step needs a matching hand-edit. `lsc`'s
+own CLI already batches `gen`/`gen-check`/`check` over the manifest with no
+file argument (used as-is by `verify:dafny`/`verify:dafny:gen`); the script
+exists only for `regen` (which `lsc` cannot batch) and the non-empty-artifact
+assertion (which `lsc` has no equivalent for).
+
 Facade oracle mapping:
 
 - A1: `rcColname`, `crToCoord`, `OffsetFormulaCoords`,
