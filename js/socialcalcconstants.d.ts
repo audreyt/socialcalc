@@ -555,6 +555,10 @@ declare namespace SocialCalc {
     s_fdef_VALUE: string;
     s_fdef_VAR: string;
     s_fdef_VARP: string;
+    s_fdef_SORT: string;
+    s_fdef_UNIQUE: string;
+    s_farg_sort: string;
+    s_farg_unique: string;
     s_fdef_VLOOKUP: string;
     s_fdef_WEEKDAY: string;
     s_fdef_YEAR: string;

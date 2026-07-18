@@ -251,7 +251,7 @@ vp test
 start. `build.ts` instruments each original `js/*.ts` source, assembles
 `dist/SocialCalc.instrumented.js` under the normal UMD wrapper, and writes
 counters to `globalThis.__VITEST_COVERAGE__`. The default gate includes the
-eleven shipping modules plus the three LemmaScript facades and requires
+eleven shipping modules plus the four LemmaScript facades and requires
 100/100/100/100.
 
 The instrumented bundle is gitignored and never shipped. Ordinary `vp build`
@@ -396,9 +396,14 @@ shipping bundle.
   `#REF!` policy — 26 Dafny VCs;
 - `lemma/eval-ops.ts`: `/` and `&` error/type lattice — 4 VCs;
 - `lemma/lookup-result.ts`: token resolution and exact-before-wildcard-before-
-  miss precedence — 3 VCs. Full row scanning stays runtime-tested.
+  miss precedence — 3 VCs. Full row scanning stays runtime-tested;
+- `lemma/spill.ts`: dynamic-array spill runtime pure policies — rectangle
+  planning (shape/bounds/resource-limit precedence), transactional claim
+  classification (reclaimable vs. collision), resize membership
+  (retained/grown/stale/outside), stable UNIQUE keep policy, and stable SORT
+  tie-break policy — 15 Dafny VCs.
 
-Total: **33 VCs (26 + 4 + 3)**.
+Total: **48 VCs (26 + 4 + 3 + 15)**.
 
 After a facade edit:
 
@@ -418,7 +423,13 @@ Facade oracle mapping:
   `AdjustFormulaCoords`;
 - eval ops: shipping `evaluate_parsed_formula`;
 - lookup result: shipping `Formula.LookupResultType` plus complete row-scan
-  runtime tests.
+  runtime tests;
+- spill: shipping `Formula.PlanSpillStatus`, `Formula.ClassifySpillClaim`,
+  `Formula.ClassifyResizeMembership`, `Formula.KeepUniqueItem`,
+  `Formula.StableTieCompare`, and the `Formula.SPILL_MAX_COL`/
+  `SPILL_MAX_ROW`/`SPILL_MAX_CELLS` constants. `test/lemma-spill-facade.test.ts`
+  cross-checks every function against its shipping counterpart exhaustively
+  and at boundary cases, plus a live `SORT()`/`UNIQUE()` formula smoke test.
 
 ## Mutation testing
 

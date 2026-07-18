@@ -57,6 +57,24 @@ same `SocialCalc` global and CommonJS value.
 The formula, command, and save/load APIs also work without a DOM in Node.js.
 `InitializeSpreadsheetControl` is only needed for rendering the editor.
 
+### Dynamic arrays
+
+Dynamic arrays are a deliberate first-class spill substrate, not merely a set
+of commands. The supported formulas are:
+
+- `SORT(range_or_array, sort_column, is_ascending, [sort_column2, is_ascending2, ...])`
+- `UNIQUE(range_or_array, [by_column], [exactly_once])`
+
+Each result spills from its anchor. A collision with a non-empty, merged, or
+user-owned cell returns `#SPILL!` and preserves the blocking cells. Spills are
+limited to the `ZZ` column, 65,536 rows, and 100,000 cells. Spill children can
+be selected and rendered, but are formula-owned and not directly editable.
+Set, paste, fill, sort, move, and merge operations protect spill ownership;
+structural inserts and deletes rebuild spills. Full saves preserve spill state.
+Copying a range copies an anchor and re-spills it, while copying a spill child
+copies its scalar value. For `UNIQUE(..., ..., TRUE)`, no matching result
+follows the existing `#N/A` policy.
+
 ## Trust boundary and host security
 
 SocialCalc has two rendering modes. The legacy mode preserves historical output

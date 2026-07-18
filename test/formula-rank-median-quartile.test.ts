@@ -189,6 +189,16 @@ test("QUARTILE: propagates a referenced error and rejects invalid arity", async 
   expect(getVT("B1")).toBe("e#DIV/0!");
   expect(getVT("B2")).toBe("e#VALUE!");
 });
+test("QUARTILE: rejects scalar ranges and nonnumeric quart arguments", async () => {
+  const { getVT } = await buildSheet([
+    "set A1 value n 1",
+    "set A2 value n 2",
+    "set B1 formula QUARTILE(9,2)",
+    'set B2 formula QUARTILE(A1:A2,"x")',
+  ]);
+  expect(getVT("B1")).toBe("e#VALUE!");
+  expect(getVT("B2")).toBe("e#VALUE!");
+});
 
 // ---------------------------------------------------------------------------
 // RANK
@@ -273,6 +283,26 @@ test("RANK: invalid arity is rejected", async () => {
 
   expect(getVT("B1")).toBe("e#VALUE!");
   expect(getVT("B2")).toBe("e#VALUE!");
+});
+test("RANK: rejects non-reference ref and nonnumeric order", async () => {
+  const { getVT } = await buildSheet([
+    "set A1 value n 1",
+    "set A2 value n 2",
+    "set B1 formula RANK(1,9)",
+    'set B2 formula RANK(1,A1:A2,"x")',
+  ]);
+  expect(getVT("B1")).toBe("e#VALUE!");
+  expect(getVT("B2")).toBe("e#VALUE!");
+});
+test("RANK: propagates invalid and error-valued number arguments", async () => {
+  const { getVT } = await buildSheet([
+    "set A1 value n 1",
+    "set A2 value n 2",
+    'set B1 formula RANK("x",A1:A2)',
+    "set B2 formula RANK(1/0,A1:A2)",
+  ]);
+  expect(getVT("B1")).toBe("e#VALUE!");
+  expect(getVT("B2")).toBe("e#DIV/0!");
 });
 
 // ---------------------------------------------------------------------------

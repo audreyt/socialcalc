@@ -135,6 +135,28 @@ test("loadclipboard exact 2x2 scsave persists through structural inserts and low
   expect(sheet.cells.G7?.datavalue).toBe(99);
 });
 
+test("bare loadclipboard command records its own undo entry, restoring prior clipboard", async () => {
+  const SC = await loadSocialCalc();
+  const sheet = new SC.Sheet();
+
+  await scheduleCommands(SC, sheet, ["set A1 value n 5", "copy A1 formulas"]);
+  const priorClipboard = SC.Clipboard.clipboard;
+  expect(priorClipboard).not.toBe("");
+
+  const newClip = "version:1.5\ncell:B1:v:9\nsheet:c:1:r:1\ncopiedfrom:B1:B1\n";
+  await scheduleCommands(SC, sheet, ["loadclipboard " + SC.encodeForSave(newClip)]);
+  expect(SC.Clipboard.clipboard).toBe(newClip);
+
+  // Without the loadclipboard case recording its own AddUndo, this undo
+  // step would be a no-op for the clipboard (leaving newClip in place)
+  // since no undo entry was pushed for the bare loadclipboard command.
+  await sheetUndo(SC, sheet);
+  expect(SC.Clipboard.clipboard).toBe(priorClipboard);
+
+  await sheetRedo(SC, sheet);
+  expect(SC.Clipboard.clipboard).toBe(newClip);
+});
+
 // Policy lock-in (ClipboardScout tip 6856a2d): cut = CreateSheetSave + erase +
 // paste via OffsetFormulaCoords (copy semantics). movepaste = in-sheet move via
 // ReplaceFormulaCoords. Do NOT rewrite cut to Excel-style move.

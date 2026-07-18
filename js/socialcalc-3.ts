@@ -211,6 +211,7 @@ SC.Cell = function (coord: any) {
   this.formula = "";
   this.valuetype = "b";
   this.readonly = false;
+  // Spill metadata is attached only when a formula actually spills.
 };
 
 // The types of cell properties
@@ -241,6 +242,11 @@ SC.CellProperties = {
   rowspan: 2,
   cssc: 2,
   csss: 2,
+  spillrows: 1,
+  spillcols: 1,
+  spillowner: 1,
+  spillrow: 1,
+  spillcol: 1,
   mod: 2,
   displaystring: 3, // used to cache rendered HTML of cell contents
   parseinfo: 3, // used to cache parsed formulas
@@ -260,6 +266,259 @@ SC.CellPropertiesTable = {
   cellformat: "cellformat",
   nontextvalueformat: "valueformat",
   textvalueformat: "valueformat",
+};
+
+SC.ClearSpill = function (sheet: any, anchor: any) {
+  var removed = false;
+  var rows = anchor.spillrows || 0,
+    cols = anchor.spillcols || 0;
+  var cr = SocialCalc.coordToCr(anchor.coord);
+  for (var r = 0; r < rows; r++)
+    for (var c = 0; c < cols; c++) {
+      if (!r && !c) continue;
+      var coord = SocialCalc.crToCoord(cr.col + c, cr.row + r);
+      var cell = sheet.cells[coord];
+      if (cell && cell.spillowner === anchor.coord) {
+        delete sheet.cells[coord];
+        removed = true;
+      }
+    }
+  delete anchor.spillrows;
+  delete anchor.spillcols;
+  if (removed) {
+    sheet.renderneeded = true;
+    sheet.changedrendervalues = true;
+    sheet.spillTopologyChanged = true;
+    sheet.reRenderCellList = sheet.reRenderCellList || [];
+    if (sheet.reRenderCellList.indexOf(anchor.coord) < 0) sheet.reRenderCellList.push(anchor.coord);
+  }
+  return removed;
+};
+SC.ClearAllDerivedSpills = function (sheet: any) {
+  var changed = false;
+  for (var key in sheet.cells) {
+    var cell = sheet.cells[key];
+    if (!cell) continue;
+    if (cell.spillowner) {
+      delete sheet.cells[key];
+      changed = true;
+    } else if (cell.spillrows || cell.spillcols) {
+      delete cell.spillrows;
+      delete cell.spillcols;
+      changed = true;
+    }
+  }
+  if (changed) {
+    sheet.renderneeded = true;
+    sheet.changedrendervalues = true;
+    sheet.spillTopologyChanged = true;
+  }
+};
+SC.SanitizeSpills = function (sheet: any) {
+  var valid: any = {};
+  for (var key in sheet.cells) {
+    var cell = sheet.cells[key],
+      ok = false,
+      cr;
+    if (!cell || cell.spillowner || (cell.spillrows == null && cell.spillcols == null)) continue;
+    try {
+      cr = SocialCalc.coordToCr(key);
+      ok =
+        Number.isInteger(cell.spillrows) &&
+        Number.isInteger(cell.spillcols) &&
+        cell.spillrows > 0 &&
+        cell.spillcols > 0 &&
+        cell.datatype === "f" &&
+        !!cell.formula &&
+        SocialCalc.Formula.PlanSpillStatus(
+          cr.col,
+          cr.row,
+          cell.spillrows,
+          cell.spillcols,
+          SocialCalc.Formula.SPILL_MAX_COL,
+          SocialCalc.Formula.SPILL_MAX_ROW,
+          SocialCalc.Formula.SPILL_MAX_CELLS,
+        ) === 0;
+    } catch {}
+    if (ok) valid[key] = true;
+    else {
+      delete cell.spillrows;
+      delete cell.spillcols;
+    }
+  }
+  for (var childkey in sheet.cells) {
+    var child = sheet.cells[childkey],
+      owner = child && sheet.cells[child.spillowner],
+      good = false;
+    if (!child || !child.spillowner) continue;
+    if (owner && valid[child.spillowner])
+      try {
+        var a = SocialCalc.coordToCr(child.spillowner),
+          c = SocialCalc.coordToCr(childkey);
+        good =
+          Number.isInteger(child.spillrow) &&
+          Number.isInteger(child.spillcol) &&
+          child.spillrow >= 0 &&
+          child.spillcol >= 0 &&
+          (child.spillrow || child.spillcol) &&
+          child.spillrow < owner.spillrows &&
+          child.spillcol < owner.spillcols &&
+          c.col === a.col + child.spillcol &&
+          c.row === a.row + child.spillrow;
+      } catch {}
+    if (!good) delete sheet.cells[childkey];
+    else {
+      child.datatype = null;
+      child.formula = "";
+    }
+  }
+  sheet.renderneeded = true;
+};
+SC.SpillOwnerForCoord = function (sheet: any, coord: any) {
+  var cell = sheet.cells[coord];
+  return cell && cell.spillowner ? cell.spillowner : coord;
+};
+SC.SpillCommandError = "Cannot change part of a spilled array.";
+SC.PrepareSpillMutation = function (sheet: any, ranges: any, blockAnchors: any) {
+  var anchors: any = {},
+    parsed: any[] = [],
+    i: any,
+    range: any,
+    coord: any,
+    cell: any,
+    cr: any,
+    covered: any;
+  for (i = 0; i < ranges.length; i++) {
+    range = typeof ranges[i] === "string" ? SocialCalc.ParseRange(ranges[i]) : ranges[i];
+    parsed.push(range);
+  }
+  for (coord in sheet.cells) {
+    cell = sheet.cells[coord];
+    if (!cell || cell.readonly) continue;
+    cr = SocialCalc.coordToCr(coord);
+    covered = false;
+    for (i = 0; i < parsed.length; i++) {
+      range = parsed[i];
+      if (
+        cr.col >= range.cr1.col &&
+        cr.col <= range.cr2.col &&
+        cr.row >= range.cr1.row &&
+        cr.row <= range.cr2.row
+      ) {
+        covered = true;
+        break;
+      }
+    }
+    if (!covered) continue;
+    if (cell.spillowner) return SC.SpillCommandError;
+    if (cell.spillrows || cell.spillcols) {
+      if (blockAnchors) return SC.SpillCommandError;
+      anchors[coord] = cell;
+    }
+  }
+  for (coord in anchors) SocialCalc.ClearSpill(sheet, anchors[coord]);
+  return "";
+};
+SC.MaterializeSpill = function (sheet: any, coord: any, eresult: any) {
+  var av = eresult && eresult.value,
+    cr = SocialCalc.coordToCr(coord),
+    anchor = sheet.GetAssuredCell(coord);
+  var valid =
+    eresult &&
+    eresult.type === "array" &&
+    av &&
+    Number.isInteger(av.rows) &&
+    Number.isInteger(av.cols) &&
+    av.rows > 0 &&
+    av.cols > 0 &&
+    Array.isArray(av.cells) &&
+    av.cells.length === av.rows &&
+    av.cells.every(function (row: any) {
+      return (
+        Array.isArray(row) &&
+        row.length === av.cols &&
+        row.every(function (v: any) {
+          return v && typeof v.type === "string" && "value" in v;
+        })
+      );
+    });
+  if (
+    !valid ||
+    SocialCalc.Formula.PlanSpillStatus(
+      cr.col,
+      cr.row,
+      av && av.rows,
+      av && av.cols,
+      SocialCalc.Formula.SPILL_MAX_COL,
+      SocialCalc.Formula.SPILL_MAX_ROW,
+      SocialCalc.Formula.SPILL_MAX_CELLS,
+    ) !== 0 ||
+    ((av.rows > 1 || av.cols > 1) && (anchor.colspan || anchor.rowspan))
+  ) {
+    SC.ClearSpill(sheet, anchor);
+    return null;
+  }
+  var oldrows = anchor.spillrows || 0,
+    oldcols = anchor.spillcols || 0;
+  var collision = false;
+  for (var key in sheet.cells) {
+    var old = sheet.cells[key];
+    if (!old || key === coord || old.spillowner === coord) continue;
+    var a = SocialCalc.coordToCr(key);
+    var inrect =
+      a.col >= cr.col && a.col < cr.col + av.cols && a.row >= cr.row && a.row < cr.row + av.rows;
+    var merged = old.colspan > 1 || old.rowspan > 1;
+    var intersects =
+      merged &&
+      a.col < cr.col + av.cols &&
+      a.col + (old.colspan || 1) > cr.col &&
+      a.row < cr.row + av.rows &&
+      a.row + (old.rowspan || 1) > cr.row;
+    if (inrect || intersects) {
+      collision = true;
+      break;
+    }
+  }
+  if (collision) {
+    SC.ClearSpill(sheet, anchor);
+    return null;
+  }
+  var topologyChanged = oldrows !== av.rows || oldcols !== av.cols;
+  for (var r = 0; r < oldrows; r++)
+    for (var c = 0; c < oldcols; c++) {
+      if (r < av.rows && c < av.cols) continue;
+      var stale = sheet.cells[SocialCalc.crToCoord(cr.col + c, cr.row + r)];
+      if (stale && stale.spillowner === coord) {
+        delete sheet.cells[stale.coord];
+        topologyChanged = true;
+      }
+    }
+  anchor.spillrows = av.rows;
+  anchor.spillcols = av.cols;
+  for (var rr = 0; rr < av.rows; rr++)
+    for (var cc = 0; cc < av.cols; cc++)
+      if (rr || cc) {
+        var value = av.cells[rr][cc],
+          childcoord = SocialCalc.crToCoord(cr.col + cc, cr.row + rr);
+        var child = sheet.cells[childcoord];
+        if (!child || child.spillowner !== coord) {
+          child = new SocialCalc.Cell(childcoord);
+          topologyChanged = true;
+        }
+        child.datavalue = value.value;
+        child.valuetype = value.type;
+        child.spillowner = coord;
+        child.spillrow = rr;
+        child.spillcol = cc;
+        delete child.displaystring;
+        sheet.cells[childcoord] = child;
+      }
+  sheet.attribs.lastrow = Math.max(sheet.attribs.lastrow, cr.row + av.rows - 1);
+  sheet.attribs.lastcol = Math.max(sheet.attribs.lastcol, cr.col + av.cols - 1);
+  sheet.renderneeded = true;
+  sheet.changedrendervalues = true;
+  if (topologyChanged) sheet.spillTopologyChanged = true;
+  return av.cells[0][0];
 };
 
 // *************************************
@@ -722,6 +981,7 @@ SC.ParseSheetSave = function (savedsheet: any, sheetobj: any) {
     }
     parts = null;
   }
+  SocialCalc.SanitizeSpills(sheetobj);
 };
 
 //
@@ -832,6 +1092,21 @@ SC.CellFromStringParts = function (sheet: any, cell: any, parts: any, j: any) {
       case "comment":
         cell.comment = SocialCalc.decodeFromSave(parts[j++]);
         break;
+      case "spillrows":
+        cell.spillrows = parts[j++] - 0;
+        break;
+      case "spillcols":
+        cell.spillcols = parts[j++] - 0;
+        break;
+      case "spillowner":
+        cell.spillowner = SocialCalc.decodeFromSave(parts[j++]);
+        break;
+      case "spillrow":
+        cell.spillrow = parts[j++] - 0;
+        break;
+      case "spillcol":
+        cell.spillcol = parts[j++] - 0;
+        break;
       default:
         throw SocialCalc.Constants.s_cfspUnknownCellType + " '" + t + "'";
     }
@@ -912,6 +1187,16 @@ SC.CreateSheetSave = function (sheetobj: any, range: any, canonicalize: any) {
       coord = SocialCalc.crToCoord(col, row);
       cell = sheetobj.cells[coord];
       if (!cell) continue;
+      if (range && (cell.spillowner || cell.spillrows != null || cell.spillcols != null)) {
+        cell = Object.assign({}, cell);
+        delete cell.spillrows;
+        delete cell.spillcols;
+        delete cell.spillowner;
+        delete cell.spillrow;
+        delete cell.spillcol;
+        if (sheetobj.cells[coord].spillowner)
+          cell.datatype = cell.valuetype && cell.valuetype.charAt(0) === "n" ? "v" : "t";
+      }
       line = sheetobj.CellToString(cell);
       if (line.length == 0) continue; // ignore completely empty cells
       line = "cell:" + coord + line;
@@ -1025,6 +1310,8 @@ SC.CellToString = function (sheet: any, cell: any) {
   } else if (cell.datatype == "t") {
     if (cell.valuetype == SocialCalc.Constants.textdatadefaulttype) line += ":t:" + value;
     else line += ":vt:" + cell.valuetype + ":" + value;
+  } else if (cell.datatype == null && cell.spillowner) {
+    line += ":vt:" + cell.valuetype + ":" + value;
   } else {
     formula = SocialCalc.encodeForSave(cell.formula);
     if (cell.datatype == "f") {
@@ -1081,6 +1368,12 @@ SC.CellToString = function (sheet: any, cell: any) {
   if (cell.mod) line += ":mod:" + cell.mod;
   if (cell.comment) line += ":comment:" + SocialCalc.encodeForSave(cell.comment);
 
+  // Spill tags are compact optional fields; absent tags preserve legacy saves.
+  if (cell.spillrows != null) line += ":spillrows:" + cell.spillrows;
+  if (cell.spillcols != null) line += ":spillcols:" + cell.spillcols;
+  if (cell.spillowner) line += ":spillowner:" + SocialCalc.encodeForSave(cell.spillowner);
+  if (cell.spillrow != null) line += ":spillrow:" + cell.spillrow;
+  if (cell.spillcol != null) line += ":spillcol:" + cell.spillcol;
   return line;
 };
 
@@ -2182,6 +2475,17 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
         cellChanged = true;
         ParseRange();
         if (
+          attrib == "value" ||
+          attrib == "text" ||
+          attrib == "formula" ||
+          attrib == "constant" ||
+          attrib == "empty" ||
+          attrib == "all"
+        ) {
+          errortext = SocialCalc.PrepareSpillMutation(sheet, [{ cr1: cr1, cr2: cr2 }], false);
+          if (errortext) break;
+        }
+        if (
           cr1.row != cr2.row ||
           cr1.col != cr2.col ||
           sheet.celldisplayneeded ||
@@ -2322,6 +2626,8 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
       what = cmd.NextToken();
       rest = cmd.RestOfString();
       ParseRange();
+      errortext = SocialCalc.PrepareSpillMutation(sheet, [{ cr1: cr1, cr2: cr2 }], true);
+      if (errortext) break;
       cell = sheet.GetAssuredCell(cr1.coord);
       if (cell.readonly) break;
 
@@ -2383,6 +2689,8 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
       what = cmd.NextToken();
       rest = cmd.RestOfString();
       ParseRange();
+      errortext = SocialCalc.PrepareSpillMutation(sheet, [{ cr1: cr1, cr2: cr2 }], false);
+      if (errortext) break;
 
       if (saveundo) changes.AddUndo("changedrendervalues"); // to take care of undone pasted spans
       if (cmd1 == "cut") {
@@ -2435,10 +2743,12 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
     case "filldown":
       sheet.renderneeded = true;
       sheet.changedrendervalues = true;
-      if (saveundo) changes.AddUndo("changedrendervalues"); // to take care of undone pasted spans
       what = cmd.NextToken();
       rest = cmd.RestOfString();
       ParseRange();
+      errortext = SocialCalc.PrepareSpillMutation(sheet, [{ cr1: cr1, cr2: cr2 }], false);
+      if (errortext) break;
+      if (saveundo) changes.AddUndo("changedrendervalues"); // to take care of undone pasted spans
       /** @param {boolean} down @param {number} seriescol @param {number} seriesrow */
       function increment_amount(down: any, seriescol: any, seriesrow: any) {
         /** @param {string | null | undefined} type */
@@ -2593,7 +2903,6 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
     case "paste":
       sheet.renderneeded = true;
       sheet.changedrendervalues = true;
-      if (saveundo) changes.AddUndo("changedrendervalues"); // to take care of undone pasted spans
       what = cmd.NextToken();
       rest = cmd.RestOfString();
       ParseRange();
@@ -2605,9 +2914,21 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
       cliprange = SocialCalc.ParseRange(clipsheet.copiedfrom);
       numcols = Math.max(cr2.col - cr1.col + 1, cliprange.cr2.col - cliprange.cr1.col + 1);
       numrows = Math.max(cr2.row - cr1.row + 1, cliprange.cr2.row - cliprange.cr1.row + 1);
+
+      errortext = SocialCalc.PrepareSpillMutation(
+        sheet,
+        [
+          {
+            cr1: cr1,
+            cr2: { col: cr1.col + numcols - 1, row: cr1.row + numrows - 1 },
+          },
+        ],
+        false,
+      );
+      if (errortext) break;
       if (cr1.col + numcols - 1 > attribs.lastcol) attribs.lastcol = cr1.col + numcols - 1;
       if (cr1.row + numrows - 1 > attribs.lastrow) attribs.lastrow = cr1.row + numrows - 1;
-
+      if (saveundo) changes.AddUndo("changedrendervalues"); // to take care of undone pasted spans
       for (row = cr1.row; row < cr1.row + numrows; row++) {
         for (col = cr1.col; col < cr1.col + numcols; col++) {
           cr = SocialCalc.crToCoord(col, row);
@@ -2707,9 +3028,11 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
     case "sort": // sort cr1:cr2 col1 up/down col2 up/down col3 up/down
       sheet.renderneeded = true;
       sheet.changedrendervalues = true;
-      if (saveundo) changes.AddUndo("changedrendervalues"); // to take care of undone pasted spans
       what = cmd.NextToken();
       ParseRange();
+      errortext = SocialCalc.PrepareSpillMutation(sheet, [{ cr1: cr1, cr2: cr2 }], true);
+      if (errortext) break;
+      if (saveundo) changes.AddUndo("changedrendervalues"); // to take care of undone pasted spans
       cols = []; // get columns and sort directions (or "")
       dirs = [];
       lastsortcol = 0;
@@ -2888,6 +3211,7 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
         newrowend = cr1.row;
         if (saveundo) changes.AddUndo("deleterow " + cr1.coord);
       }
+      SocialCalc.ClearAllDerivedSpills(sheet);
 
       for (row = lastrow; row >= rowend; row--) {
         // copy the cells forward
@@ -3059,6 +3383,7 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
           }
         }
       }
+      SocialCalc.ClearAllDerivedSpills(sheet);
 
       for (row = rowstart; row <= lastrow - rowoffset; row++) {
         // copy the cells backwards - extra so no dup of last set
@@ -3256,7 +3581,6 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
       }
       attribs.needsrecalc = "yes";
       break;
-
     case "movepaste":
     case "moveinsert":
       var movingcells: any;
@@ -3269,7 +3593,6 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
 
       sheet.renderneeded = true;
       sheet.changedrendervalues = true;
-      if (saveundo) changes.AddUndo("changedrendervalues"); // to take care of undone pasted spans
       what = cmd.NextToken();
       dest = cmd.NextToken();
       rest = cmd.RestOfString(); // rest is all/formulas/formats
@@ -3283,6 +3606,29 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
       rowoffset = destcr.row - cr1.row;
       numcols = cr2.col - cr1.col + 1;
       numrows = cr2.row - cr1.row + 1;
+      errortext = SocialCalc.PrepareSpillMutation(
+        sheet,
+        [
+          { cr1: cr1, cr2: cr2 },
+          { cr1: destcr, cr2: { col: destcr.col + numcols - 1, row: destcr.row + numrows - 1 } },
+        ],
+        true,
+      );
+      if (errortext) break;
+      if (cmd1 == "moveinsert") {
+        errortext = SocialCalc.PrepareSpillMutation(
+          sheet,
+          [
+            {
+              cr1: { col: 1, row: 1 },
+              cr2: { col: attribs.lastcol, row: attribs.lastrow },
+            },
+          ],
+          true,
+        );
+        if (errortext) break;
+      }
+      if (saveundo) changes.AddUndo("changedrendervalues"); // to take care of undone pasted spans
 
       // get a copy of moving cells and erase from where they were
 
@@ -4072,15 +4418,23 @@ SC.RecalcTimerRoutine = function () {
     SocialCalc.RecalcSetTimeout();
     return;
   }
-
-  // otherwise should be scri.state.calc (all other states handled above)
-
+  // otherwise should be scri.state.calc
   coord = sheet.recalcdata.nextcalc;
   while (coord) {
     cell = sheet.cells[coord] as any;
-    // parseinfo was cached by RecalcCheckCell during the order phase.
-    cell.parseinfo.coord = coord; // app widgets need cell ID
+    cell.parseinfo.coord = coord;
     eresult = scf.evaluate_parsed_formula(cell.parseinfo, sheet, false);
+    if (eresult.type === "array") {
+      var spillvalue = SocialCalc.MaterializeSpill(sheet, coord, eresult);
+      eresult =
+        spillvalue == null
+          ? { value: "#SPILL!", type: "e", error: "#SPILL!" }
+          : { value: spillvalue.value, type: spillvalue.type };
+    } else {
+      SocialCalc.ClearSpill(sheet, cell);
+    }
+    if (eresult.error) cell.errors = eresult.error;
+    else delete cell.errors;
     if (scf.SheetCache.waitingForLoading) {
       // wait until restarted
       // schedule render to run while waiting for dependent sheet to load - schedules first render of sheet
@@ -4110,23 +4464,16 @@ SC.RecalcTimerRoutine = function () {
       scri.currentState = scri.state.done_wait; // start load on next timer call
       return; // return and wait for next recalc timer event
     }
-
     if (cell.datavalue != eresult.value || cell.valuetype != eresult.type) {
-      // only update if changed from last time
       cell.datavalue = eresult.value;
       cell.valuetype = eresult.type;
       delete cell.displaystring;
-      sheet.recalcchangedavalue = true; // remember something changed in case other code wants to know
-    }
-    if (eresult.error) {
-      cell.errors = eresult.error;
+      sheet.recalcchangedavalue = true;
     }
     count++;
     coord = sheet.recalcdata.calclist[coord];
-
     if (Date.now() - starttime.getTime() >= scri.maxtimeslice) {
-      // if taking too long, give up CPU for a while
-      recalcdata.nextcalc = coord; // start with next cell on chain
+      recalcdata.nextcalc = coord;
       recalcdata.count += count;
       do_statuscallback("calcstep", {
         coord: coord,
@@ -4137,6 +4484,16 @@ SC.RecalcTimerRoutine = function () {
       return;
     }
   }
+  if (sheet.spillTopologyChanged && !sheet.spillTopologyRetried) {
+    sheet.spillTopologyRetried = true;
+    sheet.spillTopologyChanged = false;
+    delete sheet.recalcdata;
+    scri.currentState = scri.state.start_calc;
+    SocialCalc.RecalcSetTimeout();
+    return;
+  }
+  sheet.spillTopologyChanged = false;
+  sheet.spillTopologyRetried = false;
 
   recalcdata.inrecalc = false;
 
@@ -4268,6 +4625,7 @@ SC.RecalcCheckCell = function (sheet: any, startcoord: any) {
           coordvals.c = coordvals.c1; // start at the beginning of next row
         }
         rangecoord = SocialCalc.crToCoord(coordvals.c, coordvals.r);
+        rangecoord = SocialCalc.SpillOwnerForCoord(sheet, rangecoord);
 
         // now check that one
 
@@ -4344,7 +4702,7 @@ SC.RecalcCheckCell = function (sheet: any, startcoord: any) {
           coordvals.parsepos = i + 1; // remember our position - come back on next token
           coordvals.oldcoord = oldcoord; // remember back up chain
           oldcoord = coord; // come back to us
-          coord = ttext;
+          coord = SocialCalc.SpillOwnerForCoord(sheet, ttext);
           if (checkinfo[coord] && typeof checkinfo[coord] == "object") {
             // Circular reference
             cell.errors = SocialCalc.Constants.s_caccCircRef + startcoord; // set on original cell making the ref

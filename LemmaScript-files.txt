@@ -1,3 +1,4 @@
 lemma/a1.ts
 lemma/eval-ops.ts
 lemma/lookup-result.ts
+lemma/spill.ts

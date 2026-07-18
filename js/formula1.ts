@@ -232,6 +232,38 @@ FormulaMut.SpecialConstants = {
   "#REF!": "0,e#REF!",
   "#NAME?": "0,e#NAME?",
   "#N/A": "0,e#N/A",
+  "#SPILL!": "0,e#SPILL!",
+};
+FormulaMut.SPILL_MAX_COL = 702;
+FormulaMut.SPILL_MAX_ROW = 65536;
+FormulaMut.SPILL_MAX_CELLS = 100000;
+FormulaMut.PlanSpillStatus = function (anchorCol, anchorRow, rows, cols, maxCol, maxRow, maxCells) {
+  if (!(rows > 0 && cols > 0)) return 1;
+  if (
+    !(
+      anchorCol >= 1 &&
+      anchorRow >= 1 &&
+      anchorCol + cols - 1 <= maxCol &&
+      anchorRow + rows - 1 <= maxRow
+    )
+  )
+    return 2;
+  if (rows * cols > maxCells) return 3;
+  return 0;
+};
+FormulaMut.ClassifySpillClaim = function (anchor, blank, owned, foreign, user, merged) {
+  if (anchor) return 0;
+  if (foreign || user || merged) return 2;
+  return blank || owned ? 1 : 2;
+};
+FormulaMut.ClassifyResizeMembership = function (oldValue, newValue) {
+  return oldValue && newValue ? 0 : !oldValue && newValue ? 1 : oldValue ? 2 : 3;
+};
+FormulaMut.KeepUniqueItem = function (index, firstIndex, count, exactlyOnce) {
+  return exactlyOnce ? count === 1 : index === firstIndex;
+};
+FormulaMut.StableTieCompare = function (result, indexA, indexB) {
+  return result !== 0 ? result : indexA < indexB ? -1 : indexA > indexB ? 1 : 0;
 };
 
 // Operator Precedence table
@@ -482,6 +514,27 @@ FormulaMut.EvaluatePolish = function (parseinfo, revpolish, sheet, allowrangeret
       if (operand.length <= 0) {
         // Nothing on the stack...
         return missingOperandError;
+      }
+      if (
+        (operand[operand.length - 1].type == "array" ||
+          (operand.length > 1 && operand[operand.length - 2].type == "array")) &&
+        (ttext == "M" ||
+          ttext == "P" ||
+          ttext == "%" ||
+          ttext == "&" ||
+          ttext == "<" ||
+          ttext == "L" ||
+          ttext == "=" ||
+          ttext == "G" ||
+          ttext == ">" ||
+          ttext == "N" ||
+          ttext == "+" ||
+          ttext == "-" ||
+          ttext == "*" ||
+          ttext == "/" ||
+          ttext == "^")
+      ) {
+        return { value: 0, type: "e#VALUE!", error: "" };
       }
 
       // Unary minus
@@ -1982,7 +2035,7 @@ FormulaMut.RankMedianQuartileFunctions = function (
     if (numberoperand.type.charAt(0) != "n") {
       // Excel: RANK requires number to resolve to a number; no established
       // equivalent error convention here beyond propagating an existing error.
-      PushOperand(numberoperand.type.charAt(0) == "e" ? numberoperand.type : "e#VALUE!", 0);
+      PushOperand(numberoperand.type, 0);
       return;
     }
     var number = (numberoperand.value as number) - 0;
@@ -2003,7 +2056,7 @@ FormulaMut.RankMedianQuartileFunctions = function (
     if (foperand.length) {
       var orderoperand = scf.OperandAsNumber(sheet, foperand);
       if (orderoperand.type.charAt(0) != "n") {
-        PushOperand(orderoperand.type.charAt(0) == "e" ? orderoperand.type : "e#VALUE!", 0);
+        PushOperand(orderoperand.type, 0);
         return;
       }
       order = (orderoperand.value as number) - 0;
@@ -2041,7 +2094,7 @@ FormulaMut.RankMedianQuartileFunctions = function (
     }
     var quartoperand = scf.OperandAsNumber(sheet, foperand);
     if (quartoperand.type.charAt(0) != "n") {
-      PushOperand(quartoperand.type.charAt(0) == "e" ? quartoperand.type : "e#VALUE!", 0);
+      PushOperand(quartoperand.type, 0);
       return;
     }
     // MS-documented legacy QUARTILE/QUARTILE.INC behavior: truncate a
@@ -7276,3 +7329,176 @@ FormulaMut.TestCriteria = function (value, type, criteria) {
 
   return cond;
 };
+// Dynamic-array functions.  These intentionally return a typed rectangular value;
+// the spill layer consumes the rectangle without losing cell types.
+FormulaMut.MaterializeArray = function (sheet, value) {
+  if (value.type == "array") return value.value;
+  var range = value;
+  if (value.type == "coord")
+    range = { type: "range", value: value.value + "|" + value.value + "|0" };
+  if (range.type != "range") return null;
+  var info = FormulaMut.DecodeRangeParts(sheet, range.value);
+  if (!info) return null;
+  var cells = [];
+  for (var r = 0; r < info.nrows; r++) {
+    var row = [];
+    for (var c = 0; c < info.ncols; c++) {
+      var cell = info.sheetdata.cells[SocialCalc.crToCoord(info.col1num + c, info.row1num + r)];
+      row.push(cell ? { value: cell.datavalue, type: cell.valuetype } : { value: 0, type: "b" });
+    }
+    cells.push(row);
+  }
+  return { rows: info.nrows, cols: info.ncols, cells: cells };
+};
+FormulaMut.DynamicArrayFunctions = function (
+  fname: string,
+  operand: SocialCalc.FormulaOperand[],
+  foperand: SocialCalc.FormulaOperand[],
+  sheet: SocialCalc.Sheet,
+): void {
+  var scf = SocialCalc.Formula;
+  var source = scf.TopOfStackValueAndType(sheet, foperand);
+  var array = scf.MaterializeArray(sheet, source);
+  if (!array) {
+    operand.push({ type: "e#VALUE!", value: 0 });
+    return;
+  }
+  var fail = function () {
+    operand.push({ type: "e#VALUE!", value: 0 });
+  };
+  if (fname == "UNIQUE") {
+    if (foperand.length > 2) {
+      fail();
+      return;
+    }
+    var byColumn = false,
+      exactly = false;
+    if (foperand.length) {
+      var b = scf.OperandAsNumber(sheet, foperand);
+      if (b.type.charAt(0) != "n") {
+        fail();
+        return;
+      }
+      byColumn = b.value != 0;
+    }
+    if (foperand.length) {
+      var e = scf.OperandAsNumber(sheet, foperand);
+      if (e.type.charAt(0) != "n") {
+        fail();
+        return;
+      }
+      exactly = e.value != 0;
+    }
+    var groups = byColumn ? array.cols : array.rows,
+      width = byColumn ? array.rows : array.cols;
+    var first = new Map<string, number>(),
+      counts = new Map<string, number>(),
+      keys: string[] = [];
+    for (var i = 0; i < groups; i++) {
+      var parts: string[] = [];
+      for (var j = 0; j < width; j++) {
+        var cell = byColumn ? array.cells[j]![i]! : array.cells[i]![j]!;
+        var text = String(cell.value);
+        parts.push(cell.type.length + ":" + cell.type + ":" + text.length + ":" + text);
+      }
+      var key = parts.join("|");
+      keys.push(key);
+      if (!first.has(key)) first.set(key, i);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    var keep: number[] = [];
+    for (var k = 0; k < groups; k++)
+      if (scf.KeepUniqueItem(k, first.get(keys[k])!, counts.get(keys[k])!, exactly)) keep.push(k);
+    if (!keep.length) {
+      operand.push({
+        type: "array",
+        value: { rows: 1, cols: 1, cells: [[{ type: "e#N/A", value: 0 }]] },
+      });
+      return;
+    }
+    var out: SocialCalc.FormulaArrayCell[][] = [];
+    if (byColumn)
+      for (var r = 0; r < array.rows; r++) {
+        var rr: SocialCalc.FormulaArrayCell[] = [];
+        for (var q = 0; q < keep.length; q++) rr.push(array.cells[r]![keep[q]]!);
+        out.push(rr);
+      }
+    else for (var q = 0; q < keep.length; q++) out.push(array.cells[keep[q]]!.slice());
+    operand.push({
+      type: "array",
+      value: {
+        rows: byColumn ? array.rows : keep.length,
+        cols: byColumn ? keep.length : array.cols,
+        cells: out,
+      },
+    });
+    return;
+  }
+  if (foperand.length < 2 || foperand.length % 2 != 0) {
+    fail();
+    return;
+  }
+  var sortKeys: { col: number; asc: boolean }[] = [];
+  while (foperand.length) {
+    var col = scf.OperandAsNumber(sheet, foperand),
+      asc = scf.OperandAsNumber(sheet, foperand);
+    if (
+      col.type.charAt(0) != "n" ||
+      asc.type.charAt(0) != "n" ||
+      !Number.isFinite(Number(col.value)) ||
+      Math.floor(Number(col.value)) != Number(col.value) ||
+      Number(col.value) < 1 ||
+      Number(col.value) > array.cols ||
+      !Number.isFinite(Number(asc.value))
+    ) {
+      fail();
+      return;
+    }
+    sortKeys.push({ col: Number(col.value) - 1, asc: Number(asc.value) != 0 });
+  }
+  var rows = array.cells.map(function (row, index) {
+    return { row: row, index: index };
+  });
+  rows.sort(function (a, b) {
+    for (var z = 0; z < sortKeys.length; z++) {
+      var x = a.row[sortKeys[z]!.col]!,
+        y = b.row[sortKeys[z]!.col]!,
+        result = 0;
+      if (x.type.charAt(0) == "e" || y.type.charAt(0) == "e") {
+        if (x.type.charAt(0) == "e" && y.type.charAt(0) == "e")
+          result = x.type < y.type ? -1 : x.type > y.type ? 1 : 0;
+        else result = x.type.charAt(0) == "e" ? 1 : -1;
+      } else if (x.type == "b" || y.type == "b")
+        result = x.type == y.type ? 0 : x.type == "b" ? -1 : 1;
+      else if (x.type.charAt(0) == "n" && y.type.charAt(0) == "n")
+        result = Number(x.value) - Number(y.value);
+      else if (x.type.charAt(0) == "n" || y.type.charAt(0) == "n")
+        result = x.type.charAt(0) == "n" ? -1 : 1;
+      else {
+        var xt = String(x.value).toLowerCase(),
+          yt = String(y.value).toLowerCase();
+        result = xt < yt ? -1 : xt > yt ? 1 : 0;
+      }
+      if (result) return sortKeys[z]!.asc ? result : -result;
+    }
+    return scf.StableTieCompare(0, a.index, b.index);
+  });
+  operand.push({
+    type: "array",
+    value: {
+      rows: array.rows,
+      cols: array.cols,
+      cells: rows.map(function (x) {
+        return x.row;
+      }),
+    },
+  });
+};
+FormulaMut.FunctionList["SORT"] = [FormulaMut.DynamicArrayFunctions, -3, "sort", null, "lookup"];
+FormulaMut.FunctionList["UNIQUE"] = [
+  FormulaMut.DynamicArrayFunctions,
+  -1,
+  "unique",
+  null,
+  "lookup",
+];

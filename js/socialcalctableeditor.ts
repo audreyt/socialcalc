@@ -2339,6 +2339,7 @@ TableEditorSC.EditorOpenCellEdit = function (editor: any) {
   if (!editor.ecell) return true; // no ecell
   if (!editor.inputBox) return true; // no input box, so no editing (happens on noEdit)
   if (editor.inputBox.element.disabled) return true; // multi-line: ignore
+  if (editor.context.sheetobj.cells[editor.ecell.coord]?.spillowner) return true;
   editor.inputBox.ShowInputBox(true);
   editor.inputBox.Focus();
   editor.inputBox.SetText("");
@@ -2630,6 +2631,14 @@ TableEditorSC.EditorSaveEdit = function (editor: any, text: any) {
     value = TableEditorSC.encodeForSave(value); // newlines, :, and \ are escaped
   }
 
+  var liveCell = sheetobj.cells[wval.ecoord];
+  if (liveCell?.spillowner) {
+    editor.inputBox.ShowInputBox(false);
+    editor.state = "start";
+    editor.cellhandles.ShowCellHandles(true);
+    editor.inputBox.DisplayCellContents(null);
+    return;
+  }
   cmdline = "set " + wval.ecoord + " " + type + " " + value;
   editor.EditorScheduleSheetCommands(cmdline, true, false);
   // eddy EditorSaveEdit {

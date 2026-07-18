@@ -84,3 +84,9 @@ lean_lib LookupResult where
   srcDir := "lemma"
   roots := #[`«lookup-result.types», `«lookup-result.def», `«lookup-result.proof»]
   extraDepTargets := #[``downloadDependencies]
+
+@[default_target]
+lean_lib Spill where
+  srcDir := "lemma"
+  roots := #[`«spill.types», `«spill.def», `«spill.proof»]
+  extraDepTargets := #[``downloadDependencies]

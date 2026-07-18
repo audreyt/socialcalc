@@ -675,6 +675,12 @@
     s_fdef_STDEVP: 'Returns the standard deviation of the numeric values. ',
     s_fdef_SUBSTITUTE:
       'Returns text1 with the all occurrences of oldtext replaced by newtext. If "occurrence" is present, then only that occurrence is replaced. ',
+    s_fdef_SORT:
+      'Sorts rows of an array by one or more columns, preserving stable source order for ties. ',
+    s_fdef_UNIQUE:
+      'Returns the unique rows or columns of an array; optionally returns values occurring exactly once. ',
+    s_farg_sort: 'range, sort_column, is_ascending, [sort_column2, is_ascending2, ...]',
+    s_farg_unique: 'range, [by_column], [exactly_once]',
     s_fdef_SUM:
       'Adds the numeric values. The values to the sum function may be ranges in the form similar to A1:B5. ',
     s_fdef_SUMIF:
@@ -986,6 +992,11 @@ More comments yet to come...
     rowspan: 2,
     cssc: 2,
     csss: 2,
+    spillrows: 1,
+    spillcols: 1,
+    spillowner: 1,
+    spillrow: 1,
+    spillcol: 1,
     mod: 2,
     displaystring: 3,
     parseinfo: 3,
@@ -1004,6 +1015,259 @@ More comments yet to come...
     cellformat: 'cellformat',
     nontextvalueformat: 'valueformat',
     textvalueformat: 'valueformat',
+  };
+  SC.ClearSpill = function (sheet, anchor) {
+    var removed = false;
+    var rows = anchor.spillrows || 0,
+      cols = anchor.spillcols || 0;
+    var cr = SocialCalc.coordToCr(anchor.coord);
+    for (var r = 0; r < rows; r++)
+      for (var c = 0; c < cols; c++) {
+        if (!r && !c) continue;
+        var coord = SocialCalc.crToCoord(cr.col + c, cr.row + r);
+        var cell = sheet.cells[coord];
+        if (cell && cell.spillowner === anchor.coord) {
+          delete sheet.cells[coord];
+          removed = true;
+        }
+      }
+    delete anchor.spillrows;
+    delete anchor.spillcols;
+    if (removed) {
+      sheet.renderneeded = true;
+      sheet.changedrendervalues = true;
+      sheet.spillTopologyChanged = true;
+      sheet.reRenderCellList = sheet.reRenderCellList || [];
+      if (sheet.reRenderCellList.indexOf(anchor.coord) < 0)
+        sheet.reRenderCellList.push(anchor.coord);
+    }
+    return removed;
+  };
+  SC.ClearAllDerivedSpills = function (sheet) {
+    var changed = false;
+    for (var key in sheet.cells) {
+      var cell = sheet.cells[key];
+      if (!cell) continue;
+      if (cell.spillowner) {
+        delete sheet.cells[key];
+        changed = true;
+      } else if (cell.spillrows || cell.spillcols) {
+        delete cell.spillrows;
+        delete cell.spillcols;
+        changed = true;
+      }
+    }
+    if (changed) {
+      sheet.renderneeded = true;
+      sheet.changedrendervalues = true;
+      sheet.spillTopologyChanged = true;
+    }
+  };
+  SC.SanitizeSpills = function (sheet) {
+    var valid = {};
+    for (var key in sheet.cells) {
+      var cell = sheet.cells[key],
+        ok = false,
+        cr;
+      if (!cell || cell.spillowner || (cell.spillrows == null && cell.spillcols == null)) continue;
+      try {
+        cr = SocialCalc.coordToCr(key);
+        ok =
+          Number.isInteger(cell.spillrows) &&
+          Number.isInteger(cell.spillcols) &&
+          cell.spillrows > 0 &&
+          cell.spillcols > 0 &&
+          cell.datatype === 'f' &&
+          !!cell.formula &&
+          SocialCalc.Formula.PlanSpillStatus(
+            cr.col,
+            cr.row,
+            cell.spillrows,
+            cell.spillcols,
+            SocialCalc.Formula.SPILL_MAX_COL,
+            SocialCalc.Formula.SPILL_MAX_ROW,
+            SocialCalc.Formula.SPILL_MAX_CELLS,
+          ) === 0;
+      } catch {}
+      if (ok) valid[key] = true;
+      else {
+        delete cell.spillrows;
+        delete cell.spillcols;
+      }
+    }
+    for (var childkey in sheet.cells) {
+      var child = sheet.cells[childkey],
+        owner = child && sheet.cells[child.spillowner],
+        good = false;
+      if (!child || !child.spillowner) continue;
+      if (owner && valid[child.spillowner])
+        try {
+          var a = SocialCalc.coordToCr(child.spillowner),
+            c = SocialCalc.coordToCr(childkey);
+          good =
+            Number.isInteger(child.spillrow) &&
+            Number.isInteger(child.spillcol) &&
+            child.spillrow >= 0 &&
+            child.spillcol >= 0 &&
+            (child.spillrow || child.spillcol) &&
+            child.spillrow < owner.spillrows &&
+            child.spillcol < owner.spillcols &&
+            c.col === a.col + child.spillcol &&
+            c.row === a.row + child.spillrow;
+        } catch {}
+      if (!good) delete sheet.cells[childkey];
+      else {
+        child.datatype = null;
+        child.formula = '';
+      }
+    }
+    sheet.renderneeded = true;
+  };
+  SC.SpillOwnerForCoord = function (sheet, coord) {
+    var cell = sheet.cells[coord];
+    return cell && cell.spillowner ? cell.spillowner : coord;
+  };
+  SC.SpillCommandError = 'Cannot change part of a spilled array.';
+  SC.PrepareSpillMutation = function (sheet, ranges, blockAnchors) {
+    var anchors = {},
+      parsed = [],
+      i,
+      range,
+      coord,
+      cell,
+      cr,
+      covered;
+    for (i = 0; i < ranges.length; i++) {
+      range = typeof ranges[i] === 'string' ? SocialCalc.ParseRange(ranges[i]) : ranges[i];
+      parsed.push(range);
+    }
+    for (coord in sheet.cells) {
+      cell = sheet.cells[coord];
+      if (!cell || cell.readonly) continue;
+      cr = SocialCalc.coordToCr(coord);
+      covered = false;
+      for (i = 0; i < parsed.length; i++) {
+        range = parsed[i];
+        if (
+          cr.col >= range.cr1.col &&
+          cr.col <= range.cr2.col &&
+          cr.row >= range.cr1.row &&
+          cr.row <= range.cr2.row
+        ) {
+          covered = true;
+          break;
+        }
+      }
+      if (!covered) continue;
+      if (cell.spillowner) return SC.SpillCommandError;
+      if (cell.spillrows || cell.spillcols) {
+        if (blockAnchors) return SC.SpillCommandError;
+        anchors[coord] = cell;
+      }
+    }
+    for (coord in anchors) SocialCalc.ClearSpill(sheet, anchors[coord]);
+    return '';
+  };
+  SC.MaterializeSpill = function (sheet, coord, eresult) {
+    var av = eresult && eresult.value,
+      cr = SocialCalc.coordToCr(coord),
+      anchor = sheet.GetAssuredCell(coord);
+    var valid =
+      eresult &&
+      eresult.type === 'array' &&
+      av &&
+      Number.isInteger(av.rows) &&
+      Number.isInteger(av.cols) &&
+      av.rows > 0 &&
+      av.cols > 0 &&
+      Array.isArray(av.cells) &&
+      av.cells.length === av.rows &&
+      av.cells.every(function (row) {
+        return (
+          Array.isArray(row) &&
+          row.length === av.cols &&
+          row.every(function (v) {
+            return v && typeof v.type === 'string' && 'value' in v;
+          })
+        );
+      });
+    if (
+      !valid ||
+      SocialCalc.Formula.PlanSpillStatus(
+        cr.col,
+        cr.row,
+        av && av.rows,
+        av && av.cols,
+        SocialCalc.Formula.SPILL_MAX_COL,
+        SocialCalc.Formula.SPILL_MAX_ROW,
+        SocialCalc.Formula.SPILL_MAX_CELLS,
+      ) !== 0 ||
+      ((av.rows > 1 || av.cols > 1) && (anchor.colspan || anchor.rowspan))
+    ) {
+      SC.ClearSpill(sheet, anchor);
+      return null;
+    }
+    var oldrows = anchor.spillrows || 0,
+      oldcols = anchor.spillcols || 0;
+    var collision = false;
+    for (var key in sheet.cells) {
+      var old = sheet.cells[key];
+      if (!old || key === coord || old.spillowner === coord) continue;
+      var a = SocialCalc.coordToCr(key);
+      var inrect =
+        a.col >= cr.col && a.col < cr.col + av.cols && a.row >= cr.row && a.row < cr.row + av.rows;
+      var merged = old.colspan > 1 || old.rowspan > 1;
+      var intersects =
+        merged &&
+        a.col < cr.col + av.cols &&
+        a.col + (old.colspan || 1) > cr.col &&
+        a.row < cr.row + av.rows &&
+        a.row + (old.rowspan || 1) > cr.row;
+      if (inrect || intersects) {
+        collision = true;
+        break;
+      }
+    }
+    if (collision) {
+      SC.ClearSpill(sheet, anchor);
+      return null;
+    }
+    var topologyChanged = oldrows !== av.rows || oldcols !== av.cols;
+    for (var r = 0; r < oldrows; r++)
+      for (var c = 0; c < oldcols; c++) {
+        if (r < av.rows && c < av.cols) continue;
+        var stale = sheet.cells[SocialCalc.crToCoord(cr.col + c, cr.row + r)];
+        if (stale && stale.spillowner === coord) {
+          delete sheet.cells[stale.coord];
+          topologyChanged = true;
+        }
+      }
+    anchor.spillrows = av.rows;
+    anchor.spillcols = av.cols;
+    for (var rr = 0; rr < av.rows; rr++)
+      for (var cc = 0; cc < av.cols; cc++)
+        if (rr || cc) {
+          var value = av.cells[rr][cc],
+            childcoord = SocialCalc.crToCoord(cr.col + cc, cr.row + rr);
+          var child = sheet.cells[childcoord];
+          if (!child || child.spillowner !== coord) {
+            child = new SocialCalc.Cell(childcoord);
+            topologyChanged = true;
+          }
+          child.datavalue = value.value;
+          child.valuetype = value.type;
+          child.spillowner = coord;
+          child.spillrow = rr;
+          child.spillcol = cc;
+          delete child.displaystring;
+          sheet.cells[childcoord] = child;
+        }
+    sheet.attribs.lastrow = Math.max(sheet.attribs.lastrow, cr.row + av.rows - 1);
+    sheet.attribs.lastcol = Math.max(sheet.attribs.lastcol, cr.col + av.cols - 1);
+    sheet.renderneeded = true;
+    sheet.changedrendervalues = true;
+    if (topologyChanged) sheet.spillTopologyChanged = true;
+    return av.cells[0][0];
   };
   SC.Sheet = function () {
     SocialCalc.ResetSheet(this);
@@ -1293,6 +1557,7 @@ More comments yet to come...
       }
       parts = null;
     }
+    SocialCalc.SanitizeSpills(sheetobj);
   };
   SC.CellFromStringParts = function (sheet, cell, parts, j) {
     var t, v, ro;
@@ -1393,6 +1658,21 @@ More comments yet to come...
         case 'comment':
           cell.comment = SocialCalc.decodeFromSave(parts[j++]);
           break;
+        case 'spillrows':
+          cell.spillrows = parts[j++] - 0;
+          break;
+        case 'spillcols':
+          cell.spillcols = parts[j++] - 0;
+          break;
+        case 'spillowner':
+          cell.spillowner = SocialCalc.decodeFromSave(parts[j++]);
+          break;
+        case 'spillrow':
+          cell.spillrow = parts[j++] - 0;
+          break;
+        case 'spillcol':
+          cell.spillcol = parts[j++] - 0;
+          break;
         default:
           throw SocialCalc.Constants.s_cfspUnknownCellType + " '" + t + "'";
       }
@@ -1465,6 +1745,16 @@ More comments yet to come...
         coord = SocialCalc.crToCoord(col, row);
         cell = sheetobj.cells[coord];
         if (!cell) continue;
+        if (range && (cell.spillowner || cell.spillrows != null || cell.spillcols != null)) {
+          cell = Object.assign({}, cell);
+          delete cell.spillrows;
+          delete cell.spillcols;
+          delete cell.spillowner;
+          delete cell.spillrow;
+          delete cell.spillcol;
+          if (sheetobj.cells[coord].spillowner)
+            cell.datatype = cell.valuetype && cell.valuetype.charAt(0) === 'n' ? 'v' : 't';
+        }
         line = sheetobj.CellToString(cell);
         if (line.length == 0) continue;
         line = 'cell:' + coord + line;
@@ -1551,6 +1841,8 @@ More comments yet to come...
     } else if (cell.datatype == 't') {
       if (cell.valuetype == SocialCalc.Constants.textdatadefaulttype) line += ':t:' + value;
       else line += ':vt:' + cell.valuetype + ':' + value;
+    } else if (cell.datatype == null && cell.spillowner) {
+      line += ':vt:' + cell.valuetype + ':' + value;
     } else {
       formula = SocialCalc.encodeForSave(cell.formula);
       if (cell.datatype == 'f') {
@@ -1604,6 +1896,11 @@ More comments yet to come...
     if (cell.csss) line += ':csss:' + SocialCalc.encodeForSave(cell.csss);
     if (cell.mod) line += ':mod:' + cell.mod;
     if (cell.comment) line += ':comment:' + SocialCalc.encodeForSave(cell.comment);
+    if (cell.spillrows != null) line += ':spillrows:' + cell.spillrows;
+    if (cell.spillcols != null) line += ':spillcols:' + cell.spillcols;
+    if (cell.spillowner) line += ':spillowner:' + SocialCalc.encodeForSave(cell.spillowner);
+    if (cell.spillrow != null) line += ':spillrow:' + cell.spillrow;
+    if (cell.spillcol != null) line += ':spillcol:' + cell.spillcol;
     return line;
   };
   SC.CanonicalizeSheet = function (sheetobj, full) {
@@ -2371,6 +2668,26 @@ More comments yet to come...
           cellChanged = true;
           ParseRange();
           if (
+            attrib == 'value' ||
+            attrib == 'text' ||
+            attrib == 'formula' ||
+            attrib == 'constant' ||
+            attrib == 'empty' ||
+            attrib == 'all'
+          ) {
+            errortext = SocialCalc.PrepareSpillMutation(
+              sheet,
+              [
+                {
+                  cr1,
+                  cr2,
+                },
+              ],
+              false,
+            );
+            if (errortext) break;
+          }
+          if (
             cr1.row != cr2.row ||
             cr1.col != cr2.col ||
             sheet.celldisplayneeded ||
@@ -2501,6 +2818,17 @@ More comments yet to come...
         what = cmd.NextToken();
         rest = cmd.RestOfString();
         ParseRange();
+        errortext = SocialCalc.PrepareSpillMutation(
+          sheet,
+          [
+            {
+              cr1,
+              cr2,
+            },
+          ],
+          true,
+        );
+        if (errortext) break;
         cell = sheet.GetAssuredCell(cr1.coord);
         if (cell.readonly) break;
         for (row = cr1.row; row <= cr2.row; row++) {
@@ -2552,6 +2880,17 @@ More comments yet to come...
         what = cmd.NextToken();
         rest = cmd.RestOfString();
         ParseRange();
+        errortext = SocialCalc.PrepareSpillMutation(
+          sheet,
+          [
+            {
+              cr1,
+              cr2,
+            },
+          ],
+          false,
+        );
+        if (errortext) break;
         if (saveundo) changes.AddUndo('changedrendervalues');
         if (cmd1 == 'cut') {
           if (saveundo)
@@ -2599,10 +2938,21 @@ More comments yet to come...
       case 'filldown':
         sheet.renderneeded = true;
         sheet.changedrendervalues = true;
-        if (saveundo) changes.AddUndo('changedrendervalues');
         what = cmd.NextToken();
         rest = cmd.RestOfString();
         ParseRange();
+        errortext = SocialCalc.PrepareSpillMutation(
+          sheet,
+          [
+            {
+              cr1,
+              cr2,
+            },
+          ],
+          false,
+        );
+        if (errortext) break;
+        if (saveundo) changes.AddUndo('changedrendervalues');
         function increment_amount(down, seriescol, seriesrow) {
           function valid_datatype(type) {
             return type == 'v' || type == 'c';
@@ -2756,7 +3106,6 @@ More comments yet to come...
       case 'paste':
         sheet.renderneeded = true;
         sheet.changedrendervalues = true;
-        if (saveundo) changes.AddUndo('changedrendervalues');
         what = cmd.NextToken();
         rest = cmd.RestOfString();
         ParseRange();
@@ -2768,8 +3117,23 @@ More comments yet to come...
         cliprange = SocialCalc.ParseRange(clipsheet.copiedfrom);
         numcols = Math.max(cr2.col - cr1.col + 1, cliprange.cr2.col - cliprange.cr1.col + 1);
         numrows = Math.max(cr2.row - cr1.row + 1, cliprange.cr2.row - cliprange.cr1.row + 1);
+        errortext = SocialCalc.PrepareSpillMutation(
+          sheet,
+          [
+            {
+              cr1,
+              cr2: {
+                col: cr1.col + numcols - 1,
+                row: cr1.row + numrows - 1,
+              },
+            },
+          ],
+          false,
+        );
+        if (errortext) break;
         if (cr1.col + numcols - 1 > attribs.lastcol) attribs.lastcol = cr1.col + numcols - 1;
         if (cr1.row + numrows - 1 > attribs.lastrow) attribs.lastrow = cr1.row + numrows - 1;
+        if (saveundo) changes.AddUndo('changedrendervalues');
         for (row = cr1.row; row < cr1.row + numrows; row++) {
           for (col = cr1.col; col < cr1.col + numcols; col++) {
             cr = SocialCalc.crToCoord(col, row);
@@ -2852,9 +3216,20 @@ More comments yet to come...
       case 'sort':
         sheet.renderneeded = true;
         sheet.changedrendervalues = true;
-        if (saveundo) changes.AddUndo('changedrendervalues');
         what = cmd.NextToken();
         ParseRange();
+        errortext = SocialCalc.PrepareSpillMutation(
+          sheet,
+          [
+            {
+              cr1,
+              cr2,
+            },
+          ],
+          true,
+        );
+        if (errortext) break;
+        if (saveundo) changes.AddUndo('changedrendervalues');
         cols = [];
         dirs = [];
         lastsortcol = 0;
@@ -3016,6 +3391,7 @@ More comments yet to come...
           newrowend = cr1.row;
           if (saveundo) changes.AddUndo('deleterow ' + cr1.coord);
         }
+        SocialCalc.ClearAllDerivedSpills(sheet);
         for (row = lastrow; row >= rowend; row--) {
           for (col = lastcol; col >= colend; col--) {
             crbase = SocialCalc.crToCoord(col, row);
@@ -3155,6 +3531,7 @@ More comments yet to come...
             }
           }
         }
+        SocialCalc.ClearAllDerivedSpills(sheet);
         for (row = rowstart; row <= lastrow - rowoffset; row++) {
           for (col = colstart; col <= lastcol - coloffset; col++) {
             cr = SocialCalc.crToCoord(col + coloffset, row + rowoffset);
@@ -3332,7 +3709,6 @@ More comments yet to come...
         var movedto;
         sheet.renderneeded = true;
         sheet.changedrendervalues = true;
-        if (saveundo) changes.AddUndo('changedrendervalues');
         what = cmd.NextToken();
         dest = cmd.NextToken();
         rest = cmd.RestOfString();
@@ -3343,6 +3719,44 @@ More comments yet to come...
         rowoffset = destcr.row - cr1.row;
         numcols = cr2.col - cr1.col + 1;
         numrows = cr2.row - cr1.row + 1;
+        errortext = SocialCalc.PrepareSpillMutation(
+          sheet,
+          [
+            {
+              cr1,
+              cr2,
+            },
+            {
+              cr1: destcr,
+              cr2: {
+                col: destcr.col + numcols - 1,
+                row: destcr.row + numrows - 1,
+              },
+            },
+          ],
+          true,
+        );
+        if (errortext) break;
+        if (cmd1 == 'moveinsert') {
+          errortext = SocialCalc.PrepareSpillMutation(
+            sheet,
+            [
+              {
+                cr1: {
+                  col: 1,
+                  row: 1,
+                },
+                cr2: {
+                  col: attribs.lastcol,
+                  row: attribs.lastrow,
+                },
+              },
+            ],
+            true,
+          );
+          if (errortext) break;
+        }
+        if (saveundo) changes.AddUndo('changedrendervalues');
         movingcells = {};
         for (row = cr1.row; row <= cr2.row; row++) {
           for (col = cr1.col; col <= cr2.col; col++) {
@@ -3917,6 +4331,24 @@ More comments yet to come...
       cell = sheet.cells[coord];
       cell.parseinfo.coord = coord;
       eresult = scf.evaluate_parsed_formula(cell.parseinfo, sheet, false);
+      if (eresult.type === 'array') {
+        var spillvalue = SocialCalc.MaterializeSpill(sheet, coord, eresult);
+        eresult =
+          spillvalue == null
+            ? {
+                value: '#SPILL!',
+                type: 'e',
+                error: '#SPILL!',
+              }
+            : {
+                value: spillvalue.value,
+                type: spillvalue.type,
+              };
+      } else {
+        SocialCalc.ClearSpill(sheet, cell);
+      }
+      if (eresult.error) cell.errors = eresult.error;
+      else delete cell.errors;
       if (scf.SheetCache.waitingForLoading) {
         if (scri.firstRenderScheduled != true) {
           var editor = SocialCalc.GetSpreadsheetControlObject().editor;
@@ -3948,9 +4380,6 @@ More comments yet to come...
         delete cell.displaystring;
         sheet.recalcchangedavalue = true;
       }
-      if (eresult.error) {
-        cell.errors = eresult.error;
-      }
       count++;
       coord = sheet.recalcdata.calclist[coord];
       if (Date.now() - starttime.getTime() >= scri.maxtimeslice) {
@@ -3965,6 +4394,16 @@ More comments yet to come...
         return;
       }
     }
+    if (sheet.spillTopologyChanged && !sheet.spillTopologyRetried) {
+      sheet.spillTopologyRetried = true;
+      sheet.spillTopologyChanged = false;
+      delete sheet.recalcdata;
+      scri.currentState = scri.state.start_calc;
+      SocialCalc.RecalcSetTimeout();
+      return;
+    }
+    sheet.spillTopologyChanged = false;
+    sheet.spillTopologyRetried = false;
     recalcdata.inrecalc = false;
     sheet.reRenderCellList = sheet.recalcdata.celllist;
     delete sheet.recalcdata;
@@ -4047,6 +4486,7 @@ More comments yet to come...
             coordvals.c = coordvals.c1;
           }
           rangecoord = SocialCalc.crToCoord(coordvals.c, coordvals.r);
+          rangecoord = SocialCalc.SpillOwnerForCoord(sheet, rangecoord);
           coordvals.parsepos = i;
           coordvals.oldcoord = oldcoord;
           oldcoord = coord;
@@ -4107,7 +4547,7 @@ More comments yet to come...
             coordvals.parsepos = i + 1;
             coordvals.oldcoord = oldcoord;
             oldcoord = coord;
-            coord = ttext;
+            coord = SocialCalc.SpillOwnerForCoord(sheet, ttext);
             if (checkinfo[coord] && typeof checkinfo[coord] == 'object') {
               cell.errors = SocialCalc.Constants.s_caccCircRef + startcoord;
               checkinfo[startcoord] = true;
@@ -7766,6 +8206,7 @@ More comments yet to come...
     if (!editor.ecell) return true;
     if (!editor.inputBox) return true;
     if (editor.inputBox.element.disabled) return true;
+    if (editor.context.sheetobj.cells[editor.ecell.coord]?.spillowner) return true;
     editor.inputBox.ShowInputBox(true);
     editor.inputBox.Focus();
     editor.inputBox.SetText('');
@@ -8018,6 +8459,14 @@ More comments yet to come...
     }
     if (type.charAt(0) == 't') {
       value = TableEditorSC.encodeForSave(value);
+    }
+    var liveCell = sheetobj.cells[wval.ecoord];
+    if (liveCell?.spillowner) {
+      editor.inputBox.ShowInputBox(false);
+      editor.state = 'start';
+      editor.cellhandles.ShowCellHandles(true);
+      editor.inputBox.DisplayCellContents(null);
+      return;
     }
     cmdline = 'set ' + wval.ecoord + ' ' + type + ' ' + value;
     editor.EditorScheduleSheetCommands(cmdline, true, false);
@@ -12254,6 +12703,46 @@ More comments yet to come...
     '#REF!': '0,e#REF!',
     '#NAME?': '0,e#NAME?',
     '#N/A': '0,e#N/A',
+    '#SPILL!': '0,e#SPILL!',
+  };
+  FormulaMut.SPILL_MAX_COL = 702;
+  FormulaMut.SPILL_MAX_ROW = 65536;
+  FormulaMut.SPILL_MAX_CELLS = 1e5;
+  FormulaMut.PlanSpillStatus = function (
+    anchorCol,
+    anchorRow,
+    rows,
+    cols,
+    maxCol,
+    maxRow,
+    maxCells,
+  ) {
+    if (!(rows > 0 && cols > 0)) return 1;
+    if (
+      !(
+        anchorCol >= 1 &&
+        anchorRow >= 1 &&
+        anchorCol + cols - 1 <= maxCol &&
+        anchorRow + rows - 1 <= maxRow
+      )
+    )
+      return 2;
+    if (rows * cols > maxCells) return 3;
+    return 0;
+  };
+  FormulaMut.ClassifySpillClaim = function (anchor, blank, owned, foreign, user, merged) {
+    if (anchor) return 0;
+    if (foreign || user || merged) return 2;
+    return blank || owned ? 1 : 2;
+  };
+  FormulaMut.ClassifyResizeMembership = function (oldValue, newValue) {
+    return oldValue && newValue ? 0 : !oldValue && newValue ? 1 : oldValue ? 2 : 3;
+  };
+  FormulaMut.KeepUniqueItem = function (index, firstIndex, count, exactlyOnce) {
+    return exactlyOnce ? count === 1 : index === firstIndex;
+  };
+  FormulaMut.StableTieCompare = function (result, indexA, indexB) {
+    return result !== 0 ? result : indexA < indexB ? -1 : indexA > indexB ? 1 : 0;
   };
   FormulaMut.TokenPrecedence = {
     '!': 1,
@@ -12421,6 +12910,31 @@ More comments yet to come...
       } else if (ttype == tokentype.op) {
         if (operand.length <= 0) {
           return missingOperandError;
+        }
+        if (
+          (operand[operand.length - 1].type == 'array' ||
+            (operand.length > 1 && operand[operand.length - 2].type == 'array')) &&
+          (ttext == 'M' ||
+            ttext == 'P' ||
+            ttext == '%' ||
+            ttext == '&' ||
+            ttext == '<' ||
+            ttext == 'L' ||
+            ttext == '=' ||
+            ttext == 'G' ||
+            ttext == '>' ||
+            ttext == 'N' ||
+            ttext == '+' ||
+            ttext == '-' ||
+            ttext == '*' ||
+            ttext == '/' ||
+            ttext == '^')
+        ) {
+          return {
+            value: 0,
+            type: 'e#VALUE!',
+            error: '',
+          };
         }
         if (ttext == 'M') {
           value1 = operand_as_number(sheet, operand);
@@ -13313,7 +13827,7 @@ More comments yet to come...
     if (fname == 'RANK') {
       var numberoperand = scf.OperandAsNumber(sheet, foperand);
       if (numberoperand.type.charAt(0) != 'n') {
-        PushOperand(numberoperand.type.charAt(0) == 'e' ? numberoperand.type : 'e#VALUE!', 0);
+        PushOperand(numberoperand.type, 0);
         return;
       }
       var number = numberoperand.value - 0;
@@ -13332,7 +13846,7 @@ More comments yet to come...
       if (foperand.length) {
         var orderoperand = scf.OperandAsNumber(sheet, foperand);
         if (orderoperand.type.charAt(0) != 'n') {
-          PushOperand(orderoperand.type.charAt(0) == 'e' ? orderoperand.type : 'e#VALUE!', 0);
+          PushOperand(orderoperand.type, 0);
           return;
         }
         order = orderoperand.value - 0;
@@ -13367,7 +13881,7 @@ More comments yet to come...
       }
       var quartoperand = scf.OperandAsNumber(sheet, foperand);
       if (quartoperand.type.charAt(0) != 'n') {
-        PushOperand(quartoperand.type.charAt(0) == 'e' ? quartoperand.type : 'e#VALUE!', 0);
+        PushOperand(quartoperand.type, 0);
         return;
       }
       var quartvalue = quartoperand.value;
@@ -17245,6 +17759,212 @@ More comments yet to come...
     }
     return cond;
   };
+  FormulaMut.MaterializeArray = function (sheet, value) {
+    if (value.type == 'array') return value.value;
+    var range = value;
+    if (value.type == 'coord')
+      range = {
+        type: 'range',
+        value: value.value + '|' + value.value + '|0',
+      };
+    if (range.type != 'range') return null;
+    var info = FormulaMut.DecodeRangeParts(sheet, range.value);
+    if (!info) return null;
+    var cells = [];
+    for (var r = 0; r < info.nrows; r++) {
+      var row = [];
+      for (var c = 0; c < info.ncols; c++) {
+        var cell = info.sheetdata.cells[SocialCalc.crToCoord(info.col1num + c, info.row1num + r)];
+        row.push(
+          cell
+            ? {
+                value: cell.datavalue,
+                type: cell.valuetype,
+              }
+            : {
+                value: 0,
+                type: 'b',
+              },
+        );
+      }
+      cells.push(row);
+    }
+    return {
+      rows: info.nrows,
+      cols: info.ncols,
+      cells,
+    };
+  };
+  FormulaMut.DynamicArrayFunctions = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var source = scf.TopOfStackValueAndType(sheet, foperand);
+    var array = scf.MaterializeArray(sheet, source);
+    if (!array) {
+      operand.push({
+        type: 'e#VALUE!',
+        value: 0,
+      });
+      return;
+    }
+    var fail = function () {
+      operand.push({
+        type: 'e#VALUE!',
+        value: 0,
+      });
+    };
+    if (fname == 'UNIQUE') {
+      if (foperand.length > 2) {
+        fail();
+        return;
+      }
+      var byColumn = false,
+        exactly = false;
+      if (foperand.length) {
+        var b = scf.OperandAsNumber(sheet, foperand);
+        if (b.type.charAt(0) != 'n') {
+          fail();
+          return;
+        }
+        byColumn = b.value != 0;
+      }
+      if (foperand.length) {
+        var e = scf.OperandAsNumber(sheet, foperand);
+        if (e.type.charAt(0) != 'n') {
+          fail();
+          return;
+        }
+        exactly = e.value != 0;
+      }
+      var groups = byColumn ? array.cols : array.rows,
+        width = byColumn ? array.rows : array.cols;
+      var first = new Map(),
+        counts = new Map(),
+        keys = [];
+      for (var i = 0; i < groups; i++) {
+        var parts = [];
+        for (var j = 0; j < width; j++) {
+          var cell = byColumn ? array.cells[j][i] : array.cells[i][j];
+          var text = String(cell.value);
+          parts.push(cell.type.length + ':' + cell.type + ':' + text.length + ':' + text);
+        }
+        var key = parts.join('|');
+        keys.push(key);
+        if (!first.has(key)) first.set(key, i);
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+      var keep = [];
+      for (var k = 0; k < groups; k++)
+        if (scf.KeepUniqueItem(k, first.get(keys[k]), counts.get(keys[k]), exactly)) keep.push(k);
+      if (!keep.length) {
+        operand.push({
+          type: 'array',
+          value: {
+            rows: 1,
+            cols: 1,
+            cells: [
+              [
+                {
+                  type: 'e#N/A',
+                  value: 0,
+                },
+              ],
+            ],
+          },
+        });
+        return;
+      }
+      var out = [];
+      if (byColumn)
+        for (var r = 0; r < array.rows; r++) {
+          var rr = [];
+          for (var q = 0; q < keep.length; q++) rr.push(array.cells[r][keep[q]]);
+          out.push(rr);
+        }
+      else for (var q = 0; q < keep.length; q++) out.push(array.cells[keep[q]].slice());
+      operand.push({
+        type: 'array',
+        value: {
+          rows: byColumn ? array.rows : keep.length,
+          cols: byColumn ? keep.length : array.cols,
+          cells: out,
+        },
+      });
+      return;
+    }
+    if (foperand.length < 2 || foperand.length % 2 != 0) {
+      fail();
+      return;
+    }
+    var sortKeys = [];
+    while (foperand.length) {
+      var col = scf.OperandAsNumber(sheet, foperand),
+        asc = scf.OperandAsNumber(sheet, foperand);
+      if (
+        col.type.charAt(0) != 'n' ||
+        asc.type.charAt(0) != 'n' ||
+        !Number.isFinite(Number(col.value)) ||
+        Math.floor(Number(col.value)) != Number(col.value) ||
+        Number(col.value) < 1 ||
+        Number(col.value) > array.cols ||
+        !Number.isFinite(Number(asc.value))
+      ) {
+        fail();
+        return;
+      }
+      sortKeys.push({
+        col: Number(col.value) - 1,
+        asc: Number(asc.value) != 0,
+      });
+    }
+    var rows = array.cells.map(function (row, index) {
+      return {
+        row,
+        index,
+      };
+    });
+    rows.sort(function (a, b) {
+      for (var z = 0; z < sortKeys.length; z++) {
+        var x = a.row[sortKeys[z].col],
+          y = b.row[sortKeys[z].col],
+          result = 0;
+        if (x.type.charAt(0) == 'e' || y.type.charAt(0) == 'e') {
+          if (x.type.charAt(0) == 'e' && y.type.charAt(0) == 'e')
+            result = x.type < y.type ? -1 : x.type > y.type ? 1 : 0;
+          else result = x.type.charAt(0) == 'e' ? 1 : -1;
+        } else if (x.type == 'b' || y.type == 'b')
+          result = x.type == y.type ? 0 : x.type == 'b' ? -1 : 1;
+        else if (x.type.charAt(0) == 'n' && y.type.charAt(0) == 'n')
+          result = Number(x.value) - Number(y.value);
+        else if (x.type.charAt(0) == 'n' || y.type.charAt(0) == 'n')
+          result = x.type.charAt(0) == 'n' ? -1 : 1;
+        else {
+          var xt = String(x.value).toLowerCase(),
+            yt = String(y.value).toLowerCase();
+          result = xt < yt ? -1 : xt > yt ? 1 : 0;
+        }
+        if (result) return sortKeys[z].asc ? result : -result;
+      }
+      return scf.StableTieCompare(0, a.index, b.index);
+    });
+    operand.push({
+      type: 'array',
+      value: {
+        rows: array.rows,
+        cols: array.cols,
+        cells: rows.map(function (x) {
+          return x.row;
+        }),
+      },
+    });
+  };
+  FormulaMut.FunctionList['SORT'] = [FormulaMut.DynamicArrayFunctions, -3, 'sort', null, 'lookup'];
+  FormulaMut.FunctionList['UNIQUE'] = [
+    FormulaMut.DynamicArrayFunctions,
+    -1,
+    'unique',
+    null,
+    'lookup',
+  ];
 
   // Pure formula parse / token / type helpers.
   // Shipping source extracted from formula1 for full typecheck + LemmaScript.

@@ -23,6 +23,7 @@ Highlights
   floors for all eleven shipping modules, a pinned EtherCalc canary, and a
   deterministic, provenance-aware release pipeline.
 
+
 Compatibility and runtime fixes
 - `EvaluatePolish` now distinguishes genuine NaN results from numeric overflow
   before normalizing the computed value, restoring the correct NaN error text.
@@ -144,12 +145,13 @@ Mutation and formal verification
   Missing reports or unmeasured baselines fail the release gate rather than
   receiving placeholder scores. Each baseline also pins the measured
   full-module mutant count so narrowed reports cannot pass as complete evidence.
+- Retained the three LemmaScript facades and their shipping-oracle tests:
+  A1/reference algebra (26 Dafny VCs), evaluation operators (4), lookup
+  precedence (3), and dynamic-array spill semantics (15), for 48 checked
+  Dafny verification conditions in total.
 - Hardened mutation-report identity/status validation and the critical-mutant
   disposition registry; equivalent-mutant claims remain explicit,
   source-specific proofs rather than exclusions.
-- Retained the three LemmaScript facades and their shipping-oracle tests:
-  A1/reference algebra (26 Dafny VCs), evaluation operators (4), and lookup
-  precedence (3), for 33 checked Dafny verification conditions in total.
 
 Release engineering and dependencies
 - Release tags run independent core, merged-coverage, full-mutation,
@@ -173,6 +175,11 @@ Release engineering and dependencies
   re-audit conditions are recorded in `docs/security-disposition.json`; no
   advisory package is shipped in the npm tarball.
 Formula functions
+- Completed dynamic-array implementation for
+  [audreyt/ethercalc#650](https://github.com/audreyt/ethercalc/issues/650):
+  evaluator typed arrays, live `SORT`/`UNIQUE`, transactional spill
+  ownership with collision handling and recalc grow/shrink, persistence,
+  commands, and editor integration, with the public facade verified.
 - Added RANK(number,ref,[order]), MEDIAN(v1,c1:c2,...), and
   QUARTILE(range,quart) (audreyt/ethercalc#712, audreyt/ethercalc#726).
   RANK: descending by default, ascending with a nonzero order argument; tied

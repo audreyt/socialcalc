@@ -65,6 +65,7 @@ declare namespace SocialCalc {
     | "range"
     | "name"
     | "start"
+    | "array"
     | "e#NULL!"
     | "e#NUM!"
     | "e#DIV/0!"
@@ -72,8 +73,19 @@ declare namespace SocialCalc {
     | "e#REF!"
     | "e#NAME?"
     | "e#N/A"
+    | "e#SPILL!"
     | "e*"
     | (string & {});
+
+  interface FormulaArrayCell {
+    value: unknown;
+    type: FormulaOperandType;
+  }
+  interface FormulaArrayValue {
+    rows: number;
+    cols: number;
+    cells: FormulaArrayCell[][];
+  }
 
   interface FormulaParseToken {
     /** The raw characters that make up this token. */
@@ -218,6 +230,41 @@ declare namespace SocialCalc {
     const UpperCaseTable: { [char: string]: string };
     const SpecialConstants: { [key: string]: string };
     const TokenPrecedence: { [op: string]: number };
+    const SPILL_MAX_COL: number;
+    const SPILL_MAX_ROW: number;
+    const SPILL_MAX_CELLS: number;
+    function PlanSpillStatus(
+      anchorCol: number,
+      anchorRow: number,
+      rows: number,
+      cols: number,
+      maxCol: number,
+      maxRow: number,
+      maxCells: number,
+    ): number;
+    function ClassifySpillClaim(
+      isAnchorCell: boolean,
+      isBlank: boolean,
+      isOwnedBySameAnchor: boolean,
+      isForeignSpill: boolean,
+      hasUserContent: boolean,
+      isMergedTarget: boolean,
+    ): number;
+    function ClassifyResizeMembership(inOld: boolean, inNew: boolean): number;
+    function KeepUniqueItem(
+      index: number,
+      firstIndexOfValue: number,
+      count: number,
+      exactlyOnce: boolean,
+    ): boolean;
+    function StableTieCompare(comparatorResult: number, indexA: number, indexB: number): number;
+    function MaterializeArray(sheet: Sheet, value: FormulaValueResult): FormulaArrayValue | null;
+    function DynamicArrayFunctions(
+      fname: string,
+      operand: FormulaOperand[],
+      foperand: FormulaOperand[],
+      sheet: Sheet,
+    ): void;
     const TokenOpExpansion: { [op: string]: string };
     const TypeLookupTable: { [key: string]: { [subtype: string]: string } };
 

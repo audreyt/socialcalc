@@ -66,6 +66,11 @@ declare namespace SocialCalc {
     comment: string;
     displayvalue: string;
     parseinfo: any;
+    spillrows?: number;
+    spillcols?: number;
+    spillowner?: string;
+    spillrow?: number;
+    spillcol?: number;
 
     bt: number;
     br: number;
@@ -183,6 +188,20 @@ declare namespace SocialCalc {
   const sheetfields: string[];
   const sheetfieldsshort: string[];
   const sheetfieldsxlat: string[];
+  function ClearSpill(sheet: Sheet, anchor: Cell): boolean;
+  function MaterializeSpill(
+    sheet: Sheet,
+    coord: string,
+    result: {
+      value: { rows: number; cols: number; cells: Array<Array<{ value: unknown; type: string }>> };
+      type: string;
+    },
+  ): { value: unknown; type: string } | null;
+  function SpillOwnerForCoord(sheet: Sheet, coord: string): string;
+  const SpillCommandError: string;
+  function PrepareSpillMutation(sheet: Sheet, ranges: any[], blockAnchors: boolean): string;
+  function ClearAllDerivedSpills(sheet: Sheet): void;
+  function SanitizeSpills(sheet: Sheet): void;
   const sheetfieldsxlatshort: string[];
   const sheetfieldsxlatxlt: string[];
 
