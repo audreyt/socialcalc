@@ -156,7 +156,7 @@ test("s_loc_* localization strings (every key SC.LocalizeString/LocalizeSubstrin
   expect(candidate).toEqual(pickByPrefix(Oracle.Constants, "s_loc_"));
 });
 
-test("s_fdef_*/s_farg_* formula help text (function definitions and argument hints) match the oracle 3.0.8 baseline byte-for-byte", async () => {
+test("s_fdef_*/s_farg_* formula help text (function definitions and argument hints) match the oracle 3.0.8 baseline byte-for-byte, plus post-3.0.8 additions", async () => {
   const SC = await loadSocialCalc();
   const Oracle = loadOracleSocialCalc();
   const candidateFdef = pickByPrefix(SC.Constants, "s_fdef_");
@@ -164,8 +164,41 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
   // 115 s_fdef_* + 38 s_farg_* = 153 keys read dynamically by formula1.ts via
   // scc["s_fdef_" + fname] / scc["s_farg_" + f[2]] for the formula-entry help popup
   // — the second-largest StringLiteral survivor cluster in the file.
-  expect(Object.keys(candidateFdef).length).toBe(115);
-  expect(Object.keys(candidateFarg).length).toBe(38);
-  expect(candidateFdef).toEqual(pickByPrefix(Oracle.Constants, "s_fdef_"));
-  expect(candidateFarg).toEqual(pickByPrefix(Oracle.Constants, "s_farg_"));
+  //
+  // RANK/MEDIAN/QUARTILE (audreyt/ethercalc#712, #726) were added after the 3.0.8
+  // baseline was vendored, so the oracle bundle can never contain their s_fdef_/
+  // s_farg_ keys — a byte-for-byte toEqual against the full candidate object would
+  // fail permanently on these five keys alone, regardless of correctness. Carve out
+  // exactly this named, closed set (3 s_fdef_ + 2 s_farg_) before the oracle
+  // comparison; every other key still gets whole-object byte-for-byte parity, and
+  // the total counts (118/40) stay pinned so a future undocumented addition or
+  // removal still fails loudly instead of silently passing through this carve-out.
+  const postOracleFdefKeys = ["s_fdef_RANK", "s_fdef_MEDIAN", "s_fdef_QUARTILE"];
+  const postOracleFargKeys = ["s_farg_rank", "s_farg_quartile"];
+
+  expect(Object.keys(candidateFdef).length).toBe(118);
+  expect(Object.keys(candidateFarg).length).toBe(40);
+
+  const legacyFdef = { ...candidateFdef };
+  const legacyFarg = { ...candidateFarg };
+  for (const key of postOracleFdefKeys) delete legacyFdef[key];
+  for (const key of postOracleFargKeys) delete legacyFarg[key];
+
+  expect(Object.keys(legacyFdef).length).toBe(115);
+  expect(Object.keys(legacyFarg).length).toBe(38);
+  expect(legacyFdef).toEqual(pickByPrefix(Oracle.Constants, "s_fdef_"));
+  expect(legacyFarg).toEqual(pickByPrefix(Oracle.Constants, "s_farg_"));
+
+  // The five post-3.0.8 keys have no oracle counterpart to diff against. The
+  // focused statistical-formula test (test/formula-rank-median-quartile.test.ts,
+  // "RANK/MEDIAN/QUARTILE are registered in FunctionList with help text and arg
+  // strings") covers FunctionList/picker plumbing for all three functions, exact
+  // full-string equality for the two s_farg_* arg strings, and toContain content
+  // anchors (not exact full-string equality) for the three s_fdef_* definitions.
+  for (const key of postOracleFdefKeys) {
+    expect(candidateFdef[key]).toBeTruthy();
+  }
+  for (const key of postOracleFargKeys) {
+    expect(candidateFarg[key]).toBeTruthy();
+  }
 });

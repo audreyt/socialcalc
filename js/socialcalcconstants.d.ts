@@ -507,6 +507,7 @@ declare namespace SocialCalc {
     s_fdef_MID: string;
     s_fdef_MIN: string;
     s_fdef_MINUTE: string;
+    s_fdef_MEDIAN: string;
     s_fdef_MOD: string;
     s_fdef_MONTH: string;
     s_fdef_N: string;
@@ -523,7 +524,9 @@ declare namespace SocialCalc {
     s_fdef_PRODUCT: string;
     s_fdef_PROPER: string;
     s_fdef_PV: string;
+    s_fdef_QUARTILE: string;
     s_fdef_RADIANS: string;
+    s_fdef_RANK: string;
     s_fdef_RATE: string;
     s_fdef_REPLACE: string;
     s_fdef_REPT: string;
@@ -584,6 +587,8 @@ declare namespace SocialCalc {
     s_farg_pmt: string;
     s_farg_pv: string;
     s_farg_rate: string;
+    s_farg_rank: string;
+    s_farg_quartile: string;
     s_farg_replace: string;
     s_farg_vp: string;
     s_farg_valpre: string;

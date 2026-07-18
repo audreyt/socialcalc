@@ -1913,6 +1913,220 @@ SocialCalc.Formula.FunctionList["VARP"] = [
 
 /*
 #
+# RANK(number,ref,[order])
+# MEDIAN(v1,c1:c2,...)
+# QUARTILE(range,quart)
+#
+# Order statistics: unlike SeriesFunctions, these need the full sorted list of
+# numeric values, not just running accumulators, so they get their own
+# subroutine. Extraction/skip/error-propagation conventions (numeric-only,
+# blank/text ignored, first range error wins) mirror SeriesFunctions above.
+#
+*/
+
+/**
+ * Collect the numeric values from one or more scalar/range operands,
+ * draining foperand via OperandValueAndType (so ranges/cross-sheet refs/
+ * blanks/text are resolved exactly as SeriesFunctions resolves them).
+ * Returns {values, errortype} where errortype is set to the first
+ * non-numeric error type encountered (blank/text members are skipped, not
+ * errors).
+ */
+FormulaMut.CollectNumericValues = function (
+  sheet: SocialCalc.Sheet,
+  foperand: SocialCalc.FormulaOperand[],
+): { values: number[]; errortype: SocialCalc.FormulaOperandType | "" } {
+  var scf = SocialCalc.Formula;
+  var operand_value_and_type = scf.OperandValueAndType;
+  var values: number[] = [];
+  var errortype: SocialCalc.FormulaOperandType | "" = "";
+  var value1: SocialCalc.FormulaValueResult, t: string;
+
+  while (foperand.length > 0) {
+    value1 = operand_value_and_type(sheet, foperand);
+    t = value1.type.charAt(0);
+    if (t == "n") {
+      values.push((value1.value as number) - 0);
+    } else if (t == "e" && !errortype) {
+      errortype = value1.type; // preserve first encountered range error
+    }
+    // text/blank members are ignored, matching SeriesFunctions
+  }
+
+  return { values: values, errortype: errortype };
+};
+
+/**
+ * RANK(number,ref,[order]), MEDIAN(v1,c1:c2,...), QUARTILE(range,quart).
+ *
+ * Order statistics: unlike SeriesFunctions, these need the full sorted list
+ * of numeric values, not just running accumulators, so they get their own
+ * subroutine. Extraction/skip/error-propagation conventions (numeric-only,
+ * blank/text ignored, first range error wins) mirror SeriesFunctions above.
+ */
+FormulaMut.RankMedianQuartileFunctions = function (
+  fname: string,
+  operand: SocialCalc.FormulaOperand[],
+  foperand: SocialCalc.FormulaOperand[],
+  sheet: SocialCalc.Sheet,
+) {
+  var scf = SocialCalc.Formula;
+
+  var PushOperand = function (t: SocialCalc.FormulaOperandType, v: unknown) {
+    operand.push({ type: t, value: v });
+  };
+
+  if (fname == "RANK") {
+    // RANK(number, ref, [order]) -- args arrive in foperand in call order.
+    var numberoperand = scf.OperandAsNumber(sheet, foperand);
+    if (numberoperand.type.charAt(0) != "n") {
+      // Excel: RANK requires number to resolve to a number; no established
+      // equivalent error convention here beyond propagating an existing error.
+      PushOperand(numberoperand.type.charAt(0) == "e" ? numberoperand.type : "e#VALUE!", 0);
+      return;
+    }
+    var number = (numberoperand.value as number) - 0;
+
+    var refoperand = scf.TopOfStackValueAndType(sheet, foperand);
+    if (refoperand.type != "range" && refoperand.type != "coord") {
+      PushOperand("e#VALUE!", 0);
+      return;
+    }
+    var reflist: SocialCalc.FormulaOperand[] = [refoperand];
+    var collected = scf.CollectNumericValues(sheet, reflist);
+    if (collected.errortype) {
+      PushOperand(collected.errortype, 0);
+      return;
+    }
+
+    var order = 0;
+    if (foperand.length) {
+      var orderoperand = scf.OperandAsNumber(sheet, foperand);
+      if (orderoperand.type.charAt(0) != "n") {
+        PushOperand(orderoperand.type.charAt(0) == "e" ? orderoperand.type : "e#VALUE!", 0);
+        return;
+      }
+      order = (orderoperand.value as number) - 0;
+      if (foperand.length) {
+        // too many arguments: RANK accepts at most number, ref, order
+        scf.FunctionArgsError(fname, operand);
+        return;
+      }
+    }
+
+    var rank = 0;
+    var found = false;
+    var values = collected.values;
+    for (var i = 0; i < values.length; i++) {
+      if (values[i] === number) found = true;
+      if (order == 0) {
+        if (values[i]! > number) rank++;
+      } else {
+        if (values[i]! < number) rank++;
+      }
+    }
+    if (!found) {
+      PushOperand("e#N/A", 0); // Excel RANK behavior: number absent from ref
+      return;
+    }
+    PushOperand("n", rank + 1); // ties share the best (lowest) rank
+    return;
+  }
+
+  if (fname == "QUARTILE") {
+    var rangeoperand = scf.TopOfStackValueAndType(sheet, foperand);
+    if (rangeoperand.type != "range" && rangeoperand.type != "coord") {
+      PushOperand("e#VALUE!", 0);
+      return;
+    }
+    var quartoperand = scf.OperandAsNumber(sheet, foperand);
+    if (quartoperand.type.charAt(0) != "n") {
+      PushOperand(quartoperand.type.charAt(0) == "e" ? quartoperand.type : "e#VALUE!", 0);
+      return;
+    }
+    // MS-documented legacy QUARTILE/QUARTILE.INC behavior: truncate a
+    // noninteger quart toward zero before validating the 0..4 domain.
+    var quartvalue = quartoperand.value as number;
+    var quart = quartvalue < 0 ? Math.ceil(quartvalue) : Math.floor(quartvalue);
+    if (quart < 0 || quart > 4) {
+      PushOperand("e#NUM!", 0);
+      return;
+    }
+    var rangelist: SocialCalc.FormulaOperand[] = [rangeoperand];
+    var qcollected = scf.CollectNumericValues(sheet, rangelist);
+    if (qcollected.errortype) {
+      PushOperand(qcollected.errortype, 0);
+      return;
+    }
+    if (!qcollected.values.length) {
+      PushOperand("e#NUM!", 0); // empty numeric input
+      return;
+    }
+    var qsorted = qcollected.values.sort(function (a: number, b: number) {
+      return a - b;
+    });
+    var n = qsorted.length;
+    if (n == 1) {
+      PushOperand("n", qsorted[0]);
+      return;
+    }
+    // Excel QUARTILE.INC linear interpolation, quart in 0..4 => p in 0..1.
+    var p = quart / 4;
+    var pos = p * (n - 1);
+    var lo = Math.floor(pos);
+    var hi = Math.ceil(pos);
+    var frac = pos - lo;
+    var result = qsorted[lo]! + frac * (qsorted[hi]! - qsorted[lo]!);
+    PushOperand("n", result);
+    return;
+  }
+
+  // MEDIAN(v1, c1:c2, ...)
+  var mcollected = scf.CollectNumericValues(sheet, foperand);
+  if (mcollected.errortype) {
+    PushOperand(mcollected.errortype, 0);
+    return;
+  }
+  if (!mcollected.values.length) {
+    // No established MEDIAN error convention upstream; follow the existing
+    // AVERAGE convention for empty numeric input (js/formula1.ts SeriesFunctions).
+    PushOperand("e#DIV/0!", 0);
+    return;
+  }
+  var msorted = mcollected.values.sort(function (a: number, b: number) {
+    return a - b;
+  });
+  var mn = msorted.length;
+  var mid = Math.floor(mn / 2);
+  var median = mn % 2 == 1 ? msorted[mid] : (msorted[mid - 1]! + msorted[mid]!) / 2;
+  PushOperand("n", median);
+  return;
+};
+
+SocialCalc.Formula.FunctionList["RANK"] = [
+  SocialCalc.Formula.RankMedianQuartileFunctions,
+  -2,
+  "rank",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["MEDIAN"] = [
+  SocialCalc.Formula.RankMedianQuartileFunctions,
+  -1,
+  "vn",
+  null,
+  "stat",
+];
+SocialCalc.Formula.FunctionList["QUARTILE"] = [
+  SocialCalc.Formula.RankMedianQuartileFunctions,
+  2,
+  "quartile",
+  "",
+  "stat",
+];
+
+/*
+#
 # SUMPRODUCT(range1, range2, ...)
 #
 */

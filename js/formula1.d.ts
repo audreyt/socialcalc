@@ -349,6 +349,11 @@ declare namespace SocialCalc {
     const SeriesFunctions: FormulaFunctionImpl;
     const SumProductFunction: FormulaFunctionImpl;
     const DSeriesFunctions: FormulaFunctionImpl;
+    const RankMedianQuartileFunctions: FormulaFunctionImpl;
+    function CollectNumericValues(
+      sheet: Sheet,
+      foperand: FormulaOperand[],
+    ): { values: number[]; errortype: FormulaOperandType | "" };
     function FieldToColnum(
       sheet: Sheet,
       col1num: number,

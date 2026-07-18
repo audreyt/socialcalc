@@ -627,6 +627,8 @@
       'Returns the specified number of characters from the text value starting from the specified position. ',
     s_fdef_MIN: 'Returns the minimum of the numeric values. ',
     s_fdef_MINUTE: 'Returns the minute portion of a time or date/time value. ',
+    s_fdef_MEDIAN:
+      'Returns the median (middle value) of the numeric values. If there is an even count, averages the two middle values. ',
     s_fdef_MOD: 'Returns the remainder of the first value divided by the second. ',
     s_fdef_MONTH: 'Returns the month part of a date value. ',
     s_fdef_N: 'Returns the value if it is a numeric value otherwise an error. ',
@@ -648,7 +650,11 @@
       'Returns the text value with the first letter of each word converted to uppercase and the others to lowercase. ',
     s_fdef_PV:
       'Returns the present value of the given number of payments each invested at the given rate, with optional future value (default 0) and payment type (default 0 = at end of period, 1 = beginning of period). ',
+    s_fdef_QUARTILE:
+      "Returns the quartile of the numeric values in the range. quart selects which value: 0 = minimum, 1 = 25th percentile, 2 = median, 3 = 75th percentile, 4 = maximum. Uses linear interpolation between the closest ranks (matches Excel's legacy QUARTILE/QUARTILE.INC). ",
     s_fdef_RADIANS: 'Converts value in degrees into radians. ',
+    s_fdef_RANK:
+      'Returns the rank of number within ref: 1 is the largest value unless order is nonzero, in which case 1 is the smallest. Values tied for the same rank all receive the best (lowest) rank number. Returns #N/A if number does not appear in ref. ',
     s_fdef_RATE:
       'Returns the rate at which the given number of payments each invested at the given rate has the specified present value, with optional future value (default 0) and payment type (default 0 = at end of period, 1 = beginning of period). Uses an iterative process that will return #NUM! error if it does not converge. There may be more than one possible solution. Providing the optional guess value may help in certain situations where it does not converge or finds an inappropriate solution (the default guess is 10%). ',
     s_fdef_REPLACE:
@@ -725,6 +731,8 @@
     s_farg_pmt: 'rate, n, pv, [fv, [paytype]]',
     s_farg_pv: 'rate, n, payment, [fv, [paytype]]',
     s_farg_rate: 'n, payment, pv, [fv, [paytype, [guess]]]',
+    s_farg_rank: 'number, ref, [order]',
+    s_farg_quartile: 'range, quart',
     s_farg_replace: 'text1, start, length, text2',
     s_farg_vp: 'value, [precision]',
     s_farg_valpre: 'value, precision',
@@ -13272,6 +13280,166 @@ More comments yet to come...
     -1,
     'vn',
     null,
+    'stat',
+  ];
+  FormulaMut.CollectNumericValues = function (sheet, foperand) {
+    var scf = SocialCalc.Formula;
+    var operand_value_and_type = scf.OperandValueAndType;
+    var values = [];
+    var errortype = '';
+    var value1, t;
+    while (foperand.length > 0) {
+      value1 = operand_value_and_type(sheet, foperand);
+      t = value1.type.charAt(0);
+      if (t == 'n') {
+        values.push(value1.value - 0);
+      } else if (t == 'e' && !errortype) {
+        errortype = value1.type;
+      }
+    }
+    return {
+      values,
+      errortype,
+    };
+  };
+  FormulaMut.RankMedianQuartileFunctions = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var PushOperand = function (t, v) {
+      operand.push({
+        type: t,
+        value: v,
+      });
+    };
+    if (fname == 'RANK') {
+      var numberoperand = scf.OperandAsNumber(sheet, foperand);
+      if (numberoperand.type.charAt(0) != 'n') {
+        PushOperand(numberoperand.type.charAt(0) == 'e' ? numberoperand.type : 'e#VALUE!', 0);
+        return;
+      }
+      var number = numberoperand.value - 0;
+      var refoperand = scf.TopOfStackValueAndType(sheet, foperand);
+      if (refoperand.type != 'range' && refoperand.type != 'coord') {
+        PushOperand('e#VALUE!', 0);
+        return;
+      }
+      var reflist = [refoperand];
+      var collected = scf.CollectNumericValues(sheet, reflist);
+      if (collected.errortype) {
+        PushOperand(collected.errortype, 0);
+        return;
+      }
+      var order = 0;
+      if (foperand.length) {
+        var orderoperand = scf.OperandAsNumber(sheet, foperand);
+        if (orderoperand.type.charAt(0) != 'n') {
+          PushOperand(orderoperand.type.charAt(0) == 'e' ? orderoperand.type : 'e#VALUE!', 0);
+          return;
+        }
+        order = orderoperand.value - 0;
+        if (foperand.length) {
+          scf.FunctionArgsError(fname, operand);
+          return;
+        }
+      }
+      var rank = 0;
+      var found = false;
+      var values = collected.values;
+      for (var i = 0; i < values.length; i++) {
+        if (values[i] === number) found = true;
+        if (order == 0) {
+          if (values[i] > number) rank++;
+        } else {
+          if (values[i] < number) rank++;
+        }
+      }
+      if (!found) {
+        PushOperand('e#N/A', 0);
+        return;
+      }
+      PushOperand('n', rank + 1);
+      return;
+    }
+    if (fname == 'QUARTILE') {
+      var rangeoperand = scf.TopOfStackValueAndType(sheet, foperand);
+      if (rangeoperand.type != 'range' && rangeoperand.type != 'coord') {
+        PushOperand('e#VALUE!', 0);
+        return;
+      }
+      var quartoperand = scf.OperandAsNumber(sheet, foperand);
+      if (quartoperand.type.charAt(0) != 'n') {
+        PushOperand(quartoperand.type.charAt(0) == 'e' ? quartoperand.type : 'e#VALUE!', 0);
+        return;
+      }
+      var quartvalue = quartoperand.value;
+      var quart = quartvalue < 0 ? Math.ceil(quartvalue) : Math.floor(quartvalue);
+      if (quart < 0 || quart > 4) {
+        PushOperand('e#NUM!', 0);
+        return;
+      }
+      var rangelist = [rangeoperand];
+      var qcollected = scf.CollectNumericValues(sheet, rangelist);
+      if (qcollected.errortype) {
+        PushOperand(qcollected.errortype, 0);
+        return;
+      }
+      if (!qcollected.values.length) {
+        PushOperand('e#NUM!', 0);
+        return;
+      }
+      var qsorted = qcollected.values.sort(function (a, b) {
+        return a - b;
+      });
+      var n = qsorted.length;
+      if (n == 1) {
+        PushOperand('n', qsorted[0]);
+        return;
+      }
+      var p = quart / 4;
+      var pos = p * (n - 1);
+      var lo = Math.floor(pos);
+      var hi = Math.ceil(pos);
+      var frac = pos - lo;
+      var result = qsorted[lo] + frac * (qsorted[hi] - qsorted[lo]);
+      PushOperand('n', result);
+      return;
+    }
+    var mcollected = scf.CollectNumericValues(sheet, foperand);
+    if (mcollected.errortype) {
+      PushOperand(mcollected.errortype, 0);
+      return;
+    }
+    if (!mcollected.values.length) {
+      PushOperand('e#DIV/0!', 0);
+      return;
+    }
+    var msorted = mcollected.values.sort(function (a, b) {
+      return a - b;
+    });
+    var mn = msorted.length;
+    var mid = Math.floor(mn / 2);
+    var median = mn % 2 == 1 ? msorted[mid] : (msorted[mid - 1] + msorted[mid]) / 2;
+    PushOperand('n', median);
+    return;
+  };
+  SocialCalc.Formula.FunctionList['RANK'] = [
+    SocialCalc.Formula.RankMedianQuartileFunctions,
+    -2,
+    'rank',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['MEDIAN'] = [
+    SocialCalc.Formula.RankMedianQuartileFunctions,
+    -1,
+    'vn',
+    null,
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['QUARTILE'] = [
+    SocialCalc.Formula.RankMedianQuartileFunctions,
+    2,
+    'quartile',
+    '',
     'stat',
   ];
   FormulaMut.SumProductFunction = function (fname, operand, foperand, sheet) {

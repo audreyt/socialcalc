@@ -172,6 +172,21 @@ Release engineering and dependencies
   findings. Their dependency paths, reachability, mitigations, ownership, and
   re-audit conditions are recorded in `docs/security-disposition.json`; no
   advisory package is shipped in the npm tarball.
+Formula functions
+- Added RANK(number,ref,[order]), MEDIAN(v1,c1:c2,...), and
+  QUARTILE(range,quart) (audreyt/ethercalc#712, audreyt/ethercalc#726).
+  RANK: descending by default, ascending with a nonzero order argument; tied
+  values share the best (lowest) rank; #N/A if number is not present in ref.
+  MEDIAN: sorts the collected numeric values and averages the middle pair on
+  an even count; empty numeric input follows the existing AVERAGE #DIV/0!
+  convention. QUARTILE: Excel legacy QUARTILE/QUARTILE.INC inclusive linear
+  interpolation; a noninteger quart is truncated toward zero before the
+  0..4 domain is validated (quart outside 0..4 after truncation, or an empty
+  numeric range, is #NUM!). All three reuse the existing numeric-only
+  extraction/blank-and-text-skip/error-propagation conventions from
+  SeriesFunctions (see `SocialCalc.Formula.RankMedianQuartileFunctions` and
+  `CollectNumericValues` in js/formula1.ts) and register picker/help text
+  in js/socialcalcconstants.ts.
 
 ==============================================================================
 v3.0.8 — 2026-07-09
