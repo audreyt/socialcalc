@@ -22,6 +22,8 @@ Highlights
   differential/adversarial/performance tests, test-credibility checks, mutation
   floors for all eleven shipping modules, a pinned EtherCalc canary, and a
   deterministic, provenance-aware release pipeline.
+- Added a Vite+ root development workbench with local jQuery and bundle assets
+  and an editable spreadsheet for browser-based development.
 
 
 Compatibility and runtime fixes

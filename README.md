@@ -193,24 +193,30 @@ retains one candidate artifact.
 
 ### Common commands
 
-| Command                             | Contract                                                                                     |
-| ----------------------------------- | -------------------------------------------------------------------------------------------- |
-| `vp build`                          | Build the ordered UMD bundle and CSS; canonicalize tracked `dist/SocialCalc.js`.             |
-| `vp build --minify`                 | Build normal and minified UMD bundles.                                                       |
-| `vp check --fix`                    | Apply repository formatting and safe lint fixes, then typecheck.                             |
-| `vp check`                          | Check formatting, warning-free type-aware lint, and types without modifying files.           |
-| `vp run typecheck:strict`           | Check the narrower strict build configuration.                                               |
-| `vp test`                           | Build a fresh instrumented UMD, run Vitest, and enforce 100/100/100/100 Istanbul coverage.   |
-| `vp run test`                       | Build the plain shipping bundle first, then run the default Istanbul test gate.              |
-| `bun run test:bun`                  | Run the same corpus in isolated native Bun workers; no authoritative coverage aggregate.     |
-| `vp run check:test-credibility`     | Reject tautologies and unexplained code-free catches in tracked Vitest and Playwright tests. |
-| `vp run check:coverage-attribution` | Prove source-map attribution remains monotonic and does not duplicate the bundle.            |
-| `vp run test:coverage`              | Run the explicit source-attributed V8 diagnostic with shared release floors.                 |
-| `vp run test:coverage:merged`       | Merge unit V8 coverage with real Chromium V8 coverage and enforce the merged floors.         |
-| `vp run test:browser`               | Run Playwright against Chromium, Firefox, and WebKit.                                        |
-| `vp run test:package-contract`      | Pack and exercise the exact npm consumer contract.                                           |
-| `vp run test:ethercalc-canary`      | Networked release-only canary against the pinned EtherCalc checkout.                         |
-| `vp pm pack --out <file.tgz>`       | Run `prepack` and create the candidate npm archive.                                          |
+| Command                             | Contract                                                                                                                                                                           |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vp build`                          | Build the ordered UMD bundle and CSS; canonicalize tracked `dist/SocialCalc.js`.                                                                                                   |
+| `vp build --minify`                 | Build normal and minified UMD bundles.                                                                                                                                             |
+| `vp check --fix`                    | Apply repository formatting and safe lint fixes, then typecheck.                                                                                                                   |
+| `vp check`                          | Check formatting, warning-free type-aware lint, and types without modifying files.                                                                                                 |
+| `vp dev`                            | Open the local browser workbench at the repository root. It uses tracked `dist/SocialCalc.js`, so run `vp build` after changing JavaScript source before refreshing the workbench. |
+| `vp run typecheck:strict`           | Check the narrower strict build configuration.                                                                                                                                     |
+| `vp test`                           | Build a fresh instrumented UMD, run Vitest, and enforce 100/100/100/100 Istanbul coverage.                                                                                         |
+| `vp run test`                       | Build the plain shipping bundle first, then run the default Istanbul test gate.                                                                                                    |
+| `bun run test:bun`                  | Run the same corpus in isolated native Bun workers; no authoritative coverage aggregate.                                                                                           |
+| `vp run check:test-credibility`     | Reject tautologies and unexplained code-free catches in tracked Vitest and Playwright tests.                                                                                       |
+| `vp run check:coverage-attribution` | Prove source-map attribution remains monotonic and does not duplicate the bundle.                                                                                                  |
+| `vp run test:coverage`              | Run the explicit source-attributed V8 diagnostic with shared release floors.                                                                                                       |
+| `vp run test:coverage:merged`       | Merge unit V8 coverage with real Chromium V8 coverage and enforce the merged floors.                                                                                               |
+| `vp run test:browser`               | Run Playwright against Chromium, Firefox, and WebKit.                                                                                                                              |
+| `vp run test:package-contract`      | Pack and exercise the exact npm consumer contract.                                                                                                                                 |
+| `vp run test:ethercalc-canary`      | Networked release-only canary against the pinned EtherCalc checkout.                                                                                                               |
+| `vp pm pack --out <file.tgz>`       | Run `prepack` and create the candidate npm archive.                                                                                                                                |
+
+For the local workbench, run `vp build` and then `vp dev`. The root page opens
+the editable spreadsheet workbench and loads the tracked `dist/SocialCalc.js`;
+rebuild with `vp build` after JavaScript source changes before using `vp dev`
+again.
 
 ### Source and build model
 

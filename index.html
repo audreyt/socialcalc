@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SocialCalc Dev Workbench</title>
+    <link rel="stylesheet" href="/css/socialcalc.css" />
+    <link rel="stylesheet" href="/dev/dev.css" />
+  </head>
+  <body>
+    <header class="dev-header">
+      <div>
+        <h1>SocialCalc</h1>
+        <p>Interactive development workbench for the spreadsheet editor.</p>
+      </div>
+      <div id="dev-status" class="dev-status" role="status" aria-live="polite">Loading</div>
+    </header>
+    <main id="dev" class="dev-mount" aria-label="Spreadsheet workbench"></main>
+    <script src="/node_modules/jquery/dist/jquery.min.js"></script>
+    <script src="/dist/SocialCalc.js"></script>
+    <script type="module" src="/dev/main.ts"></script>
+  </body>
+</html>

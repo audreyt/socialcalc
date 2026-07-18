@@ -1,0 +1,54 @@
+:root {
+  color-scheme: light;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+  background: #f5f7fa;
+  color: #172033;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.dev-header {
+  align-items: center;
+  background: #ffffff;
+  border-bottom: 1px solid #d9e0e8;
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: space-between;
+  min-height: 64px;
+  padding: 10px 18px;
+  gap: 16px;
+}
+h1 {
+  font-size: 1.2rem;
+  margin: 0;
+}
+.dev-header p {
+  font-size: 0.82rem;
+  margin: 3px 0 0;
+  color: #526174;
+}
+.dev-status {
+  color: #256b3d;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.dev-mount {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
