@@ -676,10 +676,10 @@
     s_fdef_SUBSTITUTE:
       'Returns text1 with the all occurrences of oldtext replaced by newtext. If "occurrence" is present, then only that occurrence is replaced. ',
     s_fdef_SORT:
-      'Sorts rows of an array by one or more columns, preserving stable source order for ties. ',
+      'Sorts rows of an array by one or more columns (defaults to the first column ascending); omitted direction defaults to ascending and negative directions descend, preserving stable source order for ties. ',
     s_fdef_UNIQUE:
       'Returns the unique rows or columns of an array; optionally returns values occurring exactly once. ',
-    s_farg_sort: 'range, sort_column, is_ascending, [sort_column2, is_ascending2, ...]',
+    s_farg_sort: 'range, [sort_column], [is_ascending], [sort_column2, is_ascending2, ...]',
     s_farg_unique: 'range, [by_column], [exactly_once]',
     s_fdef_SUM:
       'Adds the numeric values. The values to the sum function may be ranges in the form similar to A1:B5. ',
@@ -17891,30 +17891,52 @@ More comments yet to come...
       });
       return;
     }
-    if (foperand.length < 2 || foperand.length % 2 != 0) {
-      fail();
-      return;
-    }
-    var sortKeys = [];
-    while (foperand.length) {
-      var col = scf.OperandAsNumber(sheet, foperand),
-        asc = scf.OperandAsNumber(sheet, foperand);
+    var sortKeys;
+    if (foperand.length < 2) {
+      var soleColOperand = foperand.length ? scf.OperandAsNumber(sheet, foperand) : null;
+      var soleColValue = soleColOperand ? Number(soleColOperand.value) : 1;
       if (
-        col.type.charAt(0) != 'n' ||
-        asc.type.charAt(0) != 'n' ||
-        !Number.isFinite(Number(col.value)) ||
-        Math.floor(Number(col.value)) != Number(col.value) ||
-        Number(col.value) < 1 ||
-        Number(col.value) > array.cols ||
-        !Number.isFinite(Number(asc.value))
+        (soleColOperand && soleColOperand.type.charAt(0) != 'n') ||
+        !Number.isFinite(soleColValue) ||
+        Math.floor(soleColValue) != soleColValue ||
+        soleColValue < 1 ||
+        soleColValue > array.cols
       ) {
         fail();
         return;
       }
-      sortKeys.push({
-        col: Number(col.value) - 1,
-        asc: Number(asc.value) != 0,
-      });
+      sortKeys = [
+        {
+          col: soleColValue - 1,
+          asc: true,
+        },
+      ];
+    } else {
+      if (foperand.length % 2 != 0) {
+        fail();
+        return;
+      }
+      sortKeys = [];
+      while (foperand.length) {
+        var col = scf.OperandAsNumber(sheet, foperand),
+          asc = scf.OperandAsNumber(sheet, foperand);
+        if (
+          col.type.charAt(0) != 'n' ||
+          asc.type.charAt(0) != 'n' ||
+          !Number.isFinite(Number(col.value)) ||
+          Math.floor(Number(col.value)) != Number(col.value) ||
+          Number(col.value) < 1 ||
+          Number(col.value) > array.cols ||
+          !Number.isFinite(Number(asc.value))
+        ) {
+          fail();
+          return;
+        }
+        sortKeys.push({
+          col: Number(col.value) - 1,
+          asc: Number(asc.value) > 0,
+        });
+      }
     }
     var rows = array.cells.map(function (row, index) {
       return {
@@ -17957,7 +17979,7 @@ More comments yet to come...
       },
     });
   };
-  FormulaMut.FunctionList['SORT'] = [FormulaMut.DynamicArrayFunctions, -3, 'sort', null, 'lookup'];
+  FormulaMut.FunctionList['SORT'] = [FormulaMut.DynamicArrayFunctions, -1, 'sort', null, 'lookup'];
   FormulaMut.FunctionList['UNIQUE'] = [
     FormulaMut.DynamicArrayFunctions,
     -1,

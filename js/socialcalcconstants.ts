@@ -853,10 +853,10 @@ ConstantsRoot.Constants = {
   s_fdef_SUBSTITUTE:
     'Returns text1 with the all occurrences of oldtext replaced by newtext. If "occurrence" is present, then only that occurrence is replaced. ',
   s_fdef_SORT:
-    "Sorts rows of an array by one or more columns, preserving stable source order for ties. ",
+    "Sorts rows of an array by one or more columns (defaults to the first column ascending); omitted direction defaults to ascending and negative directions descend, preserving stable source order for ties. ",
   s_fdef_UNIQUE:
     "Returns the unique rows or columns of an array; optionally returns values occurring exactly once. ",
-  s_farg_sort: "range, sort_column, is_ascending, [sort_column2, is_ascending2, ...]",
+  s_farg_sort: "range, [sort_column], [is_ascending], [sort_column2, is_ascending2, ...]",
   s_farg_unique: "range, [by_column], [exactly_once]",
   s_fdef_SUM:
     "Adds the numeric values. The values to the sum function may be ranges in the form similar to A1:B5. ",

@@ -24,6 +24,8 @@ Highlights
   deterministic, provenance-aware release pipeline.
 - Added a Vite+ root development workbench with local jQuery and bundle assets
   and an editable spreadsheet for browser-based development.
+- SORT now accepts omitted sort columns and directions, defaults to the first
+  column ascending, and treats non-positive directions as descending.
 
 
 Compatibility and runtime fixes

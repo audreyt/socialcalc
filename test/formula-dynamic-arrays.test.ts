@@ -30,7 +30,7 @@ test("SORT and UNIQUE expose exact argument help strings", async () => {
   const SC = await loadSocialCalc();
   SC.Formula.FillFunctionInfo();
   expect(SC.Formula.FunctionArgString("SORT")).toBe(
-    "range, sort_column, is_ascending, [sort_column2, is_ascending2, ...]",
+    "range, [sort_column], [is_ascending], [sort_column2, is_ascending2, ...]",
   );
   expect(SC.Formula.FunctionArgString("UNIQUE")).toBe("range, [by_column], [exactly_once]");
 });
@@ -54,14 +54,19 @@ test("evaluator materializes SORT and UNIQUE arrays", async () => {
   );
   const evaluate = (formula: string) =>
     SC.Formula.evaluate_parsed_formula(SC.Formula.ParseFormulaIntoTokens(formula), sheet, true);
-  const sorted = evaluate("SORT(A1:B3,1,1)");
+  const sorted = evaluate("SORT(A1:B3)");
   expect(sorted.type).toBe("array");
   expect(sorted.value.cells.map((row: any[]) => row[0].value)).toEqual([1, 1, 2]);
+  expect(sorted.value.cells.map((row: any[]) => row[1].value)).toEqual(["x", "y", "x"]);
+  const sortedBySecond = evaluate("SORT(A1:B3,2)");
+  expect(sortedBySecond.value.cells.map((row: any[]) => row[1].value)).toEqual(["x", "x", "y"]);
+  const explicit = evaluate("SORT(A1:B3,1,1)");
+  expect(explicit.type).toBe("array");
+  expect(explicit.value.cells.map((row: any[]) => row[0].value)).toEqual([1, 1, 2]);
   const unique = evaluate("UNIQUE(SORT(A1:B3,1,1))");
   expect(unique.type).toBe("array");
   expect(unique.value.rows).toBe(3);
   expect(evaluate("SORT(A1:B3,4,1)").type).toBe("e#VALUE!");
-  expect(evaluate("SORT(A1:B3,1)").type).toBe("e#VALUE!");
 });
 
 test("SORT direction, multi-key stability, deterministic types, and validation", async () => {
@@ -100,8 +105,9 @@ test("SORT direction, multi-key stability, deterministic types, and validation",
     return r.value.cells;
   };
   expect(rows("SORT(A1:B3,1,0)").map((r: any[]) => r[0].value)).toEqual([2, 1, 1]);
+  expect(rows("SORT(A1:B3,1,-1)").map((r: any[]) => r[0].value)).toEqual([2, 1, 1]);
+  expect(rows("SORT(A1:B3,1,2)").map((r: any[]) => r[0].value)).toEqual([1, 1, 2]);
   expect(rows("SORT(A1:B3,1,1,2,1)").map((r: any[]) => r[1].value)).toEqual(["A", "a", "b"]);
-  expect(rows("SORT(A1:B3,1,1)").map((r: any[]) => r[1].value)).toEqual(["A", "a", "b"]);
   expect(rows("SORT(A1:B5,1,1)").map((r: any[]) => r[0].type)).toEqual([
     "n",
     "n",
@@ -115,11 +121,12 @@ test("SORT direction, multi-key stability, deterministic types, and validation",
   expect(rows("SORT(A11:A12,1,1)").map((r: any[]) => r[0].value)).toEqual([0, 1]);
   expect(evaluate("SORT(A1:B3,1,1)+1").type).toBe("e#VALUE!");
   for (const f of [
+    "SORT(A1:B3,3)",
     "SORT(A1:B3,0,1)",
     "SORT(A1:B3,1.5,1)",
     "SORT(A1:B3,3,1)",
     'SORT(A1:B3,1,"up")',
-    "SORT(A1:B3,1)",
+    "SORT(A1:B3,1,NaN)",
     "SORT(A1:B3,1,1,2)",
   ])
     expect(evaluate(f).type).toBe("e#VALUE!");

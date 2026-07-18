@@ -7434,27 +7434,48 @@ FormulaMut.DynamicArrayFunctions = function (
     });
     return;
   }
-  if (foperand.length < 2 || foperand.length % 2 != 0) {
-    fail();
-    return;
-  }
-  var sortKeys: { col: number; asc: boolean }[] = [];
-  while (foperand.length) {
-    var col = scf.OperandAsNumber(sheet, foperand),
-      asc = scf.OperandAsNumber(sheet, foperand);
+  var sortKeys: { col: number; asc: boolean }[];
+  if (foperand.length < 2) {
+    // Zero or one post-source args: synthesize the default key (column 1,
+    // ascending) instead of requiring an explicit column/direction pair.
+    var soleColOperand = foperand.length ? scf.OperandAsNumber(sheet, foperand) : null;
+    var soleColValue = soleColOperand ? Number(soleColOperand.value) : 1;
     if (
-      col.type.charAt(0) != "n" ||
-      asc.type.charAt(0) != "n" ||
-      !Number.isFinite(Number(col.value)) ||
-      Math.floor(Number(col.value)) != Number(col.value) ||
-      Number(col.value) < 1 ||
-      Number(col.value) > array.cols ||
-      !Number.isFinite(Number(asc.value))
+      (soleColOperand && soleColOperand.type.charAt(0) != "n") ||
+      !Number.isFinite(soleColValue) ||
+      Math.floor(soleColValue) != soleColValue ||
+      soleColValue < 1 ||
+      soleColValue > array.cols
     ) {
       fail();
       return;
     }
-    sortKeys.push({ col: Number(col.value) - 1, asc: Number(asc.value) != 0 });
+    sortKeys = [{ col: soleColValue - 1, asc: true }];
+  } else {
+    if (foperand.length % 2 != 0) {
+      fail();
+      return;
+    }
+    sortKeys = [];
+    while (foperand.length) {
+      var col = scf.OperandAsNumber(sheet, foperand),
+        asc = scf.OperandAsNumber(sheet, foperand);
+      if (
+        col.type.charAt(0) != "n" ||
+        asc.type.charAt(0) != "n" ||
+        !Number.isFinite(Number(col.value)) ||
+        Math.floor(Number(col.value)) != Number(col.value) ||
+        Number(col.value) < 1 ||
+        Number(col.value) > array.cols ||
+        !Number.isFinite(Number(asc.value))
+      ) {
+        fail();
+        return;
+      }
+      // Excel-style direction: positive ascends, zero/negative (including -1)
+      // descends -- 0 keeps its historical false/descending meaning.
+      sortKeys.push({ col: Number(col.value) - 1, asc: Number(asc.value) > 0 });
+    }
   }
   var rows = array.cells.map(function (row, index) {
     return { row: row, index: index };
@@ -7494,7 +7515,7 @@ FormulaMut.DynamicArrayFunctions = function (
     },
   });
 };
-FormulaMut.FunctionList["SORT"] = [FormulaMut.DynamicArrayFunctions, -3, "sort", null, "lookup"];
+FormulaMut.FunctionList["SORT"] = [FormulaMut.DynamicArrayFunctions, -1, "sort", null, "lookup"];
 FormulaMut.FunctionList["UNIQUE"] = [
   FormulaMut.DynamicArrayFunctions,
   -1,

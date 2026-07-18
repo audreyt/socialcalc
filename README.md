@@ -62,7 +62,9 @@ The formula, command, and save/load APIs also work without a DOM in Node.js.
 Dynamic arrays are a deliberate first-class spill substrate, not merely a set
 of commands. The supported formulas are:
 
-- `SORT(range_or_array, sort_column, is_ascending, [sort_column2, is_ascending2, ...])`
+- `SORT(range_or_array, [sort_column], [is_ascending], [sort_column2, is_ascending2, ...])`
+  Omitted column and direction default to the first column ascending; negative
+  directions sort descending.
 - `UNIQUE(range_or_array, [by_column], [exactly_once])`
 
 Each result spills from its anchor. A collision with a non-empty, merged, or

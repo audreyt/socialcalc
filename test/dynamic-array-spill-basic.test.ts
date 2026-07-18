@@ -20,7 +20,7 @@ test("SORT spills values and types while retaining the anchor", async () => {
     "set A1 value n 3",
     "set A2 value n 1",
     "set A3 value n 2",
-    "set C1 formula SORT(A1:A3,1,1)",
+    "set C1 formula SORT(A1:A3)",
   ]);
   expect(sheet.cells.C1.datavalue).toBe(1);
   expect(sheet.cells.C1.valuetype).toBe("n");
