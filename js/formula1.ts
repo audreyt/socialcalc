@@ -6360,6 +6360,178 @@ SocialCalc.Formula.FunctionList["VALUE"] = [SocialCalc.Formula.NTVFunctions, 1, 
 
 /*
 #
+# ref_info_functions:
+#
+# ISFORMULA(value/reference)
+# ISREF(value)
+# ERROR.TYPE(error_val)
+# TYPE(value)
+#
+# ISFORMULA and ISREF inspect the operand's *typed* stack representation
+# (coord/range/name) before it is coerced to the cell value it points at --
+# this is the "preserve typed reference distinction before coercion"
+# requirement: a plain literal (5, "x", TRUE) is never mistaken for a
+# reference. ERROR.TYPE and TYPE instead resolve the operand to its actual
+# value (matching Excel, where both functions describe what a reference
+# *contains*, not the reference itself).
+#
+*/
+
+/**
+ * @param {SocialCalc.Sheet} sheet
+ * @param {string} coordtext
+ */
+FormulaMut.IsFormulaCoordCell = function (
+  sheet: SocialCalc.Sheet,
+  coordtext: string,
+): SocialCalc.Cell | null {
+  var scf = SocialCalc.Formula;
+  var coordsheet: SocialCalc.Sheet = sheet;
+  var pos = coordtext.indexOf("!");
+  if (pos != -1) {
+    // OperandsAsCoordOnSheet (the "!" cross-sheet operator) already
+    // resolves and validates the sheet before a "coord" value carrying an
+    // embedded "!" can exist, so FindInSheetCache here is always a hit;
+    // an unavailable sheet fails earlier as an e#REF! operand and never
+    // reaches this function as a "coord" type.
+    coordsheet = scf.FindInSheetCache(coordtext.substring(pos + 1))!;
+    coordtext = coordtext.substring(0, pos);
+  }
+  return coordsheet.cells[scf.PlainCoord(coordtext)] || null;
+};
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.RefInfoFunctions = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+  var result: number = 0;
+
+  if (fname == "ISFORMULA" || fname == "ISREF") {
+    var value1 = scf.TopOfStackValueAndType(sheet, foperand);
+
+    if (fname == "ISREF") {
+      result = value1.type == "coord" || value1.type == "range" ? 1 : 0;
+      scf.PushOperand(operand, "nl", result);
+      return;
+    }
+
+    // ISFORMULA
+    if (value1.type == "coord") {
+      var cell = scf.IsFormulaCoordCell(sheet, value1.value as string);
+      // An unavailable cross-sheet reference or blank cell both resolve to
+      // null here and are treated as "not a formula" (0), matching the
+      // ROW/COLUMN #REF! convention's spirit without forcing a reference
+      // to an unloaded sheet into an error.
+      result = cell && cell.datatype == "f" ? 1 : 0;
+    } else if (value1.type == "range") {
+      // No standard single-cell reduction for a range in this engine;
+      // use the top-left cell, matching the ROW/COLUMN/COLUMNS convention.
+      var rangeinfo = scf.DecodeRangeParts(sheet, value1.value as string);
+      if (!rangeinfo) {
+        result = 0;
+      } else {
+        var topleft =
+          rangeinfo.sheetdata.cells[SocialCalc.crToCoord(rangeinfo.col1num, rangeinfo.row1num)];
+        result = topleft && topleft.datatype == "f" ? 1 : 0;
+      }
+    } else {
+      // literal value, error, or unresolvable name -- not a formula reference
+      result = 0;
+    }
+
+    scf.PushOperand(operand, "nl", result);
+    return;
+  }
+
+  if (fname == "TYPE") {
+    // Peek the typed operand before OperandValueAndType coerces a "range"
+    // to its top-left cell's value (StepThroughRangeDown) -- TYPE must
+    // report range/array as 64 for the reference itself, not the value it
+    // resolves to.
+    var typedvalue = scf.TopOfStackValueAndType(sheet, foperand);
+    if (typedvalue.type == "range") {
+      scf.PushOperand(operand, "n", 64);
+      return;
+    }
+    var tt = typedvalue.type.charAt(0);
+    if (tt == "e") {
+      result = 16;
+    } else if (typedvalue.type == "nl") {
+      result = 4;
+    } else if (tt == "t") {
+      result = 2;
+    } else if (typedvalue.type == "coord") {
+      // resolve the reference to the cell's value/type, matching Excel's
+      // TYPE(A1) behavior (reports the referenced value's type).
+      var coordvalue = scf.OperandValueAndType(sheet, [typedvalue]);
+      var ct = coordvalue.type.charAt(0);
+      if (ct == "e") result = 16;
+      else if (coordvalue.type == "nl") result = 4;
+      else if (ct == "t") result = 2;
+      else result = 1;
+    } else {
+      // "n" and its subtypes, and blank ("b" coerces to numeric 0)
+      result = 1;
+    }
+    scf.PushOperand(operand, "n", result);
+    return;
+  }
+
+  // ERROR.TYPE resolves to the actual value the operand refers to.
+  var value = scf.OperandValueAndType(sheet, foperand);
+
+  var errorcodes: { [key: string]: number } = {
+    "e#NULL!": 1,
+    "e#DIV/0!": 2,
+    "e#VALUE!": 3,
+    "e#REF!": 4,
+    "e#NAME?": 5,
+    "e#NUM!": 6,
+    "e#N/A": 7,
+    // Excel reserves 8 for #GETTING_DATA, a state this engine never
+    // produces; #SPILL! has no official ERROR.TYPE code, so we extend
+    // the table with the same slot Excel later assigned it (code 8 is
+    // otherwise dead in a synchronous engine).
+    "e#SPILL!": 8,
+  };
+  var code = errorcodes[value.type];
+  if (code) {
+    scf.PushOperand(operand, "n", code);
+  } else {
+    scf.PushOperand(operand, "e#N/A", 0); // argument is not an error value
+  }
+  return;
+};
+
+SocialCalc.Formula.FunctionList["ISFORMULA"] = [
+  SocialCalc.Formula.RefInfoFunctions,
+  1,
+  "v",
+  "",
+  "test",
+];
+SocialCalc.Formula.FunctionList["ISREF"] = [
+  SocialCalc.Formula.RefInfoFunctions,
+  1,
+  "v",
+  "",
+  "test",
+];
+SocialCalc.Formula.FunctionList["ERROR.TYPE"] = [
+  SocialCalc.Formula.RefInfoFunctions,
+  1,
+  "v",
+  "",
+  "test",
+];
+SocialCalc.Formula.FunctionList["TYPE"] = [SocialCalc.Formula.RefInfoFunctions, 1, "v", "", "test"];
+
+/*
+#
 # ABS(value)
 # ACOS(value)
 # ASIN(value)
@@ -7516,6 +7688,346 @@ SocialCalc.Formula.FunctionList["OFFSET"] = [
 
 /*
 #
+# ROW([reference])
+# COLUMN([reference])
+#
+# With no argument, returns the row/column of the cell containing the
+# formula (the coord passed through CalculateFunction). With a reference
+# argument (a bare coord or a range), returns the row/column of the
+# top-left corner of that reference without resolving it to a cell value
+# -- the typed "coord"/"range" operand is inspected directly via
+# TopOfStackValueAndType, matching the "preserve typed reference before
+# coercion" contract used by ROWS/COLUMNS above. A non-reference argument
+# (number, text, etc.) is #VALUE!, matching Excel.
+#
+*/
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ * @param {string} [coord]
+ */
+FormulaMut.RowColumnFunctions = function (fname, operand, foperand, sheet, coord) {
+  var scf = SocialCalc.Formula;
+  var result = 0;
+  var resulttype = "n";
+
+  if (foperand.length > 1) {
+    scf.FunctionArgsError(fname, operand);
+    return;
+  }
+
+  if (foperand.length === 0) {
+    if (!coord) {
+      scf.PushOperand(operand, "e#REF!", 0);
+      return;
+    }
+    var here = SocialCalc.coordToCr(SocialCalc.Formula.PlainCoord(coord));
+    result = fname == "ROW" ? here.row : here.col;
+    scf.PushOperand(operand, resulttype, result);
+    return;
+  }
+
+  var value1 = scf.TopOfStackValueAndType(sheet, foperand);
+
+  if (value1.type.charAt(0) == "e") {
+    scf.PushOperand(operand, value1.type, 0);
+    return;
+  }
+
+  if (value1.type == "coord") {
+    var coordtext = value1.value as string;
+    var bang = coordtext.indexOf("!");
+    if (bang != -1) coordtext = coordtext.substring(0, bang);
+    var cr = SocialCalc.coordToCr(SocialCalc.Formula.PlainCoord(coordtext));
+    result = fname == "ROW" ? cr.row : cr.col;
+  } else if (value1.type == "range") {
+    var rangeinfo = scf.DecodeRangeParts(sheet, value1.value as string);
+    if (!rangeinfo) {
+      scf.PushOperand(operand, "e#REF!", 0);
+      return;
+    }
+    result = fname == "ROW" ? rangeinfo.row1num : rangeinfo.col1num;
+  } else {
+    scf.PushOperand(operand, "e#VALUE!", 0);
+    return;
+  }
+
+  scf.PushOperand(operand, resulttype, result);
+
+  return;
+};
+
+SocialCalc.Formula.FunctionList["ROW"] = [
+  SocialCalc.Formula.RowColumnFunctions,
+  100,
+  "refopt",
+  "",
+  "lookup",
+];
+SocialCalc.Formula.FunctionList["COLUMN"] = [
+  SocialCalc.Formula.RowColumnFunctions,
+  100,
+  "refopt",
+  "",
+  "lookup",
+];
+
+/*
+#
+# ADDRESS(row_num, column_num, [abs_num], [a1], [sheet_text])
+#
+# Builds an A1- or R1C1-style reference string. abs_num: 1 = absolute
+# row+col (default), 2 = absolute row/relative col, 3 = relative
+# row/absolute col, 4 = relative both. a1 (default TRUE): FALSE selects
+# R1C1 notation. sheet_text, if present, is prefixed with "!", quoted with
+# single quotes when it is not a bare identifier (matching the sheet-name
+# quoting SocialCalc.OperandAsSheetName / formula-ref sheet-quoting use
+# elsewhere). row_num/column_num are truncated toward zero (Excel
+# behavior); this engine's max column is ZZ (702, see AGENTS.md formula-
+# reference-compatibility policy) and max row is 65536 -- out-of-range or
+# non-positive coordinates are #VALUE!, matching Excel's ADDRESS contract.
+#
+*/
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.AddressFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+
+  var rownumv = scf.OperandAsNumber(sheet, foperand);
+  var colnumv = scf.OperandAsNumber(sheet, foperand);
+  if (rownumv.type.charAt(0) == "e") {
+    scf.PushOperand(operand, rownumv.type, 0);
+    return;
+  }
+  if (colnumv.type.charAt(0) == "e") {
+    scf.PushOperand(operand, colnumv.type, 0);
+    return;
+  }
+
+  var absnum = 1;
+  if (foperand.length) {
+    var absnumv = scf.OperandAsNumber(sheet, foperand);
+    if (absnumv.type.charAt(0) == "e") {
+      scf.PushOperand(operand, absnumv.type, 0);
+      return;
+    }
+    absnum = Math.floor(absnumv.value as number);
+    if (absnum < 1 || absnum > 4) {
+      scf.PushOperand(operand, "e#VALUE!", 0);
+      return;
+    }
+  }
+
+  var a1style = true;
+  if (foperand.length) {
+    var a1v = scf.OperandValueAndType(sheet, foperand);
+    if (a1v.type.charAt(0) == "e") {
+      scf.PushOperand(operand, a1v.type, 0);
+      return;
+    }
+    a1style = a1v.type == "b" ? true : Boolean(a1v.value);
+  }
+
+  var sheettext = "";
+  if (foperand.length) {
+    var sheetv = scf.OperandAsText(sheet, foperand);
+    if (sheetv.type.charAt(0) == "e") {
+      scf.PushOperand(operand, sheetv.type, 0);
+      return;
+    }
+    sheettext = sheetv.value as string;
+  }
+
+  if (foperand.length) {
+    scf.FunctionArgsError(fname, operand);
+    return;
+  }
+
+  var rownum = Math.trunc(rownumv.value as number);
+  var colnum = Math.trunc(colnumv.value as number);
+
+  if (rownum < 1 || rownum > 65536 || colnum < 1 || colnum > 702) {
+    scf.PushOperand(operand, "e#VALUE!", 0);
+    return;
+  }
+
+  var colname = SocialCalc.rcColname(colnum);
+  var absrow = absnum == 1 || absnum == 2;
+  var abscol = absnum == 1 || absnum == 3;
+
+  var result;
+  if (a1style) {
+    result = (abscol ? "$" : "") + colname + (absrow ? "$" : "") + rownum;
+  } else {
+    result = "R" + (absrow ? String(rownum) : "[" + rownum + "]");
+    result += "C" + (abscol ? String(colnum) : "[" + colnum + "]");
+  }
+
+  if (sheettext) {
+    var quoted = !/^[A-Za-z_][A-Za-z0-9_.]*$/.test(sheettext)
+      ? "'" + sheettext.replace(/'/g, "''") + "'"
+      : sheettext;
+    result = quoted + "!" + result;
+  }
+
+  scf.PushOperand(operand, "t", result);
+
+  return;
+};
+
+SocialCalc.Formula.FunctionList["ADDRESS"] = [
+  SocialCalc.Formula.AddressFunction,
+  -2,
+  "address",
+  "",
+  "lookup",
+];
+
+/*
+#
+# HYPERLINK(link_location, [friendly_name])
+#
+# Returns friendly_name (or link_location if omitted) as the displayed
+# cell text, tagged with the "l" value-subtype so rendering routes
+# through the already-audited SocialCalc.expand_text_link /
+# SocialCalc.SafeUrlForRender text-link path (see docs/security-sink-
+# inventory.md, "format_text_for_display 'text-link'" row) instead of a
+# new HTML sink. Excel does not validate the scheme at formula-evaluation
+# time -- it is the render-time SafeUrlForRender allowlist (consulted only
+# when SocialCalc.Callbacks.untrustedContent is true) that rejects
+# javascript:/unsafe schemes, exactly like a manually authored [desc]<url>
+# cell link.
+#
+*/
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.HyperlinkFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+
+  var linklocv = scf.OperandAsText(sheet, foperand);
+  if (linklocv.type.charAt(0) == "e") {
+    scf.PushOperand(operand, linklocv.type, 0);
+    return;
+  }
+  var linkloc = linklocv.value as string;
+
+  var friendly = linkloc;
+  if (foperand.length) {
+    var friendlyv = scf.OperandAsText(sheet, foperand);
+    if (friendlyv.type.charAt(0) == "e") {
+      scf.PushOperand(operand, friendlyv.type, 0);
+      return;
+    }
+    friendly = friendlyv.value as string;
+  }
+
+  if (foperand.length) {
+    scf.FunctionArgsError(fname, operand);
+    return;
+  }
+
+  // Reuse the manual cell-link text syntax (desc<url>) so the existing
+  // ParseCellLinkText / expand_text_link pipeline renders it identically
+  // to a hand-authored link.
+  var linktext = friendly + "<" + linkloc + ">";
+
+  scf.PushOperand(operand, "tl", linktext);
+
+  return;
+};
+
+SocialCalc.Formula.FunctionList["HYPERLINK"] = [
+  SocialCalc.Formula.HyperlinkFunction,
+  -1,
+  "hyperlink",
+  "",
+  "lookup",
+];
+
+/*
+#
+# IMAGE(url, [mode], [height], [width])
+#
+# Returns url tagged with the "m" value-subtype, which format_text_for_
+# display maps to "text-image" -- the already-audited SocialCalc.
+# SafeUrlForRender <img src> path (docs/security-sink-inventory.md,
+# "format_text_for_display 'text-image'" row); never a new raw-HTML sink.
+#
+# The text-image renderer emits a bare <img src="..."> with no explicit
+# width/height styling, which is Google Sheets IMAGE mode 3 (original
+# size), not mode 1 (fit-to-cell) or mode 2 (stretch-to-fit) -- this
+# renderer has no per-formula sizing hook to honestly deliver either of
+# those. Mode 3 is therefore the only accepted mode (and the default when
+# mode is omitted, deliberately diverging from Sheets' mode-1 default so
+# omitting mode never silently claims a fit-to-cell contract that is not
+# delivered); modes 1, 2, and 4 (custom height/width, which only has
+# meaning under mode 4) are rejected with #VALUE! rather than silently
+# ignored, per the "reject unsupported modes, no fake behavior" contract.
+#
+*/
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.ImageFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+
+  var urlv = scf.OperandAsText(sheet, foperand);
+  if (urlv.type.charAt(0) == "e") {
+    scf.PushOperand(operand, urlv.type, 0);
+    return;
+  }
+
+  if (foperand.length) {
+    var modev = scf.OperandAsNumber(sheet, foperand);
+    if (modev.type.charAt(0) == "e") {
+      scf.PushOperand(operand, modev.type, 0);
+      return;
+    }
+    if (Math.floor(modev.value as number) != 3) {
+      // modes 1 (fit cell), 2 (stretch), and 4 (custom height/width) all
+      // require rendering behavior this renderer does not implement.
+      scf.PushOperand(operand, "e#VALUE!", 0);
+      return;
+    }
+  }
+
+  if (foperand.length) {
+    // height/width only have meaning with mode 4, which is rejected above.
+    scf.PushOperand(operand, "e#VALUE!", 0);
+    return;
+  }
+
+  scf.PushOperand(operand, "tm", urlv.value as string);
+
+  return;
+};
+
+SocialCalc.Formula.FunctionList["IMAGE"] = [
+  SocialCalc.Formula.ImageFunction,
+  -1,
+  "image",
+  "",
+  "lookup",
+];
+
+/*
+#
 # FALSE()
 # NA()
 # NOW()
@@ -7612,6 +8124,160 @@ SocialCalc.Formula.FunctionList["TODAY"] = [
   "datetime",
 ];
 SocialCalc.Formula.FunctionList["TRUE"] = [SocialCalc.Formula.ZeroArgFunctions, 0, "", "", "test"];
+
+/*
+#
+# TEXT(value, format_text)
+#
+# Formats value using format_text and returns the result as plain text.
+# Reuses the existing SocialCalc.FormatNumber.formatNumberWithFormat /
+# formatTextWithFormat engine (the same code format_number_for_display /
+# format_text_for_display use for cell display) rather than a parallel
+# format grammar -- this function only adapts that engine's HTML-flavored
+# output (space runs as "&nbsp;", optional "<span style=...>" color/style
+# wrapper) back to the plain data value TEXT must return.
+#
+# format_text == "" is treated as "General" (matches
+# SocialCalc.format_number_for_display's own "" => General convention).
+# A format containing an unmatched "[" (outside quotes) is rejected as
+# malformed rather than silently swallowing the rest of the string, which
+# is what SocialCalc.FormatNumber.parse_format_string would otherwise do.
+# A numeric value with an unquoted "@" placeholder, or a text value with
+# an unquoted numeric/date placeholder, is #VALUE! -- matching Excel,
+# which treats TEXT's numeric and text format grammars as mutually
+# exclusive per call.
+#
+*/
+
+/**
+ * @param {string} format
+ * @param {string} ch
+ */
+FormulaMut.TextFormatHasUnquotedChar = function (format: string, ch: string): boolean {
+  var inquote = false;
+  var inbracket = false;
+  for (var i = 0; i < format.length; i++) {
+    var c = format.charAt(i);
+    if (inquote) {
+      if (c == '"') inquote = false;
+      continue;
+    }
+    if (inbracket) {
+      if (c == "]") inbracket = false;
+      continue;
+    }
+    if (c == '"') {
+      inquote = true;
+      continue;
+    }
+    if (c == "[") {
+      inbracket = true;
+      continue;
+    }
+    if (c == ch) return true;
+  }
+  return false;
+};
+
+/** @param {string} format */
+FormulaMut.TextFormatHasUnmatchedBracket = function (format: string): boolean {
+  var inquote = false;
+  var inbracket = false;
+  for (var i = 0; i < format.length; i++) {
+    var c = format.charAt(i);
+    if (inquote) {
+      if (c == '"') inquote = false;
+      continue;
+    }
+    if (inbracket) {
+      if (c == "]") inbracket = false;
+      continue;
+    }
+    if (c == '"') {
+      inquote = true;
+    } else if (c == "[") {
+      inbracket = true;
+    }
+  }
+  return inbracket;
+};
+
+/** @param {string} html */
+FormulaMut.TextFormatToPlainText = function (html: string): string {
+  return html.replace(/&nbsp;/g, " ").replace(/<[^>]*>/g, "");
+};
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.TextFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+  var scfn = SocialCalc.FormatNumber;
+
+  var value = scf.OperandValueAndType(sheet, foperand);
+  if (value.type.charAt(0) == "e") {
+    scf.PushOperand(operand, value.type, 0);
+    return;
+  }
+
+  var formatv = scf.OperandAsText(sheet, foperand);
+  if (formatv.type.charAt(0) == "e") {
+    scf.PushOperand(operand, formatv.type, 0);
+    return;
+  }
+
+  var format = (formatv.value as string) || "General";
+
+  if (scf.TextFormatHasUnmatchedBracket(format)) {
+    scf.PushOperand(operand, "e#VALUE!", 0);
+    return;
+  }
+
+  var t = value.type.charAt(0);
+  var isText = t == "t";
+  var isBlank = t == "b";
+  var isTextFormat = scf.TextFormatHasUnquotedChar(format, "@") && format != "General";
+
+  if (isText || (isBlank && isTextFormat)) {
+    if (!isTextFormat && !isBlank) {
+      // a text value formatted with a numeric/date grammar is #VALUE!
+      scfn.parse_format_string(scfn.format_definitions, format);
+      var textformatdef = scfn.format_definitions[format];
+      var hasNumericOp = textformatdef.operators.some(function (op: number) {
+        return (
+          op == scfn.commands.integer_placeholder ||
+          op == scfn.commands.fraction_placeholder ||
+          op == scfn.commands.decimal ||
+          op == scfn.commands.currency ||
+          op == scfn.commands.general ||
+          op == scfn.commands.date
+        );
+      });
+      if (hasNumericOp) {
+        scf.PushOperand(operand, "e#VALUE!", 0);
+        return;
+      }
+    }
+    var textresult = scfn.formatTextWithFormat(isBlank ? "" : (value.value as string), format);
+    scf.PushOperand(operand, "t", scf.TextFormatToPlainText(textresult));
+    return;
+  }
+
+  if (scf.TextFormatHasUnquotedChar(format, "@")) {
+    scf.PushOperand(operand, "e#VALUE!", 0);
+    return;
+  }
+
+  var numresult = scfn.formatNumberWithFormat(isBlank ? 0 : (value.value as number), format, "");
+  scf.PushOperand(operand, "t", scf.TextFormatToPlainText(numresult));
+
+  return;
+};
+
+SocialCalc.Formula.FunctionList["TEXT"] = [SocialCalc.Formula.TextFunction, 2, "text", "", "text"];
 
 //
 // * * * * * FINANCIAL FUNCTIONS * * * * *

@@ -9,9 +9,9 @@ set_option loom.semantics.choice "demonic"
 
 def LETTERS : Array String := #["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
 
-def MAX_COL : Int := 702
-
 def MAX_ROW : Int := 65536
+
+def MAX_COL : Int := 702
 
 method rcColname (c : Int) return (res : String)
   ensures res.length ≥ 1
@@ -216,3 +216,48 @@ method wouldOffsetRectangleRef (anchorCol : Int) (anchorRow : Int) (refRows : In
   ensures res = true ∨ res = false
   do
     return Pure.wouldOffsetRectangleRef anchorCol anchorRow refRows refCols rowoffset coloffset height width
+
+method isAddressRowInBounds (row : Int) return (res : Bool)
+  ensures res = true ∨ res = false
+  ensures res = true ↔ row ≥ 1 ∧ row ≤ 65536
+  do
+    return Pure.isAddressRowInBounds row
+
+method isAddressColInBounds (col : Int) return (res : Bool)
+  ensures res = true ∨ res = false
+  ensures res = true ↔ col ≥ 1 ∧ col ≤ 702
+  do
+    return Pure.isAddressColInBounds col
+
+method addressAbsRow (absNum : Int) return (res : Bool)
+  ensures res = true ∨ res = false
+  ensures res = true ↔ absNum = 1 ∨ absNum = 2
+  do
+    return Pure.addressAbsRow absNum
+
+method addressAbsCol (absNum : Int) return (res : Bool)
+  ensures res = true ∨ res = false
+  ensures res = true ↔ absNum = 1 ∨ absNum = 3
+  do
+    return Pure.addressAbsCol absNum
+
+method isValidAddressAbsNum (absNum : Int) return (res : Bool)
+  ensures res = true ∨ res = false
+  ensures res = true ↔ absNum ≥ 1 ∧ absNum ≤ 4
+  do
+    return Pure.isValidAddressAbsNum absNum
+
+method formatAddressA1 (row : Int) (col : Int) (absNum : Int) return (res : String)
+  ensures res.length ≥ 2
+  do
+    let _t11 ← addressAbsCol absNum
+    let absCol := _t11
+    let _t12 ← addressAbsRow absNum
+    let absRow := _t12
+    let _t13 ← rcColname col
+    return (if absCol then "$" else "") ++ _t13 ++ (if absRow then "$" else "") ++ toString row
+
+method formatAddressR1C1 (row : Int) (col : Int) (absNum : Int) return (res : String)
+  ensures res.length ≥ 4
+  do
+    return Pure.formatAddressR1C1 row col absNum

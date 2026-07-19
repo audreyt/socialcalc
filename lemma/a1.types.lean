@@ -148,4 +148,24 @@ def wouldOffsetRectangleRef (anchorCol : Int) (anchorRow : Int) (refRows : Int) 
   let plan := offsetRectangle anchorCol anchorRow refRows refCols rowoffset coloffset height width
   plan.ok = false
 
+def isAddressRowInBounds (row : Int) : Bool :=
+  row ≥ 1 ∧ row ≤ MAX_ROW
+
+def isAddressColInBounds (col : Int) : Bool :=
+  col ≥ 1 ∧ col ≤ MAX_COL
+
+def addressAbsRow (absNum : Int) : Bool :=
+  absNum = 1 ∨ absNum = 2
+
+def addressAbsCol (absNum : Int) : Bool :=
+  absNum = 1 ∨ absNum = 3
+
+def isValidAddressAbsNum (absNum : Int) : Bool :=
+  absNum ≥ 1 ∧ absNum ≤ 4
+
+def formatAddressR1C1 (row : Int) (col : Int) (absNum : Int) : String :=
+  let absRow := addressAbsRow absNum
+  let absCol := addressAbsCol absNum
+  "R" ++ (if absRow then "" ++ toString row else "[" ++ toString row ++ "]") ++ "C" ++ (if absCol then "" ++ toString col else "[" ++ toString col ++ "]")
+
 end Pure

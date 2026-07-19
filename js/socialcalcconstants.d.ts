@@ -460,7 +460,9 @@ declare namespace SocialCalc {
     s_fdef_ATAN: string;
     s_fdef_ATAN2: string;
     s_fdef_AVERAGE: string;
+    s_fdef_ADDRESS: string;
     s_fdef_CHOOSE: string;
+    s_fdef_COLUMN: string;
     s_fdef_COLUMNS: string;
     s_fdef_COS: string;
     s_fdef_CONCAT: string;
@@ -505,11 +507,16 @@ declare namespace SocialCalc {
     s_fdef_IRR: string;
     s_fdef_ISBLANK: string;
     s_fdef_ISERR: string;
+    "s_fdef_ERROR.TYPE": string;
+    s_fdef_HYPERLINK: string;
+    s_fdef_IMAGE: string;
     s_fdef_ISERROR: string;
+    s_fdef_ISFORMULA: string;
     s_fdef_ISLOGICAL: string;
     s_fdef_ISNA: string;
     s_fdef_ISNONTEXT: string;
     s_fdef_ISNUMBER: string;
+    s_fdef_ISREF: string;
     s_fdef_ISTEXT: string;
     s_fdef_LEFT: string;
     s_fdef_LEN: string;
@@ -548,6 +555,7 @@ declare namespace SocialCalc {
     s_fdef_REPT: string;
     s_fdef_RIGHT: string;
     s_fdef_ROUND: string;
+    s_fdef_ROW: string;
     s_fdef_ROWS: string;
     s_fdef_SECOND: string;
     s_fdef_SIN: string;
@@ -563,11 +571,13 @@ declare namespace SocialCalc {
     s_fdef_SYD: string;
     s_fdef_T: string;
     s_fdef_TAN: string;
+    s_fdef_TEXT: string;
     s_fdef_TIME: string;
     s_fdef_TODAY: string;
     s_fdef_TRIM: string;
     s_fdef_TRUE: string;
     s_fdef_TRUNC: string;
+    s_fdef_TYPE: string;
     s_fdef_UPPER: string;
     s_fdef_VALUE: string;
     s_fdef_VAR: string;
@@ -652,6 +662,11 @@ declare namespace SocialCalc {
     s_farg_regexmatch: string;
     s_farg_regexextract: string;
     s_farg_regexreplace: string;
+    s_farg_address: string;
+    s_farg_hyperlink: string;
+    s_farg_image: string;
+    s_farg_refopt: string;
+    s_farg_text: string;
 
     // Function class list and labels
     function_classlist: string[];

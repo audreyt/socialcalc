@@ -556,7 +556,11 @@
     s_fdef_ATAN: 'Trigonometric arctan function. ',
     s_fdef_ATAN2: 'Trigonometric arc tangent function (result is in radians). ',
     s_fdef_AVERAGE: 'Averages the values. ',
+    s_fdef_ADDRESS:
+      'Returns a reference (as text) for the given row and column numbers. abs_num selects absolute/relative: 1 = absolute row & column (e.g., "$A$1"), 2 = absolute row/relative column ("A$1"), 3 = relative row/absolute column ("$A1"), 4 = both relative ("A1", the default is 1). a1 (default TRUE) selects A1-style; FALSE selects R1C1-style. sheet_text, if given, is prefixed with "!" and quoted if it is not a bare name. ',
     s_fdef_CHOOSE: 'Returns the value specified by the index. The values may be ranges of cells. ',
+    s_fdef_COLUMN:
+      'Returns the column number of the given reference (or of the cell containing the formula if reference is omitted). ',
     s_fdef_COLUMNS: 'Returns the number of columns in the range. ',
     s_fdef_COS: 'Trigonometric cosine function (value is in radians). ',
     s_fdef_CONCAT: 'Join Together Text & Values to Create a Single Combined Text String. ',
@@ -631,9 +635,17 @@
     s_fdef_ISERR: 'Returns "true" if the value is of type "Error" but not "NA". ',
     s_fdef_ISERROR: 'Returns "true" if the value is of type "Error". ',
     s_fdef_ISLOGICAL: 'Returns "true" if the value is of type "Logical" (true/false). ',
+    's_fdef_ERROR.TYPE':
+      'Returns a number corresponding to the type of error value: 1=#NULL!, 2=#DIV/0!, 3=#VALUE!, 4=#REF!, 5=#NAME?, 6=#NUM!, 7=#N/A, 8=#SPILL!. Returns #N/A if error_val is not an error. ',
+    s_fdef_HYPERLINK:
+      'Creates a shortcut that displays friendly_name (or link_location if omitted) and links to link_location, using the same rendering path as a manually entered cell link. ',
+    s_fdef_IMAGE:
+      'Displays an image from the given url in the cell, at its original size (Google Sheets IMAGE mode 3; other modes and explicit height/width are not supported by this renderer and are rejected). ',
+    s_fdef_ISFORMULA: 'Returns "true" if reference refers to a cell that contains a formula. ',
     s_fdef_ISNA: 'Returns "true" if the value is the error type "NA". ',
     s_fdef_ISNONTEXT: 'Returns "true" if the value is not of type "Text". ',
     s_fdef_ISNUMBER: 'Returns "true" if the value is of type "Number" (including logical values). ',
+    s_fdef_ISREF: 'Returns "true" if the value is a cell or range reference. ',
     s_fdef_ISTEXT: 'Returns "true" if the value is of type "Text". ',
     s_fdef_LEFT:
       'Returns the specified number of characters from the text value. If count is omitted, 1 is assumed. ',
@@ -692,6 +704,8 @@
       'Returns the specified number of characters from the text value starting from the end. If count is omitted, 1 is assumed. ',
     s_fdef_ROUND:
       'Rounds the value to the specified number of decimal places. If precision is negative, then round to powers of 10. The default precision is 0 (round to integer). ',
+    s_fdef_ROW:
+      'Returns the row number of the given reference (or of the cell containing the formula if reference is omitted). ',
     s_fdef_ROWS: 'Returns the number of rows in the range. ',
     s_fdef_SECOND:
       'Returns the second portion of a time or date/time value (truncated to an integer). ',
@@ -740,6 +754,8 @@
     s_fdef_SYD: "Depreciation by Sum of Year's Digits method. ",
     s_fdef_T: 'Returns the text value or else a null string. ',
     s_fdef_TAN: 'Trigonometric tangent function (value is in radians) ',
+    s_fdef_TEXT:
+      'Formats value using format_text (the same number-format codes used for cell display, e.g. "0.00", "$#,##0", "mm/dd/yyyy", "@") and returns the result as text. ',
     s_fdef_TIME: 'Returns the time value given the specified hour, minute, and second. ',
     s_fdef_TODAY:
       'Returns the current date (an integer). Note: In this program, day "1" is December 31, 1899 and the year 1900 is not a leap year. Some programs use January 1, 1900, as day "1" and treat 1900 as a leap year. In both cases, though, dates on or after March 1, 1900, are the same. ',
@@ -747,6 +763,8 @@
     s_fdef_TRUE: 'Returns the logical value "true". ',
     s_fdef_TRUNC:
       'Truncates the value to the specified number of decimal places. If precision is negative, truncate to powers of 10. ',
+    s_fdef_TYPE:
+      'Returns a number representing the data type of the value: 1=Number, 2=Text, 4=Logical, 16=Error, 64=Range/Array. ',
     s_fdef_UPPER: 'Returns the text value with all lowercase characters converted to uppercase. ',
     s_fdef_VALUE:
       'Converts the specified text value into a numeric value. Various forms that look like numbers (including digits followed by %, forms that look like dates, etc.) are handled. This may not handle all of the forms accepted by other spreadsheets and may be locale dependent. ',
@@ -865,6 +883,11 @@
     s_farg_regexmatch: 'text, regular_expression',
     s_farg_regexextract: 'text, regular_expression',
     s_farg_regexreplace: 'text, regular_expression, replacement',
+    s_farg_address: 'row_num, column_num, [abs_num], [a1], [sheet_text]',
+    s_farg_hyperlink: 'link_location, [friendly_name]',
+    s_farg_image: 'url, [mode], [height], [width]',
+    s_farg_refopt: '[reference]',
+    s_farg_text: 'value, format_text',
     function_classlist: [
       'all',
       'stat',
@@ -7379,6 +7402,7 @@ More comments yet to come...
       if (valuesubtype == 'h') valueformat = 'text-html';
       if (valuesubtype == 'w' || valuesubtype == 'r') valueformat = 'text-wiki';
       if (valuesubtype == 'l') valueformat = 'text-link';
+      if (valuesubtype == 'm') valueformat = 'text-image';
       if (!valuesubtype) valueformat = 'text-plain';
     }
     if (valueformat == 'text-html') {
@@ -19409,6 +19433,117 @@ More comments yet to come...
   SocialCalc.Formula.FunctionList['N'] = [SocialCalc.Formula.NTVFunctions, 1, 'v', '', 'math'];
   SocialCalc.Formula.FunctionList['T'] = [SocialCalc.Formula.NTVFunctions, 1, 'v', '', 'text'];
   SocialCalc.Formula.FunctionList['VALUE'] = [SocialCalc.Formula.NTVFunctions, 1, 'v', '', 'text'];
+  FormulaMut.IsFormulaCoordCell = function (sheet, coordtext) {
+    var scf = SocialCalc.Formula;
+    var coordsheet = sheet;
+    var pos = coordtext.indexOf('!');
+    if (pos != -1) {
+      coordsheet = scf.FindInSheetCache(coordtext.substring(pos + 1));
+      coordtext = coordtext.substring(0, pos);
+    }
+    return coordsheet.cells[scf.PlainCoord(coordtext)] || null;
+  };
+  FormulaMut.RefInfoFunctions = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var result = 0;
+    if (fname == 'ISFORMULA' || fname == 'ISREF') {
+      var value1 = scf.TopOfStackValueAndType(sheet, foperand);
+      if (fname == 'ISREF') {
+        result = value1.type == 'coord' || value1.type == 'range' ? 1 : 0;
+        scf.PushOperand(operand, 'nl', result);
+        return;
+      }
+      if (value1.type == 'coord') {
+        var cell = scf.IsFormulaCoordCell(sheet, value1.value);
+        result = cell && cell.datatype == 'f' ? 1 : 0;
+      } else if (value1.type == 'range') {
+        var rangeinfo = scf.DecodeRangeParts(sheet, value1.value);
+        if (!rangeinfo) {
+          result = 0;
+        } else {
+          var topleft =
+            rangeinfo.sheetdata.cells[SocialCalc.crToCoord(rangeinfo.col1num, rangeinfo.row1num)];
+          result = topleft && topleft.datatype == 'f' ? 1 : 0;
+        }
+      } else {
+        result = 0;
+      }
+      scf.PushOperand(operand, 'nl', result);
+      return;
+    }
+    if (fname == 'TYPE') {
+      var typedvalue = scf.TopOfStackValueAndType(sheet, foperand);
+      if (typedvalue.type == 'range') {
+        scf.PushOperand(operand, 'n', 64);
+        return;
+      }
+      var tt = typedvalue.type.charAt(0);
+      if (tt == 'e') {
+        result = 16;
+      } else if (typedvalue.type == 'nl') {
+        result = 4;
+      } else if (tt == 't') {
+        result = 2;
+      } else if (typedvalue.type == 'coord') {
+        var coordvalue = scf.OperandValueAndType(sheet, [typedvalue]);
+        var ct = coordvalue.type.charAt(0);
+        if (ct == 'e') result = 16;
+        else if (coordvalue.type == 'nl') result = 4;
+        else if (ct == 't') result = 2;
+        else result = 1;
+      } else {
+        result = 1;
+      }
+      scf.PushOperand(operand, 'n', result);
+      return;
+    }
+    var value = scf.OperandValueAndType(sheet, foperand);
+    var errorcodes = {
+      'e#NULL!': 1,
+      'e#DIV/0!': 2,
+      'e#VALUE!': 3,
+      'e#REF!': 4,
+      'e#NAME?': 5,
+      'e#NUM!': 6,
+      'e#N/A': 7,
+      'e#SPILL!': 8,
+    };
+    var code = errorcodes[value.type];
+    if (code) {
+      scf.PushOperand(operand, 'n', code);
+    } else {
+      scf.PushOperand(operand, 'e#N/A', 0);
+    }
+    return;
+  };
+  SocialCalc.Formula.FunctionList['ISFORMULA'] = [
+    SocialCalc.Formula.RefInfoFunctions,
+    1,
+    'v',
+    '',
+    'test',
+  ];
+  SocialCalc.Formula.FunctionList['ISREF'] = [
+    SocialCalc.Formula.RefInfoFunctions,
+    1,
+    'v',
+    '',
+    'test',
+  ];
+  SocialCalc.Formula.FunctionList['ERROR.TYPE'] = [
+    SocialCalc.Formula.RefInfoFunctions,
+    1,
+    'v',
+    '',
+    'test',
+  ];
+  SocialCalc.Formula.FunctionList['TYPE'] = [
+    SocialCalc.Formula.RefInfoFunctions,
+    1,
+    'v',
+    '',
+    'test',
+  ];
   FormulaMut.Math1Functions = function (fname, operand, foperand, sheet) {
     var v1, value, f;
     var result = {};
@@ -20284,6 +20419,206 @@ More comments yet to come...
     '',
     'lookup',
   ];
+  FormulaMut.RowColumnFunctions = function (fname, operand, foperand, sheet, coord) {
+    var scf = SocialCalc.Formula;
+    var result = 0;
+    var resulttype = 'n';
+    if (foperand.length > 1) {
+      scf.FunctionArgsError(fname, operand);
+      return;
+    }
+    if (foperand.length === 0) {
+      if (!coord) {
+        scf.PushOperand(operand, 'e#REF!', 0);
+        return;
+      }
+      var here = SocialCalc.coordToCr(SocialCalc.Formula.PlainCoord(coord));
+      result = fname == 'ROW' ? here.row : here.col;
+      scf.PushOperand(operand, resulttype, result);
+      return;
+    }
+    var value1 = scf.TopOfStackValueAndType(sheet, foperand);
+    if (value1.type.charAt(0) == 'e') {
+      scf.PushOperand(operand, value1.type, 0);
+      return;
+    }
+    if (value1.type == 'coord') {
+      var coordtext = value1.value;
+      var bang = coordtext.indexOf('!');
+      if (bang != -1) coordtext = coordtext.substring(0, bang);
+      var cr = SocialCalc.coordToCr(SocialCalc.Formula.PlainCoord(coordtext));
+      result = fname == 'ROW' ? cr.row : cr.col;
+    } else if (value1.type == 'range') {
+      var rangeinfo = scf.DecodeRangeParts(sheet, value1.value);
+      if (!rangeinfo) {
+        scf.PushOperand(operand, 'e#REF!', 0);
+        return;
+      }
+      result = fname == 'ROW' ? rangeinfo.row1num : rangeinfo.col1num;
+    } else {
+      scf.PushOperand(operand, 'e#VALUE!', 0);
+      return;
+    }
+    scf.PushOperand(operand, resulttype, result);
+    return;
+  };
+  SocialCalc.Formula.FunctionList['ROW'] = [
+    SocialCalc.Formula.RowColumnFunctions,
+    100,
+    'refopt',
+    '',
+    'lookup',
+  ];
+  SocialCalc.Formula.FunctionList['COLUMN'] = [
+    SocialCalc.Formula.RowColumnFunctions,
+    100,
+    'refopt',
+    '',
+    'lookup',
+  ];
+  FormulaMut.AddressFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var rownumv = scf.OperandAsNumber(sheet, foperand);
+    var colnumv = scf.OperandAsNumber(sheet, foperand);
+    if (rownumv.type.charAt(0) == 'e') {
+      scf.PushOperand(operand, rownumv.type, 0);
+      return;
+    }
+    if (colnumv.type.charAt(0) == 'e') {
+      scf.PushOperand(operand, colnumv.type, 0);
+      return;
+    }
+    var absnum = 1;
+    if (foperand.length) {
+      var absnumv = scf.OperandAsNumber(sheet, foperand);
+      if (absnumv.type.charAt(0) == 'e') {
+        scf.PushOperand(operand, absnumv.type, 0);
+        return;
+      }
+      absnum = Math.floor(absnumv.value);
+      if (absnum < 1 || absnum > 4) {
+        scf.PushOperand(operand, 'e#VALUE!', 0);
+        return;
+      }
+    }
+    var a1style = true;
+    if (foperand.length) {
+      var a1v = scf.OperandValueAndType(sheet, foperand);
+      if (a1v.type.charAt(0) == 'e') {
+        scf.PushOperand(operand, a1v.type, 0);
+        return;
+      }
+      a1style = a1v.type == 'b' ? true : Boolean(a1v.value);
+    }
+    var sheettext = '';
+    if (foperand.length) {
+      var sheetv = scf.OperandAsText(sheet, foperand);
+      if (sheetv.type.charAt(0) == 'e') {
+        scf.PushOperand(operand, sheetv.type, 0);
+        return;
+      }
+      sheettext = sheetv.value;
+    }
+    if (foperand.length) {
+      scf.FunctionArgsError(fname, operand);
+      return;
+    }
+    var rownum = Math.trunc(rownumv.value);
+    var colnum = Math.trunc(colnumv.value);
+    if (rownum < 1 || rownum > 65536 || colnum < 1 || colnum > 702) {
+      scf.PushOperand(operand, 'e#VALUE!', 0);
+      return;
+    }
+    var colname = SocialCalc.rcColname(colnum);
+    var absrow = absnum == 1 || absnum == 2;
+    var abscol = absnum == 1 || absnum == 3;
+    var result;
+    if (a1style) {
+      result = (abscol ? '$' : '') + colname + (absrow ? '$' : '') + rownum;
+    } else {
+      result = 'R' + (absrow ? String(rownum) : '[' + rownum + ']');
+      result += 'C' + (abscol ? String(colnum) : '[' + colnum + ']');
+    }
+    if (sheettext) {
+      var quoted = !/^[A-Za-z_][A-Za-z0-9_.]*$/.test(sheettext)
+        ? "'" + sheettext.replace(/'/g, "''") + "'"
+        : sheettext;
+      result = quoted + '!' + result;
+    }
+    scf.PushOperand(operand, 't', result);
+    return;
+  };
+  SocialCalc.Formula.FunctionList['ADDRESS'] = [
+    SocialCalc.Formula.AddressFunction,
+    -2,
+    'address',
+    '',
+    'lookup',
+  ];
+  FormulaMut.HyperlinkFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var linklocv = scf.OperandAsText(sheet, foperand);
+    if (linklocv.type.charAt(0) == 'e') {
+      scf.PushOperand(operand, linklocv.type, 0);
+      return;
+    }
+    var linkloc = linklocv.value;
+    var friendly = linkloc;
+    if (foperand.length) {
+      var friendlyv = scf.OperandAsText(sheet, foperand);
+      if (friendlyv.type.charAt(0) == 'e') {
+        scf.PushOperand(operand, friendlyv.type, 0);
+        return;
+      }
+      friendly = friendlyv.value;
+    }
+    if (foperand.length) {
+      scf.FunctionArgsError(fname, operand);
+      return;
+    }
+    var linktext = friendly + '<' + linkloc + '>';
+    scf.PushOperand(operand, 'tl', linktext);
+    return;
+  };
+  SocialCalc.Formula.FunctionList['HYPERLINK'] = [
+    SocialCalc.Formula.HyperlinkFunction,
+    -1,
+    'hyperlink',
+    '',
+    'lookup',
+  ];
+  FormulaMut.ImageFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var urlv = scf.OperandAsText(sheet, foperand);
+    if (urlv.type.charAt(0) == 'e') {
+      scf.PushOperand(operand, urlv.type, 0);
+      return;
+    }
+    if (foperand.length) {
+      var modev = scf.OperandAsNumber(sheet, foperand);
+      if (modev.type.charAt(0) == 'e') {
+        scf.PushOperand(operand, modev.type, 0);
+        return;
+      }
+      if (Math.floor(modev.value) != 3) {
+        scf.PushOperand(operand, 'e#VALUE!', 0);
+        return;
+      }
+    }
+    if (foperand.length) {
+      scf.PushOperand(operand, 'e#VALUE!', 0);
+      return;
+    }
+    scf.PushOperand(operand, 'tm', urlv.value);
+    return;
+  };
+  SocialCalc.Formula.FunctionList['IMAGE'] = [
+    SocialCalc.Formula.ImageFunction,
+    -1,
+    'image',
+    '',
+    'lookup',
+  ];
   FormulaMut.ZeroArgFunctions = function (fname, operand, _foperand, _sheet) {
     var startval, tzoffset, start_1_1_1970, seconds_in_a_day, nowdays;
     var result = {
@@ -20373,6 +20708,115 @@ More comments yet to come...
     '',
     '',
     'test',
+  ];
+  FormulaMut.TextFormatHasUnquotedChar = function (format, ch) {
+    var inquote = false;
+    var inbracket = false;
+    for (var i = 0; i < format.length; i++) {
+      var c = format.charAt(i);
+      if (inquote) {
+        if (c == '"') inquote = false;
+        continue;
+      }
+      if (inbracket) {
+        if (c == ']') inbracket = false;
+        continue;
+      }
+      if (c == '"') {
+        inquote = true;
+        continue;
+      }
+      if (c == '[') {
+        inbracket = true;
+        continue;
+      }
+      if (c == ch) return true;
+    }
+    return false;
+  };
+  FormulaMut.TextFormatHasUnmatchedBracket = function (format) {
+    var inquote = false;
+    var inbracket = false;
+    for (var i = 0; i < format.length; i++) {
+      var c = format.charAt(i);
+      if (inquote) {
+        if (c == '"') inquote = false;
+        continue;
+      }
+      if (inbracket) {
+        if (c == ']') inbracket = false;
+        continue;
+      }
+      if (c == '"') {
+        inquote = true;
+      } else if (c == '[') {
+        inbracket = true;
+      }
+    }
+    return inbracket;
+  };
+  FormulaMut.TextFormatToPlainText = function (html) {
+    return html.replace(/&nbsp;/g, ' ').replace(/<[^>]*>/g, '');
+  };
+  FormulaMut.TextFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var scfn = SocialCalc.FormatNumber;
+    var value = scf.OperandValueAndType(sheet, foperand);
+    if (value.type.charAt(0) == 'e') {
+      scf.PushOperand(operand, value.type, 0);
+      return;
+    }
+    var formatv = scf.OperandAsText(sheet, foperand);
+    if (formatv.type.charAt(0) == 'e') {
+      scf.PushOperand(operand, formatv.type, 0);
+      return;
+    }
+    var format = formatv.value || 'General';
+    if (scf.TextFormatHasUnmatchedBracket(format)) {
+      scf.PushOperand(operand, 'e#VALUE!', 0);
+      return;
+    }
+    var t = value.type.charAt(0);
+    var isText = t == 't';
+    var isBlank = t == 'b';
+    var isTextFormat = scf.TextFormatHasUnquotedChar(format, '@') && format != 'General';
+    if (isText || (isBlank && isTextFormat)) {
+      if (!isTextFormat && !isBlank) {
+        scfn.parse_format_string(scfn.format_definitions, format);
+        var textformatdef = scfn.format_definitions[format];
+        var hasNumericOp = textformatdef.operators.some(function (op) {
+          return (
+            op == scfn.commands.integer_placeholder ||
+            op == scfn.commands.fraction_placeholder ||
+            op == scfn.commands.decimal ||
+            op == scfn.commands.currency ||
+            op == scfn.commands.general ||
+            op == scfn.commands.date
+          );
+        });
+        if (hasNumericOp) {
+          scf.PushOperand(operand, 'e#VALUE!', 0);
+          return;
+        }
+      }
+      var textresult = scfn.formatTextWithFormat(isBlank ? '' : value.value, format);
+      scf.PushOperand(operand, 't', scf.TextFormatToPlainText(textresult));
+      return;
+    }
+    if (scf.TextFormatHasUnquotedChar(format, '@')) {
+      scf.PushOperand(operand, 'e#VALUE!', 0);
+      return;
+    }
+    var numresult = scfn.formatNumberWithFormat(isBlank ? 0 : value.value, format, '');
+    scf.PushOperand(operand, 't', scf.TextFormatToPlainText(numresult));
+    return;
+  };
+  SocialCalc.Formula.FunctionList['TEXT'] = [
+    SocialCalc.Formula.TextFunction,
+    2,
+    'text',
+    '',
+    'text',
   ];
   FormulaMut.DDBFunction = function (fname, operand, foperand, sheet) {
     var method, depreciation, accumulateddepreciation, i;

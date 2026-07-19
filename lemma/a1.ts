@@ -40,12 +40,12 @@ const LETTERS = [
   "Z",
 ] as const;
 
+/** SocialCalc max row = 65536 (js/formula1.ts SPILL_MAX_ROW / AddressFunction
+ * bounds policy; also the OFFSET/INDIRECT rectangle row ceiling). */
+export const MAX_ROW = 65536;
+
 /** SocialCalc max column ZZ = 702. */
 export const MAX_COL = 702;
-
-/** SocialCalc max row = 65536 (js/formula1.ts SPILL_MAX_ROW; also the
- * OFFSET/INDIRECT rectangle row ceiling). */
-export const MAX_ROW = 65536;
 
 /**
  * Column index 1..702 → A..ZZ. Out-of-range clamps (shipping rcColname).
@@ -498,4 +498,110 @@ export function wouldOffsetRectangleRef(
     width,
   );
   return plan.ok === false;
+}
+
+/**
+ * ADDRESS row/column bounds policy (js/formula1.ts AddressFunction):
+ * row in [1, MAX_ROW], col in [1, MAX_COL]. Unlike rcColname/crToCoord,
+ * ADDRESS rejects out-of-band input with #VALUE! rather than clamping.
+ */
+export function isAddressRowInBounds(row: number): boolean {
+  //@ verify
+  //@ ensures \result === true || \result === false
+  //@ ensures \result === true <==> row >= 1 && row <= 65536
+  return row >= 1 && row <= MAX_ROW;
+}
+
+export function isAddressColInBounds(col: number): boolean {
+  //@ verify
+  //@ ensures \result === true || \result === false
+  //@ ensures \result === true <==> col >= 1 && col <= 702
+  return col >= 1 && col <= MAX_COL;
+}
+
+/**
+ * ADDRESS abs_num policy: 1 = absolute row & col, 2 = absolute row/
+ * relative col, 3 = relative row/absolute col, 4 = relative both.
+ * Mirrors js/formula1.ts AddressFunction's absrow/abscol derivation.
+ */
+export function addressAbsRow(absNum: number): boolean {
+  //@ verify
+  //@ ensures \result === true || \result === false
+  //@ ensures \result === true <==> absNum === 1 || absNum === 2
+  return absNum === 1 || absNum === 2;
+}
+
+export function addressAbsCol(absNum: number): boolean {
+  //@ verify
+  //@ ensures \result === true || \result === false
+  //@ ensures \result === true <==> absNum === 1 || absNum === 3
+  return absNum === 1 || absNum === 3;
+}
+
+/**
+ * Whether abs_num is one of the four documented modes.
+ */
+export function isValidAddressAbsNum(absNum: number): boolean {
+  //@ verify
+  //@ ensures \result === true || \result === false
+  //@ ensures \result === true <==> absNum >= 1 && absNum <= 4
+  return absNum >= 1 && absNum <= 4;
+}
+
+/**
+ * ADDRESS A1-style reference body (no sheet prefix). Requires bounds and
+ * abs_num to already be validated by the caller (mirrors AddressFunction,
+ * which returns #VALUE! for out-of-range/invalid input before reaching
+ * this formatting step, rather than folding a sentinel string in here).
+ */
+export function formatAddressA1(row: number, col: number, absNum: number): string {
+  //@ verify
+  //@ ensures \result.length >= 2
+  const absCol = addressAbsCol(absNum);
+  const absRow = addressAbsRow(absNum);
+  return (absCol ? "$" : "") + rcColname(col) + (absRow ? "$" : "") + row;
+}
+
+/**
+ * ADDRESS R1C1-style reference body (a1=FALSE). Absolute axes emit a bare
+ * row/column number; relative axes emit the offset-from-formula-cell form
+ * SocialCalc's ADDRESS uses: R1C1's bracketed-offset semantics degenerate
+ * to the plain row/col number here because ADDRESS has no anchor cell to
+ * offset from (matches js/formula1.ts AddressFunction's R1C1 branch).
+ */
+export function formatAddressR1C1(row: number, col: number, absNum: number): string {
+  //@ verify
+  //@ ensures \result.length >= 4
+  const absRow = addressAbsRow(absNum);
+  const absCol = addressAbsCol(absNum);
+  return "R" + (absRow ? "" + row : "[" + row + "]") + "C" + (absCol ? "" + col : "[" + col + "]");
+}
+
+/**
+ * Whether a sheet name needs single-quote wrapping in ADDRESS's sheet_text
+ * argument: anything that is not a bare identifier (letters/digits/'_'/'.',
+ * not starting with a digit) must be quoted (mirrors js/formula1.ts
+ * AddressFunction's sheet-name-quoting regex).
+ */
+// Not //@ verify: charCodeAt() is unsupported by the LemmaScript Lean
+// backend's string emitter, so the annotation was dropped entirely
+// (Dafny/Lean both skip this function -- extraction is per-annotation,
+// not per-backend). Correctness here is pinned by the behavioral facade
+// test (test/lemma-a1-facade.test.ts) instead of a discharged proof.
+export function addressSheetNeedsQuoting(name: string): boolean {
+  if (name.length === 0) return true;
+  const first = name.charCodeAt(0);
+  const firstOk = (first >= 65 && first <= 90) || (first >= 97 && first <= 122) || first === 95; // A-Z a-z _
+  let allOk = firstOk;
+  for (let i = 1; i < name.length; i++) {
+    const ch = name.charCodeAt(i);
+    const ok =
+      (ch >= 65 && ch <= 90) || // A-Z
+      (ch >= 97 && ch <= 122) || // a-z
+      (ch >= 48 && ch <= 57) || // 0-9
+      ch === 95 || // _
+      ch === 46; // .
+    allOk = allOk && ok;
+  }
+  return !allOk;
 }

@@ -3,6 +3,9 @@ import { describe, expect, test } from "vite-plus/test";
 import {
   MAX_COL,
   MAX_ROW,
+  addressAbsCol,
+  addressAbsRow,
+  addressSheetNeedsQuoting,
   adjustA1,
   adjustAxis,
   applyAxisOffset,
@@ -14,8 +17,13 @@ import {
   offsetRectangle,
   crToCoord,
   formatA1Parts,
+  formatAddressA1,
+  formatAddressR1C1,
+  isAddressColInBounds,
+  isAddressRowInBounds,
   isColInBounds,
   isRowInBounds,
+  isValidAddressAbsNum,
   offsetA1,
   offsetA1Parts,
   offsetCol,
@@ -469,5 +477,125 @@ describe("lemma/a1 facade vs shipping SocialCalc oracle", () => {
     const SC = await loadSocialCalc();
     expect(SC.OffsetFormulaCoords("ZZ1", 1, 0)).toBe("#REF!");
     expect(offsetRelativeA1(702, 1, 1, 0)).toBe("#REF!");
+  });
+});
+
+describe("lemma/a1 ADDRESS bounds/abs-mode facade laws", () => {
+  test("isAddressRowInBounds / isAddressColInBounds mirror the AddressFunction #VALUE! policy", () => {
+    expect(isAddressRowInBounds(0)).toBe(false);
+    expect(isAddressRowInBounds(1)).toBe(true);
+    expect(isAddressRowInBounds(MAX_ROW)).toBe(true);
+    expect(isAddressRowInBounds(MAX_ROW + 1)).toBe(false);
+    expect(isAddressColInBounds(0)).toBe(false);
+    expect(isAddressColInBounds(1)).toBe(true);
+    expect(isAddressColInBounds(MAX_COL)).toBe(true);
+    expect(isAddressColInBounds(MAX_COL + 1)).toBe(false);
+  });
+
+  test("isValidAddressAbsNum accepts exactly 1..4", () => {
+    expect(isValidAddressAbsNum(0)).toBe(false);
+    expect(isValidAddressAbsNum(1)).toBe(true);
+    expect(isValidAddressAbsNum(4)).toBe(true);
+    expect(isValidAddressAbsNum(5)).toBe(false);
+  });
+
+  test("addressAbsRow / addressAbsCol match the documented abs_num -> $ placement", () => {
+    expect(addressAbsRow(1)).toBe(true);
+    expect(addressAbsCol(1)).toBe(true);
+    expect(addressAbsRow(2)).toBe(true);
+    expect(addressAbsCol(2)).toBe(false);
+    expect(addressAbsRow(3)).toBe(false);
+    expect(addressAbsCol(3)).toBe(true);
+    expect(addressAbsRow(4)).toBe(false);
+    expect(addressAbsCol(4)).toBe(false);
+  });
+
+  test("formatAddressA1 produces the four documented $ placements", () => {
+    expect(formatAddressA1(2, 3, 1)).toBe("$C$2");
+    expect(formatAddressA1(2, 3, 2)).toBe("C$2");
+    expect(formatAddressA1(2, 3, 3)).toBe("$C2");
+    expect(formatAddressA1(2, 3, 4)).toBe("C2");
+  });
+
+  test("formatAddressR1C1 produces the four documented R1C1 forms", () => {
+    expect(formatAddressR1C1(2, 3, 1)).toBe("R2C3");
+    expect(formatAddressR1C1(2, 3, 2)).toBe("R2C[3]");
+    expect(formatAddressR1C1(2, 3, 3)).toBe("R[2]C3");
+    expect(formatAddressR1C1(2, 3, 4)).toBe("R[2]C[3]");
+  });
+
+  test("addressSheetNeedsQuoting: bare identifiers unquoted, everything else quoted", () => {
+    expect(addressSheetNeedsQuoting("Sheet1")).toBe(false); // digit mid-name is OK
+    expect(addressSheetNeedsQuoting("sheet1")).toBe(false); // lowercase leading letter is OK
+    expect(addressSheetNeedsQuoting("_foo.bar")).toBe(false);
+    expect(addressSheetNeedsQuoting("")).toBe(true); // empty name always needs quoting
+    expect(addressSheetNeedsQuoting("My Sheet")).toBe(true); // space fails mid-name
+    expect(addressSheetNeedsQuoting("1Sheet")).toBe(true); // must not start with a digit
+    expect(addressSheetNeedsQuoting("It's Mine")).toBe(true); // apostrophe fails mid-name
+  });
+});
+
+describe("lemma/a1 ADDRESS facade vs shipping SocialCalc ADDRESS() oracle", () => {
+  async function shippingAddress(
+    SC: any,
+    row: number,
+    col: number,
+    absNum: number,
+    a1: boolean,
+  ): Promise<string> {
+    const sheet = new SC.Sheet();
+    const formula = `ADDRESS(${row},${col},${absNum},${a1 ? "TRUE" : "FALSE"})`;
+    const parseinfo = SC.Formula.ParseFormulaIntoTokens(formula);
+    const result = SC.Formula.evaluate_parsed_formula(parseinfo, sheet, false);
+    return result.value;
+  }
+
+  test("formatAddressA1 matches shipping ADDRESS() for every abs_num at in-band/boundary coordinates", async () => {
+    const SC = await loadSocialCalc();
+    const cases: Array<[number, number]> = [
+      [1, 1],
+      [2, 3],
+      [MAX_ROW, MAX_COL], // exactly at both maxima
+      [100, 26],
+      [1, 27],
+    ];
+    for (const [row, col] of cases) {
+      for (const absNum of [1, 2, 3, 4]) {
+        const expected = await shippingAddress(SC, row, col, absNum, true);
+        expect(formatAddressA1(row, col, absNum)).toBe(expected);
+      }
+    }
+  });
+
+  test("formatAddressR1C1 matches shipping ADDRESS(...,FALSE) for every abs_num", async () => {
+    const SC = await loadSocialCalc();
+    const cases: Array<[number, number]> = [
+      [1, 1],
+      [2, 3],
+      [MAX_ROW, MAX_COL],
+    ];
+    for (const [row, col] of cases) {
+      for (const absNum of [1, 2, 3, 4]) {
+        const expected = await shippingAddress(SC, row, col, absNum, false);
+        expect(formatAddressR1C1(row, col, absNum)).toBe(expected);
+      }
+    }
+  });
+
+  test("bounds facade matches shipping #VALUE! rejection at 702/703 and 65536/65537", async () => {
+    const SC = await loadSocialCalc();
+    for (const [row, col] of [
+      [1, MAX_COL],
+      [1, MAX_COL + 1],
+      [MAX_ROW, 1],
+      [MAX_ROW + 1, 1],
+    ] as const) {
+      const sheet = new SC.Sheet();
+      const formula = `ADDRESS(${row},${col})`;
+      const parseinfo = SC.Formula.ParseFormulaIntoTokens(formula);
+      const result = SC.Formula.evaluate_parsed_formula(parseinfo, sheet, false);
+      const inBounds = isAddressRowInBounds(row) && isAddressColInBounds(col);
+      expect(result.type === "e#VALUE!").toBe(!inBounds);
+    }
   });
 });

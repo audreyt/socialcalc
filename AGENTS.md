@@ -393,7 +393,8 @@ shipping bundle.
 `LemmaScript-files.txt` contains:
 
 - `lemma/a1.ts`: A1 coordinate/clamp algebra, absolute helpers, overflow
-  `#REF!` policy and OFFSET rectangle policy — 28 Dafny VCs;
+  `#REF!` policy, OFFSET rectangle policy, and ADDRESS bounds/formatting —
+  36 Dafny VCs;
 - `lemma/eval-ops.ts`: `/` and `&` error/type lattice — 4 VCs;
 - `lemma/lookup-result.ts`: token resolution and exact-before-wildcard-before-
   miss precedence — 3 VCs. Full row scanning stays runtime-tested;
@@ -433,7 +434,7 @@ shipping bundle.
   duplicate/unique predicates, stop-if-true evaluation, and style-field
   merge policy — 8 Dafny VCs.
 
-Total: **117 VCs (28 + 5 + 3 + 15 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2 + 8)**.
+Total: **125 VCs (36 + 5 + 3 + 15 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2 + 8)**.
 
 After a facade edit:
 
@@ -460,7 +461,8 @@ assertion (which `lsc` has no equivalent for).
 Facade oracle mapping:
 
 - A1: `rcColname`, `crToCoord`, `OffsetFormulaCoords`,
-  `AdjustFormulaCoords`, and `formula-ref.ts` `OffsetRectangle` policy;
+  `AdjustFormulaCoords`, `formula-ref.ts` `OffsetRectangle` policy, and
+  `AddressFunction` bounds/formatting helpers;
 - eval ops: shipping `evaluate_parsed_formula`;
 - lookup result: shipping `Formula.LookupResultType` plus complete row-scan
   runtime tests;

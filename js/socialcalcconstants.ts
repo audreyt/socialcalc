@@ -732,7 +732,11 @@ ConstantsRoot.Constants = {
   s_fdef_ATAN: "Trigonometric arctan function. ",
   s_fdef_ATAN2: "Trigonometric arc tangent function (result is in radians). ",
   s_fdef_AVERAGE: "Averages the values. ",
+  s_fdef_ADDRESS:
+    'Returns a reference (as text) for the given row and column numbers. abs_num selects absolute/relative: 1 = absolute row & column (e.g., "$A$1"), 2 = absolute row/relative column ("A$1"), 3 = relative row/absolute column ("$A1"), 4 = both relative ("A1", the default is 1). a1 (default TRUE) selects A1-style; FALSE selects R1C1-style. sheet_text, if given, is prefixed with "!" and quoted if it is not a bare name. ',
   s_fdef_CHOOSE: "Returns the value specified by the index. The values may be ranges of cells. ",
+  s_fdef_COLUMN:
+    "Returns the column number of the given reference (or of the cell containing the formula if reference is omitted). ",
   s_fdef_COLUMNS: "Returns the number of columns in the range. ",
   s_fdef_COS: "Trigonometric cosine function (value is in radians). ",
   s_fdef_CONCAT: "Join Together Text & Values to Create a Single Combined Text String. ",
@@ -806,9 +810,17 @@ ConstantsRoot.Constants = {
   s_fdef_ISERR: 'Returns "true" if the value is of type "Error" but not "NA". ',
   s_fdef_ISERROR: 'Returns "true" if the value is of type "Error". ',
   s_fdef_ISLOGICAL: 'Returns "true" if the value is of type "Logical" (true/false). ',
+  "s_fdef_ERROR.TYPE":
+    "Returns a number corresponding to the type of error value: 1=#NULL!, 2=#DIV/0!, 3=#VALUE!, 4=#REF!, 5=#NAME?, 6=#NUM!, 7=#N/A, 8=#SPILL!. Returns #N/A if error_val is not an error. ",
+  s_fdef_HYPERLINK:
+    "Creates a shortcut that displays friendly_name (or link_location if omitted) and links to link_location, using the same rendering path as a manually entered cell link. ",
+  s_fdef_IMAGE:
+    "Displays an image from the given url in the cell, at its original size (Google Sheets IMAGE mode 3; other modes and explicit height/width are not supported by this renderer and are rejected). ",
+  s_fdef_ISFORMULA: 'Returns "true" if reference refers to a cell that contains a formula. ',
   s_fdef_ISNA: 'Returns "true" if the value is the error type "NA". ',
   s_fdef_ISNONTEXT: 'Returns "true" if the value is not of type "Text". ',
   s_fdef_ISNUMBER: 'Returns "true" if the value is of type "Number" (including logical values). ',
+  s_fdef_ISREF: 'Returns "true" if the value is a cell or range reference. ',
   s_fdef_ISTEXT: 'Returns "true" if the value is of type "Text". ',
   s_fdef_LEFT:
     "Returns the specified number of characters from the text value. If count is omitted, 1 is assumed. ",
@@ -867,6 +879,8 @@ ConstantsRoot.Constants = {
     "Returns the specified number of characters from the text value starting from the end. If count is omitted, 1 is assumed. ",
   s_fdef_ROUND:
     "Rounds the value to the specified number of decimal places. If precision is negative, then round to powers of 10. The default precision is 0 (round to integer). ",
+  s_fdef_ROW:
+    "Returns the row number of the given reference (or of the cell containing the formula if reference is omitted). ",
   s_fdef_ROWS: "Returns the number of rows in the range. ",
   s_fdef_SECOND:
     "Returns the second portion of a time or date/time value (truncated to an integer). ",
@@ -915,6 +929,8 @@ ConstantsRoot.Constants = {
   s_fdef_SYD: "Depreciation by Sum of Year's Digits method. ",
   s_fdef_T: "Returns the text value or else a null string. ",
   s_fdef_TAN: "Trigonometric tangent function (value is in radians) ",
+  s_fdef_TEXT:
+    'Formats value using format_text (the same number-format codes used for cell display, e.g. "0.00", "$#,##0", "mm/dd/yyyy", "@") and returns the result as text. ',
   s_fdef_TIME: "Returns the time value given the specified hour, minute, and second. ",
   s_fdef_TODAY:
     'Returns the current date (an integer). Note: In this program, day "1" is December 31, 1899 and the year 1900 is not a leap year. Some programs use January 1, 1900, as day "1" and treat 1900 as a leap year. In both cases, though, dates on or after March 1, 1900, are the same. ',
@@ -922,6 +938,8 @@ ConstantsRoot.Constants = {
   s_fdef_TRUE: 'Returns the logical value "true". ',
   s_fdef_TRUNC:
     "Truncates the value to the specified number of decimal places. If precision is negative, truncate to powers of 10. ",
+  s_fdef_TYPE:
+    "Returns a number representing the data type of the value: 1=Number, 2=Text, 4=Logical, 16=Error, 64=Range/Array. ",
   s_fdef_UPPER: "Returns the text value with all lowercase characters converted to uppercase. ",
   s_fdef_VALUE:
     "Converts the specified text value into a numeric value. Various forms that look like numbers (including digits followed by %, forms that look like dates, etc.) are handled. This may not handle all of the forms accepted by other spreadsheets and may be locale dependent. ",
@@ -1041,6 +1059,11 @@ ConstantsRoot.Constants = {
   s_farg_regexmatch: "text, regular_expression",
   s_farg_regexextract: "text, regular_expression",
   s_farg_regexreplace: "text, regular_expression, replacement",
+  s_farg_address: "row_num, column_num, [abs_num], [a1], [sheet_text]",
+  s_farg_hyperlink: "link_location, [friendly_name]",
+  s_farg_image: "url, [mode], [height], [width]",
+  s_farg_refopt: "[reference]",
+  s_farg_text: "value, format_text",
 
   function_classlist: [
     "all",

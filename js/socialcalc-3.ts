@@ -8262,6 +8262,7 @@ SC.format_text_for_display = function (
     if (valuesubtype == "h") valueformat = "text-html";
     if (valuesubtype == "w" || valuesubtype == "r") valueformat = "text-wiki";
     if (valuesubtype == "l") valueformat = "text-link";
+    if (valuesubtype == "m") valueformat = "text-image";
     if (!valuesubtype) valueformat = "text-plain";
   }
   if (valueformat == "text-html") {

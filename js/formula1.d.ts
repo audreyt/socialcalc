@@ -513,6 +513,16 @@ declare namespace SocialCalc {
     const IndirectFunction: FormulaFunctionImpl;
     const OffsetFunction: FormulaFunctionImpl;
     const ZeroArgFunctions: FormulaFunctionImpl;
+    const RowColumnFunctions: FormulaFunctionImpl;
+    const AddressFunction: FormulaFunctionImpl;
+    const RefInfoFunctions: FormulaFunctionImpl;
+    const HyperlinkFunction: FormulaFunctionImpl;
+    const ImageFunction: FormulaFunctionImpl;
+    const TextFunction: FormulaFunctionImpl;
+    function IsFormulaCoordCell(sheet: Sheet, coordtext: string): Cell | null;
+    function TextFormatHasUnquotedChar(format: string, ch: string): boolean;
+    function TextFormatHasUnmatchedBracket(format: string): boolean;
+    function TextFormatToPlainText(html: string): string;
 
     // Financial
     const DDBFunction: FormulaFunctionImpl;

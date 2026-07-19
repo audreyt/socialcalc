@@ -314,11 +314,78 @@ lemma wouldOffsetRectangleRef_ensures(anchorCol: int, anchorRow: int, refRows: i
 {
 }
 
+function isAddressRowInBounds(row: int): bool
+{
+  ((row >= 1) && (row <= MAX_ROW))
+}
+
+lemma isAddressRowInBounds_ensures(row: int)
+  ensures ((isAddressRowInBounds(row) == true) || (isAddressRowInBounds(row) == false))
+  ensures ((isAddressRowInBounds(row) == true) <==> ((row >= 1) && (row <= 65536)))
+{
+}
+
+function isAddressColInBounds(col: int): bool
+{
+  ((col >= 1) && (col <= MAX_COL))
+}
+
+lemma isAddressColInBounds_ensures(col: int)
+  ensures ((isAddressColInBounds(col) == true) || (isAddressColInBounds(col) == false))
+  ensures ((isAddressColInBounds(col) == true) <==> ((col >= 1) && (col <= 702)))
+{
+}
+
+function addressAbsRow(absNum: int): bool
+{
+  ((absNum == 1) || (absNum == 2))
+}
+
+lemma addressAbsRow_ensures(absNum: int)
+  ensures ((addressAbsRow(absNum) == true) || (addressAbsRow(absNum) == false))
+  ensures ((addressAbsRow(absNum) == true) <==> ((absNum == 1) || (absNum == 2)))
+{
+}
+
+function addressAbsCol(absNum: int): bool
+{
+  ((absNum == 1) || (absNum == 3))
+}
+
+lemma addressAbsCol_ensures(absNum: int)
+  ensures ((addressAbsCol(absNum) == true) || (addressAbsCol(absNum) == false))
+  ensures ((addressAbsCol(absNum) == true) <==> ((absNum == 1) || (absNum == 3)))
+{
+}
+
+function isValidAddressAbsNum(absNum: int): bool
+{
+  ((absNum >= 1) && (absNum <= 4))
+}
+
+lemma isValidAddressAbsNum_ensures(absNum: int)
+  ensures ((isValidAddressAbsNum(absNum) == true) || (isValidAddressAbsNum(absNum) == false))
+  ensures ((isValidAddressAbsNum(absNum) == true) <==> ((absNum >= 1) && (absNum <= 4)))
+{
+}
+
+function formatAddressR1C1(row: int, col: int, absNum: int): string
+{
+  var absRow := addressAbsRow(absNum);
+  var absCol := addressAbsCol(absNum);
+  ((("R" + (if absRow then ("" + IntToString(row)) else (("[" + IntToString(row)) + "]"))) + "C") + (if absCol then ("" + IntToString(col)) else (("[" + IntToString(col)) + "]")))
+}
+
+lemma formatAddressR1C1_ensures(row: int, col: int, absNum: int)
+  ensures (|formatAddressR1C1(row, col, absNum)| >= 4)
+{
+}
+
 const LETTERS: seq<string> := ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
 
-const MAX_COL: int := 702
-
 const MAX_ROW: int := 65536
+
+const MAX_COL: int := 702
 
 method rcColname(c: int) returns (res: string)
   ensures (|res| >= 1)
@@ -423,4 +490,15 @@ method adjustA1(col: int, row: int, absCol: bool, absRow: bool, startCol: int, c
   }
   var i_t10 := formatA1Parts(c, r, absCol, absRow);
   return i_t10;
+}
+
+method formatAddressA1(row: int, col: int, absNum: int) returns (res: string)
+  ensures (|res| >= 2)
+{
+  var i_t11 := addressAbsCol(absNum);
+  var absCol := i_t11;
+  var i_t12 := addressAbsRow(absNum);
+  var absRow := i_t12;
+  var i_t13 := rcColname(col);
+  return ((((if absCol then "$" else "") + i_t13) + (if absRow then "$" else "")) + IntToString(row));
 }
