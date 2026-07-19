@@ -340,6 +340,13 @@ declare global {
         col: number,
       ): { element: HTMLElement } | null;
       SetSpreadsheetControlObject(control: unknown): void;
+      // Print setup host API (js/socialcalcspreadsheetcontrol.ts): reads/
+      // writes the active SpreadsheetControl's print form fields and
+      // sheet attributes; PreparePrintArea/TriggerPrint act on the
+      // currently active control from GetSpreadsheetControlObject().
+      ApplyPrintSetup(): void;
+      PreparePrintArea(spreadsheet: unknown): void;
+      TriggerPrint(): void;
       SpreadsheetControl: new (idPrefix?: string) => {
         editor: {
           EditorScheduleSheetCommands(cmd: string, saveundo: boolean): void;
@@ -359,8 +366,19 @@ declare global {
         ): void;
         ParseSheetSave(str: string): void;
         sheet: {
-          attribs: { needsrecalc: string };
-          cells: Record<string, { datavalue: unknown; formula: string } | undefined>;
+          attribs: {
+            needsrecalc: string;
+            printarea?: string;
+            printrepeatcols?: string;
+            printrepeatrows?: string;
+            printorientation?: string;
+            printscale?: number;
+            printmargins?: string;
+          };
+          cells: Record<
+            string,
+            { datavalue: unknown; formula: string; errors?: string } | undefined
+          >;
           rowattribs: {
             hide: Record<number, string>;
             filterhide: Record<number, string>;

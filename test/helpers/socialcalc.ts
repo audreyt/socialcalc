@@ -146,18 +146,44 @@ class FakeElement {
     return this.attributes[name] ?? null;
   }
 
-  focus() {}
+  removeAttribute(name: string) {
+    delete this.attributes[name];
+    if (name === "class") this.className = "";
+    if (name === "style") this.style.cssText = "";
+  }
 
-  blur() {}
+  // Minimal support for the one selector shape production code uses
+  // against a rendered subtree: a leading "#id" match by exact id.
+  querySelector(selector: string): FakeElement | null {
+    if (!selector.startsWith("#")) return null;
+    const id = selector.slice(1);
+    const stack: FakeElement[] = [...this.childNodes];
+    while (stack.length) {
+      const node = stack.shift()!;
+      if (node.id === id) return node;
+      stack.push(...node.childNodes);
+    }
+    return null;
+  }
 
-  addEventListener() {}
-
-  removeEventListener() {}
-
-  // Minimal support for tag[attr] and tag[attr="value"] attribute selectors
-  // (only what SocialCalc.AutoFilterDropdownToggleAll needs); not a general
-  // CSS engine.
+  // Minimal support for role and attribute selector shapes used by callers;
+  // this is intentionally not a general CSS engine.
   querySelectorAll(selector: string): FakeElement[] {
+    const roleMatchers = selector
+      .split(",")
+      .map((part) => part.trim().match(/^\[role="([^"]+)"\]$/))
+      .filter((match): match is RegExpMatchArray => match !== null)
+      .map((match) => match[1]);
+    if (roleMatchers.length) {
+      const results: FakeElement[] = [];
+      const stack: FakeElement[] = [...this.childNodes];
+      while (stack.length) {
+        const node = stack.shift()!;
+        if (roleMatchers.includes(node.attributes.role)) results.push(node);
+        stack.push(...node.childNodes);
+      }
+      return results;
+    }
     const match = /^([a-zA-Z0-9]*)\[([\w-]+)(?:="([^"]*)")?\]$/.exec(selector.trim());
     const results: FakeElement[] = [];
     if (!match) return results;
@@ -174,19 +200,35 @@ class FakeElement {
     walk(this);
     return results;
   }
+
+  focus() {}
+
+  blur() {}
+
+  addEventListener() {}
+
+  removeEventListener() {}
 }
 
 class FakeDocument {
   nodesById = new Map<string, FakeElement>();
   body: FakeElement;
+  head: FakeElement;
   documentElement: FakeElement;
   forms: FakeElement[] = [];
   defaultView: any;
 
   constructor() {
     this.documentElement = new FakeElement(this, "html");
+    this.head = new FakeElement(this, "head");
     this.body = new FakeElement(this, "body");
+    this.documentElement.appendChild(this.head);
     this.documentElement.appendChild(this.body);
+  }
+
+  getElementsByTagName(tagName: string): FakeElement[] {
+    if (tagName.toLowerCase() === "head") return [this.head];
+    return [];
   }
 
   register(element: FakeElement) {
@@ -261,6 +303,7 @@ export function installBrowserShim() {
     focus() {},
     blur() {},
     alert() {},
+    print() {},
     location: { href: "https://example.test/" },
   };
 

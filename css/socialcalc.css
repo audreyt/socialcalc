@@ -129,3 +129,66 @@
 #searchbar {
   float: right;
 }
+
+/* Visually hidden but available to assistive technology (aria-live status/error regions). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Keyboard focus indicator for the grid and gridcells; only shown for keyboard
+   focus (not mouse), matching native focus-visible semantics. The grid table
+   itself (role="grid", tabindex="0" set in EditorRenderSheet) is the real
+   focusable element; individual gridcells are included for completeness
+   since a future keyboard-navigation mode could focus them directly. */
+table[role="grid"]:focus-visible,
+td[role="gridcell"]:focus-visible,
+td[role="columnheader"]:focus-visible,
+td[role="rowheader"]:focus-visible {
+  outline: 2px solid #1a73e8;
+  outline-offset: -2px;
+}
+
+/* Print: hide editor chrome (toolbar, tabs, formula bar, status line, scroll
+   controls) and let the browser print only the configured sheet content.
+   SocialCalc.PreparePrintArea (js/socialcalcspreadsheetcontrol.ts) tags the
+   rendered grid with these classes immediately before window.print(): rows
+   and headers outside the configured print area get `sc-print-hide`, and
+   the configured repeat row/column headers get `sc-print-repeat-row` /
+   `sc-print-repeat-col` so the browser repeats them on every page via
+   `display: table-header-group`, per CSS's one-repeating-group-per-table
+   rule. Orientation/margins/scale are emitted separately as an injected
+   `@page` rule since those are page-box properties, not element styles. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .sc-print-area,
+  .sc-print-area * {
+    visibility: visible;
+  }
+  .sc-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .sc-print-area .sc-print-hide {
+    display: none;
+  }
+  .sc-print-repeat-row {
+    display: table-header-group;
+  }
+  /* Column repeat has no CSS table equivalent to `table-header-group` (that
+     only repeats whole row groups). `sc-print-repeat-col` is still applied
+     to the matching row-header cells for testability, but the browser
+     print engine does not repeat a column across pages from it -- this is
+     a documented "as CSS permits" limitation, not a bug to silently mask. */
+}

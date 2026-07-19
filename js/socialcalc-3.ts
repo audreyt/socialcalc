@@ -1192,6 +1192,24 @@ SC.ParseSheetSave = function (savedsheet: any, sheetobj: any) {
             case "usermaxrow":
               attribs.usermaxrow = parts[j++] - 0;
               break;
+            case "printarea":
+              attribs.printarea = SocialCalc.decodeFromSave(parts[j++]);
+              break;
+            case "printrepeatcols":
+              attribs.printrepeatcols = SocialCalc.decodeFromSave(parts[j++]);
+              break;
+            case "printrepeatrows":
+              attribs.printrepeatrows = SocialCalc.decodeFromSave(parts[j++]);
+              break;
+            case "printorientation":
+              attribs.printorientation = parts[j++];
+              break;
+            case "printscale":
+              attribs.printscale = parts[j++] - 0;
+              break;
+            case "printmargins":
+              attribs.printmargins = SocialCalc.decodeFromSave(parts[j++]);
+              break;
             default:
               j += 1;
               break;
@@ -1428,6 +1446,12 @@ SC.sheetfields = [
   "protected",
   "usermaxcol",
   "usermaxrow",
+  "printarea",
+  "printrepeatcols",
+  "printrepeatrows",
+  "printorientation",
+  "printscale",
+  "printmargins",
 ];
 SC.sheetfieldsshort = [
   "h",
@@ -1438,6 +1462,12 @@ SC.sheetfieldsshort = [
   "protected",
   "usermaxcol",
   "usermaxrow",
+  "printarea",
+  "printrepeatcols",
+  "printrepeatrows",
+  "printorientation",
+  "printscale",
+  "printmargins",
 ];
 
 SC.sheetfieldsxlat = [
@@ -2192,6 +2222,33 @@ SC.EncodeSheetAttributes = function (sheet: any) {
     SetAttrib("usermaxrow", attribs.usermaxrow);
   }
 
+  // print: printarea, printrepeatcols, printrepeatrows, printorientation, printscale, printmargins
+
+  InitAttrib("printarea");
+  if (attribs.printarea) {
+    SetAttrib("printarea", attribs.printarea);
+  }
+  InitAttrib("printrepeatcols");
+  if (attribs.printrepeatcols) {
+    SetAttrib("printrepeatcols", attribs.printrepeatcols);
+  }
+  InitAttrib("printrepeatrows");
+  if (attribs.printrepeatrows) {
+    SetAttrib("printrepeatrows", attribs.printrepeatrows);
+  }
+  InitAttrib("printorientation");
+  if (attribs.printorientation) {
+    SetAttrib("printorientation", attribs.printorientation);
+  }
+  InitAttrib("printscale");
+  if (attribs.printscale) {
+    SetAttrib("printscale", attribs.printscale);
+  }
+  InitAttrib("printmargins");
+  if (attribs.printmargins) {
+    SetAttrib("printmargins", attribs.printmargins);
+  }
+
   return result;
 };
 
@@ -2474,6 +2531,15 @@ SC.DecodeSheetAttributes = function (sheet: any, newattribs: any) {
   CheckChanges("usermaxcol", sheet.attribs.usermaxcol, "usermaxcol");
   CheckChanges("usermaxrow", sheet.attribs.usermaxrow, "usermaxrow");
 
+  // print: printarea, printrepeatcols, printrepeatrows, printorientation, printscale, printmargins
+
+  CheckChanges("printarea", sheet.attribs.printarea, "printarea");
+  CheckChanges("printrepeatcols", sheet.attribs.printrepeatcols, "printrepeatcols");
+  CheckChanges("printrepeatrows", sheet.attribs.printrepeatrows, "printrepeatrows");
+  CheckChanges("printorientation", sheet.attribs.printorientation, "printorientation");
+  CheckChanges("printscale", sheet.attribs.printscale, "printscale");
+  CheckChanges("printmargins", sheet.attribs.printmargins, "printmargins");
+
   // if any changes return command(s)
 
   if (changed) {
@@ -2550,6 +2616,7 @@ SC.SheetCommandsTimerRoutine = function (sci: any, parseobj: any, saveundo: any)
 
     // Error - Use  log on server   OR  alert on client
     if (errortext) {
+      sci.sheetobj.lastcommanderror = errortext; // surfaced to aria-live error announcements
       if (typeof alert == "function") {
         alert(errortext);
       } else {
@@ -2796,6 +2863,41 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
             if (saveundo) changes.AddUndo(undostart, attribs[attrib] - 0);
             num = rest - 0;
             attribs[attrib] = num > 0 ? num : 0;
+            break;
+          case "printarea":
+          case "printrepeatcols":
+          case "printrepeatrows":
+            if (saveundo) changes.AddUndo(undostart, attribs[attrib]);
+            if (rest.length > 0) {
+              attribs[attrib] = rest;
+            } else {
+              delete attribs[attrib];
+            }
+            break;
+          case "printorientation":
+            if (saveundo) changes.AddUndo(undostart, attribs[attrib]);
+            if (rest == "landscape") {
+              attribs.printorientation = rest;
+            } else {
+              delete attribs.printorientation; // default is portrait
+            }
+            break;
+          case "printscale":
+            if (saveundo) changes.AddUndo(undostart, attribs[attrib] - 0);
+            num = rest - 0;
+            if (num > 0 && num != 100) {
+              attribs.printscale = num;
+            } else {
+              delete attribs.printscale;
+            }
+            break;
+          case "printmargins":
+            if (saveundo) changes.AddUndo(undostart, attribs[attrib]);
+            if (rest.length > 0) {
+              attribs.printmargins = rest;
+            } else {
+              delete attribs.printmargins;
+            }
             break;
           default:
             errortext = scc.s_escUnknownSheetCmd + cmdstr;
@@ -6104,6 +6206,9 @@ SC.RenderSheet = function (context: any, oldtable: any, linkstyle: any) {
 
   tableobj = document.createElement("table");
   context.InitializeTable(tableobj);
+  tableobj.setAttribute("role", "grid");
+  tableobj.setAttribute("aria-rowcount", String(context.sheetobj.attribs.lastrow));
+  tableobj.setAttribute("aria-colcount", String(context.sheetobj.attribs.lastcol));
 
   colgroupobj = context.RenderColGroup();
   tableobj.appendChild(colgroupobj);
@@ -6147,6 +6252,8 @@ SC.RenderRow = function (context: any, rownum: any, rowpane: any, linkstyle: any
   var sheetobj = context.sheetobj;
 
   var result = document.createElement("tr");
+  result.setAttribute("role", "row");
+  result.setAttribute("aria-rowindex", String(rownum));
   var colnum, newcol, colpane, newdiv;
 
   if (context.showRCHeaders) {
@@ -6157,6 +6264,9 @@ SC.RenderRow = function (context: any, rownum: any, rowpane: any, linkstyle: any
     newcol.height = context.rowheight[rownum];
     newcol.style.verticalAlign = "top"; // to get around Safari making top of centered row number be
     // considered top of row (and can't get <row> position in Safari)
+    newcol.setAttribute("role", "rowheader");
+    newcol.setAttribute("scope", "row");
+    newcol.setAttribute("aria-label", "Row " + rownum);
     newcol.innerHTML = rownum + "";
 
     // If neighbour is hidden, show an icon in this column.
@@ -6275,6 +6385,8 @@ SC.RenderColHeaders = function (context: any) {
   var sheetobj = context.sheetobj;
 
   var result = document.createElement("tr");
+  result.setAttribute("role", "row");
+  result.setAttribute("aria-rowindex", "0");
   var colnum, newcol, colpane;
 
   if (!context.showRCHeaders) return null;
@@ -6300,7 +6412,12 @@ SC.RenderColHeaders = function (context: any) {
         newcol.style.cssText += ";display:none";
       }
 
-      newcol.innerHTML = SocialCalc.rcColname(colnum);
+      newcol.setAttribute("role", "columnheader");
+      newcol.setAttribute("scope", "col");
+      newcol.setAttribute("aria-colindex", String(colnum));
+      var colHeaderName = SocialCalc.rcColname(colnum);
+      newcol.setAttribute("aria-label", "Column " + colHeaderName);
+      newcol.innerHTML = colHeaderName;
 
       // If neighbour is hidden, show an icon in this column.
       if (
@@ -6465,6 +6582,12 @@ SC.RenderCell = function (
 
   if (context.cellIDprefix) {
     result.id = context.cellIDprefix + coord;
+  }
+
+  if (!noElement) {
+    result.setAttribute("role", "gridcell");
+    result.setAttribute("aria-rowindex", String(rownum));
+    result.setAttribute("aria-colindex", String(colnum));
   }
 
   cell = sheetobj.cells[coord];
@@ -6665,6 +6788,21 @@ SC.RenderCell = function (
     }
   }
 
+  if (!noElement) {
+    result.setAttribute("aria-readonly", cell.readonly ? "true" : "false");
+    if (cell.errors) {
+      result.setAttribute("aria-invalid", "true");
+    } else {
+      result.removeAttribute("aria-invalid");
+    }
+    // Accessible name uses the plain-text value, never the formatted HTML,
+    // so aria-label is never built by concatenating sheet-derived markup.
+    result.setAttribute(
+      "aria-label",
+      coord + (cell.datavalue != null && cell.datavalue !== "" ? ": " + cell.datavalue : ""),
+    );
+  }
+
   result.style.cssText = stylestr;
 
   //!!!!!!!!!
@@ -6681,12 +6819,15 @@ SC.RenderCell = function (
   t = context.highlights[coord];
   if (t) {
     // this is a highlit cell: Override style appropriately
+    if (!noElement) result.setAttribute("aria-selected", "true");
     if (t == "cursor") t += context.cursorsuffix; // cursor can take alternative forms
     if (context.highlightTypes[t].className) {
       result.className =
         (result.className ? result.className + " " : "") + context.highlightTypes[t].className;
     }
     SocialCalc.setStyles(result, context.highlightTypes[t].style);
+  } else if (!noElement) {
+    result.setAttribute("aria-selected", "false");
   }
 
   // If hidden column, display: none.

@@ -1801,6 +1801,24 @@ More comments yet to come...
               case 'usermaxrow':
                 attribs.usermaxrow = parts[j++] - 0;
                 break;
+              case 'printarea':
+                attribs.printarea = SocialCalc.decodeFromSave(parts[j++]);
+                break;
+              case 'printrepeatcols':
+                attribs.printrepeatcols = SocialCalc.decodeFromSave(parts[j++]);
+                break;
+              case 'printrepeatrows':
+                attribs.printrepeatrows = SocialCalc.decodeFromSave(parts[j++]);
+                break;
+              case 'printorientation':
+                attribs.printorientation = parts[j++];
+                break;
+              case 'printscale':
+                attribs.printscale = parts[j++] - 0;
+                break;
+              case 'printmargins':
+                attribs.printmargins = SocialCalc.decodeFromSave(parts[j++]);
+                break;
               default:
                 j += 1;
                 break;
@@ -2011,6 +2029,12 @@ More comments yet to come...
     'protected',
     'usermaxcol',
     'usermaxrow',
+    'printarea',
+    'printrepeatcols',
+    'printrepeatrows',
+    'printorientation',
+    'printscale',
+    'printmargins',
   ];
   SC.sheetfieldsshort = [
     'h',
@@ -2021,6 +2045,12 @@ More comments yet to come...
     'protected',
     'usermaxcol',
     'usermaxrow',
+    'printarea',
+    'printrepeatcols',
+    'printrepeatrows',
+    'printorientation',
+    'printscale',
+    'printmargins',
   ];
   SC.sheetfieldsxlat = [
     'defaulttextformat',
@@ -2600,6 +2630,30 @@ More comments yet to come...
     if (attribs.usermaxrow) {
       SetAttrib('usermaxrow', attribs.usermaxrow);
     }
+    InitAttrib('printarea');
+    if (attribs.printarea) {
+      SetAttrib('printarea', attribs.printarea);
+    }
+    InitAttrib('printrepeatcols');
+    if (attribs.printrepeatcols) {
+      SetAttrib('printrepeatcols', attribs.printrepeatcols);
+    }
+    InitAttrib('printrepeatrows');
+    if (attribs.printrepeatrows) {
+      SetAttrib('printrepeatrows', attribs.printrepeatrows);
+    }
+    InitAttrib('printorientation');
+    if (attribs.printorientation) {
+      SetAttrib('printorientation', attribs.printorientation);
+    }
+    InitAttrib('printscale');
+    if (attribs.printscale) {
+      SetAttrib('printscale', attribs.printscale);
+    }
+    InitAttrib('printmargins');
+    if (attribs.printmargins) {
+      SetAttrib('printmargins', attribs.printmargins);
+    }
     return result;
   };
   SC.DecodeCellAttributes = function (sheet, coord, newattribs, range) {
@@ -2775,6 +2829,12 @@ More comments yet to come...
     CheckChanges('protected', sheet.attribs.protected, 'protected');
     CheckChanges('usermaxcol', sheet.attribs.usermaxcol, 'usermaxcol');
     CheckChanges('usermaxrow', sheet.attribs.usermaxrow, 'usermaxrow');
+    CheckChanges('printarea', sheet.attribs.printarea, 'printarea');
+    CheckChanges('printrepeatcols', sheet.attribs.printrepeatcols, 'printrepeatcols');
+    CheckChanges('printrepeatrows', sheet.attribs.printrepeatrows, 'printrepeatrows');
+    CheckChanges('printorientation', sheet.attribs.printorientation, 'printorientation');
+    CheckChanges('printscale', sheet.attribs.printscale, 'printscale');
+    CheckChanges('printmargins', sheet.attribs.printmargins, 'printmargins');
     if (changed) {
       return cmdstr;
     } else {
@@ -2814,6 +2874,7 @@ More comments yet to come...
         errortext = err instanceof Error ? err.message : String(err);
       }
       if (errortext) {
+        sci.sheetobj.lastcommanderror = errortext;
         if (typeof alert == 'function') {
           alert(errortext);
         } else {
@@ -2993,6 +3054,41 @@ More comments yet to come...
               if (saveundo) changes.AddUndo(undostart, attribs[attrib] - 0);
               num = rest - 0;
               attribs[attrib] = num > 0 ? num : 0;
+              break;
+            case 'printarea':
+            case 'printrepeatcols':
+            case 'printrepeatrows':
+              if (saveundo) changes.AddUndo(undostart, attribs[attrib]);
+              if (rest.length > 0) {
+                attribs[attrib] = rest;
+              } else {
+                delete attribs[attrib];
+              }
+              break;
+            case 'printorientation':
+              if (saveundo) changes.AddUndo(undostart, attribs[attrib]);
+              if (rest == 'landscape') {
+                attribs.printorientation = rest;
+              } else {
+                delete attribs.printorientation;
+              }
+              break;
+            case 'printscale':
+              if (saveundo) changes.AddUndo(undostart, attribs[attrib] - 0);
+              num = rest - 0;
+              if (num > 0 && num != 100) {
+                attribs.printscale = num;
+              } else {
+                delete attribs.printscale;
+              }
+              break;
+            case 'printmargins':
+              if (saveundo) changes.AddUndo(undostart, attribs[attrib]);
+              if (rest.length > 0) {
+                attribs.printmargins = rest;
+              } else {
+                delete attribs.printmargins;
+              }
               break;
             default:
               errortext = scc.s_escUnknownSheetCmd + cmdstr;
@@ -5722,6 +5818,9 @@ More comments yet to come...
     context.CalculateRowHeightData();
     tableobj = document.createElement('table');
     context.InitializeTable(tableobj);
+    tableobj.setAttribute('role', 'grid');
+    tableobj.setAttribute('aria-rowcount', String(context.sheetobj.attribs.lastrow));
+    tableobj.setAttribute('aria-colcount', String(context.sheetobj.attribs.lastcol));
     colgroupobj = context.RenderColGroup();
     tableobj.appendChild(colgroupobj);
     tbodyobj = document.createElement('tbody');
@@ -5754,6 +5853,8 @@ More comments yet to come...
   SC.RenderRow = function (context, rownum, rowpane, linkstyle) {
     var sheetobj = context.sheetobj;
     var result = document.createElement('tr');
+    result.setAttribute('role', 'row');
+    result.setAttribute('aria-rowindex', String(rownum));
     var colnum, newcol, colpane, newdiv;
     if (context.showRCHeaders) {
       newcol = document.createElement('td');
@@ -5762,6 +5863,9 @@ More comments yet to come...
       newcol.width = context.rownamewidth;
       newcol.height = context.rowheight[rownum];
       newcol.style.verticalAlign = 'top';
+      newcol.setAttribute('role', 'rowheader');
+      newcol.setAttribute('scope', 'row');
+      newcol.setAttribute('aria-label', 'Row ' + rownum);
       newcol.innerHTML = rownum + '';
       if (
         rownum < context.rowpanes[context.rowpanes.length - 1].last &&
@@ -5861,6 +5965,8 @@ More comments yet to come...
   SC.RenderColHeaders = function (context) {
     var sheetobj = context.sheetobj;
     var result = document.createElement('tr');
+    result.setAttribute('role', 'row');
+    result.setAttribute('aria-rowindex', '0');
     var colnum, newcol, colpane;
     if (!context.showRCHeaders) return null;
     newcol = document.createElement('td');
@@ -5880,7 +5986,12 @@ More comments yet to come...
         if (sheetobj.colattribs.hide[SocialCalc.rcColname(colnum)] == 'yes') {
           newcol.style.cssText += ';display:none';
         }
-        newcol.innerHTML = SocialCalc.rcColname(colnum);
+        newcol.setAttribute('role', 'columnheader');
+        newcol.setAttribute('scope', 'col');
+        newcol.setAttribute('aria-colindex', String(colnum));
+        var colHeaderName = SocialCalc.rcColname(colnum);
+        newcol.setAttribute('aria-label', 'Column ' + colHeaderName);
+        newcol.innerHTML = colHeaderName;
         if (
           colnum < context.colpanes[context.colpanes.length - 1].last &&
           sheetobj.colattribs.hide[SocialCalc.rcColname(colnum + 1)] == 'yes'
@@ -6004,6 +6115,11 @@ More comments yet to come...
     result = noElement ? SocialCalc.CreatePseudoElement() : document.createElement('td');
     if (context.cellIDprefix) {
       result.id = context.cellIDprefix + coord;
+    }
+    if (!noElement) {
+      result.setAttribute('role', 'gridcell');
+      result.setAttribute('aria-rowindex', String(rownum));
+      result.setAttribute('aria-colindex', String(colnum));
     }
     cell = sheetobj.cells[coord];
     if (!cell) {
@@ -6179,6 +6295,18 @@ More comments yet to come...
         stylestr += context.readonlyNoGridCSS;
       }
     }
+    if (!noElement) {
+      result.setAttribute('aria-readonly', cell.readonly ? 'true' : 'false');
+      if (cell.errors) {
+        result.setAttribute('aria-invalid', 'true');
+      } else {
+        result.removeAttribute('aria-invalid');
+      }
+      result.setAttribute(
+        'aria-label',
+        coord + (cell.datavalue != null && cell.datavalue !== '' ? ': ' + cell.datavalue : ''),
+      );
+    }
     result.style.cssText = stylestr;
     if (cell.cssc !== undefined) {
       if (noElement) {
@@ -6189,12 +6317,15 @@ More comments yet to come...
     }
     t = context.highlights[coord];
     if (t) {
+      if (!noElement) result.setAttribute('aria-selected', 'true');
       if (t == 'cursor') t += context.cursorsuffix;
       if (context.highlightTypes[t].className) {
         result.className =
           (result.className ? result.className + ' ' : '') + context.highlightTypes[t].className;
       }
       SocialCalc.setStyles(result, context.highlightTypes[t].style);
+    } else if (!noElement) {
+      result.setAttribute('aria-selected', 'false');
     }
     if (sheetobj.colattribs.hide[SocialCalc.rcColname(colnum)] == 'yes') {
       result.style.cssText += ';display:none';
@@ -8565,6 +8696,18 @@ More comments yet to come...
     if (editor.ecell) editor.SetECellHeaders('selected');
     TableEditorSC.AssignID(editor, editor.fullgrid, 'fullgrid');
     if (!TableEditorSC._app) editor.fullgrid.className = 'te_download';
+    if (!editor.noEdit) {
+      editor.fullgrid.setAttribute('tabindex', '0');
+    }
+    editor.fullgrid.setAttribute('aria-label', 'Spreadsheet');
+    if (editor.ecell && editor.fullgrid.querySelector) {
+      var activeCellElement = editor.fullgrid.querySelector(
+        '#' + editor.context.cellIDprefix + editor.ecell.coord,
+      );
+      if (activeCellElement && activeCellElement.id) {
+        editor.fullgrid.setAttribute('aria-activedescendant', activeCellElement.id);
+      }
+    }
     editor.EditorMouseRegister();
   };
   TableEditorSC.EditorScheduleSheetCommands = function (editor, cmdstr, saveundo, ignorebusy) {
@@ -10218,6 +10361,15 @@ More comments yet to come...
     }
     editor.UpdateCellCSS(cell, editor.ecell.row, editor.ecell.col);
     editor.SetECellHeaders('selected');
+    if (
+      editor.fullgrid &&
+      editor.fullgrid.setAttribute &&
+      cell &&
+      cell.element &&
+      cell.element.id
+    ) {
+      editor.fullgrid.setAttribute('aria-activedescendant', cell.element.id);
+    }
     for (f in editor.StatusCallback) {
       editor.StatusCallback[f].func(editor, 'moveecell', newcell, editor.StatusCallback[f].params);
     }
@@ -10288,6 +10440,9 @@ More comments yet to come...
         if (newelement.style[a] != 'cssText') cell.element.style[a] = newelement.style[a];
       }
     }
+    var coord = TableEditorSC.crToCoord(col, row);
+    var highlight = editor.context.highlights[coord];
+    cell.element.setAttribute('aria-selected', highlight ? 'true' : 'false');
   };
   TableEditorSC.SetECellHeaders = function (editor, selected) {
     if (editor.context.showRCHeaders === false) return;
@@ -25123,6 +25278,33 @@ not governed by the terms of the CPAL.
       oncreate: null,
       onclick: null,
     });
+    this.tabnums.print = this.tabs.length;
+    this.tabs.push({
+      name: 'print',
+      text: 'Print',
+      html:
+        '<div id="%id.printtools" style="padding:10px 0px 0px 0px;">' +
+        '<label>%loc!Print area!: <input id="%id.print-area" type="text" size="16" placeholder="A1:D20"></label>' +
+        '&nbsp;&nbsp;' +
+        '<label>%loc!Repeat rows!: <input id="%id.print-repeatrows" type="text" size="6" placeholder="1:2"></label>' +
+        '&nbsp;&nbsp;' +
+        '<label>%loc!Repeat cols!: <input id="%id.print-repeatcols" type="text" size="6" placeholder="A:B"></label>' +
+        '&nbsp;&nbsp;' +
+        '<label>%loc!Orientation!: <select id="%id.print-orientation">' +
+        '<option value="portrait">%loc!Portrait!</option>' +
+        '<option value="landscape">%loc!Landscape!</option>' +
+        '</select></label>' +
+        '&nbsp;&nbsp;' +
+        '<label>%loc!Scale!: <input id="%id.print-scale" type="number" min="10" max="400" step="1" size="4" value="100">%</label>' +
+        '&nbsp;&nbsp;' +
+        '<input id="%id.print-apply" type="button" value="%loc!Apply!" onclick="SocialCalc.ApplyPrintSetup();return false;">' +
+        '<input id="%id.print-now" type="button" value="%loc!Print!" onclick="SocialCalc.TriggerPrint();return false;">' +
+        '</div>',
+      onclick: function (s, _t) {
+        SocialCalc.LoadPrintSetupFields(s);
+      },
+      onclickFocus: true,
+    });
     this.tabnums.settings = this.tabs.length;
     this.tabs.push({
       name: 'settings',
@@ -26367,6 +26549,26 @@ not governed by the terms of the CPAL.
       'px';
     spreadsheet.statuslineDiv.id = spreadsheet.idPrefix + 'statusline';
     spreadsheet.spreadsheetDiv.appendChild(spreadsheet.statuslineDiv);
+    spreadsheet.ariaStatusDiv = document.createElement('div');
+    spreadsheet.ariaStatusDiv.id = spreadsheet.idPrefix + 'ariastatus';
+    spreadsheet.ariaStatusDiv.className = 'sr-only';
+    spreadsheet.ariaStatusDiv.setAttribute('aria-live', 'polite');
+    spreadsheet.ariaStatusDiv.setAttribute('aria-atomic', 'true');
+    spreadsheet.spreadsheetDiv.appendChild(spreadsheet.ariaStatusDiv);
+    spreadsheet.ariaErrorDiv = document.createElement('div');
+    spreadsheet.ariaErrorDiv.id = spreadsheet.idPrefix + 'ariaerror';
+    spreadsheet.ariaErrorDiv.className = 'sr-only';
+    spreadsheet.ariaErrorDiv.setAttribute('role', 'alert');
+    spreadsheet.ariaErrorDiv.setAttribute('aria-live', 'assertive');
+    spreadsheet.ariaErrorDiv.setAttribute('aria-atomic', 'true');
+    spreadsheet.spreadsheetDiv.appendChild(spreadsheet.ariaErrorDiv);
+    spreadsheet.editor.StatusCallback.ariaLive = {
+      func: SocialCalc.SpreadsheetControlAriaLiveCallback,
+      params: {
+        statusid: spreadsheet.idPrefix + 'ariastatus',
+        errorid: spreadsheet.idPrefix + 'ariaerror',
+      },
+    };
     spreadsheet.spreadsheetDiv.addEventListener(
       'mousedown',
       function () {
@@ -26386,8 +26588,11 @@ not governed by the terms of the CPAL.
   SpreadsheetControlSC.CalculateSheetNonViewHeight = function (spreadsheet) {
     spreadsheet.nonviewheight = spreadsheet.statuslineheight;
     for (var nodeIndex = 0; nodeIndex < spreadsheet.spreadsheetDiv.childNodes.length; nodeIndex++) {
-      if (spreadsheet.spreadsheetDiv.childNodes[nodeIndex].id == 'SocialCalc-statusline') continue;
-      spreadsheet.nonviewheight += spreadsheet.spreadsheetDiv.childNodes[nodeIndex].offsetHeight;
+      var childNode = spreadsheet.spreadsheetDiv.childNodes[nodeIndex];
+      if (childNode.id == 'SocialCalc-statusline') continue;
+      if (childNode === spreadsheet.ariaStatusDiv || childNode === spreadsheet.ariaErrorDiv)
+        continue;
+      spreadsheet.nonviewheight += childNode.offsetHeight;
     }
   };
   SpreadsheetControlSC.GetSpreadsheetControlObject = function () {
@@ -26522,6 +26727,33 @@ not governed by the terms of the CPAL.
         protectele.src = spreadsheet.imagePrefix + (protectedNow ? 'unlock.png' : 'lock.png');
         protectele.title = protectedNow ? 'Unprotect Sheet' : 'Protect Sheet';
       }
+    }
+  };
+  SpreadsheetControlSC.SpreadsheetControlAriaLiveCallback = function (editor, status, arg, params) {
+    var statusEle, errorEle, cell, announcement;
+    switch (status) {
+      case 'moveecell':
+        statusEle = document.getElementById(params.statusid);
+        if (!statusEle || !editor.ecell) break;
+        cell = editor.context.sheetobj.cells[editor.ecell.coord];
+        announcement = editor.ecell.coord;
+        if (cell && cell.datavalue != null && cell.datavalue !== '') {
+          announcement += ': ' + cell.datavalue;
+        }
+        statusEle.textContent = announcement;
+        break;
+      case 'cmdend':
+        errorEle = document.getElementById(params.errorid);
+        if (!errorEle) break;
+        if (editor.context.sheetobj.lastcommanderror) {
+          errorEle.textContent = editor.context.sheetobj.lastcommanderror;
+          delete editor.context.sheetobj.lastcommanderror;
+        } else {
+          errorEle.textContent = '';
+        }
+        break;
+      default:
+        break;
     }
   };
   SpreadsheetControlSC.UpdateSortRangeProposal = function (editor) {
@@ -28055,6 +28287,133 @@ not governed by the terms of the CPAL.
     }
     if (cmdstr) {
       s.editor.EditorScheduleSheetCommands(cmdstr, true, false);
+    }
+  };
+  SpreadsheetControlSC.LoadPrintSetupFields = function (s) {
+    var attribs = s.sheet.attribs;
+    var areaEle = document.getElementById(s.idPrefix + 'print-area');
+    var repeatRowsEle = document.getElementById(s.idPrefix + 'print-repeatrows');
+    var repeatColsEle = document.getElementById(s.idPrefix + 'print-repeatcols');
+    var orientationEle = document.getElementById(s.idPrefix + 'print-orientation');
+    var scaleEle = document.getElementById(s.idPrefix + 'print-scale');
+    if (areaEle) areaEle.value = attribs.printarea || '';
+    if (repeatRowsEle) repeatRowsEle.value = attribs.printrepeatrows || '';
+    if (repeatColsEle) repeatColsEle.value = attribs.printrepeatcols || '';
+    if (orientationEle) orientationEle.value = attribs.printorientation || 'portrait';
+    if (scaleEle) scaleEle.value = String(attribs.printscale || 100);
+  };
+  SpreadsheetControlSC.ApplyPrintSetup = function () {
+    var s = SocialCalc.GetSpreadsheetControlObject();
+    var attribs = s.sheet.attribs;
+    var cmds = [];
+    var areaEle = document.getElementById(s.idPrefix + 'print-area');
+    var repeatRowsEle = document.getElementById(s.idPrefix + 'print-repeatrows');
+    var repeatColsEle = document.getElementById(s.idPrefix + 'print-repeatcols');
+    var orientationEle = document.getElementById(s.idPrefix + 'print-orientation');
+    var scaleEle = document.getElementById(s.idPrefix + 'print-scale');
+    var area = areaEle ? areaEle.value.trim() : '';
+    var repeatRows = repeatRowsEle ? repeatRowsEle.value.trim() : '';
+    var repeatCols = repeatColsEle ? repeatColsEle.value.trim() : '';
+    var orientation = orientationEle ? orientationEle.value : 'portrait';
+    var scale = scaleEle ? scaleEle.value.trim() - 0 : 100;
+    if (area != (attribs.printarea || '')) cmds.push('set sheet printarea ' + area);
+    if (repeatRows != (attribs.printrepeatrows || ''))
+      cmds.push('set sheet printrepeatrows ' + repeatRows);
+    if (repeatCols != (attribs.printrepeatcols || ''))
+      cmds.push('set sheet printrepeatcols ' + repeatCols);
+    if (orientation != (attribs.printorientation || 'portrait'))
+      cmds.push('set sheet printorientation ' + orientation);
+    if (scale != (attribs.printscale || 100)) cmds.push('set sheet printscale ' + scale);
+    if (cmds.length) {
+      s.editor.EditorScheduleSheetCommands(cmds.join('\n'), true, false);
+    }
+  };
+  SpreadsheetControlSC.PreparePrintArea = function (s) {
+    var fullgrid = s.editor.fullgrid;
+    if (!fullgrid) return;
+    var attribs = s.sheet.attribs;
+    fullgrid.className = (fullgrid.className || '').replace(/\bsc-print-area\b/g, '').trim();
+    fullgrid.className = (fullgrid.className ? fullgrid.className + ' ' : '') + 'sc-print-area';
+    var printRange = attribs.printarea ? SocialCalc.ParseRange(attribs.printarea) : null;
+    var rows = fullgrid.querySelectorAll('[role="row"]');
+    var r;
+    for (r = 0; r < rows.length; r++) {
+      var rowEle = rows[r];
+      var cells = rowEle.querySelectorAll(
+        '[role="gridcell"],[role="columnheader"],[role="rowheader"]',
+      );
+      var c;
+      for (c = 0; c < cells.length; c++) {
+        var cellEle = cells[c];
+        cellEle.className = (cellEle.className || '').replace(/\bsc-print-hide\b/g, '').trim();
+        if (!printRange) continue;
+        var cellRow = cellEle.getAttribute('aria-rowindex') - 0;
+        var cellCol = cellEle.getAttribute('aria-colindex') - 0;
+        var outsideRows = cellRow && (cellRow < printRange.cr1.row || cellRow > printRange.cr2.row);
+        var outsideCols = cellCol && (cellCol < printRange.cr1.col || cellCol > printRange.cr2.col);
+        if (outsideRows || outsideCols) {
+          cellEle.className = (cellEle.className ? cellEle.className + ' ' : '') + 'sc-print-hide';
+        }
+      }
+    }
+    var repeatRowRange = attribs.printrepeatrows
+      ? SocialCalc.ParseRange(
+          attribs.printrepeatrows +
+            (attribs.printrepeatrows.indexOf(':') < 0 ? ':' + attribs.printrepeatrows : ''),
+        )
+      : null;
+    for (r = 0; r < rows.length; r++) {
+      var repeatRowEle = rows[r];
+      repeatRowEle.className = (repeatRowEle.className || '')
+        .replace(/\bsc-print-repeat-row\b/g, '')
+        .trim();
+      if (!repeatRowRange) continue;
+      var headerRowIndex = repeatRowEle.getAttribute('aria-rowindex') - 0;
+      if (headerRowIndex >= repeatRowRange.cr1.row && headerRowIndex <= repeatRowRange.cr2.row) {
+        repeatRowEle.className =
+          (repeatRowEle.className ? repeatRowEle.className + ' ' : '') + 'sc-print-repeat-row';
+      }
+    }
+    var repeatColRange = attribs.printrepeatcols
+      ? SocialCalc.ParseRange(
+          attribs.printrepeatcols +
+            (attribs.printrepeatcols.indexOf(':') < 0 ? ':' + attribs.printrepeatcols : ''),
+        )
+      : null;
+    var headerCells = fullgrid.querySelectorAll('[role="rowheader"],[role="columnheader"]');
+    for (c = 0; c < headerCells.length; c++) {
+      var headerCellEle = headerCells[c];
+      headerCellEle.className = (headerCellEle.className || '')
+        .replace(/\bsc-print-repeat-col\b/g, '')
+        .trim();
+      if (!repeatColRange) continue;
+      var headerColIndex = headerCellEle.getAttribute('aria-colindex') - 0;
+      if (headerColIndex >= repeatColRange.cr1.col && headerColIndex <= repeatColRange.cr2.col) {
+        headerCellEle.className =
+          (headerCellEle.className ? headerCellEle.className + ' ' : '') + 'sc-print-repeat-col';
+      }
+    }
+    var pageStyleId = 'sc-print-page-style';
+    var pageStyleEle = document.getElementById(pageStyleId);
+    if (!pageStyleEle) {
+      pageStyleEle = document.createElement('style');
+      pageStyleEle.id = pageStyleId;
+      document.head.appendChild(pageStyleEle);
+    }
+    var pageSize = attribs.printorientation == 'landscape' ? 'landscape' : 'portrait';
+    var pageMargin = attribs.printmargins || '0.75in';
+    var pageRule = '@page { size: ' + pageSize + '; margin: ' + pageMargin + '; }';
+    if (attribs.printscale && attribs.printscale != 100) {
+      pageRule += ' .sc-print-area { zoom: ' + attribs.printscale / 100 + '; }';
+    }
+    pageStyleEle.textContent = pageRule;
+  };
+  SpreadsheetControlSC.TriggerPrint = function () {
+    var s = SocialCalc.GetSpreadsheetControlObject();
+    if (!s) return;
+    SocialCalc.PreparePrintArea(s);
+    if (typeof window !== 'undefined' && typeof window.print === 'function') {
+      window.print();
     }
   };
   SpreadsheetControlSC.SpreadsheetControlCreateSpreadsheetSave = function (

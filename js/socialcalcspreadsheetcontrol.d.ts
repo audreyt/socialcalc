@@ -147,6 +147,16 @@ declare namespace SocialCalc {
     arg: any,
     params: { statuslineid: string; recalcid1: string; recalcid2: string; [k: string]: any },
   ): void;
+  function SpreadsheetControlAriaLiveCallback(
+    editor: any,
+    status: string,
+    arg: any,
+    params: { statusid: string; errorid: string; [k: string]: any },
+  ): void;
+  function LoadPrintSetupFields(spreadsheet: SpreadsheetControl): void;
+  function ApplyPrintSetup(): void;
+  function PreparePrintArea(spreadsheet: SpreadsheetControl): void;
+  function TriggerPrint(): void;
   function UpdateSortRangeProposal(editor: any): void;
   function LoadColumnChoosers(spreadsheet: SpreadsheetControl): void;
   function CmdGotFocus(obj: HTMLElement | boolean | null): void;

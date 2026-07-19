@@ -1071,6 +1071,18 @@ TableEditorSC.EditorRenderSheet = function (editor: any) {
   TableEditorSC.AssignID(editor, editor.fullgrid, "fullgrid"); // give it an id
   // eddy EditorRenderSheet {
   if (!TableEditorSC._app) editor.fullgrid.className = "te_download";
+  if (!editor.noEdit) {
+    editor.fullgrid.setAttribute("tabindex", "0");
+  }
+  editor.fullgrid.setAttribute("aria-label", "Spreadsheet");
+  if (editor.ecell && editor.fullgrid.querySelector) {
+    var activeCellElement = editor.fullgrid.querySelector(
+      "#" + editor.context.cellIDprefix + editor.ecell.coord,
+    );
+    if (activeCellElement && activeCellElement.id) {
+      editor.fullgrid.setAttribute("aria-activedescendant", activeCellElement.id);
+    }
+  }
   editor.EditorMouseRegister();
   // } EditorRenderSheet
 };
@@ -3215,6 +3227,13 @@ TableEditorSC.MoveECell = function (editor: any, newcell: any) {
   editor.UpdateCellCSS(cell, editor.ecell.row, editor.ecell.col);
   editor.SetECellHeaders("selected");
 
+  // Keep the grid's aria-activedescendant pointed at the current cursor
+  // cell on every move, not just at full re-render (EditorRenderSheet) --
+  // screen readers announce the referenced element as the active one.
+  if (editor.fullgrid && editor.fullgrid.setAttribute && cell && cell.element && cell.element.id) {
+    editor.fullgrid.setAttribute("aria-activedescendant", cell.element.id);
+  }
+
   for (f in editor.StatusCallback) {
     // let status line, etc., know
     editor.StatusCallback[f].func(editor, "moveecell", newcell, editor.StatusCallback[f].params);
@@ -3298,6 +3317,16 @@ TableEditorSC.UpdateCellCSS = function (editor: any, cell: any, row: any, col: a
       if (newelement.style[a] != "cssText") cell.element.style[a] = newelement.style[a];
     }
   }
+  // RenderCell's ARIA attributes (aria-selected, aria-readonly, aria-invalid,
+  // aria-label) are only assigned on real elements (noElement=false); the
+  // pseudo-element path used above for fast CSS-only updates skips them
+  // entirely. Set aria-selected directly here so keyboard/mouse cursor
+  // movement keeps the live DOM's selection state in sync, not just at
+  // full re-render (EditorRenderSheet). cell.element is always a real DOM
+  // node here (see the unconditional .style/.className access above).
+  var coord = TableEditorSC.crToCoord(col, row);
+  var highlight = editor.context.highlights[coord];
+  cell.element.setAttribute("aria-selected", highlight ? "true" : "false");
 };
 
 /** @param {any} editor @param {any} selected */

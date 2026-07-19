@@ -334,6 +334,36 @@ SpreadsheetControlSC.SpreadsheetControl = function (idPrefix: any) {
     onclick: null,
   });
 
+  // Print
+
+  this.tabnums.print = this.tabs.length;
+  this.tabs.push({
+    name: "print",
+    text: "Print",
+    html:
+      '<div id="%id.printtools" style="padding:10px 0px 0px 0px;">' +
+      '<label>%loc!Print area!: <input id="%id.print-area" type="text" size="16" placeholder="A1:D20"></label>' +
+      "&nbsp;&nbsp;" +
+      '<label>%loc!Repeat rows!: <input id="%id.print-repeatrows" type="text" size="6" placeholder="1:2"></label>' +
+      "&nbsp;&nbsp;" +
+      '<label>%loc!Repeat cols!: <input id="%id.print-repeatcols" type="text" size="6" placeholder="A:B"></label>' +
+      "&nbsp;&nbsp;" +
+      '<label>%loc!Orientation!: <select id="%id.print-orientation">' +
+      '<option value="portrait">%loc!Portrait!</option>' +
+      '<option value="landscape">%loc!Landscape!</option>' +
+      "</select></label>" +
+      "&nbsp;&nbsp;" +
+      '<label>%loc!Scale!: <input id="%id.print-scale" type="number" min="10" max="400" step="1" size="4" value="100">%</label>' +
+      "&nbsp;&nbsp;" +
+      '<input id="%id.print-apply" type="button" value="%loc!Apply!" onclick="SocialCalc.ApplyPrintSetup();return false;">' +
+      '<input id="%id.print-now" type="button" value="%loc!Print!" onclick="SocialCalc.TriggerPrint();return false;">' +
+      "</div>",
+    onclick: /** @param {any} s @param {any} _t */ function (s: any, _t: any) {
+      SocialCalc.LoadPrintSetupFields(s);
+    },
+    onclickFocus: true,
+  });
+
   // Settings (Format)
 
   this.tabnums.settings = this.tabs.length;
@@ -1607,6 +1637,34 @@ SpreadsheetControlSC.InitializeSpreadsheetControl = function (
   spreadsheet.statuslineDiv.id = spreadsheet.idPrefix + "statusline";
   spreadsheet.spreadsheetDiv.appendChild(spreadsheet.statuslineDiv);
 
+  // Visually-hidden live regions for screen-reader announcements. "polite" for
+  // routine navigation/status changes; "assertive" (with role="alert") for errors.
+  // Populated only via textContent from SocialCalc.AnnounceGridStatus so sheet
+  // content is never concatenated into markup.
+
+  spreadsheet.ariaStatusDiv = document.createElement("div");
+  spreadsheet.ariaStatusDiv.id = spreadsheet.idPrefix + "ariastatus";
+  spreadsheet.ariaStatusDiv.className = "sr-only";
+  spreadsheet.ariaStatusDiv.setAttribute("aria-live", "polite");
+  spreadsheet.ariaStatusDiv.setAttribute("aria-atomic", "true");
+  spreadsheet.spreadsheetDiv.appendChild(spreadsheet.ariaStatusDiv);
+
+  spreadsheet.ariaErrorDiv = document.createElement("div");
+  spreadsheet.ariaErrorDiv.id = spreadsheet.idPrefix + "ariaerror";
+  spreadsheet.ariaErrorDiv.className = "sr-only";
+  spreadsheet.ariaErrorDiv.setAttribute("role", "alert");
+  spreadsheet.ariaErrorDiv.setAttribute("aria-live", "assertive");
+  spreadsheet.ariaErrorDiv.setAttribute("aria-atomic", "true");
+  spreadsheet.spreadsheetDiv.appendChild(spreadsheet.ariaErrorDiv);
+
+  spreadsheet.editor.StatusCallback.ariaLive = {
+    func: SocialCalc.SpreadsheetControlAriaLiveCallback,
+    params: {
+      statusid: spreadsheet.idPrefix + "ariastatus",
+      errorid: spreadsheet.idPrefix + "ariaerror",
+    },
+  };
+
   // set current control object based on mouseover
 
   spreadsheet.spreadsheetDiv.addEventListener(
@@ -1634,8 +1692,12 @@ SpreadsheetControlSC.InitializeSpreadsheetControl = function (
 SpreadsheetControlSC.CalculateSheetNonViewHeight = function (spreadsheet: any) {
   spreadsheet.nonviewheight = spreadsheet.statuslineheight;
   for (var nodeIndex = 0; nodeIndex < spreadsheet.spreadsheetDiv.childNodes.length; nodeIndex++) {
-    if (spreadsheet.spreadsheetDiv.childNodes[nodeIndex].id == "SocialCalc-statusline") continue;
-    spreadsheet.nonviewheight += spreadsheet.spreadsheetDiv.childNodes[nodeIndex].offsetHeight;
+    var childNode = spreadsheet.spreadsheetDiv.childNodes[nodeIndex];
+    if (childNode.id == "SocialCalc-statusline") continue;
+    // Visually-hidden aria-live regions take no layout space (see .sr-only in
+    // css/socialcalc.css) and must not be counted against the view height.
+    if (childNode === spreadsheet.ariaStatusDiv || childNode === spreadsheet.ariaErrorDiv) continue;
+    spreadsheet.nonviewheight += childNode.offsetHeight;
   }
 };
 
@@ -1849,6 +1911,51 @@ SpreadsheetControlSC.SpreadsheetControlStatuslineCallback = function (
       protectele.src = spreadsheet.imagePrefix + (protectedNow ? "unlock.png" : "lock.png");
       protectele.title = protectedNow ? "Unprotect Sheet" : "Protect Sheet";
     }
+  }
+};
+
+//
+// SocialCalc.SpreadsheetControlAriaLiveCallback
+//
+// Announces cell navigation and command errors to assistive technology via
+// visually-hidden aria-live regions. Uses textContent exclusively -- sheet
+// values and error strings are never concatenated into markup.
+//
+
+/** @param {any} editor @param {string} status @param {any} arg @param {{[k: string]: any}} params */
+SpreadsheetControlSC.SpreadsheetControlAriaLiveCallback = function (
+  editor: any,
+  status: any,
+  arg: any,
+  params: any,
+) {
+  var statusEle: any, errorEle: any, cell: any, announcement: any;
+
+  switch (status) {
+    case "moveecell":
+      statusEle = (document as any).getElementById(params.statusid);
+      if (!statusEle || !editor.ecell) break;
+      cell = editor.context.sheetobj.cells[editor.ecell.coord];
+      announcement = editor.ecell.coord;
+      if (cell && cell.datavalue != null && cell.datavalue !== "") {
+        announcement += ": " + cell.datavalue;
+      }
+      statusEle.textContent = announcement;
+      break;
+
+    case "cmdend":
+      errorEle = (document as any).getElementById(params.errorid);
+      if (!errorEle) break;
+      if (editor.context.sheetobj.lastcommanderror) {
+        errorEle.textContent = editor.context.sheetobj.lastcommanderror;
+        delete editor.context.sheetobj.lastcommanderror;
+      } else {
+        errorEle.textContent = "";
+      }
+      break;
+
+    default:
+      break;
   }
 };
 
@@ -4076,6 +4183,223 @@ SpreadsheetControlSC.SettingsControlSave = function (target: any) {
   }
   if (cmdstr) {
     s.editor.EditorScheduleSheetCommands(cmdstr, true, false);
+  }
+};
+
+///////////////////////
+//
+// PRINT SETUP
+//
+// Minimal host-facing print setup: a plain form (not the Popup-based
+// SettingsControls machinery) that reads/writes the printarea,
+// printrepeatrows, printrepeatcols, printorientation, and printscale sheet
+// attributes, plus a Print button that only ever calls window.print() from
+// a direct user click -- never automatically.
+//
+///////////////////////
+
+//
+// SocialCalc.LoadPrintSetupFields(spreadsheet)
+//
+// Populates the Print tab's form fields from the current sheet's print
+// attributes when the tab is selected.
+//
+
+/** @param {any} s */
+SpreadsheetControlSC.LoadPrintSetupFields = function (s: any) {
+  var attribs = s.sheet.attribs;
+
+  var areaEle = /** @type {any} */ ((document as any).getElementById(s.idPrefix + "print-area"));
+  var repeatRowsEle = /** @type {any} */ (
+    (document as any).getElementById(s.idPrefix + "print-repeatrows")
+  );
+  var repeatColsEle = /** @type {any} */ (
+    (document as any).getElementById(s.idPrefix + "print-repeatcols")
+  );
+  var orientationEle = /** @type {any} */ (
+    (document as any).getElementById(s.idPrefix + "print-orientation")
+  );
+  var scaleEle = /** @type {any} */ ((document as any).getElementById(s.idPrefix + "print-scale"));
+
+  if (areaEle) areaEle.value = attribs.printarea || "";
+  if (repeatRowsEle) repeatRowsEle.value = attribs.printrepeatrows || "";
+  if (repeatColsEle) repeatColsEle.value = attribs.printrepeatcols || "";
+  if (orientationEle) orientationEle.value = attribs.printorientation || "portrait";
+  if (scaleEle) scaleEle.value = String(attribs.printscale || 100);
+};
+
+//
+// SocialCalc.ApplyPrintSetup()
+//
+// Reads the Print tab's form fields and issues "set sheet print..." commands
+// (undo-able, save/load round-trippable) for any changed attribute.
+//
+
+SpreadsheetControlSC.ApplyPrintSetup = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var attribs = s.sheet.attribs;
+  var cmds: string[] = [];
+
+  var areaEle = /** @type {any} */ ((document as any).getElementById(s.idPrefix + "print-area"));
+  var repeatRowsEle = /** @type {any} */ (
+    (document as any).getElementById(s.idPrefix + "print-repeatrows")
+  );
+  var repeatColsEle = /** @type {any} */ (
+    (document as any).getElementById(s.idPrefix + "print-repeatcols")
+  );
+  var orientationEle = /** @type {any} */ (
+    (document as any).getElementById(s.idPrefix + "print-orientation")
+  );
+  var scaleEle = /** @type {any} */ ((document as any).getElementById(s.idPrefix + "print-scale"));
+
+  var area = areaEle ? areaEle.value.trim() : "";
+  var repeatRows = repeatRowsEle ? repeatRowsEle.value.trim() : "";
+  var repeatCols = repeatColsEle ? repeatColsEle.value.trim() : "";
+  var orientation = orientationEle ? orientationEle.value : "portrait";
+  var scale = scaleEle ? scaleEle.value.trim() - 0 : 100;
+
+  if (area != (attribs.printarea || "")) cmds.push("set sheet printarea " + area);
+  if (repeatRows != (attribs.printrepeatrows || ""))
+    cmds.push("set sheet printrepeatrows " + repeatRows);
+  if (repeatCols != (attribs.printrepeatcols || ""))
+    cmds.push("set sheet printrepeatcols " + repeatCols);
+  if (orientation != (attribs.printorientation || "portrait"))
+    cmds.push("set sheet printorientation " + orientation);
+  if (scale != (attribs.printscale || 100)) cmds.push("set sheet printscale " + scale);
+
+  if (cmds.length) {
+    s.editor.EditorScheduleSheetCommands(cmds.join("\n"), true, false);
+  }
+};
+
+//
+// SocialCalc.PreparePrintArea(spreadsheet)
+//
+// Applies the sheet's print attributes to the rendered grid immediately
+// before printing:
+//
+//  - printarea: cells (by aria-rowindex/aria-colindex, set by RenderCell)
+//    outside the parsed range get the "sc-print-hide" class, which
+//    @media print's `.sc-print-area .sc-print-hide { display: none }` rule
+//    removes from the printed page. With no printarea, nothing is hidden
+//    and the whole sheet prints.
+//  - printrepeatrows / printrepeatcols: the matching header row(s) (from
+//    RenderColHeaders, role="row") and header cells (role="rowheader") get
+//    "sc-print-repeat-row" / "sc-print-repeat-col", which CSS renders with
+//    `display: table-header-group` so the browser repeats them per page.
+//  - printorientation / printmargins / printscale: emitted as an injected
+//    `@page` rule (id "sc-print-page-style") rather than an element style,
+//    since orientation/margins are page-box properties, not element ones.
+//
+// The grid itself always carries the "sc-print-area" class so
+// `body * { visibility: hidden }` + `.sc-print-area, .sc-print-area * {
+// visibility: visible }` isolates it from surrounding editor chrome.
+//
+
+/** @param {any} s */
+SpreadsheetControlSC.PreparePrintArea = function (s: any) {
+  var fullgrid = s.editor.fullgrid;
+  if (!fullgrid) return;
+  var attribs = s.sheet.attribs;
+
+  fullgrid.className = (fullgrid.className || "").replace(/\bsc-print-area\b/g, "").trim();
+  fullgrid.className = (fullgrid.className ? fullgrid.className + " " : "") + "sc-print-area";
+
+  // printarea: hide gridcells/headers outside the parsed range.
+  var printRange = attribs.printarea ? SocialCalc.ParseRange(attribs.printarea) : null;
+  var rows = fullgrid.querySelectorAll('[role="row"]');
+  var r;
+  for (r = 0; r < rows.length; r++) {
+    var rowEle = rows[r];
+    var cells = rowEle.querySelectorAll(
+      '[role="gridcell"],[role="columnheader"],[role="rowheader"]',
+    );
+    var c;
+    for (c = 0; c < cells.length; c++) {
+      var cellEle = cells[c];
+      cellEle.className = (cellEle.className || "").replace(/\bsc-print-hide\b/g, "").trim();
+      if (!printRange) continue;
+      var cellRow = cellEle.getAttribute("aria-rowindex") - 0;
+      var cellCol = cellEle.getAttribute("aria-colindex") - 0;
+      var outsideRows = cellRow && (cellRow < printRange.cr1.row || cellRow > printRange.cr2.row);
+      var outsideCols = cellCol && (cellCol < printRange.cr1.col || cellCol > printRange.cr2.col);
+      if (outsideRows || outsideCols) {
+        cellEle.className = (cellEle.className ? cellEle.className + " " : "") + "sc-print-hide";
+      }
+    }
+  }
+
+  // printrepeatrows / printrepeatcols: mark header row(s)/cell(s) to repeat.
+  var repeatRowRange = attribs.printrepeatrows
+    ? SocialCalc.ParseRange(
+        attribs.printrepeatrows +
+          (attribs.printrepeatrows.indexOf(":") < 0 ? ":" + attribs.printrepeatrows : ""),
+      )
+    : null;
+  for (r = 0; r < rows.length; r++) {
+    var repeatRowEle = rows[r];
+    repeatRowEle.className = (repeatRowEle.className || "")
+      .replace(/\bsc-print-repeat-row\b/g, "")
+      .trim();
+    if (!repeatRowRange) continue;
+    var headerRowIndex = repeatRowEle.getAttribute("aria-rowindex") - 0;
+    if (headerRowIndex >= repeatRowRange.cr1.row && headerRowIndex <= repeatRowRange.cr2.row) {
+      repeatRowEle.className =
+        (repeatRowEle.className ? repeatRowEle.className + " " : "") + "sc-print-repeat-row";
+    }
+  }
+
+  var repeatColRange = attribs.printrepeatcols
+    ? SocialCalc.ParseRange(
+        attribs.printrepeatcols +
+          (attribs.printrepeatcols.indexOf(":") < 0 ? ":" + attribs.printrepeatcols : ""),
+      )
+    : null;
+  var headerCells = fullgrid.querySelectorAll('[role="rowheader"],[role="columnheader"]');
+  for (c = 0; c < headerCells.length; c++) {
+    var headerCellEle = headerCells[c];
+    headerCellEle.className = (headerCellEle.className || "")
+      .replace(/\bsc-print-repeat-col\b/g, "")
+      .trim();
+    if (!repeatColRange) continue;
+    var headerColIndex = headerCellEle.getAttribute("aria-colindex") - 0;
+    if (headerColIndex >= repeatColRange.cr1.col && headerColIndex <= repeatColRange.cr2.col) {
+      headerCellEle.className =
+        (headerCellEle.className ? headerCellEle.className + " " : "") + "sc-print-repeat-col";
+    }
+  }
+
+  // printorientation / printmargins / printscale: emit as an @page rule.
+  var pageStyleId = "sc-print-page-style";
+  var pageStyleEle = (document as any).getElementById(pageStyleId);
+  if (!pageStyleEle) {
+    pageStyleEle = document.createElement("style");
+    pageStyleEle.id = pageStyleId;
+    document.head.appendChild(pageStyleEle);
+  }
+  var pageSize = attribs.printorientation == "landscape" ? "landscape" : "portrait";
+  var pageMargin = attribs.printmargins || "0.75in";
+  var pageRule = "@page { size: " + pageSize + "; margin: " + pageMargin + "; }";
+  if (attribs.printscale && attribs.printscale != 100) {
+    pageRule += " .sc-print-area { zoom: " + attribs.printscale / 100 + "; }";
+  }
+  pageStyleEle.textContent = pageRule;
+};
+
+//
+// SocialCalc.TriggerPrint()
+//
+// The only place window.print() is called. Runs strictly inside a user
+// click handler (the Print button's onclick), never on a timer, load event,
+// or programmatic trigger -- so it always reflects a direct user gesture.
+//
+
+SpreadsheetControlSC.TriggerPrint = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  if (!s) return;
+  SocialCalc.PreparePrintArea(s);
+  if (typeof window !== "undefined" && typeof window.print === "function") {
+    window.print();
   }
 };
 

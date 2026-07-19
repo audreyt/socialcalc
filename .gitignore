@@ -9,6 +9,7 @@
 /reports/
 /.stryker-tmp/
 /playwright-report/
+/.playwright-browsers/
 /test-results/
 /stryker.log
 /docs/
