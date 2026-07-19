@@ -95,4 +95,22 @@ def stableCompare (comparatorResult : Int) (indexA : Int) (indexB : Int) : Int :
       else
         0
 
+def classifyFilterMask (isError : Bool) (isTruthy : Bool) : Int :=
+  if isError = true then
+    2
+  else
+    if isTruthy = true then
+      0
+    else
+      1
+
+def classifyFilterResult (keptCount : Int) (hasIfEmpty : Bool) : Int :=
+  if keptCount > 0 then
+    0
+  else
+    if hasIfEmpty = true then
+      1
+    else
+      2
+
 end Pure

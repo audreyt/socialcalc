@@ -4,6 +4,12 @@ import {
   CLAIM_ALLOWED,
   CLAIM_COLLISION,
   CLAIM_RECLAIMABLE,
+  FILTER_DROP,
+  FILTER_ERROR,
+  FILTER_KEEP,
+  FILTER_RESULT_CALC_ERROR,
+  FILTER_RESULT_IF_EMPTY,
+  FILTER_RESULT_KEPT,
   RESIZE_ACTION_CLAIM,
   RESIZE_ACTION_CLEAR,
   RESIZE_ACTION_NONE,
@@ -17,6 +23,8 @@ import {
   SPILL_MAX_ROW,
   SPILL_OK,
   SPILL_RESOURCE_LIMIT,
+  classifyFilterMask,
+  classifyFilterResult,
   classifyResizeMembership,
   classifySpillClaim,
   endCol,
@@ -430,6 +438,52 @@ describe("lemma/spill stable SORT tie policy", () => {
   });
 });
 
+describe("lemma/spill FILTER keep/error/fallback policy", () => {
+  test("error always propagates regardless of truthiness", () => {
+    expect(classifyFilterMask(true, true)).toBe(FILTER_ERROR);
+    expect(classifyFilterMask(true, false)).toBe(FILTER_ERROR);
+  });
+
+  test("non-error truthy keeps, non-error falsy drops", () => {
+    expect(classifyFilterMask(false, true)).toBe(FILTER_KEEP);
+    expect(classifyFilterMask(false, false)).toBe(FILTER_DROP);
+  });
+
+  test("policy table: exhaustive isError/isTruthy matrix", () => {
+    const bools = [false, true];
+    for (const isError of bools) {
+      for (const isTruthy of bools) {
+        const result = classifyFilterMask(isError, isTruthy);
+        if (isError) expect(result).toBe(FILTER_ERROR);
+        else expect(result).toBe(isTruthy ? FILTER_KEEP : FILTER_DROP);
+      }
+    }
+  });
+
+  test("any kept item wins over the empty-result fallback", () => {
+    expect(classifyFilterResult(1, false)).toBe(FILTER_RESULT_KEPT);
+    expect(classifyFilterResult(5, true)).toBe(FILTER_RESULT_KEPT);
+  });
+
+  test("empty result defers to if_empty when supplied", () => {
+    expect(classifyFilterResult(0, true)).toBe(FILTER_RESULT_IF_EMPTY);
+  });
+
+  test("empty result signals #CALC! precedence when if_empty is omitted", () => {
+    expect(classifyFilterResult(0, false)).toBe(FILTER_RESULT_CALC_ERROR);
+  });
+
+  test("policy table: exhaustive keptCount boundary/hasIfEmpty matrix", () => {
+    for (let keptCount = -1; keptCount <= 3; keptCount++) {
+      for (const hasIfEmpty of [false, true]) {
+        const result = classifyFilterResult(keptCount, hasIfEmpty);
+        if (keptCount > 0) expect(result).toBe(FILTER_RESULT_KEPT);
+        else expect(result).toBe(hasIfEmpty ? FILTER_RESULT_IF_EMPTY : FILTER_RESULT_CALC_ERROR);
+      }
+    }
+  });
+});
+
 describe("lemma/spill vs shipping SC.Formula spill helpers", () => {
   test("shipping SPILL_MAX_COL/ROW/CELLS constants match the facade's documented bounds", async () => {
     const SC = await loadSocialCalc();
@@ -606,6 +660,53 @@ describe("lemma/spill vs shipping SC.Formula spill helpers", () => {
         }
       }
     }
+  });
+
+  test("ClassifyFilterMask: facade and shipping agree over every isError/isTruthy combination", async () => {
+    const SC = await loadSocialCalc();
+    const bools = [false, true];
+    for (const isError of bools) {
+      for (const isTruthy of bools) {
+        expect(classifyFilterMask(isError, isTruthy)).toBe(
+          SC.Formula.ClassifyFilterMask(isError, isTruthy),
+        );
+      }
+    }
+  });
+
+  test("ClassifyFilterResult: facade and shipping agree over a keptCount boundary/hasIfEmpty matrix", async () => {
+    const SC = await loadSocialCalc();
+    for (let keptCount = -1; keptCount <= 3; keptCount++) {
+      for (const hasIfEmpty of [false, true]) {
+        expect(classifyFilterResult(keptCount, hasIfEmpty)).toBe(
+          SC.Formula.ClassifyFilterResult(keptCount, hasIfEmpty),
+        );
+      }
+    }
+  });
+
+  test("live FILTER formula exercises ClassifyFilterMask and ClassifyFilterResult end to end", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+      "set A1 value n 1",
+      "set A2 value n 2",
+      "set A3 value n 3",
+      "set B1 formula A1>1",
+      "set B2 formula A2>1",
+      "set B3 formula A3>1",
+    ]);
+    await recalcSheet(SC, sheet);
+    const filterResult = SC.Formula.evaluate_parsed_formula(
+      SC.Formula.ParseFormulaIntoTokens("FILTER(A1:A3,B1:B3)"),
+      sheet,
+      false,
+    );
+    expect(filterResult.type).toBe("array");
+    const kept = (filterResult.value.cells as Array<Array<{ value: unknown }>>).map(
+      (row) => row[0]!.value,
+    );
+    expect(kept).toEqual([2, 3]);
   });
 
   test("live SORT/UNIQUE formulas exercise KeepUniqueItem and StableTieCompare end to end", async () => {

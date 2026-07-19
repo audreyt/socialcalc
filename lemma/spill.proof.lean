@@ -69,3 +69,9 @@ prove_correct keepUniqueRow by
 
 prove_correct stableCompare by
   unfold Pure.stableCompare; loom_solve
+
+prove_correct classifyFilterMask by
+  unfold Pure.classifyFilterMask; loom_solve
+
+prove_correct classifyFilterResult by
+  unfold Pure.classifyFilterResult; loom_solve

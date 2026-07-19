@@ -74,6 +74,7 @@ declare namespace SocialCalc {
     | "e#NAME?"
     | "e#N/A"
     | "e#SPILL!"
+    | "e#CALC!"
     | "e*"
     | (string & {});
 
@@ -263,6 +264,15 @@ declare namespace SocialCalc {
     function IsValidQuartileExcPosition(n: number, quart: number): boolean;
     function MaterializeArray(sheet: Sheet, value: FormulaValueResult): FormulaArrayValue | null;
     function DynamicArrayFunctions(
+      fname: string,
+      operand: FormulaOperand[],
+      foperand: FormulaOperand[],
+      sheet: Sheet,
+    ): void;
+    function CompareTypedCells(x: FormulaArrayCell, y: FormulaArrayCell): number;
+    function ClassifyFilterMask(isError: boolean, isTruthy: boolean): number;
+    function ClassifyFilterResult(keptCount: number, hasIfEmpty: boolean): number;
+    function ArrayShapeFunctions(
       fname: string,
       operand: FormulaOperand[],
       foperand: FormulaOperand[],

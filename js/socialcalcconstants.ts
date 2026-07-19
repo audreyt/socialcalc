@@ -920,6 +920,47 @@ ConstantsRoot.Constants = {
     "Replaces every match of regular_expression in text with replacement; replacement may use \\1..\\9 to refer to captured groups. ",
   s_farg_sort: "range, [sort_column], [is_ascending], [sort_column2, is_ascending2, ...]",
   s_farg_unique: "range, [by_column], [exactly_once]",
+  s_fdef_FILTER:
+    "Filters an array by a Boolean include array whose height or width matches the array; returns if_empty (or #CALC! if omitted) when nothing matches. ",
+  s_fdef_SEQUENCE:
+    "Generates a rows-by-columns array of sequential numbers starting at start and incrementing by step (all default to 1). ",
+  s_fdef_TRANSPOSE: "Returns the transpose of an array, swapping its rows and columns. ",
+  s_fdef_SORTBY:
+    "Sorts an array by one or more external by_array key ranges, each matching the array's row or column count; sort_order defaults to ascending (1), -1 descends, ties preserve source order. ",
+  s_fdef_CHOOSECOLS:
+    "Returns the specified columns from an array; column numbers may be negative to count from the end. ",
+  s_fdef_CHOOSEROWS:
+    "Returns the specified rows from an array; row numbers may be negative to count from the end. ",
+  s_fdef_TAKE:
+    "Returns rows and/or columns from the start (positive) or end (negative) of an array, clamped to the available extent. ",
+  s_fdef_DROP:
+    "Returns an array with rows and/or columns removed from the start (positive) or end (negative). ",
+  s_fdef_HSTACK: "Appends arrays horizontally into one array, padding shorter columns with #N/A. ",
+  s_fdef_VSTACK: "Appends arrays vertically into one array, padding shorter rows with #N/A. ",
+  s_fdef_TOCOL:
+    "Flattens an array into a single column; ignore controls blanks/errors (0 none, 1 blanks, 2 errors, 3 both) and scan_by_column reads column-first when true. ",
+  s_fdef_TOROW:
+    "Flattens an array into a single row; ignore controls blanks/errors (0 none, 1 blanks, 2 errors, 3 both) and scan_by_column reads column-first when true. ",
+  s_fdef_WRAPROWS:
+    "Wraps a row or column vector into rows of wrap_count values, padding the final row with pad_with (default #N/A). ",
+  s_fdef_WRAPCOLS:
+    "Wraps a row or column vector into columns of wrap_count values, padding the final column with pad_with (default #N/A). ",
+  s_fdef_EXPAND:
+    "Expands an array to rows-by-columns, which must each be at least the source extent, padding new cells with pad_with (default #N/A). ",
+  s_farg_filter: "array, include, [if_empty]",
+  s_farg_sequence: "rows, [columns], [start], [step]",
+  s_farg_sortby: "array, by_array1, [sort_order1], [by_array2, sort_order2, ...]",
+  s_farg_choosecols: "array, col_num1, [col_num2, ...]",
+  s_farg_chooserows: "array, row_num1, [row_num2, ...]",
+  s_farg_take: "array, rows, [columns]",
+  s_farg_drop: "array, rows, [columns]",
+  s_farg_hstack: "array1, [array2, ...]",
+  s_farg_vstack: "array1, [array2, ...]",
+  s_farg_tocol: "array, [ignore], [scan_by_column]",
+  s_farg_torow: "array, [ignore], [scan_by_column]",
+  s_farg_wraprows: "vector, wrap_count, [pad_with]",
+  s_farg_wrapcols: "vector, wrap_count, [pad_with]",
+  s_farg_expand: "array, rows, [columns], [pad_with]",
   s_fdef_SUM:
     "Adds the numeric values. The values to the sum function may be ranges in the form similar to A1:B5. ",
   s_fdef_SUMIF:

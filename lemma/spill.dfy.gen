@@ -230,3 +230,41 @@ lemma stableCompare_ensures(comparatorResult: int, indexA: int, indexB: int)
   ensures ((comparatorResult == 0) ==> (indexA == indexB) ==> (stableCompare(comparatorResult, indexA, indexB) == 0))
 {
 }
+
+function classifyFilterMask(isError: bool, isTruthy: bool): int
+{
+  if (isError == true) then
+    2
+  else
+    if (isTruthy == true) then
+      0
+    else
+      1
+}
+
+lemma classifyFilterMask_ensures(isError: bool, isTruthy: bool)
+  ensures (((classifyFilterMask(isError, isTruthy) == 0) || (classifyFilterMask(isError, isTruthy) == 1)) || (classifyFilterMask(isError, isTruthy) == 2))
+  ensures ((isError == true) ==> (classifyFilterMask(isError, isTruthy) == 2))
+  ensures ((isError == false) ==> (isTruthy == true) ==> (classifyFilterMask(isError, isTruthy) == 0))
+  ensures ((isError == false) ==> (isTruthy == false) ==> (classifyFilterMask(isError, isTruthy) == 1))
+{
+}
+
+function classifyFilterResult(keptCount: int, hasIfEmpty: bool): int
+{
+  if (keptCount > 0) then
+    0
+  else
+    if (hasIfEmpty == true) then
+      1
+    else
+      2
+}
+
+lemma classifyFilterResult_ensures(keptCount: int, hasIfEmpty: bool)
+  ensures (((classifyFilterResult(keptCount, hasIfEmpty) == 0) || (classifyFilterResult(keptCount, hasIfEmpty) == 1)) || (classifyFilterResult(keptCount, hasIfEmpty) == 2))
+  ensures ((keptCount > 0) ==> (classifyFilterResult(keptCount, hasIfEmpty) == 0))
+  ensures ((keptCount <= 0) ==> (hasIfEmpty == true) ==> (classifyFilterResult(keptCount, hasIfEmpty) == 1))
+  ensures ((keptCount <= 0) ==> (hasIfEmpty == false) ==> (classifyFilterResult(keptCount, hasIfEmpty) == 2))
+{
+}

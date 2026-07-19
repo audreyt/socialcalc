@@ -117,3 +117,19 @@ method stableCompare (comparatorResult : Int) (indexA : Int) (indexB : Int) retu
   ensures comparatorResult = 0 → indexA = indexB → res = 0
   do
     return Pure.stableCompare comparatorResult indexA indexB
+
+method classifyFilterMask (isError : Bool) (isTruthy : Bool) return (res : Int)
+  ensures res = 0 ∨ res = 1 ∨ res = 2
+  ensures isError = true → res = 2
+  ensures isError = false → isTruthy = true → res = 0
+  ensures isError = false → isTruthy = false → res = 1
+  do
+    return Pure.classifyFilterMask isError isTruthy
+
+method classifyFilterResult (keptCount : Int) (hasIfEmpty : Bool) return (res : Int)
+  ensures res = 0 ∨ res = 1 ∨ res = 2
+  ensures keptCount > 0 → res = 0
+  ensures keptCount ≤ 0 → hasIfEmpty = true → res = 1
+  ensures keptCount ≤ 0 → hasIfEmpty = false → res = 2
+  do
+    return Pure.classifyFilterResult keptCount hasIfEmpty

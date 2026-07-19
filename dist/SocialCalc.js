@@ -745,6 +745,48 @@
       'Replaces every match of regular_expression in text with replacement; replacement may use \\1..\\9 to refer to captured groups. ',
     s_farg_sort: 'range, [sort_column], [is_ascending], [sort_column2, is_ascending2, ...]',
     s_farg_unique: 'range, [by_column], [exactly_once]',
+    s_fdef_FILTER:
+      'Filters an array by a Boolean include array whose height or width matches the array; returns if_empty (or #CALC! if omitted) when nothing matches. ',
+    s_fdef_SEQUENCE:
+      'Generates a rows-by-columns array of sequential numbers starting at start and incrementing by step (all default to 1). ',
+    s_fdef_TRANSPOSE: 'Returns the transpose of an array, swapping its rows and columns. ',
+    s_fdef_SORTBY:
+      "Sorts an array by one or more external by_array key ranges, each matching the array's row or column count; sort_order defaults to ascending (1), -1 descends, ties preserve source order. ",
+    s_fdef_CHOOSECOLS:
+      'Returns the specified columns from an array; column numbers may be negative to count from the end. ',
+    s_fdef_CHOOSEROWS:
+      'Returns the specified rows from an array; row numbers may be negative to count from the end. ',
+    s_fdef_TAKE:
+      'Returns rows and/or columns from the start (positive) or end (negative) of an array, clamped to the available extent. ',
+    s_fdef_DROP:
+      'Returns an array with rows and/or columns removed from the start (positive) or end (negative). ',
+    s_fdef_HSTACK:
+      'Appends arrays horizontally into one array, padding shorter columns with #N/A. ',
+    s_fdef_VSTACK: 'Appends arrays vertically into one array, padding shorter rows with #N/A. ',
+    s_fdef_TOCOL:
+      'Flattens an array into a single column; ignore controls blanks/errors (0 none, 1 blanks, 2 errors, 3 both) and scan_by_column reads column-first when true. ',
+    s_fdef_TOROW:
+      'Flattens an array into a single row; ignore controls blanks/errors (0 none, 1 blanks, 2 errors, 3 both) and scan_by_column reads column-first when true. ',
+    s_fdef_WRAPROWS:
+      'Wraps a row or column vector into rows of wrap_count values, padding the final row with pad_with (default #N/A). ',
+    s_fdef_WRAPCOLS:
+      'Wraps a row or column vector into columns of wrap_count values, padding the final column with pad_with (default #N/A). ',
+    s_fdef_EXPAND:
+      'Expands an array to rows-by-columns, which must each be at least the source extent, padding new cells with pad_with (default #N/A). ',
+    s_farg_filter: 'array, include, [if_empty]',
+    s_farg_sequence: 'rows, [columns], [start], [step]',
+    s_farg_sortby: 'array, by_array1, [sort_order1], [by_array2, sort_order2, ...]',
+    s_farg_choosecols: 'array, col_num1, [col_num2, ...]',
+    s_farg_chooserows: 'array, row_num1, [row_num2, ...]',
+    s_farg_take: 'array, rows, [columns]',
+    s_farg_drop: 'array, rows, [columns]',
+    s_farg_hstack: 'array1, [array2, ...]',
+    s_farg_vstack: 'array1, [array2, ...]',
+    s_farg_tocol: 'array, [ignore], [scan_by_column]',
+    s_farg_torow: 'array, [ignore], [scan_by_column]',
+    s_farg_wraprows: 'vector, wrap_count, [pad_with]',
+    s_farg_wrapcols: 'vector, wrap_count, [pad_with]',
+    s_farg_expand: 'array, rows, [columns], [pad_with]',
     s_fdef_SUM:
       'Adds the numeric values. The values to the sum function may be ranges in the form similar to A1:B5. ',
     s_fdef_SUMIF:
@@ -14799,6 +14841,7 @@ More comments yet to come...
     '#NAME?': '0,e#NAME?',
     '#N/A': '0,e#N/A',
     '#SPILL!': '0,e#SPILL!',
+    '#CALC!': '0,e#CALC!',
   };
   FormulaMut.SPILL_MAX_COL = 702;
   FormulaMut.SPILL_MAX_ROW = 65536;
@@ -22913,6 +22956,20 @@ More comments yet to come...
       cells,
     };
   };
+  FormulaMut.CompareTypedCells = function (x, y) {
+    if (x.type.charAt(0) == 'e' || y.type.charAt(0) == 'e') {
+      if (x.type.charAt(0) == 'e' && y.type.charAt(0) == 'e')
+        return x.type < y.type ? -1 : x.type > y.type ? 1 : 0;
+      return x.type.charAt(0) == 'e' ? 1 : -1;
+    }
+    if (x.type == 'b' || y.type == 'b') return x.type == y.type ? 0 : x.type == 'b' ? -1 : 1;
+    if (x.type.charAt(0) == 'n' && y.type.charAt(0) == 'n')
+      return Number(x.value) - Number(y.value);
+    if (x.type.charAt(0) == 'n' || y.type.charAt(0) == 'n') return x.type.charAt(0) == 'n' ? -1 : 1;
+    var xt = String(x.value).toLowerCase(),
+      yt = String(y.value).toLowerCase();
+    return xt < yt ? -1 : xt > yt ? 1 : 0;
+  };
   FormulaMut.DynamicArrayFunctions = function (fname, operand, foperand, sheet) {
     var scf = SocialCalc.Formula;
     var source = scf.TopOfStackValueAndType(sheet, foperand);
@@ -23064,24 +23121,7 @@ More comments yet to come...
     });
     rows.sort(function (a, b) {
       for (var z = 0; z < sortKeys.length; z++) {
-        var x = a.row[sortKeys[z].col],
-          y = b.row[sortKeys[z].col],
-          result = 0;
-        if (x.type.charAt(0) == 'e' || y.type.charAt(0) == 'e') {
-          if (x.type.charAt(0) == 'e' && y.type.charAt(0) == 'e')
-            result = x.type < y.type ? -1 : x.type > y.type ? 1 : 0;
-          else result = x.type.charAt(0) == 'e' ? 1 : -1;
-        } else if (x.type == 'b' || y.type == 'b')
-          result = x.type == y.type ? 0 : x.type == 'b' ? -1 : 1;
-        else if (x.type.charAt(0) == 'n' && y.type.charAt(0) == 'n')
-          result = Number(x.value) - Number(y.value);
-        else if (x.type.charAt(0) == 'n' || y.type.charAt(0) == 'n')
-          result = x.type.charAt(0) == 'n' ? -1 : 1;
-        else {
-          var xt = String(x.value).toLowerCase(),
-            yt = String(y.value).toLowerCase();
-          result = xt < yt ? -1 : xt > yt ? 1 : 0;
-        }
+        var result = scf.CompareTypedCells(a.row[sortKeys[z].col], b.row[sortKeys[z].col]);
         if (result) return sortKeys[z].asc ? result : -result;
       }
       return scf.StableTieCompare(0, a.index, b.index);
@@ -23840,6 +23880,700 @@ More comments yet to come...
     'regexreplace',
     '',
     'text',
+  ];
+  function ResolveScalarCell(sheet, source) {
+    var mat = FormulaMut.MaterializeArray(sheet, source);
+    if (mat) return mat.cells[0][0];
+    return {
+      type: source.type,
+      value: source.value,
+    };
+  }
+  function ArrayOrScalar(sheet, source) {
+    var mat = FormulaMut.MaterializeArray(sheet, source);
+    return (
+      mat || {
+        rows: 1,
+        cols: 1,
+        cells: [
+          [
+            {
+              type: source.type,
+              value: source.value,
+            },
+          ],
+        ],
+      }
+    );
+  }
+  function WithinSpillBudget(rows, cols) {
+    return (
+      FormulaMut.PlanSpillStatus(
+        1,
+        1,
+        rows,
+        cols,
+        FormulaMut.SPILL_MAX_COL,
+        FormulaMut.SPILL_MAX_ROW,
+        FormulaMut.SPILL_MAX_CELLS,
+      ) === 0
+    );
+  }
+  var DEFAULT_PAD_CELL = {
+    type: 'e#N/A',
+    value: 0,
+  };
+  FormulaMut.ClassifyFilterMask = function (isError, isTruthy) {
+    if (isError === true) return 2;
+    if (isTruthy === true) return 0;
+    return 1;
+  };
+  FormulaMut.ClassifyFilterResult = function (keptCount, hasIfEmpty) {
+    if (keptCount > 0) return 0;
+    if (hasIfEmpty === true) return 1;
+    return 2;
+  };
+  FormulaMut.ArrayShapeFunctions = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var fail = function (errortype = 'e#VALUE!') {
+      operand.push({
+        type: errortype,
+        value: 0,
+      });
+    };
+    var pushArray = function (value) {
+      operand.push({
+        type: 'array',
+        value,
+      });
+    };
+    var readInt = function () {
+      var v = scf.OperandAsNumber(sheet, foperand);
+      if (v.type.charAt(0) != 'n' || !Number.isFinite(Number(v.value))) return null;
+      var n = Number(v.value);
+      if (Math.floor(n) != n) return null;
+      return n;
+    };
+    if (fname == 'SEQUENCE') {
+      var rows = readInt();
+      if (rows == null || rows <= 0) {
+        fail();
+        return;
+      }
+      var cols = 1;
+      if (foperand.length) {
+        var colsArg = readInt();
+        if (colsArg == null || colsArg <= 0) {
+          fail();
+          return;
+        }
+        cols = colsArg;
+      }
+      var start = 1,
+        step = 1;
+      if (foperand.length) {
+        var startArg = scf.OperandAsNumber(sheet, foperand);
+        if (startArg.type.charAt(0) != 'n' || !Number.isFinite(Number(startArg.value))) {
+          fail();
+          return;
+        }
+        start = Number(startArg.value);
+      }
+      if (foperand.length) {
+        var stepArg = scf.OperandAsNumber(sheet, foperand);
+        if (stepArg.type.charAt(0) != 'n' || !Number.isFinite(Number(stepArg.value))) {
+          fail();
+          return;
+        }
+        step = Number(stepArg.value);
+      }
+      if (!WithinSpillBudget(rows, cols)) {
+        fail('e#NUM!');
+        return;
+      }
+      var seqCells = [];
+      for (var sr = 0; sr < rows; sr++) {
+        var seqRow = [];
+        for (var sc = 0; sc < cols; sc++) {
+          seqRow.push({
+            type: 'n',
+            value: start + (sr * cols + sc) * step,
+          });
+        }
+        seqCells.push(seqRow);
+      }
+      pushArray({
+        rows,
+        cols,
+        cells: seqCells,
+      });
+      return;
+    }
+    var source = scf.TopOfStackValueAndType(sheet, foperand);
+    var array = scf.MaterializeArray(sheet, source);
+    if (!array) {
+      fail();
+      return;
+    }
+    if (fname == 'TRANSPOSE') {
+      var trCells = [];
+      for (var tr = 0; tr < array.cols; tr++) {
+        var trRow = [];
+        for (var tc = 0; tc < array.rows; tc++) trRow.push(array.cells[tc][tr]);
+        trCells.push(trRow);
+      }
+      pushArray({
+        rows: array.cols,
+        cols: array.rows,
+        cells: trCells,
+      });
+      return;
+    }
+    if (fname == 'FILTER') {
+      if (foperand.length < 1 || foperand.length > 2) {
+        fail();
+        return;
+      }
+      var includeSource = scf.TopOfStackValueAndType(sheet, foperand);
+      var include = scf.MaterializeArray(sheet, includeSource);
+      if (!include) {
+        fail();
+        return;
+      }
+      var hasIfEmpty = foperand.length > 0;
+      var ifEmptyCell = null;
+      if (hasIfEmpty) {
+        var ifEmptySource = scf.TopOfStackValueAndType(sheet, foperand);
+        ifEmptyCell = ResolveScalarCell(sheet, ifEmptySource);
+      }
+      var byColumnMask;
+      if (include.rows == array.rows && include.cols == 1) byColumnMask = false;
+      else if (include.rows == 1 && include.cols == array.cols) byColumnMask = true;
+      else {
+        fail();
+        return;
+      }
+      var maskLen = byColumnMask ? array.cols : array.rows;
+      var keepIdx = [];
+      for (var mi = 0; mi < maskLen; mi++) {
+        var maskCell = byColumnMask ? include.cells[0][mi] : include.cells[mi][0];
+        var isErr = maskCell.type.charAt(0) == 'e';
+        var isText = !isErr && maskCell.type != 'b' && maskCell.type.charAt(0) != 'n';
+        var isTruthy = !isErr && !isText && maskCell.type != 'b' && Number(maskCell.value) != 0;
+        var status = scf.ClassifyFilterMask(isErr || isText, isTruthy);
+        if (status == 2) {
+          fail(isErr ? maskCell.type : 'e#VALUE!');
+          return;
+        }
+        if (status == 0) keepIdx.push(mi);
+      }
+      var resultStatus = scf.ClassifyFilterResult(keepIdx.length, hasIfEmpty);
+      if (resultStatus == 2) {
+        fail('e#CALC!');
+        return;
+      }
+      if (resultStatus == 1) {
+        pushArray({
+          rows: 1,
+          cols: 1,
+          cells: [[ifEmptyCell]],
+        });
+        return;
+      }
+      var filtered = [];
+      if (byColumnMask)
+        for (var fr = 0; fr < array.rows; fr++) {
+          var frow = [];
+          for (var fq = 0; fq < keepIdx.length; fq++) frow.push(array.cells[fr][keepIdx[fq]]);
+          filtered.push(frow);
+        }
+      else
+        for (var fq2 = 0; fq2 < keepIdx.length; fq2++)
+          filtered.push(array.cells[keepIdx[fq2]].slice());
+      pushArray({
+        rows: byColumnMask ? array.rows : keepIdx.length,
+        cols: byColumnMask ? keepIdx.length : array.cols,
+        cells: filtered,
+      });
+      return;
+    }
+    if (fname == 'SORTBY') {
+      if (foperand.length < 1) {
+        fail();
+        return;
+      }
+      var byArrays = [];
+      var orders = [];
+      var orientation = null;
+      while (foperand.length) {
+        var bySource = scf.TopOfStackValueAndType(sheet, foperand);
+        var byArr = scf.MaterializeArray(sheet, bySource);
+        var order = 1;
+        if (foperand.length) {
+          var orderArg = scf.OperandAsNumber(sheet, foperand);
+          if (
+            orderArg.type.charAt(0) != 'n' ||
+            (Number(orderArg.value) != 1 && Number(orderArg.value) != -1)
+          ) {
+            fail();
+            return;
+          }
+          order = Number(orderArg.value);
+        }
+        if (!byArr) {
+          fail();
+          return;
+        }
+        var thisOrientation = null;
+        if (byArr.rows == array.rows && byArr.cols == 1) thisOrientation = 'col';
+        else if (byArr.cols == array.cols && byArr.rows == 1) thisOrientation = 'row';
+        else {
+          fail();
+          return;
+        }
+        if (orientation == null) orientation = thisOrientation;
+        else if (orientation != thisOrientation) {
+          fail();
+          return;
+        }
+        byArrays.push(byArr);
+        orders.push(order);
+      }
+      var byColumnSort = orientation == 'row';
+      var sortLen = byColumnSort ? array.cols : array.rows;
+      var entries = [];
+      for (var si = 0; si < sortLen; si++) entries.push({ index: si });
+      entries.sort(function (a, b) {
+        for (var k = 0; k < byArrays.length; k++) {
+          var keyArr = byArrays[k];
+          var xk = byColumnSort ? keyArr.cells[0][a.index] : keyArr.cells[a.index][0];
+          var yk = byColumnSort ? keyArr.cells[0][b.index] : keyArr.cells[b.index][0];
+          var result = scf.CompareTypedCells(xk, yk);
+          if (result) return orders[k] > 0 ? result : -result;
+        }
+        return scf.StableTieCompare(0, a.index, b.index);
+      });
+      var sortbyCells = [];
+      if (byColumnSort)
+        for (var sbr = 0; sbr < array.rows; sbr++) {
+          var sbRow = [];
+          for (var sbc = 0; sbc < entries.length; sbc++)
+            sbRow.push(array.cells[sbr][entries[sbc].index]);
+          sortbyCells.push(sbRow);
+        }
+      else
+        for (var sbq = 0; sbq < entries.length; sbq++)
+          sortbyCells.push(array.cells[entries[sbq].index].slice());
+      pushArray({
+        rows: byColumnSort ? array.rows : entries.length,
+        cols: byColumnSort ? entries.length : array.cols,
+        cells: sortbyCells,
+      });
+      return;
+    }
+    if (fname == 'CHOOSECOLS' || fname == 'CHOOSEROWS') {
+      if (!foperand.length) {
+        fail();
+        return;
+      }
+      var chooseByCol = fname == 'CHOOSECOLS';
+      var extent = chooseByCol ? array.cols : array.rows;
+      var picked = [];
+      while (foperand.length) {
+        var idx = readInt();
+        if (idx == null || idx == 0 || Math.abs(idx) > extent) {
+          fail();
+          return;
+        }
+        picked.push(idx > 0 ? idx - 1 : extent + idx);
+      }
+      var chosenCells = [];
+      if (chooseByCol)
+        for (var ccr = 0; ccr < array.rows; ccr++) {
+          var ccRow = [];
+          for (var ccc = 0; ccc < picked.length; ccc++) ccRow.push(array.cells[ccr][picked[ccc]]);
+          chosenCells.push(ccRow);
+        }
+      else
+        for (var ccq = 0; ccq < picked.length; ccq++)
+          chosenCells.push(array.cells[picked[ccq]].slice());
+      pushArray({
+        rows: chooseByCol ? array.rows : picked.length,
+        cols: chooseByCol ? picked.length : array.cols,
+        cells: chosenCells,
+      });
+      return;
+    }
+    if (fname == 'TAKE' || fname == 'DROP') {
+      if (foperand.length < 1 || foperand.length > 2) {
+        fail();
+        return;
+      }
+      var takeRows = readInt();
+      if (takeRows == null) {
+        fail();
+        return;
+      }
+      var takeCols = null;
+      if (foperand.length) {
+        takeCols = readInt();
+        if (takeCols == null) {
+          fail();
+          return;
+        }
+      }
+      var isTake = fname == 'TAKE';
+      var rowRange = SelectExtent(array.rows, takeRows, isTake);
+      if (!rowRange) {
+        fail('e#CALC!');
+        return;
+      }
+      var colRange =
+        takeCols == null
+          ? {
+              start: 0,
+              count: array.cols,
+            }
+          : SelectExtent(array.cols, takeCols, isTake);
+      if (!colRange) {
+        fail('e#CALC!');
+        return;
+      }
+      var tdCells = [];
+      for (var tdr = 0; tdr < rowRange.count; tdr++) {
+        var tdRow = [];
+        for (var tdc = 0; tdc < colRange.count; tdc++)
+          tdRow.push(array.cells[rowRange.start + tdr][colRange.start + tdc]);
+        tdCells.push(tdRow);
+      }
+      pushArray({
+        rows: rowRange.count,
+        cols: colRange.count,
+        cells: tdCells,
+      });
+      return;
+    }
+    if (fname == 'TOCOL' || fname == 'TOROW') {
+      if (foperand.length > 2) {
+        fail();
+        return;
+      }
+      var ignoreMode = 0;
+      if (foperand.length) {
+        var ignoreArg = readInt();
+        if (ignoreArg == null || ignoreArg < 0 || ignoreArg > 3) {
+          fail();
+          return;
+        }
+        ignoreMode = ignoreArg;
+      }
+      var scanByColumn = false;
+      if (foperand.length) {
+        var scanArg = scf.OperandAsNumber(sheet, foperand);
+        if (scanArg.type.charAt(0) != 'n') {
+          fail();
+          return;
+        }
+        scanByColumn = Number(scanArg.value) != 0;
+      }
+      var flat = [];
+      var pushIf = function (cell) {
+        var skipBlank = (ignoreMode == 1 || ignoreMode == 3) && cell.type == 'b';
+        var skipError = (ignoreMode == 2 || ignoreMode == 3) && cell.type.charAt(0) == 'e';
+        if (!skipBlank && !skipError) flat.push(cell);
+      };
+      if (scanByColumn) {
+        for (var tcc = 0; tcc < array.cols; tcc++)
+          for (var tcr = 0; tcr < array.rows; tcr++) pushIf(array.cells[tcr][tcc]);
+      } else {
+        for (var trr = 0; trr < array.rows; trr++)
+          for (var trc = 0; trc < array.cols; trc++) pushIf(array.cells[trr][trc]);
+      }
+      if (fname == 'TOCOL')
+        pushArray({
+          rows: flat.length,
+          cols: 1,
+          cells: flat.map((c) => [c]),
+        });
+      else
+        pushArray({
+          rows: 1,
+          cols: flat.length,
+          cells: [flat],
+        });
+      return;
+    }
+    if (fname == 'WRAPROWS' || fname == 'WRAPCOLS') {
+      if (array.rows != 1 && array.cols != 1) {
+        fail();
+        return;
+      }
+      if (foperand.length < 1 || foperand.length > 2) {
+        fail();
+        return;
+      }
+      var wrapCount = readInt();
+      if (wrapCount == null || wrapCount <= 0) {
+        fail();
+        return;
+      }
+      var wrapPad = DEFAULT_PAD_CELL;
+      if (foperand.length) {
+        var padSource = scf.TopOfStackValueAndType(sheet, foperand);
+        wrapPad = ResolveScalarCell(sheet, padSource);
+      }
+      var wrapFlat = [];
+      if (array.rows == 1)
+        for (var wfc = 0; wfc < array.cols; wfc++) wrapFlat.push(array.cells[0][wfc]);
+      else for (var wfr = 0; wfr < array.rows; wfr++) wrapFlat.push(array.cells[wfr][0]);
+      var wrapByRows = fname == 'WRAPROWS';
+      var wrapPrimary = Math.ceil(wrapFlat.length / wrapCount);
+      if (
+        !WithinSpillBudget(
+          wrapByRows ? wrapPrimary : wrapCount,
+          wrapByRows ? wrapCount : wrapPrimary,
+        )
+      ) {
+        fail('e#NUM!');
+        return;
+      }
+      var wrapCells = [];
+      if (wrapByRows) {
+        for (var wr = 0; wr < wrapPrimary; wr++) {
+          var wRow = [];
+          for (var wc = 0; wc < wrapCount; wc++) {
+            var flatIdx = wr * wrapCount + wc;
+            wRow.push(flatIdx < wrapFlat.length ? wrapFlat[flatIdx] : wrapPad);
+          }
+          wrapCells.push(wRow);
+        }
+        pushArray({
+          rows: wrapPrimary,
+          cols: wrapCount,
+          cells: wrapCells,
+        });
+      } else {
+        for (var wr2 = 0; wr2 < wrapCount; wr2++) wrapCells.push([]);
+        for (var wc2 = 0; wc2 < wrapPrimary; wc2++)
+          for (var wr3 = 0; wr3 < wrapCount; wr3++) {
+            var flatIdx2 = wc2 * wrapCount + wr3;
+            wrapCells[wr3].push(flatIdx2 < wrapFlat.length ? wrapFlat[flatIdx2] : wrapPad);
+          }
+        pushArray({
+          rows: wrapCount,
+          cols: wrapPrimary,
+          cells: wrapCells,
+        });
+      }
+      return;
+    }
+    if (fname == 'EXPAND') {
+      if (foperand.length < 1 || foperand.length > 3) {
+        fail();
+        return;
+      }
+      var expRows = readInt();
+      if (expRows == null || expRows < array.rows) {
+        fail();
+        return;
+      }
+      var expCols = array.cols;
+      if (foperand.length) {
+        var expColsArg = readInt();
+        if (expColsArg == null || expColsArg < array.cols) {
+          fail();
+          return;
+        }
+        expCols = expColsArg;
+      }
+      var expPad = DEFAULT_PAD_CELL;
+      if (foperand.length) {
+        var expPadSource = scf.TopOfStackValueAndType(sheet, foperand);
+        expPad = ResolveScalarCell(sheet, expPadSource);
+      }
+      if (!WithinSpillBudget(expRows, expCols)) {
+        fail('e#NUM!');
+        return;
+      }
+      var expCells = [];
+      for (var er = 0; er < expRows; er++) {
+        var eRow = [];
+        for (var ec = 0; ec < expCols; ec++)
+          eRow.push(er < array.rows && ec < array.cols ? array.cells[er][ec] : expPad);
+        expCells.push(eRow);
+      }
+      pushArray({
+        rows: expRows,
+        cols: expCols,
+        cells: expCells,
+      });
+      return;
+    }
+    if (fname == 'HSTACK' || fname == 'VSTACK') {
+      var stackArrays = [];
+      while (foperand.length) {
+        var stackSource = scf.TopOfStackValueAndType(sheet, foperand);
+        stackArrays.unshift(ArrayOrScalar(sheet, stackSource));
+      }
+      stackArrays.unshift(array);
+      var isH = fname == 'HSTACK';
+      var stackRows = isH
+        ? Math.max.apply(
+            null,
+            stackArrays.map((a) => a.rows),
+          )
+        : 0;
+      var stackCols = isH
+        ? 0
+        : Math.max.apply(
+            null,
+            stackArrays.map((a) => a.cols),
+          );
+      for (var sa = 0; sa < stackArrays.length; sa++) {
+        if (isH) stackCols += stackArrays[sa].cols;
+        else stackRows += stackArrays[sa].rows;
+      }
+      if (!WithinSpillBudget(stackRows, stackCols)) {
+        fail('e#NUM!');
+        return;
+      }
+      var stackCells = [];
+      for (var str = 0; str < stackRows; str++) stackCells.push([]);
+      if (isH) {
+        for (var hr = 0; hr < stackRows; hr++) {
+          for (var hi = 0; hi < stackArrays.length; hi++) {
+            var ha = stackArrays[hi];
+            for (var hc = 0; hc < ha.cols; hc++)
+              stackCells[hr].push(hr < ha.rows ? ha.cells[hr][hc] : DEFAULT_PAD_CELL);
+          }
+        }
+      } else {
+        var vrOffset = 0;
+        for (var vi = 0; vi < stackArrays.length; vi++) {
+          var va = stackArrays[vi];
+          for (var vr = 0; vr < va.rows; vr++) {
+            for (var vc = 0; vc < stackCols; vc++)
+              stackCells[vrOffset + vr].push(vc < va.cols ? va.cells[vr][vc] : DEFAULT_PAD_CELL);
+          }
+          vrOffset += va.rows;
+        }
+      }
+      pushArray({
+        rows: stackRows,
+        cols: stackCols,
+        cells: stackCells,
+      });
+      return;
+    }
+    fail();
+  };
+  function SelectExtent(extent, count, isTake) {
+    if (isTake) {
+      if (count == 0) return null;
+      var n = Math.min(Math.abs(count), extent);
+      return count > 0
+        ? {
+            start: 0,
+            count: n,
+          }
+        : {
+            start: extent - n,
+            count: n,
+          };
+    }
+    var drop = Math.min(Math.abs(count), extent);
+    if (drop >= extent) return null;
+    var remaining = extent - drop;
+    return count >= 0
+      ? {
+          start: drop,
+          count: remaining,
+        }
+      : {
+          start: 0,
+          count: remaining,
+        };
+  }
+  FormulaMut.FunctionList['FILTER'] = [
+    FormulaMut.ArrayShapeFunctions,
+    -2,
+    'filter',
+    null,
+    'lookup',
+  ];
+  FormulaMut.FunctionList['SEQUENCE'] = [
+    FormulaMut.ArrayShapeFunctions,
+    -1,
+    'sequence',
+    null,
+    'math',
+  ];
+  FormulaMut.FunctionList['TRANSPOSE'] = [
+    FormulaMut.ArrayShapeFunctions,
+    1,
+    'range',
+    null,
+    'lookup',
+  ];
+  FormulaMut.FunctionList['SORTBY'] = [
+    FormulaMut.ArrayShapeFunctions,
+    -2,
+    'sortby',
+    null,
+    'lookup',
+  ];
+  FormulaMut.FunctionList['CHOOSECOLS'] = [
+    FormulaMut.ArrayShapeFunctions,
+    -2,
+    'choosecols',
+    null,
+    'lookup',
+  ];
+  FormulaMut.FunctionList['CHOOSEROWS'] = [
+    FormulaMut.ArrayShapeFunctions,
+    -2,
+    'chooserows',
+    null,
+    'lookup',
+  ];
+  FormulaMut.FunctionList['TAKE'] = [FormulaMut.ArrayShapeFunctions, -2, 'take', null, 'lookup'];
+  FormulaMut.FunctionList['DROP'] = [FormulaMut.ArrayShapeFunctions, -2, 'drop', null, 'lookup'];
+  FormulaMut.FunctionList['HSTACK'] = [
+    FormulaMut.ArrayShapeFunctions,
+    -1,
+    'hstack',
+    null,
+    'lookup',
+  ];
+  FormulaMut.FunctionList['VSTACK'] = [
+    FormulaMut.ArrayShapeFunctions,
+    -1,
+    'vstack',
+    null,
+    'lookup',
+  ];
+  FormulaMut.FunctionList['TOCOL'] = [FormulaMut.ArrayShapeFunctions, -1, 'tocol', null, 'lookup'];
+  FormulaMut.FunctionList['TOROW'] = [FormulaMut.ArrayShapeFunctions, -1, 'torow', null, 'lookup'];
+  FormulaMut.FunctionList['WRAPROWS'] = [
+    FormulaMut.ArrayShapeFunctions,
+    -2,
+    'wraprows',
+    null,
+    'lookup',
+  ];
+  FormulaMut.FunctionList['WRAPCOLS'] = [
+    FormulaMut.ArrayShapeFunctions,
+    -2,
+    'wrapcols',
+    null,
+    'lookup',
+  ];
+  FormulaMut.FunctionList['EXPAND'] = [
+    FormulaMut.ArrayShapeFunctions,
+    -2,
+    'expand',
+    null,
+    'lookup',
   ];
 
   // Pure formula parse / token / type helpers.

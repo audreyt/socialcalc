@@ -401,8 +401,8 @@ shipping bundle.
 - `lemma/spill.ts`: dynamic-array spill runtime pure policies — rectangle
   planning (shape/bounds/resource-limit precedence), transactional claim
   classification (reclaimable vs. collision), resize membership
-  (retained/grown/stale/outside), stable UNIQUE keep policy, and stable SORT
-  tie-break policy — 15 Dafny VCs;
+  (retained/grown/stale/outside), stable UNIQUE keep policy, stable SORT
+  tie-break policy, and FILTER keep/error/fallback policy — 17 Dafny VCs;
 - `lemma/weekday-policy.ts`: WORKDAY/WORKDAY.INTL/NETWORKDAYS/
   NETWORKDAYS.INTL weekend-code/mask policy — numeric weekend-code legality
   and decode to a Mon..Sun mask, weekend-mask legality (rejects the
@@ -434,7 +434,7 @@ shipping bundle.
   duplicate/unique predicates, stop-if-true evaluation, and style-field
   merge policy — 8 Dafny VCs.
 
-Total: **125 VCs (36 + 5 + 3 + 15 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2 + 8)**.
+Total: **127 VCs (36 + 5 + 3 + 17 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2 + 8)**.
 
 After a facade edit:
 
@@ -468,10 +468,16 @@ Facade oracle mapping:
   runtime tests;
 - spill: shipping `Formula.PlanSpillStatus`, `Formula.ClassifySpillClaim`,
   `Formula.ClassifyResizeMembership`, `Formula.KeepUniqueItem`,
-  `Formula.StableTieCompare`, and the `Formula.SPILL_MAX_COL`/
+  `Formula.StableTieCompare`, `Formula.ClassifyFilterMask`,
+  `Formula.ClassifyFilterResult`, and the `Formula.SPILL_MAX_COL`/
   `SPILL_MAX_ROW`/`SPILL_MAX_CELLS` constants. `test/lemma-spill-facade.test.ts`
   cross-checks every function against its shipping counterpart exhaustively
-  and at boundary cases, plus a live `SORT()`/`UNIQUE()` formula smoke test;
+  and at boundary cases, plus live `SORT()`/`UNIQUE()`/`FILTER()` formula
+  smoke tests. `SEQUENCE`, `TRANSPOSE`, `SORTBY`, and the array-reshape
+  family (`CHOOSECOLS`/`CHOOSEROWS`/`TAKE`/`DROP`/`HSTACK`/`VSTACK`/
+  `TOCOL`/`TOROW`/`WRAPROWS`/`WRAPCOLS`/`EXPAND`) reuse this facade's
+  shape/order policies (`PlanSpillStatus`, `StableTieCompare` via
+  `CompareTypedCells`) without introducing new proof-bearing policies;
 - weekday policy: shipping `Formula.DecodeWeekendArgument` (exhaustive over
   every legal numeric weekend code) plus a live `WORKDAY.INTL()` formula
   smoke test asserting the shipping evaluator never lands on a day the

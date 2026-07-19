@@ -202,19 +202,22 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
   // popup — the second-largest StringLiteral survivor cluster in the file.
   //
   // RANK/MEDIAN/QUARTILE (audreyt/ethercalc#712, #726), SORT/UNIQUE (dynamic-
-  // array spill), date arithmetic, financial, logical/error, text, regex,
-  // math/statistics, SUBTOTAL, lookup, INDIRECT/OFFSET (dynamic references),
-  // and ROW/COLUMN/ADDRESS/ISFORMULA/ISREF/ERROR.TYPE/TYPE/HYPERLINK/IMAGE/
-  // TEXT (reference/information/render functions) were all added after the
-  // 3.0.8 baseline was vendored, so the oracle bundle can never contain their
-  // s_fdef_/s_farg_ keys — a byte-for-byte toEqual against the full candidate
-  // object would fail permanently on these keys alone, regardless of
-  // correctness. Carve out exactly this named, closed set (49 s_fdef_ + 41
-  // s_farg_) before the oracle comparison; every other key still gets
-  // whole-object byte-for-byte parity, and the total counts (115/38) stay
-  // pinned so a future undocumented addition or removal still fails loudly
-  // instead of silently passing through this carve-out. SEARCH reuses FIND's
-  // s_farg_find definition.
+  // array spill), FILTER/SEQUENCE/TRANSPOSE/SORTBY/CHOOSECOLS/CHOOSEROWS/
+  // TAKE/DROP/HSTACK/VSTACK/TOCOL/TOROW/WRAPROWS/WRAPCOLS/EXPAND (dynamic-
+  // array function family 2), date arithmetic, financial, logical/error,
+  // text, regex, math/statistics, SUBTOTAL, lookup, INDIRECT/OFFSET
+  // (dynamic references), and ROW/COLUMN/ADDRESS/ISFORMULA/ISREF/
+  // ERROR.TYPE/TYPE/HYPERLINK/IMAGE/TEXT (reference/information/render
+  // functions) were all added after the 3.0.8 baseline was vendored, so the
+  // oracle bundle can never contain their s_fdef_/s_farg_ keys — a
+  // byte-for-byte toEqual against the full candidate object would fail
+  // permanently on these keys alone, regardless of correctness. Carve out
+  // exactly this named, closed set (64 s_fdef_ + 55 s_farg_) before the
+  // oracle comparison; every other key still gets whole-object byte-for-byte
+  // parity, and the total counts (115/38) stay pinned so a future
+  // undocumented addition or removal still fails loudly instead of silently
+  // passing through this carve-out. SEARCH reuses FIND's s_farg_find
+  // definition.
   const postOracleFdefKeys = [
     "s_fdef_RANK",
     "s_fdef_MEDIAN",
@@ -265,6 +268,21 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
     "s_fdef_ROW",
     "s_fdef_TEXT",
     "s_fdef_TYPE",
+    "s_fdef_FILTER",
+    "s_fdef_SEQUENCE",
+    "s_fdef_TRANSPOSE",
+    "s_fdef_SORTBY",
+    "s_fdef_CHOOSECOLS",
+    "s_fdef_CHOOSEROWS",
+    "s_fdef_TAKE",
+    "s_fdef_DROP",
+    "s_fdef_HSTACK",
+    "s_fdef_VSTACK",
+    "s_fdef_TOCOL",
+    "s_fdef_TOROW",
+    "s_fdef_WRAPROWS",
+    "s_fdef_WRAPCOLS",
+    "s_fdef_EXPAND",
   ];
   const postOracleFargKeys = [
     "s_farg_rank",
@@ -308,10 +326,24 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
     "s_farg_image",
     "s_farg_refopt",
     "s_farg_text",
+    "s_farg_filter",
+    "s_farg_sequence",
+    "s_farg_sortby",
+    "s_farg_choosecols",
+    "s_farg_chooserows",
+    "s_farg_take",
+    "s_farg_drop",
+    "s_farg_hstack",
+    "s_farg_vstack",
+    "s_farg_tocol",
+    "s_farg_torow",
+    "s_farg_wraprows",
+    "s_farg_wrapcols",
+    "s_farg_expand",
   ];
 
-  expect(Object.keys(candidateFdef).length).toBe(164);
-  expect(Object.keys(candidateFarg).length).toBe(79);
+  expect(Object.keys(candidateFdef).length).toBe(179);
+  expect(Object.keys(candidateFarg).length).toBe(93);
 
   const legacyFdef = { ...candidateFdef };
   const legacyFarg = { ...candidateFarg };

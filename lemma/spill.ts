@@ -2,11 +2,13 @@
  * LemmaScript facade: pure policies underlying the dynamic-array spill runtime.
  * Non-shipping mirror of pure decision cores identified by the spill-runtime
  * design (rectangle planning, claim/collision classification, resize
- * membership, UNIQUE keep policy, and SORT tie-break stability).
+ * membership, UNIQUE keep policy, SORT tie-break stability, and FILTER
+ * keep/error/fallback policy).
  *
- * The shipping runtime for SORT()/UNIQUE()/spill now exposes matching pure
- * helpers on `SocialCalc.Formula`: `PlanSpillStatus`, `ClassifySpillClaim`,
- * `ClassifyResizeMembership`, `KeepUniqueItem`, `StableTieCompare`, and the
+ * The shipping runtime for SORT()/UNIQUE()/FILTER()/spill exposes matching
+ * pure helpers on `SocialCalc.Formula`: `PlanSpillStatus`, `ClassifySpillClaim`,
+ * `ClassifyResizeMembership`, `KeepUniqueItem`, `StableTieCompare`,
+ * `ClassifyFilterMask`, `ClassifyFilterResult`, and the
  * `SPILL_MAX_COL`/`SPILL_MAX_ROW`/`SPILL_MAX_CELLS` constants. This file was
  * authored before those existed, so it is deliberately built from named,
  * caller-supplied pure predicates (not raw sheet scanning) — that shape
@@ -17,7 +19,13 @@
  * (`SPILL_MAX_COL`/`SPILL_MAX_ROW`) mirror the shipping constants; the
  * verified planners themselves take every bound as a parameter rather than
  * reading a module global, so the facade produces byte-identical decisions
- * to the shipping helper when fed the same bounds/flags.
+ * to the shipping helper when fed the same bounds/flags. SEQUENCE, TRANSPOSE,
+ * SORTBY, and the array-reshape family (CHOOSECOLS/CHOOSEROWS/TAKE/DROP/
+ * HSTACK/VSTACK/TOCOL/TOROW/WRAPROWS/WRAPCOLS/EXPAND) reuse the same
+ * PlanSpillStatus/StableTieCompare/CompareTypedCells shape-and-order
+ * policies verified here and in lemma/a1.ts; only FILTER's
+ * keep/error/fallback decision is a genuinely new pure policy, so it is the
+ * only addition to this facade.
  *
  * Policy groups (mirrors AGENTS.md "Facade oracle mapping" style):
  * 1. spill rectangle planning — shape/bounds/resource-limit precedence.
@@ -25,6 +33,8 @@
  * 3. resize membership classification — retained/grown/stale/outside.
  * 4. stable UNIQUE keep policy — first-occurrence / exactly-once.
  * 5. stable SORT tie policy — nonzero comparator wins, ties keep index order.
+ * 6. FILTER keep/error/fallback policy — error propagation precedence,
+ *    then keep-if-truthy, then empty-result if_empty/#CALC! fallback.
  */
 
 /** SocialCalc max column ZZ = 702 (mirrors lemma/a1.ts MAX_COL). */
@@ -351,4 +361,56 @@ export function stableCompare(comparatorResult: number, indexA: number, indexB: 
   if (indexA < indexB) return -1;
   if (indexA > indexB) return 1;
   return 0;
+}
+
+// --- 6. FILTER keep/error/fallback policy ------------------------------------
+
+/** Keep the item (include truthy, not an error). */
+export const FILTER_KEEP = 0;
+/** Drop the item (include falsy, not an error). */
+export const FILTER_DROP = 1;
+/** Include value is itself an error (or non-Boolean-coercible) -- propagate. */
+export const FILTER_ERROR = 2;
+
+/**
+ * Classify one FILTER mask element: an error (or non-coercible) include
+ * value always propagates regardless of truthiness; otherwise keep iff
+ * truthy. Mirrors the shipping `SocialCalc.Formula.ClassifyFilterMask`,
+ * which folds "cannot convert to Boolean" into the same isError input this
+ * facade takes (see `test/lemma-spill-facade.test.ts` oracle cross-check).
+ */
+export function classifyFilterMask(isError: boolean, isTruthy: boolean): number {
+  //@ verify
+  //@ ensures \result === 0 || \result === 1 || \result === 2
+  //@ ensures isError === true ==> \result === 2
+  //@ ensures isError === false && isTruthy === true ==> \result === 0
+  //@ ensures isError === false && isTruthy === false ==> \result === 1
+  if (isError === true) return 2;
+  if (isTruthy === true) return 0;
+  return 1;
+}
+
+/** Nonempty kept rows/columns are returned as-is. */
+export const FILTER_RESULT_KEPT = 0;
+/** Nothing matched but if_empty was supplied -- return if_empty. */
+export const FILTER_RESULT_IF_EMPTY = 1;
+/** Nothing matched and if_empty was omitted -- #CALC! (Excel has no empty
+ * array literal). */
+export const FILTER_RESULT_CALC_ERROR = 2;
+
+/**
+ * Classify FILTER's overall result once every mask element has been
+ * classified: any kept item wins over the empty-result fallback; an empty
+ * result defers to if_empty when supplied, else signals #CALC!. Mirrors the
+ * shipping `SocialCalc.Formula.ClassifyFilterResult`.
+ */
+export function classifyFilterResult(keptCount: number, hasIfEmpty: boolean): number {
+  //@ verify
+  //@ ensures \result === 0 || \result === 1 || \result === 2
+  //@ ensures keptCount > 0 ==> \result === 0
+  //@ ensures keptCount <= 0 && hasIfEmpty === true ==> \result === 1
+  //@ ensures keptCount <= 0 && hasIfEmpty === false ==> \result === 2
+  if (keptCount > 0) return 0;
+  if (hasIfEmpty === true) return 1;
+  return 2;
 }

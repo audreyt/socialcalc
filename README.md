@@ -66,6 +66,36 @@ of commands. The supported formulas are:
   Omitted column and direction default to the first column ascending; negative
   directions sort descending.
 - `UNIQUE(range_or_array, [by_column], [exactly_once])`
+- `FILTER(array, include, [if_empty])` `include`'s height or width must match
+  `array`; a nonzero/error `include` element keeps/propagates, a zero or
+  blank element drops. An empty result returns `if_empty`, or `#CALC!` if
+  `if_empty` was omitted.
+- `SEQUENCE(rows, [columns], [start], [step])` `columns`/`start`/`step`
+  default to 1; `rows`/`columns` must be positive integers.
+- `TRANSPOSE(array)`
+- `SORTBY(array, by_array1, [sort_order1], [by_array2, sort_order2, ...])`
+  Each `by_array` must match `array`'s row or column count (all key pairs
+  share one orientation); omitted `sort_order` defaults to ascending (`1`),
+  `-1` descends, and ties preserve source order.
+- `CHOOSECOLS(array, col_num1, [col_num2, ...])` /
+  `CHOOSEROWS(array, row_num1, [row_num2, ...])` Negative indices count from
+  the end; `0` or an out-of-range index is `#VALUE!`.
+- `TAKE(array, rows, [columns])` / `DROP(array, rows, [columns])` Negative
+  counts operate from the end. `TAKE` clamps to the available extent; `DROP`
+  returns `#CALC!` if it would remove every row/column on an axis.
+- `HSTACK(array1, [array2, ...])` / `VSTACK(array1, [array2, ...])` Pads
+  shorter columns/rows with `#N/A`; bare scalars are accepted alongside
+  ranges.
+- `TOCOL(array, [ignore], [scan_by_column])` /
+  `TOROW(array, [ignore], [scan_by_column])` `ignore` is `0` (keep all),
+  `1` (skip blanks), `2` (skip errors), or `3` (skip both); `scan_by_column`
+  reads column-first when true.
+- `WRAPROWS(vector, wrap_count, [pad_with])` /
+  `WRAPCOLS(vector, wrap_count, [pad_with])` `vector` must be a single row
+  or column; the final wrap is padded with `pad_with` (default `#N/A`).
+- `EXPAND(array, rows, [columns], [pad_with])` `rows`/`columns` must each be
+  at least `array`'s corresponding extent; new cells are padded with
+  `pad_with` (default `#N/A`).
 
 Each result spills from its anchor. A collision with a non-empty, merged, or
 user-owned cell returns `#SPILL!` and preserves the blocking cells. Spills are

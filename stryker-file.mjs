@@ -71,6 +71,11 @@ const sheetCoreTests = [
 // formula-dynamic-reference.test.ts drives INDIRECT/OFFSET through
 // evaluate_parsed_formula and full scheduleCommands/recalcSheet cycles,
 // exercising formula-ref.ts OffsetRectangle and coordinate overflow paths.
+// formula-dynamic-arrays.test.ts/formula-array-family2*.test.ts/
+// lemma-spill-facade.test.ts/dynamic-array-spill-*.test.ts cover
+// SORT/UNIQUE/FILTER/SEQUENCE/TRANSPOSE/SORTBY/CHOOSECOLS/CHOOSEROWS/TAKE/
+// DROP/HSTACK/VSTACK/TOCOL/TOROW/WRAPROWS/WRAPCOLS/EXPAND and the shared
+// spill layer (basic/commands/editor/persistence/family2 scenarios).
 const formulaOnlyTests = [
   "test/formula-coverage.test.ts",
   "test/formula.test.ts",
@@ -88,6 +93,15 @@ const formulaOnlyTests = [
   "test/formula-date-arithmetic.test.ts",
   "test/lemma-weekday-policy-facade.test.ts",
   "test/formula-dynamic-reference.test.ts",
+  "test/formula-dynamic-arrays.test.ts",
+  "test/formula-array-family2.test.ts",
+  "test/formula-array-family2-coverage.test.ts",
+  "test/lemma-spill-facade.test.ts",
+  "test/dynamic-array-spill-basic.test.ts",
+  "test/dynamic-array-spill-commands.test.ts",
+  "test/dynamic-array-spill-editor.test.ts",
+  "test/dynamic-array-spill-persistence.test.ts",
+  "test/dynamic-array-spill-family2.test.ts",
 ];
 
 // Differential/adversarial corpus (test/differential/**, test/adversarial/**):
@@ -244,6 +258,11 @@ export const testsByFile = {
     "test/lemma-protect-facade.test.ts",
     "test/conditional-formatting.test.ts",
     "test/lemma-condfmt-facade.test.ts",
+    "test/dynamic-array-spill-basic.test.ts",
+    "test/dynamic-array-spill-commands.test.ts",
+    "test/dynamic-array-spill-editor.test.ts",
+    "test/dynamic-array-spill-persistence.test.ts",
+    "test/dynamic-array-spill-family2.test.ts",
   ],
 
   "socialcalctableeditor.ts": editorTests,
