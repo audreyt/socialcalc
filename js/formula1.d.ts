@@ -423,6 +423,15 @@ declare namespace SocialCalc {
       rangeType?: string,
     ): FormulaDecodedRange | null;
 
+    /**
+     * Resolve one *IFS-family criteria/aggregate operand (coord or range) to
+     * a decoded rectangle; a coord is treated as a 1x1 range.
+     */
+    function DecodeIfsRangeOperand(
+      sheet: Sheet,
+      operand: FormulaValueResult,
+    ): FormulaDecodedRange | null;
+
     // --------------------------------------------------------------
     // I/O event / form utilities (eddy extensions)
     // --------------------------------------------------------------
@@ -555,6 +564,7 @@ declare namespace SocialCalc {
     const SumifsFunction: FormulaFunctionImpl;
     const SubtotalFunction: FormulaFunctionImpl;
     const SubtotalFunctionCodes: { [code: number]: [string, boolean] };
+    const CriteriaAggregateFunctions: FormulaFunctionImpl;
     const IfFunction: FormulaFunctionImpl;
     const DateFunction: FormulaFunctionImpl;
     const TimeFunction: FormulaFunctionImpl;

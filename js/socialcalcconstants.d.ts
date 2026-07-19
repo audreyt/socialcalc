@@ -464,6 +464,8 @@ declare namespace SocialCalc {
     s_fdef_ATAN2: string;
     s_fdef_AVERAGE: string;
     s_fdef_ADDRESS: string;
+    s_fdef_AVERAGEIF: string;
+    s_fdef_AVERAGEIFS: string;
     s_fdef_CHOOSE: string;
     s_fdef_COLUMN: string;
     s_fdef_COLUMNS: string;
@@ -474,6 +476,7 @@ declare namespace SocialCalc {
     s_fdef_COUNTA: string;
     s_fdef_COUNTBLANK: string;
     s_fdef_COUNTIF: string;
+    s_fdef_COUNTIFS: string;
     s_fdef_DATE: string;
     s_fdef_DAVERAGE: string;
     s_fdef_DAY: string;
@@ -529,8 +532,10 @@ declare namespace SocialCalc {
     s_fdef_LOWER: string;
     s_fdef_MATCH: string;
     s_fdef_MAX: string;
+    s_fdef_MAXIFS: string;
     s_fdef_MID: string;
     s_fdef_MIN: string;
+    s_fdef_MINIFS: string;
     s_fdef_MINUTE: string;
     s_fdef_MEDIAN: string;
     s_fdef_MOD: string;

@@ -744,6 +744,10 @@ ConstantsRoot.Constants = {
     "Applies lambda to each row of array (as a 1-row array) and returns a single column of per-row results. ",
   s_farg_bycol: "array, lambda",
   s_farg_byrow: "array, lambda",
+  s_fdef_AVERAGEIF:
+    'Averages the numeric values of cells in the range that meet the criteria. The criteria may be a value ("x", 15, 1+3) or a test (>25). If average_range is present, then range is tested and the corresponding average_range value is averaged. ',
+  s_fdef_AVERAGEIFS:
+    'Averages the numeric values of cells in the average_range that meet the multiple criteria. The criteria may be a value ("x", 15, 1+3) or a test (>25). ',
   s_fdef_CHOOSE: "Returns the value specified by the index. The values may be ranges of cells. ",
   s_fdef_COLUMN:
     "Returns the column number of the given reference (or of the cell containing the formula if reference is omitted). ",
@@ -756,6 +760,8 @@ ConstantsRoot.Constants = {
   s_fdef_COUNTBLANK: 'Counts the number of blank values. (Note: "" is not blank.) ',
   s_fdef_COUNTIF:
     'Counts the number of number of cells in the range that meet the criteria. The criteria may be a value ("x", 15, 1+3) or a test (>25). ',
+  s_fdef_COUNTIFS:
+    'Counts the number of cells that meet multiple criteria, one per criteria_range. The criteria may be a value ("x", 15, 1+3) or a test (>25). ',
   s_fdef_DATE:
     'Returns the appropriate date value given numbers for year, month, and day. For example: DATE(2006,2,1) for February 1, 2006. Note: In this program, day "1" is December 31, 1899 and the year 1900 is not a leap year. Some programs use January 1, 1900, as day "1" and treat 1900 as a leap year. In both cases, though, dates on or after March 1, 1900, are the same. ',
   s_fdef_DAVERAGE: "Averages the values in the specified field in records that meet the criteria. ",
@@ -848,9 +854,13 @@ ConstantsRoot.Constants = {
   s_fdef_MATCH:
     "Look for the matching value for the given value in the range and return position (the first is 1) in that range. If rangelookup is 1 (the default) and not 0, match if within numeric brackets (match<=value) instead of exact match. If rangelookup is -1, act like 1 but the bracket is match>=value. ",
   s_fdef_MAX: "Returns the maximum of the numeric values. ",
+  s_fdef_MAXIFS:
+    'Returns the maximum of the numeric values of cells in the max_range that meet the multiple criteria. The criteria may be a value ("x", 15, 1+3) or a test (>25). ',
   s_fdef_MID:
     "Returns the specified number of characters from the text value starting from the specified position. ",
   s_fdef_MIN: "Returns the minimum of the numeric values. ",
+  s_fdef_MINIFS:
+    'Returns the minimum of the numeric values of cells in the min_range that meet the multiple criteria. The criteria may be a value ("x", 15, 1+3) or a test (>25). ',
   s_fdef_MINUTE: "Returns the minute portion of a time or date/time value. ",
   s_fdef_MEDIAN:
     "Returns the median (middle value) of the numeric values. If there is an even count, averages the two middle values. ",

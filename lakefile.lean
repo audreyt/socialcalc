@@ -120,4 +120,7 @@ lean_lib Validation where
 lean_lib LambdaScope where
   srcDir := "lemma"
   roots := #[`«lambda-scope.types», `«lambda-scope.def», `«lambda-scope.proof»]
+lean_lib Criteria where
+  srcDir := "lemma"
+  roots := #[`«criteria.types», `«criteria.def», `«criteria.proof»]
   extraDepTargets := #[``downloadDependencies]

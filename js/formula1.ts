@@ -5310,8 +5310,6 @@ FormulaMut.SubtotalFunction = function (fname, operand, foperand, sheet) {
     }
   }
 
-  resulttypesum = resulttypesum || "n";
-
   switch (aggregateKind) {
     case "SUM":
       PushOperand(resulttypesum, sum);
@@ -5375,6 +5373,247 @@ SocialCalc.Formula.FunctionList["SUBTOTAL"] = [
   SocialCalc.Formula.SubtotalFunction,
   -2,
   "function_code, ref1, [ref2, ...]",
+  "",
+  "math",
+];
+
+/*
+#
+# COUNTIFS(criteria_range1, criteria1, [criteria_range2, criteria2, ...])
+# AVERAGEIF(range, criteria, [average_range])
+# AVERAGEIFS(average_range, criteria_range1, criteria1, [criteria_range2, criteria2, ...])
+# MAXIFS(max_range, criteria_range1, criteria1, [criteria_range2, criteria2, ...])
+# MINIFS(min_range, criteria_range1, criteria1, [criteria_range2, criteria2, ...])
+#
+# Shared "*IFS"-family core: unlike SUMIF/SUMIFS/COUNTIF above (which walk
+# every range in lockstep via the operand-stack StepThroughRangeDown
+# machinery and never validate size/shape — kept exactly as-is so the
+# pinned oracle-3.0.8 differential stays byte-for-byte), these five newer
+# functions follow Excel/Sheets' documented contract: every criteria_range
+# (and the aggregate range) must have the SAME size and shape, or the whole
+# call is #VALUE!. That is straightforward to check up front with
+# DecodeRangeParts (ncols/nrows), so it is — one boring shared walker
+# instead of five near-duplicate copies.
+#
+*/
+
+/**
+ * Resolve one *IFS-family range/coord operand to a decoded rectangle.
+ * A bare coord is a 1x1 rectangle (DecodeRangeParts only accepts the
+ * two-corner "|" stack form, so a coord is turned into coord|coord|).
+ * Returns null (caller pushes #REF!) only when DecodeRangeParts itself
+ * fails (e.g. cross-sheet lookup miss); shape mismatches are handled by
+ * the caller comparing ncols/nrows across operands.
+ */
+FormulaMut.DecodeIfsRangeOperand = function (sheet, operand) {
+  var scf = SocialCalc.Formula;
+  if (operand.type == "coord") {
+    var plain = scf.PlainCoord(operand.value as string);
+    return scf.DecodeRangeParts(sheet, plain + "|" + plain + "|");
+  }
+  return scf.DecodeRangeParts(sheet, operand.value as string);
+};
+
+/**
+ * COUNTIFS / AVERAGEIF / AVERAGEIFS / MAXIFS / MINIFS.
+ *
+ * Argument shapes (all resolved via TopOfStackValueAndType, call order):
+ *   COUNTIFS(criteria_range1, criteria1, [criteria_range2, criteria2, ...])
+ *   AVERAGEIF(range, criteria, [average_range])
+ *   AVERAGEIFS(average_range, criteria_range1, criteria1, [..., ...])
+ *   MAXIFS(max_range, criteria_range1, criteria1, [..., ...])
+ *   MINIFS(min_range, criteria_range1, criteria1, [..., ...])
+ *
+ * Every criteria_range (and the aggregate range, when present) must decode
+ * to the identical ncols/nrows rectangle; any mismatch (or a non-range/coord
+ * operand) is #VALUE!, matching documented Excel/Sheets behavior.
+ */
+FormulaMut.CriteriaAggregateFunctions = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+  var lookup_result_type = scf.LookupResultType;
+  var typelookupplus = scf.TypeLookupTable.plus;
+
+  var PushOperand = function (t: SocialCalc.FormulaOperandType, v: unknown) {
+    operand.push({ type: t, value: v });
+  };
+
+  // AVERAGEIF is the one member of this family with an *optional* trailing
+  // aggregate range (defaults to the criteria range itself) and exactly one
+  // criteria pair. Handle its distinct arg shape up front, then fall through
+  // to the shared row-walk below with a synthesized aggregate range operand.
+  var aggrange: SocialCalc.FormulaValueResult;
+  var pairRanges: SocialCalc.FormulaValueResult[] = [];
+  var pairCriteria: SocialCalc.FormulaValueResult[] = [];
+
+  if (fname == "AVERAGEIF") {
+    var ifRange = scf.TopOfStackValueAndType(sheet, foperand);
+    var ifCriteria = scf.OperandAsText(sheet, foperand);
+    if (ifCriteria.type.charAt(0) == "e") ifCriteria.value = null;
+    if (foperand.length) {
+      aggrange = scf.TopOfStackValueAndType(sheet, foperand);
+    } else {
+      aggrange = { value: ifRange.value, type: ifRange.type };
+    }
+    pairRanges.push(ifRange);
+    pairCriteria.push(ifCriteria);
+  } else {
+    // COUNTIFS has no leading aggregate range; AVERAGEIFS/MAXIFS/MINIFS do.
+    if (fname != "COUNTIFS") {
+      aggrange = scf.TopOfStackValueAndType(sheet, foperand);
+    } else {
+      aggrange = { value: "", type: "" }; // unused for COUNTIFS
+    }
+    // Remaining args come in criteria_range/criteria pairs; an odd trailing
+    // range with no criteria (or zero pairs) is a caller arity error.
+    if (foperand.length < 2 || foperand.length % 2 != 0) {
+      scf.FunctionArgsError(fname, operand);
+      return 0;
+    }
+    while (foperand.length) {
+      var prange = scf.TopOfStackValueAndType(sheet, foperand);
+      var pcriteria = scf.OperandAsText(sheet, foperand);
+      if (pcriteria.type.charAt(0) == "e") pcriteria.value = null;
+      pairRanges.push(prange);
+      pairCriteria.push(pcriteria);
+    }
+  }
+
+  // Validate every operand is a coord/range, then decode + confirm
+  // congruent shape against the first decoded rectangle.
+  var shapeRanges = pairRanges.slice();
+  if (fname != "COUNTIFS") shapeRanges.push(aggrange!);
+
+  var decoded: SocialCalc.FormulaDecodedRange[] = [];
+  var wantCols = 0,
+    wantRows = 0;
+  for (var si = 0; si < shapeRanges.length; si++) {
+    var sr = shapeRanges[si]!;
+    if (sr.type != "coord" && sr.type != "range") {
+      scf.FunctionArgsError(fname, operand);
+      return 0;
+    }
+    var di = scf.DecodeIfsRangeOperand(sheet, sr);
+    if (!di) {
+      PushOperand("e#REF!", 0);
+      return;
+    }
+    if (si == 0) {
+      wantCols = di.ncols;
+      wantRows = di.nrows;
+    } else if (di.ncols != wantCols || di.nrows != wantRows) {
+      PushOperand("e#VALUE!", 0);
+      return;
+    }
+    decoded.push(di);
+  }
+  var aggInfo = fname == "COUNTIFS" ? null : decoded[decoded.length - 1]!;
+
+  var count = 0;
+  var numericCount = 0;
+  var sum = 0;
+  var resulttypesum = "";
+  var maxval: number | undefined;
+  var minval: number | undefined;
+
+  for (var c = 0; c < wantCols; c++) {
+    for (var r = 0; r < wantRows; r++) {
+      var rowOk = true;
+      for (var pi = 0; pi < pairRanges.length; pi++) {
+        var pdi = decoded[pi]!;
+        var cellcr = SocialCalc.crToCoord(pdi.col1num + c, pdi.row1num + r);
+        var cell = pdi.sheetdata.GetAssuredCell(cellcr);
+        if (!scf.TestCriteria(cell.datavalue, cell.valuetype || "b", pairCriteria[pi]!.value)) {
+          rowOk = false;
+          break;
+        }
+      }
+      if (!rowOk) continue;
+
+      count += 1;
+      if (fname == "COUNTIFS") continue;
+
+      var aggcr = SocialCalc.crToCoord(aggInfo!.col1num + c, aggInfo!.row1num + r);
+      var aggcell = aggInfo!.sheetdata.GetAssuredCell(aggcr);
+      var avt = aggcell.valuetype || "b";
+      if (avt.charAt(0) == "n") {
+        var v = Number(aggcell.datavalue);
+        numericCount += 1;
+        sum += v;
+        maxval = maxval != undefined ? (v > maxval ? v : maxval) : v;
+        minval = minval != undefined ? (v < minval ? v : minval) : v;
+        resulttypesum = lookup_result_type(avt, resulttypesum || avt, typelookupplus);
+      } else if (avt.charAt(0) == "e" && resulttypesum.charAt(0) != "e") {
+        resulttypesum = avt;
+      }
+    }
+  }
+
+  resulttypesum = resulttypesum || "n";
+
+  switch (fname) {
+    case "COUNTIFS":
+      PushOperand("n", count);
+      return;
+    case "AVERAGEIF":
+    case "AVERAGEIFS":
+      if (resulttypesum.charAt(0) == "e") {
+        PushOperand(resulttypesum, 0);
+      } else if (numericCount > 0) {
+        PushOperand(resulttypesum, sum / numericCount);
+      } else {
+        PushOperand("e#DIV/0!", 0);
+      }
+      return;
+    case "MAXIFS":
+      if (resulttypesum.charAt(0) == "e") {
+        PushOperand(resulttypesum, 0);
+      } else {
+        PushOperand("n", maxval != undefined ? maxval : 0);
+      }
+      return;
+    case "MINIFS":
+      if (resulttypesum.charAt(0) == "e") {
+        PushOperand(resulttypesum, 0);
+      } else {
+        PushOperand("n", minval != undefined ? minval : 0);
+      }
+      return;
+  }
+  return;
+};
+
+SocialCalc.Formula.FunctionList["COUNTIFS"] = [
+  SocialCalc.Formula.CriteriaAggregateFunctions,
+  -2,
+  "criteria_range1, criteria1, [criteria_range2, criteria2, ... criteria_range_n, criteria_n]",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["AVERAGEIF"] = [
+  SocialCalc.Formula.CriteriaAggregateFunctions,
+  -2,
+  "range, criteria, [average_range]",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["AVERAGEIFS"] = [
+  SocialCalc.Formula.CriteriaAggregateFunctions,
+  -3,
+  "average_range, criteria_range1, criteria1, [criteria_range2, criteria2, ... criteria_range_n, criteria_n]",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["MAXIFS"] = [
+  SocialCalc.Formula.CriteriaAggregateFunctions,
+  -3,
+  "max_range, criteria_range1, criteria1, [criteria_range2, criteria2, ... criteria_range_n, criteria_n]",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["MINIFS"] = [
+  SocialCalc.Formula.CriteriaAggregateFunctions,
+  -3,
+  "min_range, criteria_range1, criteria1, [criteria_range2, criteria2, ... criteria_range_n, criteria_n]",
   "",
   "stat",
 ];

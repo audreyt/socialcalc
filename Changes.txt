@@ -226,11 +226,11 @@ Mutation and formal verification
   Missing reports or unmeasured baselines fail the release gate rather than
   receiving placeholder scores. Each baseline also pins the measured
   full-module mutant count so narrowed reports cannot pass as complete evidence.
-- Retained the LemmaScript facades and their shipping-oracle tests:
+- Retained the six LemmaScript facades and their shipping-oracle tests:
   A1/reference algebra (26 Dafny VCs), evaluation operators (4), lookup
-  precedence (3), dynamic-array spill semantics (15), and conditional-
-  formatting rule match/precedence (8), for 56 checked Dafny verification
-  conditions in total.
+  precedence (3), dynamic-array spill semantics (15), conditional-
+  formatting rule match/precedence (8), and criteria aggregation policy
+  (5), for 61 checked Dafny verification conditions in total.
 - Hardened mutation-report identity/status validation and the critical-mutant
   disposition registry; equivalent-mutant claims remain explicit,
   source-specific proofs rather than exclusions.
@@ -308,6 +308,27 @@ Formula functions
   `lemma/xlookup.ts` LemmaScript facade (7 Dafny/Lean VCs: match_mode/
   search_mode legality, binary/wildcard incompatibility, exact-before-
   approximate-before-miss precedence, if_not_found fallback).
+- Added COUNTIFS(criteria_range1,criteria1,...), AVERAGEIF(range,criteria,
+  [average_range]), AVERAGEIFS(average_range,criteria_range1,criteria1,...),
+  MAXIFS(max_range,criteria_range1,criteria1,...), and
+  MINIFS(min_range,criteria_range1,criteria1,...), sharing a new
+  `SocialCalc.Formula.CriteriaAggregateFunctions` core (js/formula1.ts).
+  Unlike the pre-existing COUNTIF/SUMIF/SUMIFS (left untouched, including
+  their lockstep operand-stack range walk with no shape validation, so the
+  pinned oracle-3.0.8 differential stays byte-for-byte), every criteria_range
+  and the aggregate range in this family must decode to the identical
+  ncols/nrows rectangle or the call is #VALUE!, matching documented
+  Excel/Sheets *IFS semantics. AVERAGEIF/AVERAGEIFS average only numeric
+  matched cells (blank/text ignored) and return #DIV/0! when none match;
+  MAXIFS/MINIFS return 0 (not #DIV/0!) when no cells match, per Microsoft's
+  documented example. An error among matched aggregate cells always wins
+  over any numeric result, first-error-first. Cross-sheet ranges and named
+  ranges are supported via the same `DecodeRangeParts`/`LookupName` machinery
+  as the rest of the formula engine. A new `lemma/criteria.ts` LemmaScript
+  facade (5 Dafny VCs) verifies the shared row-eligibility/result-decision
+  policy (COUNTIFS always counts; AVERAGE-family empty-match is DIV0;
+  MAXIFS/MINIFS empty-match is zero; captured error outranks any numeric
+  branch), and registers picker/help text in js/socialcalcconstants.ts.
 
 ==============================================================================
 v3.0.8 — 2026-07-09

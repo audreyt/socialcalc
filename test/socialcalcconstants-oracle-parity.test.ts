@@ -213,13 +213,16 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
   // text, regex, math/statistics, SUBTOTAL, lookup, INDIRECT/OFFSET
   // (dynamic references), ROW/COLUMN/ADDRESS/ISFORMULA/ISREF/
   // ERROR.TYPE/TYPE/HYPERLINK/IMAGE/TEXT (reference/information/render
-  // functions), and MAP/REDUCE/SCAN/BYROW/BYCOL/MAKEARRAY (LET/LAMBDA
-  // lambda-array functions) were all added after the 3.0.8 baseline was
-  // vendored, so the oracle bundle can never contain their s_fdef_/s_farg_
-  // keys — a byte-for-byte toEqual against the full candidate object would
-  // fail permanently on these keys alone, regardless of correctness. Carve
-  // out exactly this named, closed set (70 s_fdef_ + 61 s_farg_) before the
-  // oracle comparison; every other key still gets whole-object byte-for-byte
+  // functions), MAP/REDUCE/SCAN/BYROW/BYCOL/MAKEARRAY (LET/LAMBDA
+  // lambda-array functions), and AVERAGEIF/AVERAGEIFS/COUNTIFS/MAXIFS/
+  // MINIFS (shared criteria-aggregation family; arg strings are inline in
+  // FunctionList, not registry-based, so they add no new s_farg_ keys)
+  // were all added after the 3.0.8 baseline was vendored, so the oracle
+  // bundle can never contain their s_fdef_/s_farg_ keys — a byte-for-byte
+  // toEqual against the full candidate object would fail permanently on
+  // these keys alone, regardless of correctness. Carve out exactly this
+  // named, closed set (75 s_fdef_ + 61 s_farg_) before the oracle
+  // comparison; every other key still gets whole-object byte-for-byte
   // parity, and the total counts (115/38) stay pinned so a future
   // undocumented addition or removal still fails loudly instead of silently
   // passing through this carve-out. SEARCH reuses FIND's s_farg_find
@@ -295,6 +298,11 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
     "s_fdef_BYROW",
     "s_fdef_BYCOL",
     "s_fdef_MAKEARRAY",
+    "s_fdef_AVERAGEIF",
+    "s_fdef_AVERAGEIFS",
+    "s_fdef_COUNTIFS",
+    "s_fdef_MAXIFS",
+    "s_fdef_MINIFS",
   ];
   const postOracleFargKeys = [
     "s_farg_rank",
@@ -360,7 +368,7 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
     "s_farg_makearray",
   ];
 
-  expect(Object.keys(candidateFdef).length).toBe(185);
+  expect(Object.keys(candidateFdef).length).toBe(190);
   expect(Object.keys(candidateFarg).length).toBe(99);
 
   const legacyFdef = { ...candidateFdef };
@@ -377,10 +385,11 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
   // compatibility suites cover FunctionList, picker plumbing, and behavior:
   // test/formula-rank-median-quartile.test.ts (RANK/MEDIAN/QUARTILE),
   // test/formula-dynamic-arrays.test.ts (SORT/UNIQUE), date/financial/
-  // logical/text/regex/math-stat/SUBTOTAL/lookup focused suites, and
-  // test/formula-reference-info-functions.test.ts covers INDIRECT/OFFSET
-  // registration plus the reference/information/render functions added in
-  // this carve-out; this test only asserts every carved-out key has
+  // logical/text/regex/math-stat/SUBTOTAL/lookup focused suites,
+  // test/formula-reference-info-functions.test.ts (INDIRECT/OFFSET
+  // registration plus the reference/information/render functions), and
+  // test/criteria-functions.test.ts (AVERAGEIF/AVERAGEIFS/COUNTIFS/
+  // MAXIFS/MINIFS); this test only asserts every carved-out key has
   // non-empty help text.
   for (const key of postOracleFdefKeys) {
     expect(candidateFdef[key]).toBeTruthy();

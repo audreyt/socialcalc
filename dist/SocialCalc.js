@@ -565,6 +565,10 @@
       'Applies lambda to each row of array (as a 1-row array) and returns a single column of per-row results. ',
     s_farg_bycol: 'array, lambda',
     s_farg_byrow: 'array, lambda',
+    s_fdef_AVERAGEIF:
+      'Averages the numeric values of cells in the range that meet the criteria. The criteria may be a value ("x", 15, 1+3) or a test (>25). If average_range is present, then range is tested and the corresponding average_range value is averaged. ',
+    s_fdef_AVERAGEIFS:
+      'Averages the numeric values of cells in the average_range that meet the multiple criteria. The criteria may be a value ("x", 15, 1+3) or a test (>25). ',
     s_fdef_CHOOSE: 'Returns the value specified by the index. The values may be ranges of cells. ',
     s_fdef_COLUMN:
       'Returns the column number of the given reference (or of the cell containing the formula if reference is omitted). ',
@@ -577,6 +581,8 @@
     s_fdef_COUNTBLANK: 'Counts the number of blank values. (Note: "" is not blank.) ',
     s_fdef_COUNTIF:
       'Counts the number of number of cells in the range that meet the criteria. The criteria may be a value ("x", 15, 1+3) or a test (>25). ',
+    s_fdef_COUNTIFS:
+      'Counts the number of cells that meet multiple criteria, one per criteria_range. The criteria may be a value ("x", 15, 1+3) or a test (>25). ',
     s_fdef_DATE:
       'Returns the appropriate date value given numbers for year, month, and day. For example: DATE(2006,2,1) for February 1, 2006. Note: In this program, day "1" is December 31, 1899 and the year 1900 is not a leap year. Some programs use January 1, 1900, as day "1" and treat 1900 as a leap year. In both cases, though, dates on or after March 1, 1900, are the same. ',
     s_fdef_DAVERAGE:
@@ -670,9 +676,13 @@
     s_fdef_MATCH:
       'Look for the matching value for the given value in the range and return position (the first is 1) in that range. If rangelookup is 1 (the default) and not 0, match if within numeric brackets (match<=value) instead of exact match. If rangelookup is -1, act like 1 but the bracket is match>=value. ',
     s_fdef_MAX: 'Returns the maximum of the numeric values. ',
+    s_fdef_MAXIFS:
+      'Returns the maximum of the numeric values of cells in the max_range that meet the multiple criteria. The criteria may be a value ("x", 15, 1+3) or a test (>25). ',
     s_fdef_MID:
       'Returns the specified number of characters from the text value starting from the specified position. ',
     s_fdef_MIN: 'Returns the minimum of the numeric values. ',
+    s_fdef_MINIFS:
+      'Returns the minimum of the numeric values of cells in the min_range that meet the multiple criteria. The criteria may be a value ("x", 15, 1+3) or a test (>25). ',
     s_fdef_MINUTE: 'Returns the minute portion of a time or date/time value. ',
     s_fdef_MEDIAN:
       'Returns the median (middle value) of the numeric values. If there is an even count, averages the two middle values. ',
@@ -20923,7 +20933,6 @@ More comments yet to come...
         }
       }
     }
-    resulttypesum = resulttypesum || 'n';
     switch (aggregateKind) {
       case 'SUM':
         PushOperand(resulttypesum, sum);
@@ -20985,6 +20994,191 @@ More comments yet to come...
     SocialCalc.Formula.SubtotalFunction,
     -2,
     'function_code, ref1, [ref2, ...]',
+    '',
+    'math',
+  ];
+  FormulaMut.DecodeIfsRangeOperand = function (sheet, operand) {
+    var scf = SocialCalc.Formula;
+    if (operand.type == 'coord') {
+      var plain = scf.PlainCoord(operand.value);
+      return scf.DecodeRangeParts(sheet, plain + '|' + plain + '|');
+    }
+    return scf.DecodeRangeParts(sheet, operand.value);
+  };
+  FormulaMut.CriteriaAggregateFunctions = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var lookup_result_type = scf.LookupResultType;
+    var typelookupplus = scf.TypeLookupTable.plus;
+    var PushOperand = function (t, v) {
+      operand.push({
+        type: t,
+        value: v,
+      });
+    };
+    var aggrange;
+    var pairRanges = [];
+    var pairCriteria = [];
+    if (fname == 'AVERAGEIF') {
+      var ifRange = scf.TopOfStackValueAndType(sheet, foperand);
+      var ifCriteria = scf.OperandAsText(sheet, foperand);
+      if (ifCriteria.type.charAt(0) == 'e') ifCriteria.value = null;
+      if (foperand.length) {
+        aggrange = scf.TopOfStackValueAndType(sheet, foperand);
+      } else {
+        aggrange = {
+          value: ifRange.value,
+          type: ifRange.type,
+        };
+      }
+      pairRanges.push(ifRange);
+      pairCriteria.push(ifCriteria);
+    } else {
+      if (fname != 'COUNTIFS') {
+        aggrange = scf.TopOfStackValueAndType(sheet, foperand);
+      } else {
+        aggrange = {
+          value: '',
+          type: '',
+        };
+      }
+      if (foperand.length < 2 || foperand.length % 2 != 0) {
+        scf.FunctionArgsError(fname, operand);
+        return 0;
+      }
+      while (foperand.length) {
+        var prange = scf.TopOfStackValueAndType(sheet, foperand);
+        var pcriteria = scf.OperandAsText(sheet, foperand);
+        if (pcriteria.type.charAt(0) == 'e') pcriteria.value = null;
+        pairRanges.push(prange);
+        pairCriteria.push(pcriteria);
+      }
+    }
+    var shapeRanges = pairRanges.slice();
+    if (fname != 'COUNTIFS') shapeRanges.push(aggrange);
+    var decoded = [];
+    var wantCols = 0,
+      wantRows = 0;
+    for (var si = 0; si < shapeRanges.length; si++) {
+      var sr = shapeRanges[si];
+      if (sr.type != 'coord' && sr.type != 'range') {
+        scf.FunctionArgsError(fname, operand);
+        return 0;
+      }
+      var di = scf.DecodeIfsRangeOperand(sheet, sr);
+      if (!di) {
+        PushOperand('e#REF!', 0);
+        return;
+      }
+      if (si == 0) {
+        wantCols = di.ncols;
+        wantRows = di.nrows;
+      } else if (di.ncols != wantCols || di.nrows != wantRows) {
+        PushOperand('e#VALUE!', 0);
+        return;
+      }
+      decoded.push(di);
+    }
+    var aggInfo = fname == 'COUNTIFS' ? null : decoded[decoded.length - 1];
+    var count = 0;
+    var numericCount = 0;
+    var sum = 0;
+    var resulttypesum = '';
+    var maxval;
+    var minval;
+    for (var c = 0; c < wantCols; c++) {
+      for (var r = 0; r < wantRows; r++) {
+        var rowOk = true;
+        for (var pi = 0; pi < pairRanges.length; pi++) {
+          var pdi = decoded[pi];
+          var cellcr = SocialCalc.crToCoord(pdi.col1num + c, pdi.row1num + r);
+          var cell = pdi.sheetdata.GetAssuredCell(cellcr);
+          if (!scf.TestCriteria(cell.datavalue, cell.valuetype || 'b', pairCriteria[pi].value)) {
+            rowOk = false;
+            break;
+          }
+        }
+        if (!rowOk) continue;
+        count += 1;
+        if (fname == 'COUNTIFS') continue;
+        var aggcr = SocialCalc.crToCoord(aggInfo.col1num + c, aggInfo.row1num + r);
+        var aggcell = aggInfo.sheetdata.GetAssuredCell(aggcr);
+        var avt = aggcell.valuetype || 'b';
+        if (avt.charAt(0) == 'n') {
+          var v = Number(aggcell.datavalue);
+          numericCount += 1;
+          sum += v;
+          maxval = maxval != undefined ? (v > maxval ? v : maxval) : v;
+          minval = minval != undefined ? (v < minval ? v : minval) : v;
+          resulttypesum = lookup_result_type(avt, resulttypesum || avt, typelookupplus);
+        } else if (avt.charAt(0) == 'e' && resulttypesum.charAt(0) != 'e') {
+          resulttypesum = avt;
+        }
+      }
+    }
+    resulttypesum = resulttypesum || 'n';
+    switch (fname) {
+      case 'COUNTIFS':
+        PushOperand('n', count);
+        return;
+      case 'AVERAGEIF':
+      case 'AVERAGEIFS':
+        if (resulttypesum.charAt(0) == 'e') {
+          PushOperand(resulttypesum, 0);
+        } else if (numericCount > 0) {
+          PushOperand(resulttypesum, sum / numericCount);
+        } else {
+          PushOperand('e#DIV/0!', 0);
+        }
+        return;
+      case 'MAXIFS':
+        if (resulttypesum.charAt(0) == 'e') {
+          PushOperand(resulttypesum, 0);
+        } else {
+          PushOperand('n', maxval != undefined ? maxval : 0);
+        }
+        return;
+      case 'MINIFS':
+        if (resulttypesum.charAt(0) == 'e') {
+          PushOperand(resulttypesum, 0);
+        } else {
+          PushOperand('n', minval != undefined ? minval : 0);
+        }
+        return;
+    }
+    return;
+  };
+  SocialCalc.Formula.FunctionList['COUNTIFS'] = [
+    SocialCalc.Formula.CriteriaAggregateFunctions,
+    -2,
+    'criteria_range1, criteria1, [criteria_range2, criteria2, ... criteria_range_n, criteria_n]',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['AVERAGEIF'] = [
+    SocialCalc.Formula.CriteriaAggregateFunctions,
+    -2,
+    'range, criteria, [average_range]',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['AVERAGEIFS'] = [
+    SocialCalc.Formula.CriteriaAggregateFunctions,
+    -3,
+    'average_range, criteria_range1, criteria1, [criteria_range2, criteria2, ... criteria_range_n, criteria_n]',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['MAXIFS'] = [
+    SocialCalc.Formula.CriteriaAggregateFunctions,
+    -3,
+    'max_range, criteria_range1, criteria1, [criteria_range2, criteria2, ... criteria_range_n, criteria_n]',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['MINIFS'] = [
+    SocialCalc.Formula.CriteriaAggregateFunctions,
+    -3,
+    'min_range, criteria_range1, criteria1, [criteria_range2, criteria2, ... criteria_range_n, criteria_n]',
     '',
     'stat',
   ];

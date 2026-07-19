@@ -16,3 +16,4 @@ lemma/chart.ts
 lemma/validation.ts
 lemma/lambda-scope.ts
 lemma/pivot.ts
+lemma/criteria.ts

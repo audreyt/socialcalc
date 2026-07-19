@@ -462,8 +462,12 @@ shipping bundle.
   and transactional output-cell claim classification (allowed/
   reclaimable/collision, covering foreign spill/pivot ownership) — 20
   Dafny VCs.
+- `lemma/criteria.ts`: shared COUNTIFS/AVERAGEIF/AVERAGEIFS/MAXIFS/MINIFS
+  row-eligibility + result-decision policy (first-error-wins, AVERAGE-family
+  DIV0-on-empty vs. MAXIFS/MINIFS zero-on-empty, running max/min) — 5 Dafny
+  VCs.
 
-Total: **181 VCs (36 + 5 + 3 + 17 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2 + 8 + 9 + 16 + 3 + 6 + 20)**.
+Total: **186 VCs (36 + 5 + 3 + 17 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2 + 8 + 9 + 16 + 3 + 6 + 20 + 5)**.
 
 After a facade edit:
 

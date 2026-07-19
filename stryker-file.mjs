@@ -102,6 +102,7 @@ const formulaOnlyTests = [
   "test/dynamic-array-spill-editor.test.ts",
   "test/dynamic-array-spill-persistence.test.ts",
   "test/dynamic-array-spill-family2.test.ts",
+  "test/criteria-functions.test.ts",
 ];
 
 // Differential/adversarial corpus (test/differential/**, test/adversarial/**):
