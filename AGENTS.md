@@ -652,7 +652,7 @@ both tsconfig files.
 
 ## Package and release operations
 
-The package ships a pinned 17-member tarball contract. `package.json.files` and
+The package ships a pinned 21-member tarball contract. `package.json.files` and
 `scripts/verify-package-contract.mjs` each hold deliberate expected manifests;
 update both in the same reviewed change when the published file set changes.
 Do not derive expected members from the manifest under test.

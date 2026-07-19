@@ -287,7 +287,7 @@ generated artifacts: change their `js/` or `css/` inputs, then regenerate them
 rather than editing generated output by hand.
 
 `vp run test:package-contract` packs a fresh tarball and checks the pinned
-17-member allowlist, package-size ceilings, declaration consumption, and
+21-member allowlist, package-size ceilings, declaration consumption, and
 behavior/API-shape parity across:
 
 1. root CommonJS `require("socialcalc")`;
