@@ -873,6 +873,9 @@ ConstantsRoot.Constants = {
     'Returns text1 with the all occurrences of oldtext replaced by newtext. If "occurrence" is present, then only that occurrence is replaced. ',
   s_fdef_SPLIT:
     "Divides text around a specified delimiter and puts each fragment into a separate cell in the row. split_by_each (default true) treats every character of delimiter as a separate delimiter; remove_empty_text (default true) discards empty fragments. ",
+  s_fdef_SUBTOTAL:
+    "Aggregates ref1, [ref2, ...] using function_code (1-11 SUM/AVERAGE/etc, ignoring AutoFilter-hidden rows; 101-111 additionally ignore manually-hidden rows). Nested SUBTOTAL results are always excluded from the aggregate. Codes: 1/101=AVERAGE, 2/102=COUNT, 3/103=COUNTA, 4/104=MAX, 5/105=MIN, 6/106=PRODUCT, 7/107=STDEV, 8/108=STDEVP, 9/109=SUM, 10/110=VAR, 11/111=VARP. ",
+  s_farg_function_code: "function_code, ref1, [ref2, ...]",
   s_fdef_SORT:
     "Sorts rows of an array by one or more columns (defaults to the first column ascending); omitted direction defaults to ascending and negative directions descend, preserving stable source order for ties. ",
   s_fdef_UNIQUE:

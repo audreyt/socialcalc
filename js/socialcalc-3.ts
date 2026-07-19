@@ -374,6 +374,242 @@ SC.SanitizeSpills = function (sheet: any) {
   }
   sheet.renderneeded = true;
 };
+
+//
+// AutoFilter / structured tables
+//
+// AutoFilter state (sheet.autofilters[id] = {id, range, criteria}) drives a
+// derived, independently-owned hidden-row axis (sheet.rowattribs.filterhide)
+// that is composed with the pre-existing manual axis (sheet.rowattribs.hide)
+// via RowEffectivelyHidden -- see lemma/visibility.ts for the proved
+// composition/clear-isolation/idempotence policies this mirrors.
+//
+// Structured tables (sheet.tables[name] = {name, range, hasHeader, style,
+// filterId}) are a thin named-registry layer over a range plus an optional
+// integrated AutoFilter; they do not introduce structured-reference formula
+// syntax.
+//
+
+/** @param {any} sheet @param {any} row */
+SC.RowEffectivelyHidden = function (sheet: any, row: number): boolean {
+  return sheet.rowattribs.hide[row] == "yes" || sheet.rowattribs.filterhide[row] == "yes";
+};
+
+/**
+ * Whether cell cr fails the AutoFilter's criterion. A criterion with no
+ * present sub-parts (values/op/op2) never fails a cell.
+ */
+SC.AutoFilterCellFailsCriterion = function (sheet: any, criterion: any, cr: string): boolean {
+  var cell = sheet.cells[cr];
+  var datavalue = cell ? cell.datavalue : "";
+  var valuetype = (cell && cell.valuetype) || "b";
+  // SocialCalc.format_number_for_display is unconditionally assigned by
+  // this same shipping module (no plausible "without rest of SocialCalc"
+  // partial-load path exists at this call site), so no defensive fallback
+  // is needed here.
+  var displaytext =
+    datavalue == null
+      ? ""
+      : valuetype.charAt(0) == "n"
+        ? SocialCalc.format_number_for_display(datavalue, valuetype, "")
+        : "" + datavalue;
+
+  if (criterion.values) {
+    var found = false;
+    for (var i = 0; i < criterion.values.length; i++) {
+      if (criterion.values[i] === displaytext) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) return true;
+  }
+  if (criterion.op && !SocialCalc.Formula.TestCriteria(datavalue, valuetype, criterion.op)) {
+    return true;
+  }
+  if (criterion.op2 && !SocialCalc.Formula.TestCriteria(datavalue, valuetype, criterion.op2)) {
+    return true;
+  }
+  return false;
+};
+
+/**
+ * Recompute one AutoFilter's contribution to sheet.rowattribs.filterhide.
+ * Pure function of current cell data and the filter's own criteria --
+ * idempotent by construction (lemma/visibility.ts recomputeIsIdempotent):
+ * re-running never depends on the prior filterhide bit. Only rows inside
+ * this filter's data band (below the header, within the range) are ever
+ * touched; a filterhide flag set by this filter for a row it no longer
+ * covers is cleared.
+ */
+SC.RecomputeAutoFilter = function (sheet: any, filterId: string) {
+  var def = sheet.autofilters[filterId];
+  if (!def) return;
+  // ParseRange never throws (see FindAutoFilterForHeaderCell's comment).
+  var prange: any = SocialCalc.ParseRange(def.range);
+  var cr1 = prange.cr1,
+    cr2 = prange.cr2;
+  var headerRow = cr1.row;
+  var lastRow = cr2.row;
+  var ownedRows = def.ownedRows || {};
+  var newOwnedRows: { [row: number]: boolean } = {};
+
+  for (var row = headerRow + 1; row <= lastRow; row++) {
+    var failsAny = false;
+    for (var offsetKey in def.criteria) {
+      var offset = Number(offsetKey);
+      var col = cr1.col + offset;
+      if (col > cr2.col) continue;
+      var cr = SocialCalc.crToCoord(col, row);
+      if (SocialCalc.AutoFilterCellFailsCriterion(sheet, def.criteria[offsetKey], cr)) {
+        failsAny = true;
+        break;
+      }
+    }
+    newOwnedRows[row] = true;
+    if (failsAny) {
+      sheet.rowattribs.filterhide[row] = "yes";
+    } else if (sheet.rowattribs.filterhide[row] == "yes") {
+      delete sheet.rowattribs.filterhide[row];
+    }
+  }
+  // Rows previously owned by this filter but no longer in its band (range
+  // shrank via structural edit) lose this filter's hide contribution.
+  for (var ownedRowKey in ownedRows) {
+    var ownedRow = Number(ownedRowKey);
+    if (!newOwnedRows[ownedRow] && sheet.rowattribs.filterhide[ownedRow] == "yes") {
+      delete sheet.rowattribs.filterhide[ownedRow];
+    }
+  }
+  def.ownedRows = newOwnedRows;
+};
+
+/** Recompute every AutoFilter's filterhide contribution. Safe to call repeatedly (idempotent). */
+SC.RecomputeAutoFilters = function (sheet: any) {
+  for (var id in sheet.autofilters) {
+    SocialCalc.RecomputeAutoFilter(sheet, id);
+  }
+};
+
+/** Collect the distinct display values present in one AutoFilter column, for dropdown population. */
+SC.CollectAutoFilterColumnValues = function (
+  sheet: any,
+  filterId: string,
+  colOffset: number,
+): string[] {
+  var def = sheet.autofilters[filterId];
+  if (!def) return [];
+  var prange: any = SocialCalc.ParseRange(def.range);
+  var cr1 = prange.cr1,
+    cr2 = prange.cr2;
+  var col = cr1.col + colOffset;
+  if (col > cr2.col) return [];
+  var seen: { [v: string]: boolean } = {};
+  var result: string[] = [];
+  for (var row = cr1.row + 1; row <= cr2.row; row++) {
+    var cr = SocialCalc.crToCoord(col, row);
+    var cell = sheet.cells[cr];
+    var valuetype = (cell && cell.valuetype) || "b";
+    var datavalue = cell ? cell.datavalue : "";
+    var displaytext =
+      datavalue == null
+        ? ""
+        : valuetype.charAt(0) == "n"
+          ? SocialCalc.format_number_for_display(datavalue, valuetype, "")
+          : "" + datavalue;
+    if (!seen[displaytext]) {
+      seen[displaytext] = true;
+      result.push(displaytext);
+    }
+  }
+  result.sort();
+  return result;
+};
+
+/**
+ * Shift/invalidate every AutoFilter and table range on a structural insert
+ * (positive coloffset/rowoffset) or delete (negative). Mirrors the endpoint
+ * policy AdjustFormulaCoords applies to formulas/names: a range whose start
+ * or end lands entirely inside a deleted band collapses (filter/table
+ * removed); otherwise both endpoints shift independently via
+ * AdjustFormulaCoords on synthetic single-cell references.
+ */
+SC.AdjustAutoFilterRangesForStructuralEdit = function (
+  sheet: any,
+  startCol: number,
+  coloffset: number,
+  startRow: number,
+  rowoffset: number,
+) {
+  var adjustEndpoint = function (coord: string): string | null {
+    var adjusted = SocialCalc.AdjustFormulaCoords(coord, startCol, coloffset, startRow, rowoffset);
+    if (adjusted.indexOf("#REF!") != -1) return null;
+    return adjusted;
+  };
+
+  var adjustRange = function (range: string): string | null {
+    var pos = range.indexOf(":");
+    var c1 = pos >= 0 ? range.substring(0, pos) : range;
+    var c2 = pos >= 0 ? range.substring(pos + 1) : range;
+    var a1 = adjustEndpoint(c1);
+    var a2 = adjustEndpoint(c2);
+    if (a1 == null || a2 == null) return null;
+    return pos >= 0 ? a1 + ":" + a2 : a1;
+  };
+
+  var filterId: string;
+  for (filterId in sheet.autofilters) {
+    var def = sheet.autofilters[filterId];
+    var adjusted = adjustRange(def.range);
+    if (adjusted == null) {
+      // Header or full range destroyed by the structural edit: drop the filter
+      // and release every row it was holding hidden.
+      var ownedRows = def.ownedRows || {};
+      for (var ownedRowKey in ownedRows) {
+        var ownedRow = Number(ownedRowKey);
+        if (sheet.rowattribs.filterhide[ownedRow] == "yes") {
+          delete sheet.rowattribs.filterhide[ownedRow];
+        }
+      }
+      delete sheet.autofilters[filterId];
+      for (var tname in sheet.tables) {
+        if (sheet.tables[tname].filterId == filterId) sheet.tables[tname].filterId = null;
+      }
+    } else {
+      def.range = adjusted;
+    }
+  }
+
+  var tableName: string;
+  for (tableName in sheet.tables) {
+    var tdef = sheet.tables[tableName];
+    var tadjusted = adjustRange(tdef.range);
+    if (tadjusted == null) {
+      delete sheet.tables[tableName];
+    } else {
+      tdef.range = tadjusted;
+    }
+  }
+
+  SocialCalc.RecomputeAutoFilters(sheet);
+};
+
+/** Uppercase, strip to [A-Z0-9_.] -- identical policy to name sanitization (ExecuteSheetCommand "name"). */
+SC.SanitizeTableName = function (name: string): string {
+  return name.toUpperCase().replace(/[^A-Z0-9_.]/g, "");
+};
+
+/**
+ * Whether SUBTOTAL must exclude this row from its aggregate: filter-hidden
+ * rows are always excluded; manually-hidden rows are excluded only for the
+ * 101-111 function-code family (includeManualHidden=true).
+ */
+SC.SubtotalExcludesRow = function (sheet: any, row: number, includeManualHidden: boolean): boolean {
+  if (sheet.rowattribs.filterhide[row] == "yes") return true;
+  if (includeManualHidden && sheet.rowattribs.hide[row] == "yes") return true;
+  return false;
+};
+
 SC.SpillOwnerForCoord = function (sheet: any, coord: any) {
   var cell = sheet.cells[coord];
   return cell && cell.spillowner ? cell.spillowner : coord;
@@ -584,14 +820,17 @@ SC.ResetSheet = function (sheet: any, _reload: any) {
       usermaxrow: 0,
     };
   sheet.rowattribs = {
-    hide: {}, // access by row number
+    hide: {}, // access by row number -- MANUAL hide only, never written by AutoFilter recompute
     height: {},
+    filterhide: {}, // access by row number -- AutoFilter-derived hide, recomputed by SocialCalc.RecomputeAutoFilters
   };
   sheet.colattribs = {
     width: {}, // access by col name
     hide: {},
   };
   sheet.names = {}; // Each is: {desc: "optional description", definition: "B5, A1:B7, or =formula"}
+  sheet.autofilters = {}; // Each is: {id, range, criteria: {colOffset: {values?, op?, op2?}}}
+  sheet.tables = {}; // Each is: {name, range, hasHeader, style, filterId}
   sheet.layouts = [];
   sheet.layouthash = {};
   sheet.fonts = [];
@@ -928,6 +1167,31 @@ SC.ParseSheetSave = function (savedsheet: any, sheetobj: any) {
         sheetobj.names[name].definition = SocialCalc.decodeFromSave(parts[3]);
         break;
 
+      case "autofilter":
+        sheetobj.autofilters[SocialCalc.decodeFromSave(parts[1])] = {
+          id: SocialCalc.decodeFromSave(parts[1]),
+          range: SocialCalc.decodeFromSave(parts[2]),
+          criteria: {},
+        };
+        break;
+
+      case "autofiltercol":
+        if (sheetobj.autofilters[SocialCalc.decodeFromSave(parts[1])]) {
+          sheetobj.autofilters[SocialCalc.decodeFromSave(parts[1])].criteria[parts[2] - 0] =
+            JSON.parse(SocialCalc.decodeFromSave(parts[3]));
+        }
+        break;
+
+      case "table":
+        sheetobj.tables[SocialCalc.decodeFromSave(parts[1])] = {
+          name: SocialCalc.decodeFromSave(parts[1]),
+          range: SocialCalc.decodeFromSave(parts[2]),
+          hasHeader: parts[3] == "1",
+          style: SocialCalc.decodeFromSave(parts[4]),
+          filterId: SocialCalc.decodeFromSave(parts[5]) || null,
+        };
+        break;
+
       case "layout":
         parts = lines[i].match(/^layout:(\d+):(.+)$/); // layouts can have ":" in them
         sheetobj.layouts[parts[1] - 0] = parts[2];
@@ -982,6 +1246,7 @@ SC.ParseSheetSave = function (savedsheet: any, sheetobj: any) {
     parts = null;
   }
   SocialCalc.SanitizeSpills(sheetobj);
+  SocialCalc.RecomputeAutoFilters(sheetobj);
 };
 
 //
@@ -1272,6 +1537,53 @@ SC.CreateSheetSave = function (sheetobj: any, range: any, canonicalize: any) {
         SocialCalc.encodeForSave(sheetobj.names[name].desc) +
         ":" +
         SocialCalc.encodeForSave(sheetobj.names[name].definition),
+    );
+  }
+
+  var afSaveIds: string[] = [];
+  for (var afSaveId in sheetobj.autofilters) afSaveIds.push(afSaveId);
+  afSaveIds.sort();
+  for (i = 0; i < afSaveIds.length; i++) {
+    var afSaveDef = sheetobj.autofilters[afSaveIds[i]];
+    result.push(
+      "autofilter:" +
+        SocialCalc.encodeForSave(afSaveDef.id) +
+        ":" +
+        SocialCalc.encodeForSave(afSaveDef.range),
+    );
+    var afCriteriaOffsets: string[] = [];
+    for (var afCriteriaOffset in afSaveDef.criteria) afCriteriaOffsets.push(afCriteriaOffset);
+    afCriteriaOffsets.sort(function (a: string, b: string) {
+      return (a as any) - (b as any);
+    });
+    for (var afci = 0; afci < afCriteriaOffsets.length; afci++) {
+      result.push(
+        "autofiltercol:" +
+          SocialCalc.encodeForSave(afSaveDef.id) +
+          ":" +
+          afCriteriaOffsets[afci] +
+          ":" +
+          SocialCalc.encodeForSave(JSON.stringify(afSaveDef.criteria[afCriteriaOffsets[afci]])),
+      );
+    }
+  }
+
+  var tblSaveNames: string[] = [];
+  for (var tblSaveName in sheetobj.tables) tblSaveNames.push(tblSaveName);
+  tblSaveNames.sort();
+  for (i = 0; i < tblSaveNames.length; i++) {
+    var tblSaveDef = sheetobj.tables[tblSaveNames[i]];
+    result.push(
+      "table:" +
+        SocialCalc.encodeForSave(tblSaveDef.name) +
+        ":" +
+        SocialCalc.encodeForSave(tblSaveDef.range) +
+        ":" +
+        (tblSaveDef.hasHeader ? "1" : "0") +
+        ":" +
+        SocialCalc.encodeForSave(tblSaveDef.style) +
+        ":" +
+        SocialCalc.encodeForSave(tblSaveDef.filterId || ""),
     );
   }
 
@@ -2230,6 +2542,15 @@ SC.SheetCommandsTimerRoutine = function (sci: any, parseobj: any, saveundo: any)
 //    name define NAME definition
 //    name desc NAME description
 //    name delete NAME
+//    autofilter attach ID range
+//    autofilter criteria ID colOffset json-criterion-or-empty
+//    autofilter clearcol ID colOffset
+//    autofilter clearall ID
+//    autofilter detach ID
+//    table create NAME range hasHeader:0/1 style withFilter:0/1
+//    table delete NAME
+//    table style NAME style
+//    table range NAME range
 //    recalc
 //    redisplay
 //    changedrendervalues
@@ -3351,6 +3672,13 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
         }
       }
 
+      SocialCalc.AdjustAutoFilterRangesForStructuralEdit(
+        sheet,
+        cr1.col,
+        coloffset,
+        cr1.row,
+        rowoffset,
+      );
       attribs.lastcol = Math.min(702, attribs.lastcol + coloffset);
       attribs.lastrow += rowoffset;
       attribs.needsrecalc = "yes";
@@ -3591,6 +3919,13 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
           }
         }
       }
+      SocialCalc.AdjustAutoFilterRangesForStructuralEdit(
+        sheet,
+        cr1.col,
+        coloffset,
+        cr1.row,
+        rowoffset,
+      );
       attribs.needsrecalc = "yes";
       break;
     case "movepaste":
@@ -3905,6 +4240,224 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
       attribs.needsrecalc = "yes";
       break;
 
+    case "autofilter":
+      // autofilter attach <id> <range>
+      // autofilter criteria <id> <colOffset> <json-criterion-or-empty>
+      // autofilter clearcol <id> <colOffset>
+      // autofilter clearall <id>
+      // autofilter detach <id>
+      what = cmd.NextToken();
+      name = cmd.NextToken(); // filter id
+
+      if (what == "attach") {
+        rest = cmd.RestOfString();
+        pos = rest.indexOf(" ");
+        var afRange = pos >= 0 ? rest.substring(0, pos) : rest;
+        if (!afRange) break;
+        if (saveundo) {
+          if (sheet.autofilters[name]) {
+            changes.AddUndo("autofilter attach " + name + " " + sheet.autofilters[name].range);
+          } else {
+            changes.AddUndo("autofilter detach " + name);
+          }
+        }
+        sheet.autofilters[name] = { id: name, range: afRange.toUpperCase(), criteria: {} };
+        SocialCalc.RecomputeAutoFilters(sheet);
+        sheet.renderneeded = true;
+      } else if (what == "criteria") {
+        colnext = cmd.NextToken(); // colOffset
+        rest = cmd.RestOfString();
+        if (!sheet.autofilters[name]) break;
+        var afOffset = colnext - 0;
+        if (saveundo) {
+          var afOldCriterion = sheet.autofilters[name].criteria[afOffset];
+          if (afOldCriterion) {
+            changes.AddUndo(
+              "autofilter criteria " +
+                name +
+                " " +
+                afOffset +
+                " " +
+                SocialCalc.encodeForSave(JSON.stringify(afOldCriterion)),
+            );
+          } else {
+            changes.AddUndo("autofilter clearcol " + name + " " + afOffset);
+          }
+        }
+        if (rest.length > 0) {
+          try {
+            sheet.autofilters[name].criteria[afOffset] = JSON.parse(
+              SocialCalc.decodeFromSave(rest),
+            );
+          } catch {
+            errortext = scc.s_escUnknownSheetCmd + cmdstr;
+            break;
+          }
+        } else {
+          delete sheet.autofilters[name].criteria[afOffset];
+        }
+        SocialCalc.RecomputeAutoFilters(sheet);
+        sheet.renderneeded = true;
+      } else if (what == "clearcol") {
+        colnext = cmd.NextToken();
+        if (!sheet.autofilters[name]) break;
+        var afClearOffset = colnext - 0;
+        if (saveundo) {
+          var afClearOld = sheet.autofilters[name].criteria[afClearOffset];
+          if (afClearOld) {
+            changes.AddUndo(
+              "autofilter criteria " +
+                name +
+                " " +
+                afClearOffset +
+                " " +
+                SocialCalc.encodeForSave(JSON.stringify(afClearOld)),
+            );
+          }
+        }
+        delete sheet.autofilters[name].criteria[afClearOffset];
+        SocialCalc.RecomputeAutoFilters(sheet);
+        sheet.renderneeded = true;
+      } else if (what == "clearall") {
+        if (!sheet.autofilters[name]) break;
+        if (saveundo) {
+          for (var afRestoreOffset in sheet.autofilters[name].criteria) {
+            changes.AddUndo(
+              "autofilter criteria " +
+                name +
+                " " +
+                afRestoreOffset +
+                " " +
+                SocialCalc.encodeForSave(
+                  JSON.stringify(sheet.autofilters[name].criteria[afRestoreOffset]),
+                ),
+            );
+          }
+        }
+        sheet.autofilters[name].criteria = {};
+        SocialCalc.RecomputeAutoFilters(sheet);
+        sheet.renderneeded = true;
+      } else if (what == "detach") {
+        if (!sheet.autofilters[name]) break;
+        if (saveundo) {
+          changes.AddUndo("autofilter attach " + name + " " + sheet.autofilters[name].range);
+          for (var afDetachOffset in sheet.autofilters[name].criteria) {
+            changes.AddUndo(
+              "autofilter criteria " +
+                name +
+                " " +
+                afDetachOffset +
+                " " +
+                SocialCalc.encodeForSave(
+                  JSON.stringify(sheet.autofilters[name].criteria[afDetachOffset]),
+                ),
+            );
+          }
+        }
+        var afOwnedRows = sheet.autofilters[name].ownedRows || {};
+        for (var afOwnedRowKey in afOwnedRows) {
+          var afOwnedRow = Number(afOwnedRowKey);
+          if (sheet.rowattribs.filterhide[afOwnedRow] == "yes") {
+            delete sheet.rowattribs.filterhide[afOwnedRow];
+          }
+        }
+        delete sheet.autofilters[name];
+        for (var afTname in sheet.tables) {
+          if (sheet.tables[afTname].filterId == name) sheet.tables[afTname].filterId = null;
+        }
+        sheet.renderneeded = true;
+      }
+      break;
+
+    case "table":
+      // table create <name> <range> <hasHeader:0/1> <style> <withFilter:0/1>
+      // table delete <name>
+      // table style <name> <style>
+      // table range <name> <range>
+      what = cmd.NextToken();
+      name = SocialCalc.SanitizeTableName(cmd.NextToken());
+      rest = cmd.RestOfString();
+      if (name == "") break;
+
+      if (what == "create") {
+        var tParts = rest.split(" ");
+        var tRange = (tParts[0] || "").toUpperCase();
+        var tHasHeader = tParts[1] == "1";
+        var tStyle = tParts[2] || "none";
+        var tWithFilter = tParts[3] == "1";
+        if (!tRange) break;
+        if (sheet.tables[name]) break; // names must be unique
+        if (saveundo) changes.AddUndo("table delete " + name);
+        var tFilterId: string | null = null;
+        if (tHasHeader && tWithFilter) {
+          tFilterId = "table:" + name;
+          sheet.autofilters[tFilterId] = { id: tFilterId, range: tRange, criteria: {} };
+        }
+        sheet.tables[name] = {
+          name: name,
+          range: tRange,
+          hasHeader: tHasHeader,
+          style: tStyle,
+          filterId: tFilterId,
+        };
+        SocialCalc.RecomputeAutoFilters(sheet);
+        sheet.renderneeded = true;
+      } else if (what == "delete") {
+        if (!sheet.tables[name]) break;
+        var tOld = sheet.tables[name];
+        if (saveundo) {
+          changes.AddUndo(
+            "table create " +
+              name +
+              " " +
+              tOld.range +
+              " " +
+              (tOld.hasHeader ? "1" : "0") +
+              " " +
+              tOld.style +
+              " " +
+              (tOld.filterId ? "1" : "0"),
+          );
+        }
+        if (tOld.filterId && sheet.autofilters[tOld.filterId]) {
+          var tOwnedRows = sheet.autofilters[tOld.filterId].ownedRows || {};
+          for (var tOwnedRowKey in tOwnedRows) {
+            var tOwnedRow = Number(tOwnedRowKey);
+            if (sheet.rowattribs.filterhide[tOwnedRow] == "yes") {
+              delete sheet.rowattribs.filterhide[tOwnedRow];
+            }
+          }
+          delete sheet.autofilters[tOld.filterId];
+        }
+        delete sheet.tables[name];
+        sheet.renderneeded = true;
+      } else if (what == "style") {
+        if (!sheet.tables[name]) break;
+        if (saveundo) changes.AddUndo("table style " + name + " " + sheet.tables[name].style);
+        sheet.tables[name].style = rest || "none";
+        sheet.renderneeded = true;
+      } else if (what == "range") {
+        if (!sheet.tables[name]) break;
+        var tNewRange = rest.toUpperCase();
+        if (!tNewRange) break;
+        if (saveundo) changes.AddUndo("table range " + name + " " + sheet.tables[name].range);
+        sheet.tables[name].range = tNewRange;
+        if (sheet.tables[name].filterId && sheet.autofilters[sheet.tables[name].filterId]) {
+          if (saveundo) {
+            changes.AddUndo(
+              "autofilter attach " +
+                sheet.tables[name].filterId +
+                " " +
+                sheet.autofilters[sheet.tables[name].filterId].range,
+            );
+          }
+          sheet.autofilters[sheet.tables[name].filterId].range = tNewRange;
+          SocialCalc.RecomputeAutoFilters(sheet);
+        }
+        sheet.renderneeded = true;
+      }
+      break;
+
     case "name":
       what = cmd.NextToken();
       name = cmd.NextToken();
@@ -3972,7 +4525,7 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
         if (saveundo) changes.AddUndo("pane row " + undoNum);
 
         // Handle hidden row.
-        while (editor.context.sheetobj.rowattribs.hide[row] == "yes") {
+        while (SocialCalc.RowEffectivelyHidden(editor.context.sheetobj, row)) {
           row++;
         }
 
@@ -4513,6 +5066,12 @@ SC.RecalcTimerRoutine = function () {
   delete sheet.recalcdata; // save memory and clear out for name lookup formula evaluation
 
   delete sheet.attribs.needsrecalc; // remember recalc done
+
+  // Recompute AutoFilter-hidden rows now that formulas/values are settled --
+  // covers every path that ends in a recalc (value edits, fill, paste, sort,
+  // structural edits). Idempotent (lemma/visibility.ts), so repeated calls
+  // across chained/queued recalcs never drift.
+  SocialCalc.RecomputeAutoFilters(sheet);
 
   scri.sheet = sheet.previousrecalcsheet || null; // chain back if doing recalc of loaded sheets
   if (scri.sheet) {
@@ -5332,7 +5891,7 @@ SC.CalculateRowHeightData = function (context: any) {
       rownum <= context.rowpanes[rowpane].last;
       rownum++
     ) {
-      if (sheetobj.rowattribs.hide[rownum] === "yes") {
+      if (SocialCalc.RowEffectivelyHidden(sheetobj, rownum)) {
         context.rowheight[rownum] = 0;
       } else {
         rowheight =
@@ -5531,7 +6090,7 @@ SC.RenderRow = function (context: any, rownum: any, rowpane: any, linkstyle: any
   }
 
   // If hidden row, display: none.
-  if (sheetobj.rowattribs.hide[rownum] == "yes") {
+  if (SocialCalc.RowEffectivelyHidden(sheetobj, rownum)) {
     result.style.cssText += ";display:none";
   }
 
@@ -5805,7 +6364,7 @@ SC.RenderCell = function (
     span = 1;
     for (num = 1; num < cell.rowspan; num++) {
       if (
-        sheetobj.rowattribs.hide[rownum + num + ""] != "yes" &&
+        !SocialCalc.RowEffectivelyHidden(sheetobj, rownum + num) &&
         context.CellInPane(rownum + num, colnum, rowpane, colpane)
       )
         span++;
@@ -5824,6 +6383,29 @@ SC.RenderCell = function (
   }
 
   result.innerHTML = cell.displaystring;
+
+  // AutoFilter header dropdown affordance: only for a real DOM element
+  // (noElement builds a pseudo element for measurement, not display) and
+  // only when this exact cell is the header row of an attached AutoFilter.
+  if (!noElement) {
+    var afHeader = SocialCalc.FindAutoFilterForHeaderCell(sheetobj, rownum, colnum);
+    if (afHeader) {
+      var afArrow = document.createElement("span");
+      afArrow.className = "autofilter-dropdown-arrow";
+      afArrow.style.cssText =
+        "cursor:pointer;float:right;margin-left:2px;font-size:x-small;user-select:none;";
+      afArrow.textContent = "\u25BC";
+      afArrow.setAttribute("data-autofilter-id", afHeader.filterId);
+      afArrow.setAttribute("data-autofilter-coloffset", String(afHeader.colOffset));
+      afArrow.onclick = (function (filterId: string, colOffset: number, arrowEl: HTMLElement) {
+        return function (ev: MouseEvent) {
+          ev.stopPropagation();
+          SocialCalc.ShowAutoFilterDropdown(sheetobj, filterId, colOffset, arrowEl);
+        };
+      })(afHeader.filterId, afHeader.colOffset, afArrow);
+      (result as HTMLElement).appendChild(afArrow);
+    }
+  }
 
   num = cell.layout || sheetattribs.defaultlayout;
   if (num && typeof context.layouts[num] !== "undefined") {
@@ -5984,7 +6566,7 @@ SC.RenderCell = function (
   }
 
   // If hidden row, display: none.
-  if (sheetobj.rowattribs.hide[rownum] == "yes") {
+  if (SocialCalc.RowEffectivelyHidden(sheetobj, rownum)) {
     result.style.cssText += ";display:none";
   }
 
@@ -6431,6 +7013,204 @@ SC.FormatCellForExport = function (sheet: any, cell: any, _cr: any) {
   }
 
   return SocialCalc.format_number_for_display(cell.datavalue, valuetype, valueformat);
+};
+
+//
+// AutoFilter header dropdown UI
+//
+// A safe, escaped popup reusing the same HTML-building convention as
+// SocialCalc.Popup.Types.List.MakeList (js/socialcalcpopup.ts) -- every
+// column-value label is run through SocialCalc.special_chars before it is
+// concatenated into innerHTML, so sheet-derived cell content can never
+// execute as markup inside the dropdown.
+//
+
+/** Ids of any currently open AutoFilter dropdown, for AutoFilterDropdownClose/ItemClick. */
+SC.AutoFilterDropdownState = {
+  popupele: null,
+  sheet: null,
+  filterId: "",
+  colOffset: 0,
+  checked: {},
+};
+
+/**
+ * Build the escaped inner HTML for one AutoFilter column's dropdown: a
+ * "(Select All)" toggle plus one checkbox row per distinct display value,
+ * each derived via SocialCalc.CollectAutoFilterColumnValues and escaped with
+ * SocialCalc.special_chars before entering the markup.
+ */
+SC.BuildAutoFilterDropdownHtml = function (
+  sheet: any,
+  filterId: string,
+  colOffset: number,
+): string {
+  var values = SocialCalc.CollectAutoFilterColumnValues(sheet, filterId, colOffset);
+  var def = sheet.autofilters[filterId];
+  var existing = (def && def.criteria[colOffset] && def.criteria[colOffset].values) || null;
+  var checked: { [v: string]: boolean } = {};
+  for (var vi = 0; vi < values.length; vi++) {
+    checked[values[vi]] = existing ? existing.indexOf(values[vi]) != -1 : true;
+  }
+  SocialCalc.AutoFilterDropdownState.checked = checked;
+
+  var allChecked = values.every(function (v) {
+    return checked[v];
+  });
+
+  var html =
+    '<div style="cursor:default;padding:4px;font-size:x-small;max-height:200px;overflow:auto;">';
+  html +=
+    '<div style="white-space:nowrap;"><label><input type="checkbox" onclick="SocialCalc.AutoFilterDropdownToggleAll(this.checked)"' +
+    (allChecked ? " checked" : "") +
+    "> (Select All)</label></div><hr>";
+  for (var i = 0; i < values.length; i++) {
+    var escaped = SocialCalc.special_chars(values[i]);
+    html +=
+      '<div style="white-space:nowrap;"><label><input type="checkbox" data-autofilter-value="' +
+      escaped +
+      '" onclick="SocialCalc.AutoFilterDropdownToggleValue(this)"' +
+      (checked[values[i]] ? " checked" : "") +
+      "> " +
+      (escaped === "" ? "(Blanks)" : escaped) +
+      "</label></div>";
+  }
+  html +=
+    '<hr><div style="white-space:nowrap;text-align:right;">' +
+    '<input type="button" value="Clear Filter" onclick="SocialCalc.AutoFilterDropdownClear();">' +
+    '<input type="button" value="OK" onclick="SocialCalc.AutoFilterDropdownApply();">' +
+    '<input type="button" value="Cancel" onclick="SocialCalc.AutoFilterDropdownCancel();">' +
+    "</div></div>";
+  return html;
+};
+
+/**
+ * Open the escaped dropdown popup for one AutoFilter column, anchored under
+ * the header cell. Builds a standalone positioned div directly (does not
+ * register through SocialCalc.Popup.Controls/CreatePopupDiv, which require
+ * a pre-existing control id bound to a DOM element the List/ColorChooser
+ * flow owns) -- content is assembled purely via BuildAutoFilterDropdownHtml,
+ * whose only sheet-derived text (column display values) is HTML-escaped
+ * with SocialCalc.special_chars before it enters innerHTML.
+ */
+SC.ShowAutoFilterDropdown = function (
+  sheet: any,
+  filterId: string,
+  colOffset: number,
+  anchorElement: HTMLElement,
+) {
+  SocialCalc.AutoFilterDropdownClose();
+
+  var popupele = document.createElement("div");
+  popupele.innerHTML = SocialCalc.BuildAutoFilterDropdownHtml(sheet, filterId, colOffset);
+
+  var pos = SocialCalc.GetElementPositionWithScroll(anchorElement);
+  popupele.style.position = "absolute";
+  popupele.style.left = pos.left + "px";
+  popupele.style.top = pos.bottom + "px";
+  popupele.style.backgroundColor = "#FFF";
+  popupele.style.border = "1px solid #888";
+  popupele.style.zIndex = "1000";
+
+  document.body.appendChild(popupele);
+
+  SocialCalc.AutoFilterDropdownState.popupele = popupele;
+  SocialCalc.AutoFilterDropdownState.sheet = sheet;
+  SocialCalc.AutoFilterDropdownState.filterId = filterId;
+  SocialCalc.AutoFilterDropdownState.colOffset = colOffset;
+};
+
+/**
+ * Toggle every value checkbox to match the "(Select All)" checkbox.
+ * querySelectorAll("input[data-autofilter-value]") only ever returns
+ * elements that already have that attribute, so getAttribute cannot
+ * return null here.
+ */
+SC.AutoFilterDropdownToggleAll = function (checkedState: boolean) {
+  var state: any = SocialCalc.AutoFilterDropdownState;
+  if (!state.popupele) return;
+  var boxes = state.popupele.querySelectorAll("input[data-autofilter-value]");
+  for (var i = 0; i < boxes.length; i++) {
+    var box = boxes[i] as HTMLInputElement;
+    box.checked = checkedState;
+    state.checked[box.getAttribute("data-autofilter-value") as string] = checkedState;
+  }
+};
+
+/** Record one value checkbox's toggled state. */
+SC.AutoFilterDropdownToggleValue = function (box: HTMLInputElement) {
+  var state: any = SocialCalc.AutoFilterDropdownState;
+  state.checked[box.getAttribute("data-autofilter-value") || ""] = box.checked;
+};
+
+/** Apply the checked-value set as an exact-match criterion and close. */
+SC.AutoFilterDropdownApply = function () {
+  var state: any = SocialCalc.AutoFilterDropdownState;
+  if (!state.sheet) return;
+  var selected: string[] = [];
+  for (var v in state.checked) {
+    if (state.checked[v]) selected.push(v);
+  }
+  var cmd =
+    "autofilter criteria " +
+    state.filterId +
+    " " +
+    state.colOffset +
+    " " +
+    SocialCalc.encodeForSave(JSON.stringify({ values: selected }));
+  SocialCalc.ScheduleSheetCommands(state.sheet, cmd, true);
+  SocialCalc.AutoFilterDropdownClose();
+};
+
+/** Remove this column's criterion entirely (show every value) and close. */
+SC.AutoFilterDropdownClear = function () {
+  var state: any = SocialCalc.AutoFilterDropdownState;
+  if (!state.sheet) return;
+  SocialCalc.ScheduleSheetCommands(
+    state.sheet,
+    "autofilter clearcol " + state.filterId + " " + state.colOffset,
+    true,
+  );
+  SocialCalc.AutoFilterDropdownClose();
+};
+
+/** Discard changes and close without applying. */
+SC.AutoFilterDropdownCancel = function () {
+  SocialCalc.AutoFilterDropdownClose();
+};
+
+/** Tear down any open AutoFilter dropdown popup. */
+SC.AutoFilterDropdownClose = function () {
+  var state: any = SocialCalc.AutoFilterDropdownState;
+  if (state.popupele && state.popupele.parentNode) {
+    state.popupele.parentNode.removeChild(state.popupele);
+  }
+  state.popupele = null;
+  state.sheet = null;
+  state.filterId = "";
+  state.colOffset = 0;
+  state.checked = {};
+};
+
+/**
+ * Find the AutoFilter (if any) whose header row is exactly `rownum` and
+ * whose range covers `colnum`, returning {filterId, colOffset} or null.
+ * Used by RenderCell to decide whether a data cell is an AutoFilter header
+ * cell that needs a dropdown affordance.
+ */
+SC.FindAutoFilterForHeaderCell = function (sheetobj: any, rownum: number, colnum: number) {
+  // SocialCalc.ParseRange never throws (worst case, an empty/malformed
+  // range string falls back to "A1:A1" internally), so no try/catch is
+  // needed here -- unlike AdjustAutoFilterRangesForStructuralEdit, which
+  // guards AdjustFormulaCoords' #REF! *return value*, not an exception.
+  for (var filterId in sheetobj.autofilters) {
+    var def = sheetobj.autofilters[filterId];
+    var prange: any = SocialCalc.ParseRange(def.range);
+    if (prange.cr1.row !== rownum) continue;
+    if (colnum < prange.cr1.col || colnum > prange.cr2.col) continue;
+    return { filterId: filterId, colOffset: colnum - prange.cr1.col };
+  }
+  return null;
 };
 
 /** @param {any} sheetobj @param {any} value @param {any} cr @param {any} [linkstyle] */

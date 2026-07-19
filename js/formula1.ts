@@ -4166,6 +4166,261 @@ SocialCalc.Formula.FunctionList["SUMIFS"] = [
 
 /*
 #
+# SUBTOTAL(function_code, ref1, [ref2,...])
+#
+# Aggregates only over rows the AutoFilter/manual-hide policy leaves visible
+# to this function code, and always ignores nested SUBTOTAL() results so
+# subtotals over subtotaled sub-ranges don't double count. See
+# lemma/visibility.ts for the proved hide-composition/idempotence policy
+# SocialCalc.SubtotalExcludesRow implements.
+#
+*/
+
+/** function_code -> [aggregateKind, includeManualHidden]. 1-11 always exclude
+ * filter-hidden rows only; 101-111 also exclude manually-hidden rows. */
+FormulaMut.SubtotalFunctionCodes = {
+  1: ["AVERAGE", false],
+  2: ["COUNT", false],
+  3: ["COUNTA", false],
+  4: ["MAX", false],
+  5: ["MIN", false],
+  6: ["PRODUCT", false],
+  7: ["STDEV", false],
+  8: ["STDEVP", false],
+  9: ["SUM", false],
+  10: ["VAR", false],
+  11: ["VARP", false],
+  101: ["AVERAGE", true],
+  102: ["COUNT", true],
+  103: ["COUNTA", true],
+  104: ["MAX", true],
+  105: ["MIN", true],
+  106: ["PRODUCT", true],
+  107: ["STDEV", true],
+  108: ["STDEVP", true],
+  109: ["SUM", true],
+  110: ["VAR", true],
+  111: ["VARP", true],
+};
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.SubtotalFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+
+  var PushOperand = function (t: any, v: any) {
+    operand.push({ type: t, value: v });
+  };
+
+  // Args arrive in call order in foperand; function_code is first.
+  var codeoperand = scf.OperandAsNumber(sheet, foperand);
+  if (codeoperand.type.charAt(0) != "n") {
+    PushOperand("e#VALUE!", 0);
+    return;
+  }
+  var code = Math.floor((codeoperand.value as number) - 0);
+  var entry = (scf as any).SubtotalFunctionCodes[code];
+  if (!entry) {
+    PushOperand("e#VALUE!", 0);
+    return;
+  }
+  var aggregateKind: string = entry[0];
+  var includeManualHidden: boolean = entry[1];
+
+  var concat = "";
+  var sum = 0;
+  var resulttypesum = "";
+  var count = 0;
+  var counta = 0;
+  var product = 1;
+  var maxval: number | undefined;
+  var minval: number | undefined;
+  var mk = 0,
+    sk = 0,
+    mk1 = 0,
+    sk1 = 0;
+
+  var visitCell = function (sheetdata: any, cr: string) {
+    var crparts = SocialCalc.coordToCr(cr);
+    if (SocialCalc.SubtotalExcludesRow(sheetdata, crparts.row, includeManualHidden)) return;
+    var cell = sheetdata.cells[cr];
+    if (!cell) return; // blank cell contributes nothing (matches SeriesFunctions blank skip)
+    // Exclude nested SUBTOTAL() results so subtotals-of-subtotals don't double count.
+    if (
+      cell.datatype == "f" &&
+      typeof cell.formula == "string" &&
+      /^\s*SUBTOTAL\s*\(/i.test(cell.formula)
+    ) {
+      return;
+    }
+    var value1 = { value: cell.datavalue, type: cell.valuetype || "b" };
+    var t = value1.type.charAt(0);
+    if (t == "n") count += 1;
+    if (t != "b") counta += 1;
+    if (t != "e" && t != "b") concat = concat + value1.value;
+
+    if (t == "n") {
+      var v1 = (value1.value as number) - 0;
+      sum += v1;
+      product *= v1;
+      maxval = maxval != undefined ? (v1 > maxval ? v1 : maxval) : v1;
+      minval = minval != undefined ? (v1 < minval ? v1 : minval) : v1;
+      if (count == 1) {
+        mk1 = v1;
+        sk1 = 0;
+      } else {
+        mk = mk1 + (v1 - mk1) / count;
+        sk = sk1 + (v1 - mk1) * (v1 - mk);
+        sk1 = sk;
+        mk1 = mk;
+      }
+      resulttypesum = scf.LookupResultType(
+        value1.type,
+        resulttypesum || value1.type,
+        scf.TypeLookupTable.plus,
+      );
+    } else if (t == "e" && resulttypesum.charAt(0) != "e") {
+      resulttypesum = value1.type;
+    }
+  };
+
+  while (foperand.length > 0) {
+    var refoperand = scf.TopOfStackValueAndType(sheet, foperand);
+    if (refoperand.type == "range") {
+      // TopOfStackValueAndType/StepThroughRangeDown already resolve an
+      // unavailable-sheet or malformed range to an "e#REF!" operand before
+      // this branch is ever reached, so DecodeRangeParts here always
+      // succeeds for a genuinely "range"-typed operand (see
+      // FindAutoFilterForHeaderCell's analogous ParseRange comment).
+      var rangeinfo = scf.DecodeRangeParts(sheet, refoperand.value as string) as any;
+      var col1num = rangeinfo.col1num,
+        ncols = rangeinfo.ncols,
+        row1num = rangeinfo.row1num,
+        nrows = rangeinfo.nrows;
+      for (var ri = 0; ri < nrows; ri++) {
+        for (var ci = 0; ci < ncols; ci++) {
+          visitCell(rangeinfo.sheetdata, SocialCalc.crToCoord(col1num + ci, row1num + ri));
+        }
+      }
+    } else if (refoperand.type == "coord") {
+      // Same reasoning: an unavailable sheet-qualified coord resolves to
+      // "e#REF!" before reaching here, so FindInSheetCache always succeeds
+      // for a genuinely "coord"-typed operand.
+      var coordtext = refoperand.value as string;
+      var pos = coordtext.indexOf("!");
+      var coordsheet = pos != -1 ? scf.FindInSheetCache(coordtext.substring(pos + 1)) : sheet;
+      if (pos != -1) coordtext = coordtext.substring(0, pos);
+      visitCell(coordsheet, scf.PlainCoord(coordtext));
+    } else {
+      // Scalar literal argument (TopOfStackValueAndType only ever resolves
+      // a bare literal/expression here to "n", "t", or "e" -- never "b";
+      // blank only reaches this function through visitCell's cell lookup
+      // above -- so no blank special-case is needed on this arm).
+      var t2 = refoperand.type.charAt(0);
+      if (t2 == "n") count += 1;
+      counta += 1;
+      if (t2 != "e") concat = concat + refoperand.value;
+      if (t2 == "n") {
+        var v2 = (refoperand.value as number) - 0;
+        sum += v2;
+        product *= v2;
+        maxval = maxval != undefined ? (v2 > maxval ? v2 : maxval) : v2;
+        minval = minval != undefined ? (v2 < minval ? v2 : minval) : v2;
+        if (count == 1) {
+          mk1 = v2;
+          sk1 = 0;
+        } else {
+          mk = mk1 + (v2 - mk1) / count;
+          sk = sk1 + (v2 - mk1) * (v2 - mk);
+          sk1 = sk;
+          mk1 = mk;
+        }
+        resulttypesum = scf.LookupResultType(
+          refoperand.type,
+          resulttypesum || refoperand.type,
+          scf.TypeLookupTable.plus,
+        );
+      } else if (t2 == "e" && resulttypesum.charAt(0) != "e") {
+        resulttypesum = refoperand.type;
+      }
+    }
+  }
+
+  resulttypesum = resulttypesum || "n";
+
+  switch (aggregateKind) {
+    case "SUM":
+      PushOperand(resulttypesum, sum);
+      break;
+    case "PRODUCT":
+      PushOperand(resulttypesum, product);
+      break;
+    case "MIN":
+      PushOperand(resulttypesum, minval || 0);
+      break;
+    case "MAX":
+      PushOperand(resulttypesum, maxval || 0);
+      break;
+    case "COUNT":
+      PushOperand("n", count);
+      break;
+    case "COUNTA":
+      PushOperand("n", counta);
+      break;
+    case "AVERAGE":
+      if (count > 0) {
+        PushOperand(resulttypesum, sum / count);
+      } else {
+        PushOperand("e#DIV/0!", 0);
+      }
+      break;
+    case "STDEV":
+      if (count > 1) {
+        PushOperand(resulttypesum, Math.sqrt(sk / (count - 1)));
+      } else {
+        PushOperand("e#DIV/0!", 0);
+      }
+      break;
+    case "STDEVP":
+      if (count > 1) {
+        PushOperand(resulttypesum, Math.sqrt(sk / count));
+      } else {
+        PushOperand("e#DIV/0!", 0);
+      }
+      break;
+    case "VAR":
+      if (count > 1) {
+        PushOperand(resulttypesum, sk / (count - 1));
+      } else {
+        PushOperand("e#DIV/0!", 0);
+      }
+      break;
+    case "VARP":
+      if (count > 1) {
+        PushOperand(resulttypesum, sk / count);
+      } else {
+        PushOperand("e#DIV/0!", 0);
+      }
+      break;
+  }
+
+  return null;
+};
+
+SocialCalc.Formula.FunctionList["SUBTOTAL"] = [
+  SocialCalc.Formula.SubtotalFunction,
+  -2,
+  "function_code, ref1, [ref2, ...]",
+  "",
+  "stat",
+];
+
+/*
+#
 # IF(cond,truevalue,falsevalue)
 #
 */

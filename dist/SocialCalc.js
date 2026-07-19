@@ -698,6 +698,9 @@
       'Returns text1 with the all occurrences of oldtext replaced by newtext. If "occurrence" is present, then only that occurrence is replaced. ',
     s_fdef_SPLIT:
       'Divides text around a specified delimiter and puts each fragment into a separate cell in the row. split_by_each (default true) treats every character of delimiter as a separate delimiter; remove_empty_text (default true) discards empty fragments. ',
+    s_fdef_SUBTOTAL:
+      'Aggregates ref1, [ref2, ...] using function_code (1-11 SUM/AVERAGE/etc, ignoring AutoFilter-hidden rows; 101-111 additionally ignore manually-hidden rows). Nested SUBTOTAL results are always excluded from the aggregate. Codes: 1/101=AVERAGE, 2/102=COUNT, 3/103=COUNTA, 4/104=MAX, 5/105=MIN, 6/106=PRODUCT, 7/107=STDEV, 8/108=STDEVP, 9/109=SUM, 10/110=VAR, 11/111=VARP. ',
+    s_farg_function_code: 'function_code, ref1, [ref2, ...]',
     s_fdef_SORT:
       'Sorts rows of an array by one or more columns (defaults to the first column ascending); omitted direction defaults to ascending and negative directions descend, preserving stable source order for ties. ',
     s_fdef_UNIQUE:
@@ -1216,6 +1219,175 @@ More comments yet to come...
     }
     sheet.renderneeded = true;
   };
+  SC.RowEffectivelyHidden = function (sheet, row) {
+    return sheet.rowattribs.hide[row] == 'yes' || sheet.rowattribs.filterhide[row] == 'yes';
+  };
+  SC.AutoFilterCellFailsCriterion = function (sheet, criterion, cr) {
+    var cell = sheet.cells[cr];
+    var datavalue = cell ? cell.datavalue : '';
+    var valuetype = (cell && cell.valuetype) || 'b';
+    var displaytext =
+      datavalue == null
+        ? ''
+        : valuetype.charAt(0) == 'n'
+          ? SocialCalc.format_number_for_display(datavalue, valuetype, '')
+          : '' + datavalue;
+    if (criterion.values) {
+      var found = false;
+      for (var i = 0; i < criterion.values.length; i++) {
+        if (criterion.values[i] === displaytext) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) return true;
+    }
+    if (criterion.op && !SocialCalc.Formula.TestCriteria(datavalue, valuetype, criterion.op)) {
+      return true;
+    }
+    if (criterion.op2 && !SocialCalc.Formula.TestCriteria(datavalue, valuetype, criterion.op2)) {
+      return true;
+    }
+    return false;
+  };
+  SC.RecomputeAutoFilter = function (sheet, filterId) {
+    var def = sheet.autofilters[filterId];
+    if (!def) return;
+    var prange = SocialCalc.ParseRange(def.range);
+    var cr1 = prange.cr1,
+      cr2 = prange.cr2;
+    var headerRow = cr1.row;
+    var lastRow = cr2.row;
+    var ownedRows = def.ownedRows || {};
+    var newOwnedRows = {};
+    for (var row = headerRow + 1; row <= lastRow; row++) {
+      var failsAny = false;
+      for (var offsetKey in def.criteria) {
+        var offset = Number(offsetKey);
+        var col = cr1.col + offset;
+        if (col > cr2.col) continue;
+        var cr = SocialCalc.crToCoord(col, row);
+        if (SocialCalc.AutoFilterCellFailsCriterion(sheet, def.criteria[offsetKey], cr)) {
+          failsAny = true;
+          break;
+        }
+      }
+      newOwnedRows[row] = true;
+      if (failsAny) {
+        sheet.rowattribs.filterhide[row] = 'yes';
+      } else if (sheet.rowattribs.filterhide[row] == 'yes') {
+        delete sheet.rowattribs.filterhide[row];
+      }
+    }
+    for (var ownedRowKey in ownedRows) {
+      var ownedRow = Number(ownedRowKey);
+      if (!newOwnedRows[ownedRow] && sheet.rowattribs.filterhide[ownedRow] == 'yes') {
+        delete sheet.rowattribs.filterhide[ownedRow];
+      }
+    }
+    def.ownedRows = newOwnedRows;
+  };
+  SC.RecomputeAutoFilters = function (sheet) {
+    for (var id in sheet.autofilters) {
+      SocialCalc.RecomputeAutoFilter(sheet, id);
+    }
+  };
+  SC.CollectAutoFilterColumnValues = function (sheet, filterId, colOffset) {
+    var def = sheet.autofilters[filterId];
+    if (!def) return [];
+    var prange = SocialCalc.ParseRange(def.range);
+    var cr1 = prange.cr1,
+      cr2 = prange.cr2;
+    var col = cr1.col + colOffset;
+    if (col > cr2.col) return [];
+    var seen = {};
+    var result = [];
+    for (var row = cr1.row + 1; row <= cr2.row; row++) {
+      var cr = SocialCalc.crToCoord(col, row);
+      var cell = sheet.cells[cr];
+      var valuetype = (cell && cell.valuetype) || 'b';
+      var datavalue = cell ? cell.datavalue : '';
+      var displaytext =
+        datavalue == null
+          ? ''
+          : valuetype.charAt(0) == 'n'
+            ? SocialCalc.format_number_for_display(datavalue, valuetype, '')
+            : '' + datavalue;
+      if (!seen[displaytext]) {
+        seen[displaytext] = true;
+        result.push(displaytext);
+      }
+    }
+    result.sort();
+    return result;
+  };
+  SC.AdjustAutoFilterRangesForStructuralEdit = function (
+    sheet,
+    startCol,
+    coloffset,
+    startRow,
+    rowoffset,
+  ) {
+    var adjustEndpoint = function (coord) {
+      var adjusted = SocialCalc.AdjustFormulaCoords(
+        coord,
+        startCol,
+        coloffset,
+        startRow,
+        rowoffset,
+      );
+      if (adjusted.indexOf('#REF!') != -1) return null;
+      return adjusted;
+    };
+    var adjustRange = function (range) {
+      var pos = range.indexOf(':');
+      var c1 = pos >= 0 ? range.substring(0, pos) : range;
+      var c2 = pos >= 0 ? range.substring(pos + 1) : range;
+      var a1 = adjustEndpoint(c1);
+      var a2 = adjustEndpoint(c2);
+      if (a1 == null || a2 == null) return null;
+      return pos >= 0 ? a1 + ':' + a2 : a1;
+    };
+    var filterId;
+    for (filterId in sheet.autofilters) {
+      var def = sheet.autofilters[filterId];
+      var adjusted = adjustRange(def.range);
+      if (adjusted == null) {
+        var ownedRows = def.ownedRows || {};
+        for (var ownedRowKey in ownedRows) {
+          var ownedRow = Number(ownedRowKey);
+          if (sheet.rowattribs.filterhide[ownedRow] == 'yes') {
+            delete sheet.rowattribs.filterhide[ownedRow];
+          }
+        }
+        delete sheet.autofilters[filterId];
+        for (var tname in sheet.tables) {
+          if (sheet.tables[tname].filterId == filterId) sheet.tables[tname].filterId = null;
+        }
+      } else {
+        def.range = adjusted;
+      }
+    }
+    var tableName;
+    for (tableName in sheet.tables) {
+      var tdef = sheet.tables[tableName];
+      var tadjusted = adjustRange(tdef.range);
+      if (tadjusted == null) {
+        delete sheet.tables[tableName];
+      } else {
+        tdef.range = tadjusted;
+      }
+    }
+    SocialCalc.RecomputeAutoFilters(sheet);
+  };
+  SC.SanitizeTableName = function (name) {
+    return name.toUpperCase().replace(/[^A-Z0-9_.]/g, '');
+  };
+  SC.SubtotalExcludesRow = function (sheet, row, includeManualHidden) {
+    if (sheet.rowattribs.filterhide[row] == 'yes') return true;
+    if (includeManualHidden && sheet.rowattribs.hide[row] == 'yes') return true;
+    return false;
+  };
   SC.SpillOwnerForCoord = function (sheet, coord) {
     var cell = sheet.cells[coord];
     return cell && cell.spillowner ? cell.spillowner : coord;
@@ -1379,12 +1551,15 @@ More comments yet to come...
     sheet.rowattribs = {
       hide: {},
       height: {},
+      filterhide: {},
     };
     sheet.colattribs = {
       width: {},
       hide: {},
     };
     sheet.names = {};
+    sheet.autofilters = {};
+    sheet.tables = {};
     sheet.layouts = [];
     sheet.layouthash = {};
     sheet.fonts = [];
@@ -1607,6 +1782,28 @@ More comments yet to come...
           sheetobj.names[name] = { desc: SocialCalc.decodeFromSave(parts[2]) };
           sheetobj.names[name].definition = SocialCalc.decodeFromSave(parts[3]);
           break;
+        case 'autofilter':
+          sheetobj.autofilters[SocialCalc.decodeFromSave(parts[1])] = {
+            id: SocialCalc.decodeFromSave(parts[1]),
+            range: SocialCalc.decodeFromSave(parts[2]),
+            criteria: {},
+          };
+          break;
+        case 'autofiltercol':
+          if (sheetobj.autofilters[SocialCalc.decodeFromSave(parts[1])]) {
+            sheetobj.autofilters[SocialCalc.decodeFromSave(parts[1])].criteria[parts[2] - 0] =
+              JSON.parse(SocialCalc.decodeFromSave(parts[3]));
+          }
+          break;
+        case 'table':
+          sheetobj.tables[SocialCalc.decodeFromSave(parts[1])] = {
+            name: SocialCalc.decodeFromSave(parts[1]),
+            range: SocialCalc.decodeFromSave(parts[2]),
+            hasHeader: parts[3] == '1',
+            style: SocialCalc.decodeFromSave(parts[4]),
+            filterId: SocialCalc.decodeFromSave(parts[5]) || null,
+          };
+          break;
         case 'layout':
           parts = lines[i].match(/^layout:(\d+):(.+)$/);
           sheetobj.layouts[parts[1] - 0] = parts[2];
@@ -1651,6 +1848,7 @@ More comments yet to come...
       parts = null;
     }
     SocialCalc.SanitizeSpills(sheetobj);
+    SocialCalc.RecomputeAutoFilters(sheetobj);
   };
   SC.CellFromStringParts = function (sheet, cell, parts, j) {
     var t, v, ro;
@@ -1909,6 +2107,51 @@ More comments yet to come...
           SocialCalc.encodeForSave(sheetobj.names[name].desc) +
           ':' +
           SocialCalc.encodeForSave(sheetobj.names[name].definition),
+      );
+    }
+    var afSaveIds = [];
+    for (var afSaveId in sheetobj.autofilters) afSaveIds.push(afSaveId);
+    afSaveIds.sort();
+    for (i = 0; i < afSaveIds.length; i++) {
+      var afSaveDef = sheetobj.autofilters[afSaveIds[i]];
+      result.push(
+        'autofilter:' +
+          SocialCalc.encodeForSave(afSaveDef.id) +
+          ':' +
+          SocialCalc.encodeForSave(afSaveDef.range),
+      );
+      var afCriteriaOffsets = [];
+      for (var afCriteriaOffset in afSaveDef.criteria) afCriteriaOffsets.push(afCriteriaOffset);
+      afCriteriaOffsets.sort(function (a, b) {
+        return a - b;
+      });
+      for (var afci = 0; afci < afCriteriaOffsets.length; afci++) {
+        result.push(
+          'autofiltercol:' +
+            SocialCalc.encodeForSave(afSaveDef.id) +
+            ':' +
+            afCriteriaOffsets[afci] +
+            ':' +
+            SocialCalc.encodeForSave(JSON.stringify(afSaveDef.criteria[afCriteriaOffsets[afci]])),
+        );
+      }
+    }
+    var tblSaveNames = [];
+    for (var tblSaveName in sheetobj.tables) tblSaveNames.push(tblSaveName);
+    tblSaveNames.sort();
+    for (i = 0; i < tblSaveNames.length; i++) {
+      var tblSaveDef = sheetobj.tables[tblSaveNames[i]];
+      result.push(
+        'table:' +
+          SocialCalc.encodeForSave(tblSaveDef.name) +
+          ':' +
+          SocialCalc.encodeForSave(tblSaveDef.range) +
+          ':' +
+          (tblSaveDef.hasHeader ? '1' : '0') +
+          ':' +
+          SocialCalc.encodeForSave(tblSaveDef.style) +
+          ':' +
+          SocialCalc.encodeForSave(tblSaveDef.filterId || ''),
       );
     }
     if (range) {
@@ -3596,6 +3839,13 @@ More comments yet to come...
             cellsToExpand[mergerCellCoords] = true;
           }
         }
+        SocialCalc.AdjustAutoFilterRangesForStructuralEdit(
+          sheet,
+          cr1.col,
+          coloffset,
+          cr1.row,
+          rowoffset,
+        );
         attribs.lastcol = Math.min(702, attribs.lastcol + coloffset);
         attribs.lastrow += rowoffset;
         attribs.needsrecalc = 'yes';
@@ -3801,6 +4051,13 @@ More comments yet to come...
             }
           }
         }
+        SocialCalc.AdjustAutoFilterRangesForStructuralEdit(
+          sheet,
+          cr1.col,
+          coloffset,
+          cr1.row,
+          rowoffset,
+        );
         attribs.needsrecalc = 'yes';
         break;
       case 'movepaste':
@@ -4077,6 +4334,219 @@ More comments yet to come...
         }
         attribs.needsrecalc = 'yes';
         break;
+      case 'autofilter':
+        what = cmd.NextToken();
+        name = cmd.NextToken();
+        if (what == 'attach') {
+          rest = cmd.RestOfString();
+          pos = rest.indexOf(' ');
+          var afRange = pos >= 0 ? rest.substring(0, pos) : rest;
+          if (!afRange) break;
+          if (saveundo) {
+            if (sheet.autofilters[name]) {
+              changes.AddUndo('autofilter attach ' + name + ' ' + sheet.autofilters[name].range);
+            } else {
+              changes.AddUndo('autofilter detach ' + name);
+            }
+          }
+          sheet.autofilters[name] = {
+            id: name,
+            range: afRange.toUpperCase(),
+            criteria: {},
+          };
+          SocialCalc.RecomputeAutoFilters(sheet);
+          sheet.renderneeded = true;
+        } else if (what == 'criteria') {
+          colnext = cmd.NextToken();
+          rest = cmd.RestOfString();
+          if (!sheet.autofilters[name]) break;
+          var afOffset = colnext - 0;
+          if (saveundo) {
+            var afOldCriterion = sheet.autofilters[name].criteria[afOffset];
+            if (afOldCriterion) {
+              changes.AddUndo(
+                'autofilter criteria ' +
+                  name +
+                  ' ' +
+                  afOffset +
+                  ' ' +
+                  SocialCalc.encodeForSave(JSON.stringify(afOldCriterion)),
+              );
+            } else {
+              changes.AddUndo('autofilter clearcol ' + name + ' ' + afOffset);
+            }
+          }
+          if (rest.length > 0) {
+            try {
+              sheet.autofilters[name].criteria[afOffset] = JSON.parse(
+                SocialCalc.decodeFromSave(rest),
+              );
+            } catch {
+              errortext = scc.s_escUnknownSheetCmd + cmdstr;
+              break;
+            }
+          } else {
+            delete sheet.autofilters[name].criteria[afOffset];
+          }
+          SocialCalc.RecomputeAutoFilters(sheet);
+          sheet.renderneeded = true;
+        } else if (what == 'clearcol') {
+          colnext = cmd.NextToken();
+          if (!sheet.autofilters[name]) break;
+          var afClearOffset = colnext - 0;
+          if (saveundo) {
+            var afClearOld = sheet.autofilters[name].criteria[afClearOffset];
+            if (afClearOld) {
+              changes.AddUndo(
+                'autofilter criteria ' +
+                  name +
+                  ' ' +
+                  afClearOffset +
+                  ' ' +
+                  SocialCalc.encodeForSave(JSON.stringify(afClearOld)),
+              );
+            }
+          }
+          delete sheet.autofilters[name].criteria[afClearOffset];
+          SocialCalc.RecomputeAutoFilters(sheet);
+          sheet.renderneeded = true;
+        } else if (what == 'clearall') {
+          if (!sheet.autofilters[name]) break;
+          if (saveundo) {
+            for (var afRestoreOffset in sheet.autofilters[name].criteria) {
+              changes.AddUndo(
+                'autofilter criteria ' +
+                  name +
+                  ' ' +
+                  afRestoreOffset +
+                  ' ' +
+                  SocialCalc.encodeForSave(
+                    JSON.stringify(sheet.autofilters[name].criteria[afRestoreOffset]),
+                  ),
+              );
+            }
+          }
+          sheet.autofilters[name].criteria = {};
+          SocialCalc.RecomputeAutoFilters(sheet);
+          sheet.renderneeded = true;
+        } else if (what == 'detach') {
+          if (!sheet.autofilters[name]) break;
+          if (saveundo) {
+            changes.AddUndo('autofilter attach ' + name + ' ' + sheet.autofilters[name].range);
+            for (var afDetachOffset in sheet.autofilters[name].criteria) {
+              changes.AddUndo(
+                'autofilter criteria ' +
+                  name +
+                  ' ' +
+                  afDetachOffset +
+                  ' ' +
+                  SocialCalc.encodeForSave(
+                    JSON.stringify(sheet.autofilters[name].criteria[afDetachOffset]),
+                  ),
+              );
+            }
+          }
+          var afOwnedRows = sheet.autofilters[name].ownedRows || {};
+          for (var afOwnedRowKey in afOwnedRows) {
+            var afOwnedRow = Number(afOwnedRowKey);
+            if (sheet.rowattribs.filterhide[afOwnedRow] == 'yes') {
+              delete sheet.rowattribs.filterhide[afOwnedRow];
+            }
+          }
+          delete sheet.autofilters[name];
+          for (var afTname in sheet.tables) {
+            if (sheet.tables[afTname].filterId == name) sheet.tables[afTname].filterId = null;
+          }
+          sheet.renderneeded = true;
+        }
+        break;
+      case 'table':
+        what = cmd.NextToken();
+        name = SocialCalc.SanitizeTableName(cmd.NextToken());
+        rest = cmd.RestOfString();
+        if (name == '') break;
+        if (what == 'create') {
+          var tParts = rest.split(' ');
+          var tRange = (tParts[0] || '').toUpperCase();
+          var tHasHeader = tParts[1] == '1';
+          var tStyle = tParts[2] || 'none';
+          var tWithFilter = tParts[3] == '1';
+          if (!tRange) break;
+          if (sheet.tables[name]) break;
+          if (saveundo) changes.AddUndo('table delete ' + name);
+          var tFilterId = null;
+          if (tHasHeader && tWithFilter) {
+            tFilterId = 'table:' + name;
+            sheet.autofilters[tFilterId] = {
+              id: tFilterId,
+              range: tRange,
+              criteria: {},
+            };
+          }
+          sheet.tables[name] = {
+            name,
+            range: tRange,
+            hasHeader: tHasHeader,
+            style: tStyle,
+            filterId: tFilterId,
+          };
+          SocialCalc.RecomputeAutoFilters(sheet);
+          sheet.renderneeded = true;
+        } else if (what == 'delete') {
+          if (!sheet.tables[name]) break;
+          var tOld = sheet.tables[name];
+          if (saveundo) {
+            changes.AddUndo(
+              'table create ' +
+                name +
+                ' ' +
+                tOld.range +
+                ' ' +
+                (tOld.hasHeader ? '1' : '0') +
+                ' ' +
+                tOld.style +
+                ' ' +
+                (tOld.filterId ? '1' : '0'),
+            );
+          }
+          if (tOld.filterId && sheet.autofilters[tOld.filterId]) {
+            var tOwnedRows = sheet.autofilters[tOld.filterId].ownedRows || {};
+            for (var tOwnedRowKey in tOwnedRows) {
+              var tOwnedRow = Number(tOwnedRowKey);
+              if (sheet.rowattribs.filterhide[tOwnedRow] == 'yes') {
+                delete sheet.rowattribs.filterhide[tOwnedRow];
+              }
+            }
+            delete sheet.autofilters[tOld.filterId];
+          }
+          delete sheet.tables[name];
+          sheet.renderneeded = true;
+        } else if (what == 'style') {
+          if (!sheet.tables[name]) break;
+          if (saveundo) changes.AddUndo('table style ' + name + ' ' + sheet.tables[name].style);
+          sheet.tables[name].style = rest || 'none';
+          sheet.renderneeded = true;
+        } else if (what == 'range') {
+          if (!sheet.tables[name]) break;
+          var tNewRange = rest.toUpperCase();
+          if (!tNewRange) break;
+          if (saveundo) changes.AddUndo('table range ' + name + ' ' + sheet.tables[name].range);
+          sheet.tables[name].range = tNewRange;
+          if (sheet.tables[name].filterId && sheet.autofilters[sheet.tables[name].filterId]) {
+            if (saveundo) {
+              changes.AddUndo(
+                'autofilter attach ' +
+                  sheet.tables[name].filterId +
+                  ' ' +
+                  sheet.autofilters[sheet.tables[name].filterId].range,
+              );
+            }
+            sheet.autofilters[sheet.tables[name].filterId].range = tNewRange;
+            SocialCalc.RecomputeAutoFilters(sheet);
+          }
+          sheet.renderneeded = true;
+        }
+        break;
       case 'name':
         what = cmd.NextToken();
         name = cmd.NextToken();
@@ -4134,7 +4604,7 @@ More comments yet to come...
             undoNum = editor.context.rowpanes[1].first;
           }
           if (saveundo) changes.AddUndo('pane row ' + undoNum);
-          while (editor.context.sheetobj.rowattribs.hide[row] == 'yes') {
+          while (SocialCalc.RowEffectivelyHidden(editor.context.sheetobj, row)) {
             row++;
           }
           if (
@@ -4513,6 +4983,7 @@ More comments yet to come...
     sheet.reRenderCellList = sheet.recalcdata.celllist;
     delete sheet.recalcdata;
     delete sheet.attribs.needsrecalc;
+    SocialCalc.RecomputeAutoFilters(sheet);
     scri.sheet = sheet.previousrecalcsheet || null;
     if (scri.sheet) {
       scri.currentState = scri.state.calc;
@@ -5109,7 +5580,7 @@ More comments yet to come...
         rownum <= context.rowpanes[rowpane].last;
         rownum++
       ) {
-        if (sheetobj.rowattribs.hide[rownum] === 'yes') {
+        if (SocialCalc.RowEffectivelyHidden(sheetobj, rownum)) {
           context.rowheight[rownum] = 0;
         } else {
           rowheight =
@@ -5240,7 +5711,7 @@ More comments yet to come...
         result.appendChild(newcol);
       }
     }
-    if (sheetobj.rowattribs.hide[rownum] == 'yes') {
+    if (SocialCalc.RowEffectivelyHidden(sheetobj, rownum)) {
       result.style.cssText += ';display:none';
     }
     return result;
@@ -5453,7 +5924,7 @@ More comments yet to come...
       span = 1;
       for (num = 1; num < cell.rowspan; num++) {
         if (
-          sheetobj.rowattribs.hide[rownum + num + ''] != 'yes' &&
+          !SocialCalc.RowEffectivelyHidden(sheetobj, rownum + num) &&
           context.CellInPane(rownum + num, colnum, rowpane, colpane)
         )
           span++;
@@ -5469,6 +5940,25 @@ More comments yet to come...
       );
     }
     result.innerHTML = cell.displaystring;
+    if (!noElement) {
+      var afHeader = SocialCalc.FindAutoFilterForHeaderCell(sheetobj, rownum, colnum);
+      if (afHeader) {
+        var afArrow = document.createElement('span');
+        afArrow.className = 'autofilter-dropdown-arrow';
+        afArrow.style.cssText =
+          'cursor:pointer;float:right;margin-left:2px;font-size:x-small;user-select:none;';
+        afArrow.textContent = '▼';
+        afArrow.setAttribute('data-autofilter-id', afHeader.filterId);
+        afArrow.setAttribute('data-autofilter-coloffset', String(afHeader.colOffset));
+        afArrow.onclick = (function (filterId, colOffset, arrowEl) {
+          return function (ev) {
+            ev.stopPropagation();
+            SocialCalc.ShowAutoFilterDropdown(sheetobj, filterId, colOffset, arrowEl);
+          };
+        })(afHeader.filterId, afHeader.colOffset, afArrow);
+        result.appendChild(afArrow);
+      }
+    }
     num = cell.layout || sheetattribs.defaultlayout;
     if (num && typeof context.layouts[num] !== 'undefined') {
       stylestr += context.layouts[num];
@@ -5606,7 +6096,7 @@ More comments yet to come...
     if (sheetobj.colattribs.hide[SocialCalc.rcColname(colnum)] == 'yes') {
       result.style.cssText += ';display:none';
     }
-    if (sheetobj.rowattribs.hide[rownum] == 'yes') {
+    if (SocialCalc.RowEffectivelyHidden(sheetobj, rownum)) {
       result.style.cssText += ';display:none';
     }
     return result;
@@ -5846,6 +6336,135 @@ More comments yet to come...
       valueformat = '';
     }
     return SocialCalc.format_number_for_display(cell.datavalue, valuetype, valueformat);
+  };
+  SC.AutoFilterDropdownState = {
+    popupele: null,
+    sheet: null,
+    filterId: '',
+    colOffset: 0,
+    checked: {},
+  };
+  SC.BuildAutoFilterDropdownHtml = function (sheet, filterId, colOffset) {
+    var values = SocialCalc.CollectAutoFilterColumnValues(sheet, filterId, colOffset);
+    var def = sheet.autofilters[filterId];
+    var existing = (def && def.criteria[colOffset] && def.criteria[colOffset].values) || null;
+    var checked = {};
+    for (var vi = 0; vi < values.length; vi++) {
+      checked[values[vi]] = existing ? existing.indexOf(values[vi]) != -1 : true;
+    }
+    SocialCalc.AutoFilterDropdownState.checked = checked;
+    var allChecked = values.every(function (v) {
+      return checked[v];
+    });
+    var html =
+      '<div style="cursor:default;padding:4px;font-size:x-small;max-height:200px;overflow:auto;">';
+    html +=
+      '<div style="white-space:nowrap;"><label><input type="checkbox" onclick="SocialCalc.AutoFilterDropdownToggleAll(this.checked)"' +
+      (allChecked ? ' checked' : '') +
+      '> (Select All)</label></div><hr>';
+    for (var i = 0; i < values.length; i++) {
+      var escaped = SocialCalc.special_chars(values[i]);
+      html +=
+        '<div style="white-space:nowrap;"><label><input type="checkbox" data-autofilter-value="' +
+        escaped +
+        '" onclick="SocialCalc.AutoFilterDropdownToggleValue(this)"' +
+        (checked[values[i]] ? ' checked' : '') +
+        '> ' +
+        (escaped === '' ? '(Blanks)' : escaped) +
+        '</label></div>';
+    }
+    html +=
+      '<hr><div style="white-space:nowrap;text-align:right;">' +
+      '<input type="button" value="Clear Filter" onclick="SocialCalc.AutoFilterDropdownClear();">' +
+      '<input type="button" value="OK" onclick="SocialCalc.AutoFilterDropdownApply();">' +
+      '<input type="button" value="Cancel" onclick="SocialCalc.AutoFilterDropdownCancel();">' +
+      '</div></div>';
+    return html;
+  };
+  SC.ShowAutoFilterDropdown = function (sheet, filterId, colOffset, anchorElement) {
+    SocialCalc.AutoFilterDropdownClose();
+    var popupele = document.createElement('div');
+    popupele.innerHTML = SocialCalc.BuildAutoFilterDropdownHtml(sheet, filterId, colOffset);
+    var pos = SocialCalc.GetElementPositionWithScroll(anchorElement);
+    popupele.style.position = 'absolute';
+    popupele.style.left = pos.left + 'px';
+    popupele.style.top = pos.bottom + 'px';
+    popupele.style.backgroundColor = '#FFF';
+    popupele.style.border = '1px solid #888';
+    popupele.style.zIndex = '1000';
+    document.body.appendChild(popupele);
+    SocialCalc.AutoFilterDropdownState.popupele = popupele;
+    SocialCalc.AutoFilterDropdownState.sheet = sheet;
+    SocialCalc.AutoFilterDropdownState.filterId = filterId;
+    SocialCalc.AutoFilterDropdownState.colOffset = colOffset;
+  };
+  SC.AutoFilterDropdownToggleAll = function (checkedState) {
+    var state = SocialCalc.AutoFilterDropdownState;
+    if (!state.popupele) return;
+    var boxes = state.popupele.querySelectorAll('input[data-autofilter-value]');
+    for (var i = 0; i < boxes.length; i++) {
+      var box = boxes[i];
+      box.checked = checkedState;
+      state.checked[box.getAttribute('data-autofilter-value')] = checkedState;
+    }
+  };
+  SC.AutoFilterDropdownToggleValue = function (box) {
+    var state = SocialCalc.AutoFilterDropdownState;
+    state.checked[box.getAttribute('data-autofilter-value') || ''] = box.checked;
+  };
+  SC.AutoFilterDropdownApply = function () {
+    var state = SocialCalc.AutoFilterDropdownState;
+    if (!state.sheet) return;
+    var selected = [];
+    for (var v in state.checked) {
+      if (state.checked[v]) selected.push(v);
+    }
+    var cmd =
+      'autofilter criteria ' +
+      state.filterId +
+      ' ' +
+      state.colOffset +
+      ' ' +
+      SocialCalc.encodeForSave(JSON.stringify({ values: selected }));
+    SocialCalc.ScheduleSheetCommands(state.sheet, cmd, true);
+    SocialCalc.AutoFilterDropdownClose();
+  };
+  SC.AutoFilterDropdownClear = function () {
+    var state = SocialCalc.AutoFilterDropdownState;
+    if (!state.sheet) return;
+    SocialCalc.ScheduleSheetCommands(
+      state.sheet,
+      'autofilter clearcol ' + state.filterId + ' ' + state.colOffset,
+      true,
+    );
+    SocialCalc.AutoFilterDropdownClose();
+  };
+  SC.AutoFilterDropdownCancel = function () {
+    SocialCalc.AutoFilterDropdownClose();
+  };
+  SC.AutoFilterDropdownClose = function () {
+    var state = SocialCalc.AutoFilterDropdownState;
+    if (state.popupele && state.popupele.parentNode) {
+      state.popupele.parentNode.removeChild(state.popupele);
+    }
+    state.popupele = null;
+    state.sheet = null;
+    state.filterId = '';
+    state.colOffset = 0;
+    state.checked = {};
+  };
+  SC.FindAutoFilterForHeaderCell = function (sheetobj, rownum, colnum) {
+    for (var filterId in sheetobj.autofilters) {
+      var def = sheetobj.autofilters[filterId];
+      var prange = SocialCalc.ParseRange(def.range);
+      if (prange.cr1.row !== rownum) continue;
+      if (colnum < prange.cr1.col || colnum > prange.cr2.col) continue;
+      return {
+        filterId,
+        colOffset: colnum - prange.cr1.col,
+      };
+    }
+    return null;
   };
   SC.FormatValueForDisplay = function (sheetobj, value, cr, linkstyle) {
     var valueformat, valuetype, valuesubtype;
@@ -15755,6 +16374,221 @@ More comments yet to come...
     SocialCalc.Formula.SumifsFunction,
     -3,
     'sum_range, criteria_range1, criteria1, [criteria_range2, criteria2, ... criteria_range_n, criteria_n]',
+    '',
+    'stat',
+  ];
+  FormulaMut.SubtotalFunctionCodes = {
+    1: ['AVERAGE', false],
+    2: ['COUNT', false],
+    3: ['COUNTA', false],
+    4: ['MAX', false],
+    5: ['MIN', false],
+    6: ['PRODUCT', false],
+    7: ['STDEV', false],
+    8: ['STDEVP', false],
+    9: ['SUM', false],
+    10: ['VAR', false],
+    11: ['VARP', false],
+    101: ['AVERAGE', true],
+    102: ['COUNT', true],
+    103: ['COUNTA', true],
+    104: ['MAX', true],
+    105: ['MIN', true],
+    106: ['PRODUCT', true],
+    107: ['STDEV', true],
+    108: ['STDEVP', true],
+    109: ['SUM', true],
+    110: ['VAR', true],
+    111: ['VARP', true],
+  };
+  FormulaMut.SubtotalFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var PushOperand = function (t, v) {
+      operand.push({
+        type: t,
+        value: v,
+      });
+    };
+    var codeoperand = scf.OperandAsNumber(sheet, foperand);
+    if (codeoperand.type.charAt(0) != 'n') {
+      PushOperand('e#VALUE!', 0);
+      return;
+    }
+    var code = Math.floor(codeoperand.value - 0);
+    var entry = scf.SubtotalFunctionCodes[code];
+    if (!entry) {
+      PushOperand('e#VALUE!', 0);
+      return;
+    }
+    var aggregateKind = entry[0];
+    var includeManualHidden = entry[1];
+    var concat = '';
+    var sum = 0;
+    var resulttypesum = '';
+    var count = 0;
+    var counta = 0;
+    var product = 1;
+    var maxval;
+    var minval;
+    var mk = 0,
+      sk = 0,
+      mk1 = 0,
+      sk1 = 0;
+    var visitCell = function (sheetdata, cr) {
+      var crparts = SocialCalc.coordToCr(cr);
+      if (SocialCalc.SubtotalExcludesRow(sheetdata, crparts.row, includeManualHidden)) return;
+      var cell = sheetdata.cells[cr];
+      if (!cell) return;
+      if (
+        cell.datatype == 'f' &&
+        typeof cell.formula == 'string' &&
+        /^\s*SUBTOTAL\s*\(/i.test(cell.formula)
+      ) {
+        return;
+      }
+      var value1 = {
+        value: cell.datavalue,
+        type: cell.valuetype || 'b',
+      };
+      var t = value1.type.charAt(0);
+      if (t == 'n') count += 1;
+      if (t != 'b') counta += 1;
+      if (t != 'e' && t != 'b') concat = concat + value1.value;
+      if (t == 'n') {
+        var v1 = value1.value - 0;
+        sum += v1;
+        product *= v1;
+        maxval = maxval != undefined ? (v1 > maxval ? v1 : maxval) : v1;
+        minval = minval != undefined ? (v1 < minval ? v1 : minval) : v1;
+        if (count == 1) {
+          mk1 = v1;
+          sk1 = 0;
+        } else {
+          mk = mk1 + (v1 - mk1) / count;
+          sk = sk1 + (v1 - mk1) * (v1 - mk);
+          sk1 = sk;
+          mk1 = mk;
+        }
+        resulttypesum = scf.LookupResultType(
+          value1.type,
+          resulttypesum || value1.type,
+          scf.TypeLookupTable.plus,
+        );
+      } else if (t == 'e' && resulttypesum.charAt(0) != 'e') {
+        resulttypesum = value1.type;
+      }
+    };
+    while (foperand.length > 0) {
+      var refoperand = scf.TopOfStackValueAndType(sheet, foperand);
+      if (refoperand.type == 'range') {
+        var rangeinfo = scf.DecodeRangeParts(sheet, refoperand.value);
+        var col1num = rangeinfo.col1num,
+          ncols = rangeinfo.ncols,
+          row1num = rangeinfo.row1num,
+          nrows = rangeinfo.nrows;
+        for (var ri = 0; ri < nrows; ri++) {
+          for (var ci = 0; ci < ncols; ci++) {
+            visitCell(rangeinfo.sheetdata, SocialCalc.crToCoord(col1num + ci, row1num + ri));
+          }
+        }
+      } else if (refoperand.type == 'coord') {
+        var coordtext = refoperand.value;
+        var pos = coordtext.indexOf('!');
+        var coordsheet = pos != -1 ? scf.FindInSheetCache(coordtext.substring(pos + 1)) : sheet;
+        if (pos != -1) coordtext = coordtext.substring(0, pos);
+        visitCell(coordsheet, scf.PlainCoord(coordtext));
+      } else {
+        var t2 = refoperand.type.charAt(0);
+        if (t2 == 'n') count += 1;
+        counta += 1;
+        if (t2 != 'e') concat = concat + refoperand.value;
+        if (t2 == 'n') {
+          var v2 = refoperand.value - 0;
+          sum += v2;
+          product *= v2;
+          maxval = maxval != undefined ? (v2 > maxval ? v2 : maxval) : v2;
+          minval = minval != undefined ? (v2 < minval ? v2 : minval) : v2;
+          if (count == 1) {
+            mk1 = v2;
+            sk1 = 0;
+          } else {
+            mk = mk1 + (v2 - mk1) / count;
+            sk = sk1 + (v2 - mk1) * (v2 - mk);
+            sk1 = sk;
+            mk1 = mk;
+          }
+          resulttypesum = scf.LookupResultType(
+            refoperand.type,
+            resulttypesum || refoperand.type,
+            scf.TypeLookupTable.plus,
+          );
+        } else if (t2 == 'e' && resulttypesum.charAt(0) != 'e') {
+          resulttypesum = refoperand.type;
+        }
+      }
+    }
+    resulttypesum = resulttypesum || 'n';
+    switch (aggregateKind) {
+      case 'SUM':
+        PushOperand(resulttypesum, sum);
+        break;
+      case 'PRODUCT':
+        PushOperand(resulttypesum, product);
+        break;
+      case 'MIN':
+        PushOperand(resulttypesum, minval || 0);
+        break;
+      case 'MAX':
+        PushOperand(resulttypesum, maxval || 0);
+        break;
+      case 'COUNT':
+        PushOperand('n', count);
+        break;
+      case 'COUNTA':
+        PushOperand('n', counta);
+        break;
+      case 'AVERAGE':
+        if (count > 0) {
+          PushOperand(resulttypesum, sum / count);
+        } else {
+          PushOperand('e#DIV/0!', 0);
+        }
+        break;
+      case 'STDEV':
+        if (count > 1) {
+          PushOperand(resulttypesum, Math.sqrt(sk / (count - 1)));
+        } else {
+          PushOperand('e#DIV/0!', 0);
+        }
+        break;
+      case 'STDEVP':
+        if (count > 1) {
+          PushOperand(resulttypesum, Math.sqrt(sk / count));
+        } else {
+          PushOperand('e#DIV/0!', 0);
+        }
+        break;
+      case 'VAR':
+        if (count > 1) {
+          PushOperand(resulttypesum, sk / (count - 1));
+        } else {
+          PushOperand('e#DIV/0!', 0);
+        }
+        break;
+      case 'VARP':
+        if (count > 1) {
+          PushOperand(resulttypesum, sk / count);
+        } else {
+          PushOperand('e#DIV/0!', 0);
+        }
+        break;
+    }
+    return null;
+  };
+  SocialCalc.Formula.FunctionList['SUBTOTAL'] = [
+    SocialCalc.Formula.SubtotalFunction,
+    -2,
+    'function_code, ref1, [ref2, ...]',
     '',
     'stat',
   ];

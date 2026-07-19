@@ -361,6 +361,10 @@ declare global {
         sheet: {
           attribs: { needsrecalc: string };
           cells: Record<string, { datavalue: unknown; formula: string } | undefined>;
+          rowattribs: {
+            hide: Record<number, string>;
+            filterhide: Record<number, string>;
+          };
         };
       };
     };

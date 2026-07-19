@@ -23,6 +23,41 @@ declare namespace SocialCalc {
     allowedDataMimeTypes: string[];
   }
 
+  // --- AutoFilter -----------------------------------------------------------
+  //
+  // A per-column criterion. "values" is an exact-match allowlist (checked
+  // set semantics: cell text must be in the set to pass); "op"/"op2" encode
+  // comparison/text/date criteria in the same vocabulary as
+  // SocialCalc.Formula.TestCriteria ("<", "<=", ">", ">=", "<>", "=", or a
+  // bare/quoted value meaning "="; wildcard * and ? are honored for text).
+  // Both a values allowlist and comparison operators may be present; a row
+  // passes the column only if it satisfies every present sub-criterion
+  // (values allowlist AND op AND op2, each optional).
+  interface AutoFilterCriterion {
+    values?: string[]; // exact-match allowlist; absent/undefined = no allowlist restriction
+    op?: string; // e.g. ">=", "<", "<>10", "*abc*" -- fed directly to TestCriteria
+    op2?: string; // second comparison, ANDed with op (e.g. between: >=1 AND <=10)
+  }
+  interface AutoFilterDef {
+    id: string; // stable id, also the autofilters dictionary key
+    range: string; // "A1:D20" rectangular range, row 1 of range is the header
+    criteria: { [colOffset: number]: AutoFilterCriterion }; // 0-based offset from range's first column
+  }
+
+  // --- Structured tables ------------------------------------------------------
+  //
+  // Closed built-in banded-style palette; not arbitrary CSS. "none" disables
+  // banding. Table names share the same sanitization/uniqueness rules as
+  // SocialCalc named ranges (see socialcalc-3.ts ExecuteSheetCommand "table").
+  type TableStyle = "none" | "light1" | "light2" | "medium1" | "medium2" | "dark1";
+  interface StructuredTableDef {
+    name: string; // unique per-sheet identifier, also the tables dictionary key
+    range: string; // "A1:D20" rectangular range
+    hasHeader: boolean;
+    style: TableStyle;
+    filterId: string | null; // id into sheet.autofilters when hasHeader, else null
+  }
+
   const Callbacks: {
     expand_wiki:
       | ((displayvalue: string, sheetobj: Sheet, linkstyle: unknown, valueformat: string) => string)
@@ -123,12 +158,15 @@ declare namespace SocialCalc {
     rowattribs: {
       hide: { [row: number]: string };
       height: { [row: number]: number };
+      filterhide: { [row: number]: string };
     };
     colattribs: {
       width: { [col: string]: string };
       hide: { [col: string]: string };
     };
     names: { [name: string]: { desc: string; definition: string } };
+    autofilters: { [id: string]: AutoFilterDef };
+    tables: { [name: string]: StructuredTableDef };
     layouts: string[];
     layouthash: { [key: string]: number };
     fonts: string[];
@@ -202,6 +240,55 @@ declare namespace SocialCalc {
   function PrepareSpillMutation(sheet: Sheet, ranges: any[], blockAnchors: boolean): string;
   function ClearAllDerivedSpills(sheet: Sheet): void;
   function SanitizeSpills(sheet: Sheet): void;
+
+  // --- AutoFilter / structured table runtime -------------------------------
+  function RowEffectivelyHidden(sheet: Sheet, row: number): boolean;
+  function RecomputeAutoFilters(sheet: Sheet): void;
+  function RecomputeAutoFilter(sheet: Sheet, filterId: string): void;
+  function CollectAutoFilterColumnValues(
+    sheet: Sheet,
+    filterId: string,
+    colOffset: number,
+  ): string[];
+  function AdjustAutoFilterRangesForStructuralEdit(
+    sheet: Sheet,
+    startCol: number,
+    coloffset: number,
+    startRow: number,
+    rowoffset: number,
+  ): void;
+  function SanitizeTableName(name: string): string;
+  function SubtotalExcludesRow(sheet: Sheet, row: number, includeManualHidden: boolean): boolean;
+  function AutoFilterCellFailsCriterion(
+    sheet: Sheet,
+    criterion: AutoFilterCriterion,
+    cr: string,
+  ): boolean;
+  function FindAutoFilterForHeaderCell(
+    sheet: Sheet,
+    rownum: number,
+    colnum: number,
+  ): { filterId: string; colOffset: number } | null;
+  function BuildAutoFilterDropdownHtml(sheet: Sheet, filterId: string, colOffset: number): string;
+  function ShowAutoFilterDropdown(
+    sheet: Sheet,
+    filterId: string,
+    colOffset: number,
+    anchorElement: HTMLElement,
+  ): void;
+  function AutoFilterDropdownToggleAll(checkedState: boolean): void;
+  function AutoFilterDropdownToggleValue(box: HTMLInputElement): void;
+  function AutoFilterDropdownApply(): void;
+  function AutoFilterDropdownClear(): void;
+  function AutoFilterDropdownCancel(): void;
+  function AutoFilterDropdownClose(): void;
+  const AutoFilterDropdownState: {
+    popupele: HTMLElement | null;
+    sheet: Sheet | null;
+    filterId: string;
+    colOffset: number;
+    checked: { [value: string]: boolean };
+  };
   const sheetfieldsxlatshort: string[];
   const sheetfieldsxlatxlt: string[];
 

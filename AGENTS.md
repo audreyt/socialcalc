@@ -413,8 +413,12 @@ shipping bundle.
   real-valued average/position are unverified one-line bridges around the
   proved integer core, same split as `spill.ts`'s `planSpillRectangle`) —
   3 Dafny VCs.
+- `lemma/visibility.ts`: AutoFilter row-visibility composition policy —
+  manual/filter hide union, clear isolation (each axis independently
+  owned), idempotent filter-recompute, and filter-data-band membership — 7
+  Dafny VCs.
 
-Total: **87 VCs (26 + 5 + 3 + 15 + 29 + 3 + 3 + 3)**.
+Total: **94 VCs (26 + 5 + 3 + 15 + 29 + 3 + 3 + 3 + 7)**.
 
 After a facade edit:
 
@@ -465,6 +469,12 @@ Facade oracle mapping:
   `lemma/statistics.ts`'s header for the deliberate scope boundary (only
   genuinely integer-exact boundary/tie classification is proved; plain
   arithmetic folds and floating-point iterative solvers are not).
+- visibility: shipping `SocialCalc.RowEffectivelyHidden` (manual/filter hide
+  union) and `SocialCalc.RecomputeAutoFilter`'s idempotent recompute policy.
+  `test/lemma-visibility-facade.test.ts` exhaustively cross-checks the
+  facade against `RowEffectivelyHidden` over every manual/filter boolean
+  combination and proves recompute-on-recalc converges without drift in the
+  shipping runtime.
 
 ## Mutation testing
 

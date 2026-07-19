@@ -6,3 +6,4 @@ lemma/spill.ts
 lemma/weekday-policy.ts
 lemma/finance-policy.ts
 lemma/statistics.ts
+lemma/visibility.ts

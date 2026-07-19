@@ -191,7 +191,7 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
   // — the second-largest StringLiteral survivor cluster in the file.
   //
   // RANK/MEDIAN/QUARTILE, SORT/UNIQUE, date arithmetic, financial, logical/error,
-  // text, regex, and math/statistics functions were added after the 3.0.8
+  // text, regex, math/statistics, and SUBTOTAL were added after the 3.0.8
   // baseline was vendored, so the oracle has no corresponding help keys. Focused
   // compatibility suites cover registration, help text, and behavior; this test
   // asserts every carved-out key has non-empty help text. SEARCH reuses FIND's
@@ -231,6 +231,7 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
     "s_fdef_REGEXMATCH",
     "s_fdef_REGEXEXTRACT",
     "s_fdef_REGEXREPLACE",
+    "s_fdef_SUBTOTAL",
   ];
   const postOracleFargKeys = [
     "s_farg_rank",
@@ -264,10 +265,11 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
     "s_farg_pairedrange",
     "s_farg_forecast",
     "s_farg_trendgrowth",
+    "s_farg_function_code",
   ];
 
-  expect(Object.keys(candidateFdef).length).toBe(149);
-  expect(Object.keys(candidateFarg).length).toBe(69);
+  expect(Object.keys(candidateFdef).length).toBe(150);
+  expect(Object.keys(candidateFarg).length).toBe(70);
 
   const legacyFdef = { ...candidateFdef };
   const legacyFarg = { ...candidateFarg };

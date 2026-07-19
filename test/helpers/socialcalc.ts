@@ -153,6 +153,27 @@ class FakeElement {
   addEventListener() {}
 
   removeEventListener() {}
+
+  // Minimal support for tag[attr] and tag[attr="value"] attribute selectors
+  // (only what SocialCalc.AutoFilterDropdownToggleAll needs); not a general
+  // CSS engine.
+  querySelectorAll(selector: string): FakeElement[] {
+    const match = /^([a-zA-Z0-9]*)\[([\w-]+)(?:="([^"]*)")?\]$/.exec(selector.trim());
+    const results: FakeElement[] = [];
+    if (!match) return results;
+    const [, tag, attr, value] = match;
+    const walk = (node: FakeElement) => {
+      for (const child of node.childNodes) {
+        const tagOk = !tag || child.tagName === tag.toUpperCase();
+        const attrValue = child.getAttribute(attr);
+        const attrOk = attrValue != null && (value === undefined || attrValue === value);
+        if (tagOk && attrOk) results.push(child);
+        walk(child);
+      }
+    };
+    walk(this);
+    return results;
+  }
 }
 
 class FakeDocument {

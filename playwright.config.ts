@@ -19,7 +19,7 @@
 import { defineConfig, devices } from "@playwright/test";
 import process from "node:process";
 
-const port = 4173;
+const port = Number(process.env.SOCIALCALC_E2E_PORT || 4173);
 const coverageMode = process.env.SOCIALCALC_BROWSER_COVERAGE === "1";
 
 export default defineConfig({

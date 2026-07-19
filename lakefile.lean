@@ -101,4 +101,8 @@ lean_lib Spill where
 lean_lib Statistics where
   srcDir := "lemma"
   roots := #[`«statistics.types», `«statistics.def», `«statistics.proof»]
+
+lean_lib Visibility where
+  srcDir := "lemma"
+  roots := #[`«visibility.types», `«visibility.def», `«visibility.proof»]
   extraDepTargets := #[``downloadDependencies]

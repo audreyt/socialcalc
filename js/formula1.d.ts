@@ -432,6 +432,8 @@ declare namespace SocialCalc {
     const IndexFunction: FormulaFunctionImpl;
     const CountifSumifFunctions: FormulaFunctionImpl;
     const SumifsFunction: FormulaFunctionImpl;
+    const SubtotalFunction: FormulaFunctionImpl;
+    const SubtotalFunctionCodes: { [code: number]: [string, boolean] };
     const IfFunction: FormulaFunctionImpl;
     const DateFunction: FormulaFunctionImpl;
     const TimeFunction: FormulaFunctionImpl;
