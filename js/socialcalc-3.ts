@@ -4928,6 +4928,7 @@ SC.RecalcTimerRoutine = function () {
   if (scri.currentState == scri.state.start_calc) {
     recalcdata = new SocialCalc.RecalcData();
     sheet.recalcdata = recalcdata;
+    sheet.hasDynamicRef = false; // INDIRECT/OFFSET set this true while evaluating
 
     for (coord in sheet.cells) {
       // get list of cells to check for order
@@ -5059,6 +5060,27 @@ SC.RecalcTimerRoutine = function () {
   }
   sheet.spillTopologyChanged = false;
   sheet.spillTopologyRetried = false;
+
+  // Conservative dynamic-reference dependency policy: INDIRECT/OFFSET
+  // targets are not visible to RecalcCheckCell's static token walk (the
+  // target coord/range is only known after evaluation), so a formula that
+  // reads a cell touched earlier in this same pass by one of those
+  // functions could observe a value from before that cell's own recalc.
+  // Re-run the whole calc chain exactly once more whenever any INDIRECT/
+  // OFFSET call fired during the pass that just finished; by the second
+  // pass every statically-dependent cell already holds its final value,
+  // so the retry itself cannot introduce further staleness. Bounded to one
+  // retry (mirrors the spill-topology retry above) — sheets without
+  // INDIRECT/OFFSET never take this branch.
+  if (sheet.hasDynamicRef && !sheet.dynamicRefRetried) {
+    sheet.dynamicRefRetried = true;
+    sheet.hasDynamicRef = false;
+    delete sheet.recalcdata;
+    scri.currentState = scri.state.start_calc;
+    SocialCalc.RecalcSetTimeout();
+    return;
+  }
+  sheet.dynamicRefRetried = false;
 
   recalcdata.inrecalc = false;
 

@@ -56,13 +56,21 @@ const sheetCoreTests = [
 // Formula lexer/parser/operand-stack/rewrite tests, verified by name plus
 // grep for ParseFormulaIntoTokens/ConvertInfixToPolish/OperandAs*/
 // OffsetFormulaCoords/AdjustFormulaCoords/ReplaceFormulaCoords call sites.
-// Formula lexer/parser/operand-stack/rewrite tests, plus shipping compatibility
-// suites for weekday/date arithmetic and financial formulas. Facade tests cover
-// shipping cross-checks for weekday policy and finance policy; formula suites
-// cover EDATE/EOMONTH/DATEDIF/WEEKNUM/ISOWEEKNUM/YEARFRAC/WORKDAY,
-// NETWORKDAYS, WORKDAY.INTL, NETWORKDAYS.INTL, PPMT, IPMT, MIRR, XNPV,
-// and XIRR. Includes mutation-survivor regressions and direct SC.Formula
-// branch-coverage tests.
+// Excludes test/lemma-*-facade.test.ts on purpose: those exercise the
+// non-shipping LemmaScript mirror in lemma/a1.ts (see its header comment),
+// not the shipping js/formula-ref.ts this config mutates. Includes the
+// 2026-07-12 mutation-survivor regression files added while closing the
+// critical-scope Stryker gap (see stryker-mutation-disposition.json), the
+// semantic-audit-hardened branch-coverage file (direct SC.Formula.* calls
+// across EvaluatePolish/ConvertInfixToPolish/DecodeRangeParts/FreshnessInfo/
+// FunctionClasses/etc.), and the NaN-vs-overflow numeric-error-message
+// regression (drives EvaluatePolish via a full sheet recalc).
+// Includes date/finance compatibility suites and dynamic-reference coverage:
+// formula-date-arithmetic.test.ts covers date/workday functions;
+// formula-financial-functions.test.ts covers PPMT/IPMT/MIRR/XNPV/XIRR; and
+// formula-dynamic-reference.test.ts drives INDIRECT/OFFSET through
+// evaluate_parsed_formula and full scheduleCommands/recalcSheet cycles,
+// exercising formula-ref.ts OffsetRectangle and coordinate overflow paths.
 const formulaOnlyTests = [
   "test/formula-coverage.test.ts",
   "test/formula.test.ts",
@@ -79,6 +87,7 @@ const formulaOnlyTests = [
   "test/formula-numeric-error-classification-regressions.test.ts",
   "test/formula-date-arithmetic.test.ts",
   "test/lemma-weekday-policy-facade.test.ts",
+  "test/formula-dynamic-reference.test.ts",
 ];
 
 // Differential/adversarial corpus (test/differential/**, test/adversarial/**):
@@ -201,6 +210,13 @@ export const testsByFile = {
   // branches.test.ts, render-security-policy.test.ts, and
   // sheet-cache-load-regressions.test.ts (direct SC.Formula.SheetCache /
   // `new SC.Sheet` call sites) all drive that surface directly.
+  // formula-dynamic-reference.test.ts (2026-07-19) additionally owns the
+  // bounded dynamic-reference retry pass in RecalcTimerRoutine
+  // (`sheet.hasDynamicRef && !sheet.dynamicRefRetried`, set by INDIRECT/
+  // OFFSET in js/formula1.ts): its same-pass-staleness tests construct
+  // `new SC.Sheet()`, drive it through scheduleCommands/recalcSheet, and
+  // were verified (by temporarily disabling the retry branch) to fail
+  // without that exact mechanism.
   "socialcalc-3.ts": [
     ...sheetCoreTests,
     ...commandRegressionTests,
@@ -211,6 +227,7 @@ export const testsByFile = {
     "test/hardening-sheet-core-branches.test.ts",
     "test/render-security-policy.test.ts",
     "test/sheet-cache-load-regressions.test.ts",
+    "test/formula-dynamic-reference.test.ts",
   ],
 
   "socialcalctableeditor.ts": editorTests,

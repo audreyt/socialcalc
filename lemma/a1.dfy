@@ -35,6 +35,8 @@ datatype OffsetA1PartsResult = OffsetA1PartsResult(col: int, row: int)
 
 datatype ColToRcRanksResult = ColToRcRanksResult(colhigh: int, collow: int)
 
+datatype OffsetRectangleResult = OffsetRectangleResult(ok: bool, col1: int, row1: int, col2: int, row2: int)
+
 function clampCol(c: int): int
 {
   if (c < 1) then
@@ -274,7 +276,49 @@ lemma colToRcRanks_ensures(c: int)
 {
 }
 
+function offsetRectangle(anchorCol: int, anchorRow: int, refRows: int, refCols: int, rowoffset: int, coloffset: int, height: int, width: int): OffsetRectangleResult
+{
+  var h := (if (height == 0) then refRows else height);
+  var w := (if (width == 0) then refCols else width);
+  var col1 := (anchorCol + coloffset);
+  var row1 := (anchorRow + rowoffset);
+  if ((((((h < 1) || (w < 1)) || (col1 < 1)) || (row1 < 1)) || (col1 > MAX_COL)) || (row1 > MAX_ROW)) then
+    OffsetRectangleResult(false, 0, 0, 0, 0)
+  else
+    var col2 := ((col1 + w) - 1);
+    var row2 := ((row1 + h) - 1);
+    if ((col2 > MAX_COL) || (row2 > MAX_ROW)) then
+      OffsetRectangleResult(false, 0, 0, 0, 0)
+    else
+      OffsetRectangleResult(true, col1, row1, col2, row2)
+}
+
+lemma offsetRectangle_ensures(anchorCol: int, anchorRow: int, refRows: int, refCols: int, rowoffset: int, coloffset: int, height: int, width: int)
+  ensures ((offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).ok == true) || (offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).ok == false))
+  ensures ((offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).ok == false) ==> ((((offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).col1 == 0) && (offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).row1 == 0)) && (offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).col2 == 0)) && (offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).row2 == 0)))
+  ensures ((offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).ok == true) ==> ((offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).col1 >= 1) && (offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).col1 <= 702)))
+  ensures ((offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).ok == true) ==> ((offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).row1 >= 1) && (offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).row1 <= 65536)))
+  ensures ((offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).ok == true) ==> ((offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).col2 >= offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).col1) && (offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).col2 <= 702)))
+  ensures ((offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).ok == true) ==> ((offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).row2 >= offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).row1) && (offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width).row2 <= 65536)))
+{
+}
+
+function wouldOffsetRectangleRef(anchorCol: int, anchorRow: int, refRows: int, refCols: int, rowoffset: int, coloffset: int, height: int, width: int): bool
+{
+  var plan := offsetRectangle(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width);
+  (plan.ok == false)
+}
+
+lemma wouldOffsetRectangleRef_ensures(anchorCol: int, anchorRow: int, refRows: int, refCols: int, rowoffset: int, coloffset: int, height: int, width: int)
+  ensures ((wouldOffsetRectangleRef(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width) == true) || (wouldOffsetRectangleRef(anchorCol, anchorRow, refRows, refCols, rowoffset, coloffset, height, width) == false))
+{
+}
+
 const LETTERS: seq<string> := ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
+
+const MAX_COL: int := 702
+
+const MAX_ROW: int := 65536
 
 method rcColname(c: int) returns (res: string)
   ensures (|res| >= 1)

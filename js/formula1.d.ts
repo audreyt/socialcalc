@@ -510,6 +510,8 @@ declare namespace SocialCalc {
     const NotFunction: FormulaFunctionImpl;
     const ChooseFunction: FormulaFunctionImpl;
     const ColumnsRowsFunctions: FormulaFunctionImpl;
+    const IndirectFunction: FormulaFunctionImpl;
+    const OffsetFunction: FormulaFunctionImpl;
     const ZeroArgFunctions: FormulaFunctionImpl;
 
     // Financial

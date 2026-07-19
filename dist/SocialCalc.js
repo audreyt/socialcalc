@@ -617,6 +617,8 @@
       'Evaluates condition1, condition2, ... in order and returns the value paired with the first true condition; returns #N/A if none are true. ',
     s_fdef_INDEX:
       'Returns a cell or range reference for the specified row and column in the range. If range is 1-dimensional, then only one of rownum or colnum are needed. If range is 2-dimensional and rownum or colnum are zero, a reference to the range of just the specified column or row is returned. You can use the returned reference value in a range, e.g., sum(A1:INDEX(A2:A10,4)). ',
+    s_fdef_INDIRECT:
+      'Returns the reference specified by ref_text, evaluated as a live cell/range reference rather than a literal string. Accepts A1-style references (A1, $A$1, A1:B2), sheet-qualified references (Sheet1!A1), and defined names. If a1 is omitted or non-zero, ref_text is parsed as A1-style; a1=FALSE (R1C1-style) is not supported and always returns #REF!. Invalid text, unavailable sheets, and out-of-bounds column/row overflow all return #REF!. ',
     s_fdef_INT: 'Returns the value rounded down to the nearest integer (towards -infinity). ',
     s_fdef_IRR:
       'Returns the interest rate at which the cash flows in the range have a net present value of zero. Uses an iterative process that will return #NUM! error if it does not converge. There may be more than one possible solution. Providing the optional guess value may help in certain situations where it does not converge or finds an inappropriate solution (the default guess is 10%). ',
@@ -659,6 +661,8 @@
     s_fdef_NPV:
       'Returns the net present value of cash flows (which may be individual values and/or ranges) at the given rate. The flows are positive if income, negative if paid out, and are assumed at the end of each period. ',
     s_fdef_ODD: 'Rounds the value up in magnitude to the nearest odd integer. ',
+    s_fdef_OFFSET:
+      "Returns a reference offset from reference by rows/cols (may be negative), resized to the optional height/width (omitted inherits the reference's own extent; an explicit 0 is #REF!). Any resulting edge outside column A..ZZ or row 1..65536 returns #REF!. ",
     s_fdef_OR: 'True if any argument is true ',
     s_fdef_PI: 'The value 3.1415926... ',
     s_fdef_PMT:
@@ -798,12 +802,14 @@
     s_farg_hlookup: 'value, range, row, [rangelookup]',
     s_farg_iffunc: 'logical-expression, true-value, [false-value]',
     s_farg_index: 'range, rownum, colnum',
+    s_farg_indirect: 'ref_text, [a1]',
     s_farg_irr: 'range, [guess]',
     s_farg_tc: 'text, count',
     s_farg_log: 'value, base',
     s_farg_match: 'value, range, [rangelookup]',
     s_farg_mid: 'text, start, length',
     s_farg_nper: 'rate, payment, pv, [fv, [paytype]]',
+    s_farg_offset: 'reference, rows, cols, [height], [width]',
     s_farg_npv: 'rate, value1, value2, ...',
     s_farg_pmt: 'rate, n, pv, [fv, [paytype]]',
     s_farg_pv: 'rate, n, payment, [fv, [paytype]]',
@@ -4865,6 +4871,7 @@ More comments yet to come...
     if (scri.currentState == scri.state.start_calc) {
       recalcdata = new SocialCalc.RecalcData();
       sheet.recalcdata = recalcdata;
+      sheet.hasDynamicRef = false;
       for (coord in sheet.cells) {
         if (!coord) continue;
         recalcdata.celllist.push(coord);
@@ -4986,6 +4993,15 @@ More comments yet to come...
     }
     sheet.spillTopologyChanged = false;
     sheet.spillTopologyRetried = false;
+    if (sheet.hasDynamicRef && !sheet.dynamicRefRetried) {
+      sheet.dynamicRefRetried = true;
+      sheet.hasDynamicRef = false;
+      delete sheet.recalcdata;
+      scri.currentState = scri.state.start_calc;
+      SocialCalc.RecalcSetTimeout();
+      return;
+    }
+    sheet.dynamicRefRetried = false;
     recalcdata.inrecalc = false;
     sheet.reRenderCellList = sheet.recalcdata.celllist;
     delete sheet.recalcdata;
@@ -19285,6 +19301,221 @@ More comments yet to come...
     '',
     'lookup',
   ];
+  FormulaMut.IndirectFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    sheet.hasDynamicRef = true;
+    var reftext = scf.OperandAsText(sheet, foperand);
+    if (reftext.type.charAt(0) == 'e') {
+      scf.PushOperand(operand, reftext.type, 0);
+      return;
+    }
+    var a1style = true;
+    if (foperand.length) {
+      var a1operand = scf.OperandAsNumber(sheet, foperand);
+      if (a1operand.type.charAt(0) == 'e') {
+        scf.PushOperand(operand, a1operand.type, 0);
+        return;
+      }
+      a1style = a1operand.value !== 0;
+    }
+    if (!a1style) {
+      scf.PushOperand(operand, 'e#REF!', 0);
+      return;
+    }
+    var text = ('' + reftext.value).trim();
+    if (!text) {
+      scf.PushOperand(operand, 'e#REF!', 0);
+      return;
+    }
+    var sheetname = '';
+    var body = text;
+    var bangpos = text.lastIndexOf('!');
+    if (bangpos != -1) {
+      sheetname = text.substring(0, bangpos);
+      if (
+        sheetname.length >= 2 &&
+        sheetname.charAt(0) == "'" &&
+        sheetname.charAt(sheetname.length - 1) == "'"
+      ) {
+        sheetname = sheetname.substring(1, sheetname.length - 1).replace(/''/g, "'");
+      }
+      body = text.substring(bangpos + 1);
+    }
+    var targetsheet = sheet;
+    if (sheetname) {
+      targetsheet = scf.FindInSheetCache(sheetname);
+      if (targetsheet == null) {
+        scf.PushOperand(
+          operand,
+          'e#REF!',
+          SocialCalc.Constants.s_sheetunavailable + ' ' + sheetname,
+        );
+        return;
+      }
+    }
+    var coordregex = /^\$?[A-Z]{1,2}\$?[1-9]\d*$/i;
+    var rangeparts = body.split(':');
+    var pushCoordOrRange = function (c1, c2) {
+      var cr1 = SocialCalc.coordToCr(c1.replace(/\$/g, ''));
+      if (cr1.row > 65536) {
+        scf.PushOperand(operand, 'e#REF!', 0);
+        return;
+      }
+      var suffix = sheetname ? '!' + sheetname : '';
+      if (c2 == null) {
+        scf.PushOperand(operand, 'coord', c1.toUpperCase().replace(/\$/g, '') + suffix);
+      } else {
+        var cr2 = SocialCalc.coordToCr(c2.replace(/\$/g, ''));
+        if (cr2.row > 65536) {
+          scf.PushOperand(operand, 'e#REF!', 0);
+          return;
+        }
+        scf.PushOperand(
+          operand,
+          'range',
+          c1.toUpperCase().replace(/\$/g, '') +
+            suffix +
+            '|' +
+            c2.toUpperCase().replace(/\$/g, '') +
+            '|',
+        );
+      }
+    };
+    if (
+      rangeparts.length == 2 &&
+      coordregex.test(rangeparts[0]) &&
+      coordregex.test(rangeparts[1])
+    ) {
+      pushCoordOrRange(rangeparts[0], rangeparts[1]);
+      return;
+    }
+    if (rangeparts.length == 1 && coordregex.test(body)) {
+      pushCoordOrRange(body, null);
+      return;
+    }
+    var nvalue = scf.LookupName(targetsheet, body.toUpperCase());
+    if (nvalue.type == 'coord' || nvalue.type == 'range') {
+      if (sheetname && nvalue.value.indexOf('!') == -1) {
+        if (nvalue.type == 'coord') {
+          nvalue.value = nvalue.value + '!' + sheetname;
+        } else {
+          var rv = nvalue.value;
+          var rpos = rv.indexOf('|');
+          nvalue.value = rv.substring(0, rpos) + '!' + sheetname + '|' + rv.substring(rpos + 1);
+        }
+      }
+      scf.PushOperand(operand, nvalue.type, nvalue.value);
+      return;
+    }
+    scf.PushOperand(operand, 'e#REF!', 0);
+  };
+  SocialCalc.Formula.FunctionList['INDIRECT'] = [
+    SocialCalc.Formula.IndirectFunction,
+    -1,
+    'indirect',
+    '',
+    'lookup',
+  ];
+  FormulaMut.OffsetFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    sheet.hasDynamicRef = true;
+    var refoperand = scf.TopOfStackValueAndType(sheet, foperand);
+    var sheetname = '';
+    var refvalue = refoperand.value;
+    var reftype = refoperand.type;
+    if (reftype != 'coord' && reftype != 'range') {
+      scf.PushOperand(operand, 'e#REF!', 0);
+      return;
+    }
+    var anchorCol, anchorRow, refRows, refCols;
+    if (reftype == 'coord') {
+      var coordtext = refvalue;
+      var bangpos = coordtext.indexOf('!');
+      if (bangpos != -1) {
+        sheetname = coordtext.substring(bangpos + 1);
+        coordtext = coordtext.substring(0, bangpos);
+      }
+      var cr = SocialCalc.coordToCr(coordtext);
+      anchorCol = cr.col;
+      anchorRow = cr.row;
+      refRows = 1;
+      refCols = 1;
+    } else {
+      var rangeinfo = scf.DecodeRangeParts(sheet, refvalue);
+      if (!rangeinfo) {
+        scf.PushOperand(operand, 'e#REF!', 0);
+        return;
+      }
+      sheetname = rangeinfo.sheetname;
+      anchorCol = rangeinfo.col1num;
+      anchorRow = rangeinfo.row1num;
+      refRows = rangeinfo.nrows;
+      refCols = rangeinfo.ncols;
+    }
+    var rowsoperand = scf.OperandAsNumber(sheet, foperand);
+    if (rowsoperand.type.charAt(0) == 'e') {
+      scf.PushOperand(operand, rowsoperand.type, 0);
+      return;
+    }
+    var colsoperand = scf.OperandAsNumber(sheet, foperand);
+    if (colsoperand.type.charAt(0) == 'e') {
+      scf.PushOperand(operand, colsoperand.type, 0);
+      return;
+    }
+    var height;
+    var width;
+    if (foperand.length) {
+      var heightoperand = scf.OperandAsNumber(sheet, foperand);
+      if (heightoperand.type.charAt(0) == 'e') {
+        scf.PushOperand(operand, heightoperand.type, 0);
+        return;
+      }
+      height = heightoperand.value;
+      if (foperand.length) {
+        var widthoperand = scf.OperandAsNumber(sheet, foperand);
+        if (widthoperand.type.charAt(0) == 'e') {
+          scf.PushOperand(operand, widthoperand.type, 0);
+          return;
+        }
+        width = widthoperand.value;
+      }
+    }
+    var rect = SocialCalc.OffsetRectangle(
+      anchorCol,
+      anchorRow,
+      refRows,
+      refCols,
+      rowsoperand.value,
+      colsoperand.value,
+      height,
+      width,
+    );
+    if (!rect.ok) {
+      scf.PushOperand(operand, 'e#REF!', 0);
+      return;
+    }
+    var suffix = sheetname ? '!' + sheetname : '';
+    if (rect.col1 == rect.col2 && rect.row1 == rect.row2) {
+      scf.PushOperand(operand, 'coord', SocialCalc.crToCoord(rect.col1, rect.row1) + suffix);
+    } else {
+      scf.PushOperand(
+        operand,
+        'range',
+        SocialCalc.crToCoord(rect.col1, rect.row1) +
+          suffix +
+          '|' +
+          SocialCalc.crToCoord(rect.col2, rect.row2) +
+          '|',
+      );
+    }
+  };
+  SocialCalc.Formula.FunctionList['OFFSET'] = [
+    SocialCalc.Formula.OffsetFunction,
+    -3,
+    'offset',
+    '',
+    'lookup',
+  ];
   FormulaMut.ZeroArgFunctions = function (fname, operand, _foperand, _sheet) {
     var startval, tzoffset, start_1_1_1970, seconds_in_a_day, nowdays;
     var result = {
@@ -23243,6 +23474,48 @@ More comments yet to come...
         col: p0.col,
         coord: range,
       },
+    };
+  };
+  FormulaRefRoot.OffsetRectangle = function (
+    anchorCol,
+    anchorRow,
+    refRows,
+    refCols,
+    rowoffset,
+    coloffset,
+    height,
+    width,
+  ) {
+    const h = height == null ? refRows : height;
+    const w = width == null ? refCols : width;
+    const col1 = anchorCol + coloffset;
+    const row1 = anchorRow + rowoffset;
+    if (h < 1 || w < 1 || col1 < 1 || row1 < 1 || col1 > 702 || row1 > 65536) {
+      return {
+        ok: false,
+        col1: 0,
+        row1: 0,
+        col2: 0,
+        row2: 0,
+      };
+    }
+    const col2 = col1 + w - 1;
+    const row2 = row1 + h - 1;
+    if (col2 > 702 || row2 > 65536) {
+      return {
+        ok: false,
+        col1: 0,
+        row1: 0,
+        col2: 0,
+        row2: 0,
+      };
+    }
+    return {
+      ok: true,
+      col1,
+      row1,
+      col2,
+      row2,
     };
   };
   function quoteFormulaString(text) {

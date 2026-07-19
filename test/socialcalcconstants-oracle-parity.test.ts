@@ -191,11 +191,11 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
   // — the second-largest StringLiteral survivor cluster in the file.
   //
   // RANK/MEDIAN/QUARTILE, SORT/UNIQUE, date arithmetic, financial, logical/error,
-  // text, regex, math/statistics, SUBTOTAL, and XMATCH/XLOOKUP were added after
-  // the 3.0.8 baseline was vendored, so the oracle has no corresponding help
-  // keys. Focused compatibility suites cover registration, help text, and
-  // behavior; this test asserts every carved-out key has non-empty help text.
-  // SEARCH reuses FIND's s_farg_find definition.
+  // text, regex, math/statistics, SUBTOTAL, lookup, and INDIRECT/OFFSET were
+  // added after the 3.0.8 baseline was vendored, so the oracle has no
+  // corresponding help keys. Focused compatibility suites cover registration,
+  // help text, and behavior; this test asserts every carved-out key has
+  // non-empty help text. SEARCH reuses FIND's s_farg_find definition.
   const postOracleFdefKeys = [
     "s_fdef_RANK",
     "s_fdef_MEDIAN",
@@ -234,6 +234,8 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
     "s_fdef_SUBTOTAL",
     "s_fdef_XMATCH",
     "s_fdef_XLOOKUP",
+    "s_fdef_INDIRECT",
+    "s_fdef_OFFSET",
   ];
   const postOracleFargKeys = [
     "s_farg_rank",
@@ -270,10 +272,12 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
     "s_farg_function_code",
     "s_farg_xmatch",
     "s_farg_xlookup",
+    "s_farg_indirect",
+    "s_farg_offset",
   ];
 
-  expect(Object.keys(candidateFdef).length).toBe(152);
-  expect(Object.keys(candidateFarg).length).toBe(72);
+  expect(Object.keys(candidateFdef).length).toBe(154);
+  expect(Object.keys(candidateFarg).length).toBe(74);
 
   const legacyFdef = { ...candidateFdef };
   const legacyFarg = { ...candidateFarg };
@@ -286,10 +290,10 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
   expect(legacyFarg).toEqual(pickByPrefix(Oracle.Constants, "s_farg_"));
 
   // The post-3.0.8 date, financial, logical/error, text, regex, math/statistics,
-  // SUBTOTAL, and lookup keys have no oracle counterpart to diff against.
-  // Focused compatibility suites cover FunctionList, picker plumbing, and
-  // behavior; this test only asserts every carved-out key has non-empty help
-  // text.
+  // SUBTOTAL, lookup, and dynamic-reference keys have no oracle counterpart to
+  // diff against. Focused compatibility suites cover FunctionList, picker
+  // plumbing, and behavior, including INDIRECT/OFFSET registration; this test
+  // only asserts every carved-out key has non-empty help text.
   for (const key of postOracleFdefKeys) {
     expect(candidateFdef[key]).toBeTruthy();
   }

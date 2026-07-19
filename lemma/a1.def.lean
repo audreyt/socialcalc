@@ -9,6 +9,10 @@ set_option loom.semantics.choice "demonic"
 
 def LETTERS : Array String := #["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
 
+def MAX_COL : Int := 702
+
+def MAX_ROW : Int := 65536
+
 method rcColname (c : Int) return (res : String)
   ensures res.length ≥ 1
   ensures res.length ≤ 2
@@ -197,3 +201,18 @@ method colToRcRanks (c : Int) return (res : ColToRcRanksResult)
   ensures res.colhigh ≤ 26
   do
     return Pure.colToRcRanks c
+
+method offsetRectangle (anchorCol : Int) (anchorRow : Int) (refRows : Int) (refCols : Int) (rowoffset : Int) (coloffset : Int) (height : Int) (width : Int) return (res : OffsetRectangleResult)
+  ensures res.ok = true ∨ res.ok = false
+  ensures res.ok = false → res.col1 = 0 ∧ res.row1 = 0 ∧ res.col2 = 0 ∧ res.row2 = 0
+  ensures res.ok = true → res.col1 ≥ 1 ∧ res.col1 ≤ 702
+  ensures res.ok = true → res.row1 ≥ 1 ∧ res.row1 ≤ 65536
+  ensures res.ok = true → res.col2 ≥ res.col1 ∧ res.col2 ≤ 702
+  ensures res.ok = true → res.row2 ≥ res.row1 ∧ res.row2 ≤ 65536
+  do
+    return Pure.offsetRectangle anchorCol anchorRow refRows refCols rowoffset coloffset height width
+
+method wouldOffsetRectangleRef (anchorCol : Int) (anchorRow : Int) (refRows : Int) (refCols : Int) (rowoffset : Int) (coloffset : Int) (height : Int) (width : Int) return (res : Bool)
+  ensures res = true ∨ res = false
+  do
+    return Pure.wouldOffsetRectangleRef anchorCol anchorRow refRows refCols rowoffset coloffset height width

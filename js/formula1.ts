@@ -7237,6 +7237,285 @@ SocialCalc.Formula.FunctionList["ROWS"] = [
 
 /*
 #
+# INDIRECT(ref_text,[a1])
+#
+# Turns ref_text into an actual reference. a1 defaults to TRUE (A1-style).
+# a1=FALSE would select R1C1-style references; the tokenizer/coord parser
+# in this codebase has no R1C1 support (formula-parse.ts only recognizes
+# /^\$?[A-Z]{1,2}\$?[1-9]\d*$/i coords), so a1=FALSE always yields #REF!.
+# Accepts: A1, $A$1, A1:B2, Sheet1!A1, Sheet1!A1:B2, 'My Sheet'!A1, and
+# defined names (coord/range/formula-defined) via LookupName. Invalid text,
+# unknown sheets, and out-of-bounds columns/rows (>ZZ / >65536) yield #REF!.
+#
+*/
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.IndirectFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+  sheet.hasDynamicRef = true; // conservative: force one extra recalc pass this cycle
+
+  var reftext = scf.OperandAsText(sheet, foperand);
+  if (reftext.type.charAt(0) == "e") {
+    scf.PushOperand(operand, reftext.type, 0);
+    return;
+  }
+
+  var a1style = true;
+  if (foperand.length) {
+    var a1operand = scf.OperandAsNumber(sheet, foperand);
+    if (a1operand.type.charAt(0) == "e") {
+      scf.PushOperand(operand, a1operand.type, 0);
+      return;
+    }
+    a1style = a1operand.value !== 0;
+  }
+
+  if (!a1style) {
+    // R1C1-style references are not supported by the parser/tokenizer.
+    scf.PushOperand(operand, "e#REF!", 0);
+    return;
+  }
+
+  var text = ("" + reftext.value).trim();
+  if (!text) {
+    scf.PushOperand(operand, "e#REF!", 0);
+    return;
+  }
+
+  var sheetname = "";
+  var body = text;
+  var bangpos = text.lastIndexOf("!");
+  if (bangpos != -1) {
+    sheetname = text.substring(0, bangpos);
+    if (
+      sheetname.length >= 2 &&
+      sheetname.charAt(0) == "'" &&
+      sheetname.charAt(sheetname.length - 1) == "'"
+    ) {
+      sheetname = sheetname.substring(1, sheetname.length - 1).replace(/''/g, "'");
+    }
+    body = text.substring(bangpos + 1);
+  }
+
+  var targetsheet: typeof sheet | null = sheet;
+  if (sheetname) {
+    targetsheet = scf.FindInSheetCache(sheetname);
+    if (targetsheet == null) {
+      scf.PushOperand(operand, "e#REF!", SocialCalc.Constants.s_sheetunavailable + " " + sheetname);
+      return;
+    }
+  }
+
+  var coordregex = /^\$?[A-Z]{1,2}\$?[1-9]\d*$/i;
+  var rangeparts = body.split(":");
+
+  // coordregex (above) already guarantees col in [1,702] and row >= 1 for
+  // anything reaching this point, so only the row-overflow edge is live.
+  var pushCoordOrRange = function (c1: string, c2: string | null) {
+    var cr1 = SocialCalc.coordToCr(c1.replace(/\$/g, ""));
+    if (cr1.row > 65536) {
+      scf.PushOperand(operand, "e#REF!", 0);
+      return;
+    }
+    var suffix = sheetname ? "!" + sheetname : "";
+    if (c2 == null) {
+      scf.PushOperand(operand, "coord", c1.toUpperCase().replace(/\$/g, "") + suffix);
+    } else {
+      var cr2 = SocialCalc.coordToCr(c2.replace(/\$/g, ""));
+      if (cr2.row > 65536) {
+        scf.PushOperand(operand, "e#REF!", 0);
+        return;
+      }
+      scf.PushOperand(
+        operand,
+        "range",
+        c1.toUpperCase().replace(/\$/g, "") +
+          suffix +
+          "|" +
+          c2.toUpperCase().replace(/\$/g, "") +
+          "|",
+      );
+    }
+  };
+
+  if (
+    rangeparts.length == 2 &&
+    coordregex.test(rangeparts[0]!) &&
+    coordregex.test(rangeparts[1]!)
+  ) {
+    pushCoordOrRange(rangeparts[0]!, rangeparts[1]!);
+    return;
+  }
+  if (rangeparts.length == 1 && coordregex.test(body)) {
+    pushCoordOrRange(body, null);
+    return;
+  }
+
+  // Not a direct coord/range: try a defined name on the target sheet.
+  var nvalue = scf.LookupName(targetsheet, body.toUpperCase());
+  if (nvalue.type == "coord" || nvalue.type == "range") {
+    if (sheetname && (nvalue.value as string).indexOf("!") == -1) {
+      if (nvalue.type == "coord") {
+        nvalue.value = (nvalue.value as string) + "!" + sheetname;
+      } else {
+        var rv = nvalue.value as string;
+        var rpos = rv.indexOf("|");
+        nvalue.value = rv.substring(0, rpos) + "!" + sheetname + "|" + rv.substring(rpos + 1);
+      }
+    }
+    scf.PushOperand(operand, nvalue.type, nvalue.value);
+    return;
+  }
+
+  scf.PushOperand(operand, "e#REF!", 0);
+};
+
+SocialCalc.Formula.FunctionList["INDIRECT"] = [
+  SocialCalc.Formula.IndirectFunction,
+  -1,
+  "indirect",
+  "",
+  "lookup",
+];
+
+/*
+#
+# OFFSET(reference,rows,cols,[height],[width])
+#
+# Returns a reference offset from `reference` by rows/cols (may be negative),
+# resized to height/width (omitted -> inherit reference's own extent;
+# explicit 0 -> #REF!). Any edge landing outside col A..ZZ (1..702) or
+# row 1..65536 is a #REF! overflow. Preserves the reference's own sheet
+# qualifier, if any.
+#
+*/
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.OffsetFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+  sheet.hasDynamicRef = true; // conservative: force one extra recalc pass this cycle
+
+  var refoperand = scf.TopOfStackValueAndType(sheet, foperand);
+  var sheetname = "";
+  var refvalue = refoperand.value;
+  var reftype = refoperand.type;
+
+  if (reftype != "coord" && reftype != "range") {
+    scf.PushOperand(operand, "e#REF!", 0);
+    return;
+  }
+
+  var anchorCol: number, anchorRow: number, refRows: number, refCols: number;
+
+  if (reftype == "coord") {
+    var coordtext = refvalue as string;
+    var bangpos = coordtext.indexOf("!");
+    if (bangpos != -1) {
+      sheetname = coordtext.substring(bangpos + 1);
+      coordtext = coordtext.substring(0, bangpos);
+    }
+    var cr = SocialCalc.coordToCr(coordtext);
+    anchorCol = cr.col;
+    anchorRow = cr.row;
+    refRows = 1;
+    refCols = 1;
+  } else {
+    var rangeinfo = scf.DecodeRangeParts(sheet, refvalue as string);
+    if (!rangeinfo) {
+      scf.PushOperand(operand, "e#REF!", 0);
+      return;
+    }
+    sheetname = rangeinfo.sheetname;
+    anchorCol = rangeinfo.col1num;
+    anchorRow = rangeinfo.row1num;
+    refRows = rangeinfo.nrows;
+    refCols = rangeinfo.ncols;
+  }
+
+  var rowsoperand = scf.OperandAsNumber(sheet, foperand);
+  if (rowsoperand.type.charAt(0) == "e") {
+    scf.PushOperand(operand, rowsoperand.type, 0);
+    return;
+  }
+  var colsoperand = scf.OperandAsNumber(sheet, foperand);
+  if (colsoperand.type.charAt(0) == "e") {
+    scf.PushOperand(operand, colsoperand.type, 0);
+    return;
+  }
+
+  var height: number | undefined;
+  var width: number | undefined;
+
+  if (foperand.length) {
+    var heightoperand = scf.OperandAsNumber(sheet, foperand);
+    if (heightoperand.type.charAt(0) == "e") {
+      scf.PushOperand(operand, heightoperand.type, 0);
+      return;
+    }
+    height = heightoperand.value as number;
+
+    if (foperand.length) {
+      var widthoperand = scf.OperandAsNumber(sheet, foperand);
+      if (widthoperand.type.charAt(0) == "e") {
+        scf.PushOperand(operand, widthoperand.type, 0);
+        return;
+      }
+      width = widthoperand.value as number;
+    }
+  }
+
+  var rect = SocialCalc.OffsetRectangle(
+    anchorCol,
+    anchorRow,
+    refRows,
+    refCols,
+    rowsoperand.value as number,
+    colsoperand.value as number,
+    height,
+    width,
+  );
+
+  if (!rect.ok) {
+    scf.PushOperand(operand, "e#REF!", 0);
+    return;
+  }
+
+  var suffix = sheetname ? "!" + sheetname : "";
+  if (rect.col1 == rect.col2 && rect.row1 == rect.row2) {
+    scf.PushOperand(operand, "coord", SocialCalc.crToCoord(rect.col1, rect.row1) + suffix);
+  } else {
+    scf.PushOperand(
+      operand,
+      "range",
+      SocialCalc.crToCoord(rect.col1, rect.row1) +
+        suffix +
+        "|" +
+        SocialCalc.crToCoord(rect.col2, rect.row2) +
+        "|",
+    );
+  }
+};
+
+SocialCalc.Formula.FunctionList["OFFSET"] = [
+  SocialCalc.Formula.OffsetFunction,
+  -3,
+  "offset",
+  "",
+  "lookup",
+];
+
+/*
+#
 # FALSE()
 # NA()
 # NOW()

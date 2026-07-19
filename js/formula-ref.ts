@@ -35,6 +35,16 @@ type FormulaRefMutableRoot = {
   crToCoord: (c: number, r: number) => string;
   coordToCr: (cr: string) => CrParts;
   ParseRange: (range: string) => { cr1: CrPartsWithCoord; cr2: CrPartsWithCoord };
+  OffsetRectangle: (
+    anchorCol: number,
+    anchorRow: number,
+    refRows: number,
+    refCols: number,
+    rowoffset: number,
+    coloffset: number,
+    height?: number,
+    width?: number,
+  ) => { ok: boolean; col1: number; row1: number; col2: number; row2: number };
   OffsetFormulaCoords: (
     formula: string,
     coloffset: number,
@@ -177,6 +187,42 @@ FormulaRefRoot.ParseRange = function (range: string): {
     cr1: { row: p0.row, col: p0.col, coord: range },
     cr2: { row: p0.row, col: p0.col, coord: range },
   };
+};
+
+//@ verify
+//@ ensures \result.ok == false || (\result.col1 >= 1 && \result.col1 <= 702)
+//@ ensures \result.ok == false || (\result.row1 >= 1 && \result.row1 <= 65536)
+//@ ensures \result.ok == false || (\result.col2 >= \result.col1 && \result.row2 >= \result.row1)
+// LemmaScript: pure OFFSET target-rectangle planner.
+// anchorCol/anchorRow is the top-left of `reference`; rowoffset/coloffset
+// shift it (may be negative); height/width (>=1, defaulting to the
+// reference's own extent) size the resulting rectangle. Any edge landing
+// outside col 1..702 (A..ZZ) or row 1..65536 is a #REF! overflow: ok=false.
+// OFFSET_ZERO_IDENTITY: rowoffset=0, coloffset=0, height=refRows,
+// width=refCols reproduces the original reference rectangle exactly.
+FormulaRefRoot.OffsetRectangle = function (
+  anchorCol: number,
+  anchorRow: number,
+  refRows: number,
+  refCols: number,
+  rowoffset: number,
+  coloffset: number,
+  height?: number,
+  width?: number,
+): { ok: boolean; col1: number; row1: number; col2: number; row2: number } {
+  const h = height == null ? refRows : height;
+  const w = width == null ? refCols : width;
+  const col1 = anchorCol + coloffset;
+  const row1 = anchorRow + rowoffset;
+  if (h < 1 || w < 1 || col1 < 1 || row1 < 1 || col1 > 702 || row1 > 65536) {
+    return { ok: false, col1: 0, row1: 0, col2: 0, row2: 0 };
+  }
+  const col2 = col1 + w - 1;
+  const row2 = row1 + h - 1;
+  if (col2 > 702 || row2 > 65536) {
+    return { ok: false, col1: 0, row1: 0, col2: 0, row2: 0 };
+  }
+  return { ok: true, col1: col1, row1: row1, col2: col2, row2: row2 };
 };
 
 // *************************************

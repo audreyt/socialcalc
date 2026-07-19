@@ -43,6 +43,10 @@ const LETTERS = [
 /** SocialCalc max column ZZ = 702. */
 export const MAX_COL = 702;
 
+/** SocialCalc max row = 65536 (js/formula1.ts SPILL_MAX_ROW; also the
+ * OFFSET/INDIRECT rectangle row ceiling). */
+export const MAX_ROW = 65536;
+
 /**
  * Column index 1..702 → A..ZZ. Out-of-range clamps (shipping rcColname).
  */
@@ -406,4 +410,92 @@ export function colToRcRanks(c: number): { colhigh: number; collow: number } {
   const collow = (col - 1) % 26;
   const colhigh = Math.floor((col - 1) / 26);
   return { colhigh, collow };
+}
+
+/**
+ * OFFSET target-rectangle planner (mirrors js/formula-ref.ts
+ * OffsetRectangle exactly, pure integer algebra over 1-based indices).
+ *
+ * anchorCol/anchorRow is the top-left of the source reference; rowoffset/
+ * coloffset shift it (may be negative); height/width (use 0 as the "omitted"
+ * sentinel — height=0/width=0 means "inherit refRows/refCols", matching the
+ * runtime's `height == null` check since Dafny/Lean have no optional-number
+ * concept here) size the resulting rectangle. Any edge landing outside
+ * col [1, MAX_COL] or row [1, MAX_ROW] is a #REF! overflow: ok=false.
+ *
+ * MODELING GAP (documented, not a bug): the runtime distinguishes omitted
+ * (JS `undefined`, inherits refRows/refCols) from an explicit literal 0
+ * (always #REF! — see OffsetFunction/js/formula1.ts and the "explicit
+ * height=0 or width=0" runtime test in formula-dynamic-reference.test.ts).
+ * This pure-integer facade cannot express "argument omitted" without an
+ * optional-number type Dafny/Lean don't need here, so it collapses both
+ * to the 0-sentinel-means-inherit reading. The oracle cross-check test
+ * (test/lemma-a1-facade.test.ts) therefore maps sentinel 0 -> `undefined`
+ * before calling the shipping SC.OffsetRectangle, and the runtime's
+ * explicit-zero #REF! policy is proven only at the runtime boundary, not
+ * by this facade.
+ *
+ * OFFSET_ZERO_IDENTITY: rowoffset=0, coloffset=0, height=refRows,
+ * width=refCols reproduces the original reference rectangle exactly.
+ */
+export function offsetRectangle(
+  anchorCol: number,
+  anchorRow: number,
+  refRows: number,
+  refCols: number,
+  rowoffset: number,
+  coloffset: number,
+  height: number,
+  width: number,
+): { ok: boolean; col1: number; row1: number; col2: number; row2: number } {
+  //@ verify
+  //@ ensures \result.ok === true || \result.ok === false
+  //@ ensures \result.ok === false ==> \result.col1 === 0 && \result.row1 === 0 && \result.col2 === 0 && \result.row2 === 0
+  //@ ensures \result.ok === true ==> \result.col1 >= 1 && \result.col1 <= 702
+  //@ ensures \result.ok === true ==> \result.row1 >= 1 && \result.row1 <= 65536
+  //@ ensures \result.ok === true ==> \result.col2 >= \result.col1 && \result.col2 <= 702
+  //@ ensures \result.ok === true ==> \result.row2 >= \result.row1 && \result.row2 <= 65536
+  const h = height === 0 ? refRows : height;
+  const w = width === 0 ? refCols : width;
+  const col1 = anchorCol + coloffset;
+  const row1 = anchorRow + rowoffset;
+  if (h < 1 || w < 1 || col1 < 1 || row1 < 1 || col1 > MAX_COL || row1 > MAX_ROW) {
+    return { ok: false, col1: 0, row1: 0, col2: 0, row2: 0 };
+  }
+  const col2 = col1 + w - 1;
+  const row2 = row1 + h - 1;
+  if (col2 > MAX_COL || row2 > MAX_ROW) {
+    return { ok: false, col1: 0, row1: 0, col2: 0, row2: 0 };
+  }
+  return { ok: true, col1, row1, col2, row2 };
+}
+
+/**
+ * Whether an OFFSET rectangle plan would overflow to #REF!.
+ * Separated from the full result so Dafny/Lean can state the #REF! policy
+ * (OFFSET bounds) without record equality (same role as wouldOffsetRef).
+ */
+export function wouldOffsetRectangleRef(
+  anchorCol: number,
+  anchorRow: number,
+  refRows: number,
+  refCols: number,
+  rowoffset: number,
+  coloffset: number,
+  height: number,
+  width: number,
+): boolean {
+  //@ verify
+  //@ ensures \result === true || \result === false
+  const plan = offsetRectangle(
+    anchorCol,
+    anchorRow,
+    refRows,
+    refCols,
+    rowoffset,
+    coloffset,
+    height,
+    width,
+  );
+  return plan.ok === false;
 }

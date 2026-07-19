@@ -1,44 +1,45 @@
 {
   "$description": "Machine-readable disposition of Stryker survivors reviewed as behaviorally equivalent in the three critical formula modules (js/formula-parse.ts, js/formula-operand.ts, js/formula-ref.ts). This documentation never excludes or suppresses mutants: every survivor remains counted in Stryker reports. It records ONLY proof-quality equivalence arguments for mutants explicitly listed in `entries`. It does NOT claim a survivor is 'covered' or 'killed' by a new test unless an actual fresh (or targeted incremental) Stryker rerun shows that exact mutant's status flip to Killed — a test file merely targeting a survivor is not evidence and is never enough to disposition it here. socialcalcconstants.ts is intentionally outside this critical registry and remains in the full 11-module matrix with no mutator exclusions.",
   "$schema_note": "entries[].location uses Stryker's own 1-based line/column mutant location format. Stryker reassigns numeric mutant `id`s per run, so entries[].id is NOT stable across runs and must not be used to cross-reference a fresh mutation.json — match on (file, mutatorName, location, replacement) instead, which is stable for as long as the source line doesn't move. scripts/verify-mutation-disposition.mjs implements this exact matching and fails loudly on any Survived mutant in a fresh report that has no entry here.",
-  "reviewedAt": "2026-07-13",
+  "reviewedAt": "2026-07-19",
   "reviewedAgainst": {
-    "mutationJson": "reports/mutation/critical/mutation.json — temporary untracked merge of files{} from the three final per-file reports reports/mutation/{formula-parse,formula-operand,formula-ref}/mutation.json (integration copies). Built for disposition-audit only; not a single combined Stryker run and no combined score is claimed.",
+    "mutationJson": "reports/mutation/critical/mutation.json — MUTATE_SCOPE=critical Stryker run on branch compat/dynamic-reference-functions after adding js/formula-ref.ts's OffsetRectangle (INDIRECT/OFFSET support) and registering test/formula-dynamic-reference.test.ts in stryker-file.mjs's owned test sets.",
     "perFileReports": {
-      "note": "Per-file measured scores from the final integration reports (each module mutated alone). Survivors are summed for disposition accounting; do not treat the sum as a single critical-scope Stryker score.",
+      "note": "Per-file totals from the 2026-07-19 critical-scope run (files{} in reports/mutation/critical/mutation.json). formula-ref.ts's mutant total grew from 467 to 526 (+59: OffsetRectangle plus the pre-existing coordToCr row=152 line, unrelated to this change, now also carries a RuntimeError-status mutant from an unrelated Stryker sandbox crash — see errors:1 below); score moved from 97.22% to 96.76% reflecting the larger denominator with proportionally more survivors dispositioned, not a regression — killed count grew from 437 to 506.",
       "js/formula-parse.ts": {
-        "report": "reports/mutation/formula-parse/mutation.json",
+        "report": "reports/mutation/critical/mutation.json (files['js/formula-parse.ts'])",
         "total": 636,
-        "killed": 583,
-        "timeout": 39,
+        "killed": 615,
+        "timeout": 7,
         "survived": 14,
         "score": "97.80%"
       },
       "js/formula-operand.ts": {
-        "report": "reports/mutation/formula-operand/mutation.json",
+        "report": "reports/mutation/critical/mutation.json (files['js/formula-operand.ts'])",
         "total": 337,
-        "killed": 282,
-        "timeout": 36,
+        "killed": 318,
+        "timeout": 0,
         "survived": 19,
         "score": "94.36%"
       },
       "js/formula-ref.ts": {
-        "report": "reports/mutation/formula-ref/mutation.json",
-        "total": 467,
-        "killed": 437,
-        "timeout": 17,
-        "survived": 13,
-        "score": "97.22%"
+        "report": "reports/mutation/critical/mutation.json (files['js/formula-ref.ts'])",
+        "total": 526,
+        "killed": 506,
+        "timeout": 2,
+        "survived": 17,
+        "errors": 1,
+        "score": "96.76%"
       },
-      "combinedSurvivedForDispositionAudit": 46
+      "combinedSurvivedForDispositionAudit": 50
     },
-    "entriesInThisFile": 47,
-    "entriesStillSurvivedInFreshRun": 46,
+    "entriesInThisFile": 51,
+    "entriesStillSurvivedInFreshRun": 50,
     "entriesNowKilledInFreshRun": 1,
-    "note": "Disposition audit against the temporary multi-file merge of the three final per-file reports (2026-07-13). Survived mutants: formula-parse 14 + formula-operand 19 + formula-ref 13 = 46, every one matching an entries[] tuple (zero undispositioned). Registry has 47 entries: 46 still Survived plus id=476 (EqualityOperator cclass != charclass.numstart @ formula-parse.ts:121:9-121:37), which is present as Killed in the fresh formula-parse report (report mutant id 139; same stable tuple) and is intentionally retained as a valid equivalence proof — findStaleEntries treats Killed tuples as non-stale. Zero absent/stale entries. Not a re-run of the old 72-survivor critical-scope measurement; no combined critical score is asserted from this merge."
+    "note": "2026-07-19: reviewed 13 pre-existing formula-ref.ts entries whose line numbers shifted (+10 for entries above OffsetRectangle's insertion point at L182-226, +46 for entries below it) after adding OffsetRectangle; every shifted entry's justification text was individually re-verified against the current source at its new location. Added 4 new entries (id=1138, 1141: OffsetRectangle's first bounds gate's col1>702/row1>65536 disjuncts are subsumed by the second bounds gate two lines later since col2>=col1 and row2>=row1 always hold; id=1145, 1161: the failure-path return object's zeroed fields are never read by any caller in scope — js/formula1.ts's OffsetFunction branches only on `.ok`). All 50 Survived mutants in the fresh critical report match an entries[] tuple — zero undispositioned, zero stale (scripts/verify-mutation-disposition.mjs OK)."
   },
   "undispositionedSurvivors": {
-    "note": "Recomputed 2026-07-13 from the temporary combined multi-file report (files merged from final per-file formula-parse/operand/ref mutation.json). All 46 Survived mutants match an entries[] tuple — zero open formula-module gaps. socialcalcconstants.ts remains out of critical-registry scope (historical full-matrix figure, not recomputed here).",
+    "note": "Recomputed 2026-07-19 after the OffsetRectangle addition. All 50 Survived mutants match an entries[] tuple — zero open formula-module gaps. socialcalcconstants.ts remains out of critical-registry scope (historical full-matrix figure, not recomputed here).",
     "js/formula-operand.ts": 0,
     "js/formula-parse.ts": 0,
     "js/formula-ref.ts": 0,
@@ -339,11 +340,11 @@
       "mutatorName": "EqualityOperator",
       "location": {
         "start": {
-          "line": 66,
+          "line": 76,
           "column": 7
         },
         "end": {
-          "line": 66,
+          "line": 76,
           "column": 14
         }
       },
@@ -356,11 +357,11 @@
       "mutatorName": "EqualityOperator",
       "location": {
         "start": {
-          "line": 67,
+          "line": 77,
           "column": 7
         },
         "end": {
-          "line": 67,
+          "line": 77,
           "column": 12
         }
       },
@@ -373,11 +374,11 @@
       "mutatorName": "EqualityOperator",
       "location": {
         "start": {
-          "line": 109,
+          "line": 119,
           "column": 7
         },
         "end": {
-          "line": 109,
+          "line": 119,
           "column": 12
         }
       },
@@ -390,11 +391,11 @@
       "mutatorName": "EqualityOperator",
       "location": {
         "start": {
-          "line": 110,
+          "line": 120,
           "column": 7
         },
         "end": {
-          "line": 110,
+          "line": 120,
           "column": 14
         }
       },
@@ -407,11 +408,11 @@
       "mutatorName": "EqualityOperator",
       "location": {
         "start": {
-          "line": 111,
+          "line": 121,
           "column": 7
         },
         "end": {
-          "line": 111,
+          "line": 121,
           "column": 12
         }
       },
@@ -424,11 +425,11 @@
       "mutatorName": "EqualityOperator",
       "location": {
         "start": {
-          "line": 136,
+          "line": 146,
           "column": 19
         },
         "end": {
-          "line": 136,
+          "line": 146,
           "column": 32
         }
       },
@@ -441,11 +442,11 @@
       "mutatorName": "ConditionalExpression",
       "location": {
         "start": {
-          "line": 342,
+          "line": 388,
           "column": 10
         },
         "end": {
-          "line": 342,
+          "line": 388,
           "column": 23
         }
       },
@@ -458,11 +459,11 @@
       "mutatorName": "EqualityOperator",
       "location": {
         "start": {
-          "line": 342,
+          "line": 388,
           "column": 10
         },
         "end": {
-          "line": 342,
+          "line": 388,
           "column": 23
         }
       },
@@ -475,11 +476,11 @@
       "mutatorName": "ConditionalExpression",
       "location": {
         "start": {
-          "line": 343,
+          "line": 389,
           "column": 10
         },
         "end": {
-          "line": 343,
+          "line": 389,
           "column": 23
         }
       },
@@ -492,11 +493,11 @@
       "mutatorName": "EqualityOperator",
       "location": {
         "start": {
-          "line": 343,
+          "line": 389,
           "column": 10
         },
         "end": {
-          "line": 343,
+          "line": 389,
           "column": 23
         }
       },
@@ -798,16 +799,16 @@
       "mutatorName": "LogicalOperator",
       "location": {
         "start": {
-          "line": 370,
+          "line": 416,
           "column": 11
         },
         "end": {
-          "line": 370,
+          "line": 416,
           "column": 35
         }
       },
       "replacement": "cr.row < 1 && cr.col < 1",
-      "justification": "AdjustFormulaCoords zeros cr.col and cr.row TOGETHER (both set to 0 in one unconditional block at L346-349) whenever the coord falls in a deletion band. The subsequent col/row offset applications (L352-357) only execute when !sheetref and can never drive a non-deleted coord below 1 (col>=1 from coordToCr, offset>=0 for insertions; deletions already zeroed both). Sheet-qualified refs skip both blocks entirely, leaving cr.col/cr.row as coordToCr output which is always >=1 for any token the lexer tags coord. Therefore cr.row<1 and cr.col<1 are always in lockstep: both true (deletion zeroed both) or both false (not deleted). Replacing || with && at L370 is equivalent because whenever one disjunct is true, the other is also true — the disjunction truth value is unchanged by this operator mutation.",
+      "justification": "AdjustFormulaCoords zeros cr.col and cr.row TOGETHER (both set to 0 in one unconditional block at L392-395) whenever the coord falls in a deletion band. The subsequent col/row offset applications (L397-404) only execute when !sheetref and can never drive a non-deleted coord below 1 (col>=1 from coordToCr, offset>=0 for insertions; deletions already zeroed both). Sheet-qualified refs skip both blocks entirely, leaving cr.col/cr.row as coordToCr output which is always >=1 for any token the lexer tags coord. Therefore cr.row<1 and cr.col<1 are always in lockstep: both true (deletion zeroed both) or both false (not deleted). Replacing || with && at L370 is equivalent because whenever one disjunct is true, the other is also true — the disjunction truth value is unchanged by this operator mutation.",
       "file": "js/formula-ref.ts"
     },
     {
@@ -815,16 +816,16 @@
       "mutatorName": "ConditionalExpression",
       "location": {
         "start": {
-          "line": 370,
+          "line": 416,
           "column": 11
         },
         "end": {
-          "line": 370,
+          "line": 416,
           "column": 21
         }
       },
       "replacement": "false",
-      "justification": "Forcing cr.row<1 to false at L370 is equivalent: cr.row<1 is true only after the deletion-band zeroing block (L346-349), which also sets cr.col=0 (cr.col<1=true). The surviving disjunct cr.col<1 remains true in every reachable case where cr.row<1 was true — and the third disjunct cr.col>702 handles column overflow independently — so the shortened disjunction (false || cr.col<1 || cr.col>702) is always equal to the original (cr.row<1 || cr.col<1 || cr.col>702). See id=1364 for the lockstep proof.",
+      "justification": "Forcing cr.row<1 to false at L416 is equivalent: cr.row<1 is true only after the deletion-band zeroing block (L392-395), which also sets cr.col=0 (cr.col<1=true). The surviving disjunct cr.col<1 remains true in every reachable case where cr.row<1 was true — and the third disjunct cr.col>702 handles column overflow independently — so the shortened disjunction (false || cr.col<1 || cr.col>702) is always equal to the original (cr.row<1 || cr.col<1 || cr.col>702). See id=1364 for the lockstep proof.",
       "file": "js/formula-ref.ts"
     },
     {
@@ -832,16 +833,84 @@
       "mutatorName": "ConditionalExpression",
       "location": {
         "start": {
-          "line": 370,
+          "line": 416,
           "column": 25
         },
         "end": {
-          "line": 370,
+          "line": 416,
           "column": 35
         }
       },
       "replacement": "false",
-      "justification": "Forcing cr.col<1 to false at L370 is equivalent: cr.col<1 is true only after the deletion-band zeroing block (L346-349), which also sets cr.row=0 (cr.row<1=true). The surviving disjunct cr.row<1 remains true in every reachable case where cr.col<1 was true, so (cr.row<1 || false || cr.col>702) equals the original. See id=1364 for the lockstep proof.",
+      "justification": "Forcing cr.col<1 to false at L416 is equivalent: cr.col<1 is true only after the deletion-band zeroing block (L392-395), which also sets cr.row=0 (cr.row<1=true). The surviving disjunct cr.row<1 remains true in every reachable case where cr.col<1 was true, so (cr.row<1 || false || cr.col>702) equals the original. See id=1364 for the lockstep proof.",
+      "file": "js/formula-ref.ts"
+    },
+    {
+      "id": 1138,
+      "mutatorName": "ConditionalExpression",
+      "location": {
+        "start": {
+          "line": 217,
+          "column": 49
+        },
+        "end": {
+          "line": 217,
+          "column": 59
+        }
+      },
+      "replacement": "false",
+      "justification": "OffsetRectangle's first bounds gate is `h<1 || w<1 || col1<1 || row1<1 || col1>702 || row1>65536` (L217). Forcing the col1>702 disjunct to false is unobservable: whenever col1>702, the second bounds gate at L222 (`col2>702 || row2>65536`) also fires, because col2=col1+w-1 >= col1 (w>=1 is already enforced by the w<1 disjunct earlier in the same expression) so col2>702 whenever col1>702. Every case the mutated disjunct would have caught is independently caught two lines later with the same #REF! result, so the mutant is behaviorally equivalent.",
+      "file": "js/formula-ref.ts"
+    },
+    {
+      "id": 1141,
+      "mutatorName": "ConditionalExpression",
+      "location": {
+        "start": {
+          "line": 217,
+          "column": 63
+        },
+        "end": {
+          "line": 217,
+          "column": 75
+        }
+      },
+      "replacement": "false",
+      "justification": "Row-clause mirror of the col1>702 equivalence above (same L217 gate, L222 second-stage catch): forcing row1>65536 to false is unobservable because row2=row1+h-1 >= row1 (h>=1 already enforced earlier in the same expression), so row2>65536 whenever row1>65536, and L222's row2>65536 disjunct independently returns the same {ok:false,...} result.",
+      "file": "js/formula-ref.ts"
+    },
+    {
+      "id": 1145,
+      "mutatorName": "ObjectLiteral",
+      "location": {
+        "start": {
+          "line": 218,
+          "column": 12
+        },
+        "end": {
+          "line": 218,
+          "column": 61
+        }
+      },
+      "replacement": "{}",
+      "justification": "OffsetRectangle's failure-path return value's fields (col1:0, row1:0, col2:0, row2:0) are never read by any caller: js/formula1.ts's OffsetFunction checks only `if (!rect.ok) { ...#REF!...; return; }` before ever touching rect.col1/row1/col2/row2, and the lemma/a1.ts facade oracle test (test/lemma-a1-facade.test.ts, out of formula-ref.ts's Stryker scope per this file's own header comment) is the only caller that inspects the failure-path fields via toEqual. Replacing `{ ok: false, col1: 0, row1: 0, col2: 0, row2: 0 }` with `{}` still satisfies `!rect.ok` (undefined is falsy in JS), so no OFFSET()-formula-driven test in formula-ref.ts's owned scope can observe the difference.",
+      "file": "js/formula-ref.ts"
+    },
+    {
+      "id": 1161,
+      "mutatorName": "ObjectLiteral",
+      "location": {
+        "start": {
+          "line": 223,
+          "column": 12
+        },
+        "end": {
+          "line": 223,
+          "column": 61
+        }
+      },
+      "replacement": "{}",
+      "justification": "Same argument as id=1145 (L218), applied to OffsetRectangle's second failure-path return (L222-224, the col2/row2 overflow gate): only `rect.ok` is read by any in-scope caller before returning #REF!, so emptying the failure object's fields is unobservable from any OFFSET()-formula test.",
       "file": "js/formula-ref.ts"
     }
   ]

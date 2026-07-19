@@ -497,6 +497,7 @@ declare namespace SocialCalc {
     s_fdef_IFNA: string;
     s_fdef_IFS: string;
     s_fdef_INDEX: string;
+    s_fdef_INDIRECT: string;
     s_fdef_INT: string;
     s_fdef_IRR: string;
     s_fdef_ISBLANK: string;
@@ -528,6 +529,7 @@ declare namespace SocialCalc {
     s_fdef_NPER: string;
     s_fdef_NPV: string;
     s_fdef_ODD: string;
+    s_fdef_OFFSET: string;
     s_fdef_OR: string;
     s_fdef_PI: string;
     s_fdef_PMT: string;
@@ -602,12 +604,14 @@ declare namespace SocialCalc {
     s_farg_hlookup: string;
     s_farg_iffunc: string;
     s_farg_index: string;
+    s_farg_indirect: string;
     s_farg_irr: string;
     s_farg_tc: string;
     s_farg_log: string;
     s_farg_match: string;
     s_farg_mid: string;
     s_farg_nper: string;
+    s_farg_offset: string;
     s_farg_npv: string;
     s_farg_pmt: string;
     s_farg_pv: string;

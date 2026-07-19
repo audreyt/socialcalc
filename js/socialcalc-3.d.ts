@@ -627,6 +627,16 @@ declare namespace SocialCalc {
     cr1: { row: number; col: number; coord: string };
     cr2: { row: number; col: number; coord: string };
   };
+  function OffsetRectangle(
+    anchorCol: number,
+    anchorRow: number,
+    refRows: number,
+    refCols: number,
+    rowoffset: number,
+    coloffset: number,
+    height?: number,
+    width?: number,
+  ): { ok: boolean; col1: number; row1: number; col2: number; row2: number };
 
   function decodeFromSave(s: string): string;
   function decodeFromAjax(s: string): string;

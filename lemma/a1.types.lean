@@ -13,6 +13,14 @@ structure ColToRcRanksResult where
   collow : Int
 deriving Repr, Inhabited, DecidableEq
 
+structure OffsetRectangleResult where
+  ok : Bool
+  col1 : Int
+  row1 : Int
+  col2 : Int
+  row2 : Int
+deriving Repr, Inhabited, DecidableEq
+
 namespace Pure
 
 def clampCol (c : Int) : Int :=
@@ -120,5 +128,24 @@ def colToRcRanks (c : Int) : ColToRcRanksResult :=
   let collow := Int.tmod (col - 1) 26
   let colhigh := (col - 1) / 26
   { colhigh := colhigh, collow := collow }
+
+def offsetRectangle (anchorCol : Int) (anchorRow : Int) (refRows : Int) (refCols : Int) (rowoffset : Int) (coloffset : Int) (height : Int) (width : Int) : OffsetRectangleResult :=
+  let h := if height = 0 then refRows else height
+  let w := if width = 0 then refCols else width
+  let col1 := anchorCol + coloffset
+  let row1 := anchorRow + rowoffset
+  if h < 1 ∨ w < 1 ∨ col1 < 1 ∨ row1 < 1 ∨ col1 > MAX_COL ∨ row1 > MAX_ROW then
+    { ok := false, col1 := 0, row1 := 0, col2 := 0, row2 := 0 }
+  else
+    let col2 := col1 + w - 1
+    let row2 := row1 + h - 1
+    if col2 > MAX_COL ∨ row2 > MAX_ROW then
+      { ok := false, col1 := 0, row1 := 0, col2 := 0, row2 := 0 }
+    else
+      { ok := true, col1 := col1, row1 := row1, col2 := col2, row2 := row2 }
+
+def wouldOffsetRectangleRef (anchorCol : Int) (anchorRow : Int) (refRows : Int) (refCols : Int) (rowoffset : Int) (coloffset : Int) (height : Int) (width : Int) : Bool :=
+  let plan := offsetRectangle anchorCol anchorRow refRows refCols rowoffset coloffset height width
+  plan.ok = false
 
 end Pure

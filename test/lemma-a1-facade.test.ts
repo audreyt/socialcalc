@@ -2,6 +2,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import {
   MAX_COL,
+  MAX_ROW,
   adjustA1,
   adjustAxis,
   applyAxisOffset,
@@ -10,6 +11,7 @@ import {
   colFromRcRanks,
   colToRcRanks,
   composeOffsets,
+  offsetRectangle,
   crToCoord,
   formatA1Parts,
   isColInBounds,
@@ -23,6 +25,7 @@ import {
   wouldAdjustRef,
   wouldOffsetA1Ref,
   wouldOffsetRef,
+  wouldOffsetRectangleRef,
 } from "../lemma/a1";
 import { loadSocialCalc } from "./helpers/socialcalc";
 
@@ -243,6 +246,83 @@ describe("lemma/a1 facade laws (Dafny/Lean surface)", () => {
       expect(crToCoord(c, 1)).not.toBe("#REF!");
     }
   });
+
+  test("offsetRectangle: zero-offset identity reproduces the reference rectangle", () => {
+    const r = offsetRectangle(1, 1, 3, 2, 0, 0, 0, 0);
+    expect(r).toEqual({ ok: true, col1: 1, row1: 1, col2: 2, row2: 3 });
+  });
+
+  test("offsetRectangle: positive/negative offsets shift the anchor", () => {
+    expect(offsetRectangle(5, 5, 1, 1, 2, 3, 0, 0)).toEqual({
+      ok: true,
+      col1: 8,
+      row1: 7,
+      col2: 8,
+      row2: 7,
+    });
+    expect(offsetRectangle(5, 5, 1, 1, -2, -3, 0, 0)).toEqual({
+      ok: true,
+      col1: 2,
+      row1: 3,
+      col2: 2,
+      row2: 3,
+    });
+  });
+
+  test("offsetRectangle: explicit height/width resize independent of the reference extent", () => {
+    expect(offsetRectangle(1, 1, 1, 1, 0, 0, 3, 2)).toEqual({
+      ok: true,
+      col1: 1,
+      row1: 1,
+      col2: 2,
+      row2: 3,
+    });
+  });
+
+  test("offsetRectangle: explicit height=0 or width=0 sentinel means omitted (inherit), not zero-size", () => {
+    // The facade's 0-sentinel encodes the runtime's `height == null` check;
+    // it cannot express "explicit literal zero" — that #REF! policy is
+    // proven at the runtime boundary (OffsetFunction operand parsing),
+    // not in this pure integer-algebra facade. Confirm the sentinel inherits.
+    const r = offsetRectangle(1, 1, 3, 2, 0, 0, 0, 5);
+    expect(r).toEqual({ ok: true, col1: 1, row1: 1, col2: 5, row2: 3 });
+  });
+
+  test("offsetRectangle: column overflow past MAX_COL is #REF!", () => {
+    expect(offsetRectangle(1, 1, 1, 1, 0, MAX_COL, 0, 0)).toEqual({
+      ok: false,
+      col1: 0,
+      row1: 0,
+      col2: 0,
+      row2: 0,
+    });
+  });
+
+  test("offsetRectangle: row overflow past MAX_ROW is #REF!", () => {
+    expect(offsetRectangle(1, 1, 1, 1, MAX_ROW, 0, 0, 0)).toEqual({
+      ok: false,
+      col1: 0,
+      row1: 0,
+      col2: 0,
+      row2: 0,
+    });
+  });
+
+  test("offsetRectangle: negative offset past column A / row 1 is #REF!", () => {
+    expect(offsetRectangle(1, 1, 1, 1, 0, -1, 0, 0).ok).toBe(false);
+    expect(offsetRectangle(1, 1, 1, 1, -1, 0, 0, 0).ok).toBe(false);
+  });
+
+  test("offsetRectangle: overflow triggered solely by width/height extent (anchor stays in bounds)", () => {
+    expect(offsetRectangle(1, 1, 1, 1, 0, 0, 0, MAX_COL + 1).ok).toBe(false);
+    expect(offsetRectangle(1, 1, 1, 1, 0, 0, MAX_ROW + 1, 0).ok).toBe(false);
+  });
+
+  test("wouldOffsetRectangleRef matches offsetRectangle.ok negation", () => {
+    expect(wouldOffsetRectangleRef(1, 1, 3, 2, 0, 0, 0, 0)).toBe(false);
+    expect(wouldOffsetRectangleRef(1, 1, 1, 1, 0, MAX_COL, 0, 0)).toBe(true);
+    expect(wouldOffsetRectangleRef(1, 1, 1, 1, MAX_ROW, 0, 0, 0)).toBe(true);
+  });
 });
 
 describe("lemma/a1 facade vs shipping SocialCalc oracle", () => {
@@ -330,6 +410,58 @@ describe("lemma/a1 facade vs shipping SocialCalc oracle", () => {
       expect(adjustA1(cr.col, cr.row, absCol, absRow, startCol, dCol, startRow, dRow)).toBe(
         SC.AdjustFormulaCoords(coord, startCol, dCol, startRow, dRow),
       );
+    }
+  });
+
+  test("offsetRectangle matches shipping SC.OffsetRectangle exhaustively across representative cases", async () => {
+    const SC = await loadSocialCalc();
+    const cases: Array<[number, number, number, number, number, number, number, number]> = [
+      [1, 1, 1, 1, 0, 0, 0, 0], // identity
+      [1, 1, 3, 2, 0, 0, 0, 0], // identity, multi-cell reference
+      [5, 5, 1, 1, 2, 3, 0, 0], // positive shift
+      [5, 5, 1, 1, -2, -3, 0, 0], // negative shift
+      [1, 1, 1, 1, 0, 0, 3, 2], // explicit resize
+      [1, 1, 3, 2, 0, 0, 0, 5], // explicit width only (0 => inherit height)
+      [1, 1, 1, 1, 0, MAX_COL, 0, 0], // column overflow via offset
+      [1, 1, 1, 1, MAX_ROW, 0, 0, 0], // row overflow via offset
+      [1, 1, 1, 1, 0, -1, 0, 0], // negative overflow (column)
+      [1, 1, 1, 1, -1, 0, 0, 0], // negative overflow (row)
+      [1, 1, 1, 1, 0, 0, 0, MAX_COL + 1], // overflow via width extent only
+      [1, 1, 1, 1, 0, 0, MAX_ROW + 1, 0], // overflow via height extent only
+      [MAX_COL, MAX_ROW, 1, 1, 0, 0, 0, 0], // in-bounds at the exact ceiling
+      [MAX_COL, MAX_ROW, 1, 1, 0, 1, 0, 0], // one past the ceiling
+    ];
+    for (const [
+      anchorCol,
+      anchorRow,
+      refRows,
+      refCols,
+      rowoffset,
+      coloffset,
+      height,
+      width,
+    ] of cases) {
+      const facade = offsetRectangle(
+        anchorCol,
+        anchorRow,
+        refRows,
+        refCols,
+        rowoffset,
+        coloffset,
+        height,
+        width,
+      );
+      const shipping = SC.OffsetRectangle(
+        anchorCol,
+        anchorRow,
+        refRows,
+        refCols,
+        rowoffset,
+        coloffset,
+        height === 0 ? undefined : height,
+        width === 0 ? undefined : width,
+      );
+      expect(facade).toEqual(shipping);
     }
   });
 

@@ -792,6 +792,8 @@ ConstantsRoot.Constants = {
     "Evaluates condition1, condition2, ... in order and returns the value paired with the first true condition; returns #N/A if none are true. ",
   s_fdef_INDEX:
     "Returns a cell or range reference for the specified row and column in the range. If range is 1-dimensional, then only one of rownum or colnum are needed. If range is 2-dimensional and rownum or colnum are zero, a reference to the range of just the specified column or row is returned. You can use the returned reference value in a range, e.g., sum(A1:INDEX(A2:A10,4)). ",
+  s_fdef_INDIRECT:
+    "Returns the reference specified by ref_text, evaluated as a live cell/range reference rather than a literal string. Accepts A1-style references (A1, $A$1, A1:B2), sheet-qualified references (Sheet1!A1), and defined names. If a1 is omitted or non-zero, ref_text is parsed as A1-style; a1=FALSE (R1C1-style) is not supported and always returns #REF!. Invalid text, unavailable sheets, and out-of-bounds column/row overflow all return #REF!. ",
   s_fdef_INT: "Returns the value rounded down to the nearest integer (towards -infinity). ",
   s_fdef_IRR:
     "Returns the interest rate at which the cash flows in the range have a net present value of zero. Uses an iterative process that will return #NUM! error if it does not converge. There may be more than one possible solution. Providing the optional guess value may help in certain situations where it does not converge or finds an inappropriate solution (the default guess is 10%). ",
@@ -834,6 +836,8 @@ ConstantsRoot.Constants = {
   s_fdef_NPV:
     "Returns the net present value of cash flows (which may be individual values and/or ranges) at the given rate. The flows are positive if income, negative if paid out, and are assumed at the end of each period. ",
   s_fdef_ODD: "Rounds the value up in magnitude to the nearest odd integer. ",
+  s_fdef_OFFSET:
+    "Returns a reference offset from reference by rows/cols (may be negative), resized to the optional height/width (omitted inherits the reference's own extent; an explicit 0 is #REF!). Any resulting edge outside column A..ZZ or row 1..65536 returns #REF!. ",
   s_fdef_OR: "True if any argument is true ",
   s_fdef_PI: "The value 3.1415926... ",
   s_fdef_PMT:
@@ -974,12 +978,14 @@ ConstantsRoot.Constants = {
   s_farg_hlookup: "value, range, row, [rangelookup]",
   s_farg_iffunc: "logical-expression, true-value, [false-value]",
   s_farg_index: "range, rownum, colnum",
+  s_farg_indirect: "ref_text, [a1]",
   s_farg_irr: "range, [guess]",
   s_farg_tc: "text, count",
   s_farg_log: "value, base",
   s_farg_match: "value, range, [rangelookup]",
   s_farg_mid: "text, start, length",
   s_farg_nper: "rate, payment, pv, [fv, [paytype]]",
+  s_farg_offset: "reference, rows, cols, [height], [width]",
   s_farg_npv: "rate, value1, value2, ...",
   s_farg_pmt: "rate, n, pv, [fv, [paytype]]",
   s_farg_pv: "rate, n, payment, [fv, [paytype]]",

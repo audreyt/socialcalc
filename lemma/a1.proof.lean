@@ -176,3 +176,9 @@ prove_correct adjustA1 by
   unfold adjustAxis Pure.wouldAdjustRef Pure.adjustAxis
   loom_solve
   all_goals (try { native_decide })
+
+prove_correct offsetRectangle by
+  unfold Pure.offsetRectangle; loom_solve
+
+prove_correct wouldOffsetRectangleRef by
+  unfold Pure.wouldOffsetRectangleRef Pure.offsetRectangle; loom_solve
