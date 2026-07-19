@@ -78,30 +78,38 @@ const EXPECTED_TARBALL_MEMBERS = [
   "dist/SocialCalc.min.js",
   "dist/SocialCalc.d.ts",
   "dist/socialcalc.css",
+  "js/chart.d.ts",
   "js/formatnumber2.d.ts",
   "js/formula1.d.ts",
+  "js/pivot.d.ts",
   "js/socialcalc-3.d.ts",
   "js/socialcalcconstants.d.ts",
   "js/socialcalcpopup.d.ts",
   "js/socialcalcspreadsheetcontrol.d.ts",
   "js/socialcalctableeditor.d.ts",
   "js/socialcalcviewer.d.ts",
+  "js/workbook-ui.d.ts",
+  "js/workbook.d.ts",
 ];
 // Component size ceilings are explicit package-contract values, not snapshots.
-// Baselines measured 2026-07-14 after canonical formatting: normal 827,394
-// raw / 138,391 gzip; minified 411,911 raw / 101,624 gzip; CSS 2,688 raw /
-// 958 gzip; combined package members 1,407,601 raw; tarball 280,857. The
-// normal raw ceiling was raised only for Oxfmt's deterministic whitespace;
-// executable shape and minified size remain independently pinned. Combined
-// release-package ceilings remain unchanged.
-const MAX_NORMAL_RAW_BYTES = 850_000;
-const MAX_MINIFIED_RAW_BYTES = 450_000;
+// Baselines measured 2026-07-19 after integrating the full compat/integration
+// feature set (28 feature commits: multi-sheet workbook, charts, pivot
+// tables, data validation, lambda formulas, criteria functions, rich-HTML-
+// table clipboard paste, and 20+ prior function-family/editor/proof
+// integrations) on top of the 2026-07-14 baseline: normal 1,293,423 raw /
+// 226,304 gzip; minified 640,291 raw / 163,686 gzip; CSS 4,995 raw / 1,966
+// gzip (print/accessibility stylesheet rules); combined package members
+// 2,166,698 raw; tarball 449,625. Ceilings carry ~10% headroom above these
+// measured, deterministically-reproducible (`vp build --minify`) values —
+// executable shape and minified size remain independently pinned.
+const MAX_NORMAL_RAW_BYTES = 1_450_000;
+const MAX_MINIFIED_RAW_BYTES = 720_000;
 const MAX_CSS_RAW_BYTES = 6_000;
-const MAX_NORMAL_GZIP_BYTES = 152_000;
-const MAX_MINIFIED_GZIP_BYTES = 117_000;
-const MAX_CSS_GZIP_BYTES = 1_100;
-const MAX_PACKAGE_RAW_BYTES = 1_600_000;
-const MAX_PACKAGE_GZIP_BYTES = 300_000;
+const MAX_NORMAL_GZIP_BYTES = 255_000;
+const MAX_MINIFIED_GZIP_BYTES = 185_000;
+const MAX_CSS_GZIP_BYTES = 2_300;
+const MAX_PACKAGE_RAW_BYTES = 2_450_000;
+const MAX_PACKAGE_GZIP_BYTES = 510_000;
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
@@ -266,7 +274,7 @@ async function main() {
     });
 
     record(
-      "tarball contains exactly the pinned 17-member contract (no extra or missing member)",
+      "tarball contains exactly the pinned 21-member contract (no extra or missing member)",
       () => {
         mkdirSync(extractDir, { recursive: true });
         const extractResult = run("tar", ["-xzf", tarballPath, "-C", extractDir]);

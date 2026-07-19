@@ -153,6 +153,24 @@ declare namespace SocialCalc {
     arg: any,
     params: { statusid: string; errorid: string; [k: string]: any },
   ): void;
+  function SpreadsheetControlCellIsHidden(
+    spreadsheet: SpreadsheetControl,
+    cr: { row: number; col: number },
+  ): boolean;
+  function SpreadsheetControlEscapeRegexLiteral(text: string): string;
+  function SpreadsheetControlReplaceCandidateCoords(
+    spreadsheet: SpreadsheetControl,
+    wholeSheet: boolean,
+  ): string[];
+  function SpreadsheetControlBuildReplaceCommand(
+    cell: any,
+    coord: string,
+    replaceRegex: RegExp,
+    replacement: string,
+    includeFormulas: boolean,
+    regexMode: boolean,
+  ): string | null;
+  function SpreadsheetControlRunReplace(all: boolean): void;
   function LoadPrintSetupFields(spreadsheet: SpreadsheetControl): void;
   function ApplyPrintSetup(): void;
   function PreparePrintArea(spreadsheet: SpreadsheetControl): void;

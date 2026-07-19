@@ -74,6 +74,7 @@ declare namespace SocialCalc {
     logo: HTMLElement | null;
 
     cellhandles: CellHandles | null;
+    dvDropdown: ValidationDropdown | null;
 
     timeout: number | null;
     busy: boolean;
@@ -244,6 +245,17 @@ declare namespace SocialCalc {
     ShowCellHandles(show: boolean, moveshow?: boolean): void;
 
     [key: string]: any;
+  }
+
+  class ValidationDropdown {
+    constructor(editor: TableEditor);
+
+    editor: TableEditor;
+    coord: string | null;
+    main: HTMLElement;
+    anchor: HTMLElement;
+
+    Update(): void;
   }
 
   class TableControl {
@@ -636,6 +648,9 @@ declare namespace SocialCalc {
   function SetInputEchoText(inputecho: InputEcho, str: string): void;
   function InputEchoHeartbeat(): void;
   function InputEchoMouseDown(e: MouseEvent): boolean | void;
+
+  function UpdateValidationDropdown(dvDropdown: ValidationDropdown): void;
+  function ValidationDropdownMouseDown(e: MouseEvent): boolean | void;
 
   function ShowCellHandles(cellhandles: CellHandles, show: boolean, moveshow?: boolean): void;
   function CellHandlesMouseMoveOnHandle(e: MouseEvent): void;
