@@ -67,6 +67,15 @@ FormulaOperandMut.OperandAsNumber = function (
 
   t = operandinfo.type.charAt(0);
 
+  if (operandinfo.type == "lambda") {
+    // A LAMBDA closure has no numeric coercion (Excel: #CALC!/#VALUE!
+    // depending on context) -- fail closed instead of stringifying/NaN-ing
+    // the closure object through DetermineValueType below.
+    operandinfo.value = 0;
+    operandinfo.type = "e#VALUE!";
+    return operandinfo;
+  }
+
   if (t == "n") {
     operandinfo.value = (operandinfo.value as number) - 0;
   } else if (t == "b") {
@@ -104,6 +113,14 @@ FormulaOperandMut.OperandAsText = function (
   var operandinfo = SocialCalc.Formula.OperandValueAndType(sheet, operand);
 
   t = operandinfo.type.charAt(0);
+
+  if (operandinfo.type == "lambda") {
+    // A LAMBDA closure has no text coercion -- fail closed rather than
+    // stringifying the closure object (`[object Object]`).
+    operandinfo.value = "";
+    operandinfo.type = "e#VALUE!";
+    return operandinfo;
+  }
 
   if (t == "t") {
     // any flavor of text returns as is

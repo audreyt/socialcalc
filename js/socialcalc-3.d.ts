@@ -205,6 +205,16 @@ declare namespace SocialCalc {
     condfmtRulesVersion: number;
     condfmtValueVersion: number;
     charts: { [id: string]: ChartObject };
+    /** LET/LAMBDA lexical scope stack (innermost frame last), installed
+     * around evaluation of a LET/LAMBDA body/value so LookupName can
+     * shadow global names. Empty/absent outside LET/LAMBDA evaluation. */
+    formulaScope?: FormulaScopeFrame[];
+    /** LAMBDA recursion-guard depth counter, reset per top-level formula
+     * evaluation. */
+    lambdaDepth?: number;
+    /** Circular named-formula-reference guard (set/cleared by
+     * SocialCalc.Formula.LookupName). */
+    checknamecirc?: { [name: string]: boolean };
     layouts: string[];
     layouthash: { [key: string]: number };
     fonts: string[];

@@ -22,6 +22,11 @@ type FormulaParseMutable = Pick<
   | "ArrayValuesEqual"
   | "PushOperand"
   | "CopyFunctionArgs"
+  | "ClassifyArity"
+  | "ResolveScopeIndex"
+  | "RecursionStatus"
+  | "ShapesMatch"
+  | "IsValidRectShape"
 >;
 const FormulaParseMut = SocialCalc.Formula as FormulaParseMutable;
 
@@ -332,7 +337,12 @@ FormulaParseMut.ConvertInfixToPolish = function (
     pii = parseinfo[i]!;
     ttype = pii.type;
     ttext = pii.text;
-    if (ttype == tokentype.num || ttype == tokentype.coord || ttype == tokentype.string) {
+    if (
+      ttype == tokentype.num ||
+      ttype == tokentype.coord ||
+      ttype == tokentype.string ||
+      ttype == tokentype.special
+    ) {
       revpolish.push(i);
     } else if (ttype == tokentype.name) {
       parsestack.push(i);
@@ -482,4 +492,55 @@ FormulaParseMut.CopyFunctionArgs = function (
   operand.pop(); // get rid of "start"
 
   return;
+};
+
+// ----------------------------------------------------------------------
+// LET/LAMBDA pure binding/scope/shape policy.
+// Mirrors the LemmaScript facade in lemma/lambda-scope.ts exactly: these
+// are the runtime counterparts kept byte-identical to the proof-bearing
+// pure decision cores (see AGENTS.md "Facade oracle mapping").
+// ----------------------------------------------------------------------
+
+//@ verify
+//@ ensures result_is_0_1_or_2
+// LemmaScript: pure arity classification. 0=OK, 1=too few, 2=too many.
+FormulaParseMut.ClassifyArity = function (paramCount: number, argCount: number): number {
+  if (argCount < paramCount) return 1;
+  if (argCount > paramCount) return 2;
+  return 0;
+};
+
+//@ verify
+// LemmaScript: pure lexical-shadowing resolution — innermost (highest
+// index) true entry wins; -1 means unbound (fall through to global names).
+FormulaParseMut.ResolveScopeIndex = function (matches: boolean[]): number {
+  for (var i = matches.length - 1; i >= 0; i--) {
+    if (matches[i]) return i;
+  }
+  return -1;
+};
+
+//@ verify
+//@ ensures result_is_0_or_1
+// LemmaScript: pure recursion-guard status. 0=OK, 1=exceeded.
+FormulaParseMut.RecursionStatus = function (depth: number, maxDepth: number): number {
+  return depth > maxDepth ? 1 : 0;
+};
+
+//@ verify
+// LemmaScript: pure array-output shape equality (MAKEARRAY/MAP/BYROW/BYCOL
+// row-vs-column output-rectangle agreement policy).
+FormulaParseMut.ShapesMatch = function (
+  rows1: number,
+  cols1: number,
+  rows2: number,
+  cols2: number,
+): boolean {
+  return rows1 === rows2 && cols1 === cols2;
+};
+
+//@ verify
+// LemmaScript: pure rectangle-shape validity (positive integer extents).
+FormulaParseMut.IsValidRectShape = function (rows: number, cols: number): boolean {
+  return Number.isFinite(rows) && Number.isFinite(cols) && rows > 0 && cols > 0;
 };

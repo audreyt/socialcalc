@@ -251,7 +251,7 @@ vp test
 start. `build.ts` instruments each original `js/*.ts` source, assembles
 `dist/SocialCalc.instrumented.js` under the normal UMD wrapper, and writes
 counters to `globalThis.__VITEST_COVERAGE__`. The default gate includes the
-eleven shipping modules plus the four LemmaScript facades and requires
+eleven shipping modules plus the five LemmaScript facades and requires
 100/100/100/100.
 
 The instrumented bundle is gitignored and never shipped. Ordinary `vp build`
@@ -449,8 +449,13 @@ shipping bundle.
   le/…), and reject/warn/pass outcome precedence (blank-with-allowBlank
   short-circuits to pass; a failed check falls to warn only in warn mode,
   else reject) — 3 Dafny VCs.
+- `lemma/lambda-scope.ts`: LET/LAMBDA binding/scope/shape policy — fixed-
+  arity call classification, innermost-wins lexical-shadowing resolution
+  (with a proven forall witness: the resolved frame binds the name and is
+  the innermost such frame), recursion-depth guard, and MAKEARRAY/MAP/
+  BYROW/BYCOL output-rectangle shape agreement — 6 Dafny VCs.
 
-Total: **155 VCs (36 + 5 + 3 + 17 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2 + 8 + 9 + 16 + 3)**.
+Total: **161 VCs (36 + 5 + 3 + 17 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2 + 8 + 9 + 16 + 3 + 6)**.
 
 After a facade edit:
 
@@ -526,6 +531,11 @@ Facade oracle mapping:
 - condfmt: shipping conditional-format rule evaluation, duplicate/unique
   predicates, stop-if-true precedence, and style merge behavior, covered by
   `test/lemma-condfmt-facade.test.ts` and the conditional-formatting suite.
+- lambda scope: shipping `Formula.ClassifyArity`, `Formula.ResolveScopeIndex`,
+  `Formula.RecursionStatus`, `Formula.ShapesMatch`, `Formula.IsValidRectShape`,
+  and the `Formula.LAMBDA_MAX_DEPTH` constant. `test/lemma-lambda-scope-
+facade.test.ts` cross-checks every function against its shipping
+  counterpart, plus live `LET`/`LAMBDA`/`MAKEARRAY` formula smoke tests.
 
 ## Mutation testing
 

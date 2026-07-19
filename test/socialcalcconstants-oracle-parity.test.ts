@@ -211,13 +211,14 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
   // TAKE/DROP/HSTACK/VSTACK/TOCOL/TOROW/WRAPROWS/WRAPCOLS/EXPAND (dynamic-
   // array function family 2), date arithmetic, financial, logical/error,
   // text, regex, math/statistics, SUBTOTAL, lookup, INDIRECT/OFFSET
-  // (dynamic references), and ROW/COLUMN/ADDRESS/ISFORMULA/ISREF/
+  // (dynamic references), ROW/COLUMN/ADDRESS/ISFORMULA/ISREF/
   // ERROR.TYPE/TYPE/HYPERLINK/IMAGE/TEXT (reference/information/render
-  // functions) were all added after the 3.0.8 baseline was vendored, so the
-  // oracle bundle can never contain their s_fdef_/s_farg_ keys — a
-  // byte-for-byte toEqual against the full candidate object would fail
-  // permanently on these keys alone, regardless of correctness. Carve out
-  // exactly this named, closed set (64 s_fdef_ + 55 s_farg_) before the
+  // functions), and MAP/REDUCE/SCAN/BYROW/BYCOL/MAKEARRAY (LET/LAMBDA
+  // lambda-array functions) were all added after the 3.0.8 baseline was
+  // vendored, so the oracle bundle can never contain their s_fdef_/s_farg_
+  // keys — a byte-for-byte toEqual against the full candidate object would
+  // fail permanently on these keys alone, regardless of correctness. Carve
+  // out exactly this named, closed set (70 s_fdef_ + 61 s_farg_) before the
   // oracle comparison; every other key still gets whole-object byte-for-byte
   // parity, and the total counts (115/38) stay pinned so a future
   // undocumented addition or removal still fails loudly instead of silently
@@ -288,6 +289,12 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
     "s_fdef_WRAPROWS",
     "s_fdef_WRAPCOLS",
     "s_fdef_EXPAND",
+    "s_fdef_MAP",
+    "s_fdef_REDUCE",
+    "s_fdef_SCAN",
+    "s_fdef_BYROW",
+    "s_fdef_BYCOL",
+    "s_fdef_MAKEARRAY",
   ];
   const postOracleFargKeys = [
     "s_farg_rank",
@@ -345,10 +352,16 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
     "s_farg_wraprows",
     "s_farg_wrapcols",
     "s_farg_expand",
+    "s_farg_map",
+    "s_farg_reduce",
+    "s_farg_scan",
+    "s_farg_byrow",
+    "s_farg_bycol",
+    "s_farg_makearray",
   ];
 
-  expect(Object.keys(candidateFdef).length).toBe(179);
-  expect(Object.keys(candidateFarg).length).toBe(93);
+  expect(Object.keys(candidateFdef).length).toBe(185);
+  expect(Object.keys(candidateFarg).length).toBe(99);
 
   const legacyFdef = { ...candidateFdef };
   const legacyFarg = { ...candidateFarg };

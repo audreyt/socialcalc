@@ -8,7 +8,7 @@ declare namespace SocialCalc {
    * numeric constants defined in SocialCalc.Formula.TokenType:
    *   num=1, coord=2, op=3, name=4, error=5, string=6, space=7
    */
-  type FormulaTokenTypeCode = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  type FormulaTokenTypeCode = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
   /**
    * Single-character opcodes as emitted by the parser and used in
@@ -65,6 +65,7 @@ declare namespace SocialCalc {
     | "range"
     | "name"
     | "start"
+    | "lambda"
     | "array"
     | "e#NULL!"
     | "e#NUM!"
@@ -88,6 +89,18 @@ declare namespace SocialCalc {
     cells: FormulaArrayCell[][];
   }
 
+  /** One lexical scope frame: uppercase bound name -> resolved value/type. */
+  interface FormulaScopeFrame {
+    [nameUpper: string]: FormulaValueResult;
+  }
+
+  /** A LAMBDA closure: parameter names (in order), unevaluated body tokens, and the lexical scope snapshot captured where the LAMBDA literal appeared. */
+  interface FormulaLambdaClosure {
+    params: string[];
+    bodyTokens: FormulaParseToken[];
+    scope: FormulaScopeFrame[];
+  }
+
   interface FormulaParseToken {
     /** The raw characters that make up this token. */
     text: string;
@@ -95,6 +108,10 @@ declare namespace SocialCalc {
     type: FormulaTokenTypeCode;
     /** Single-char opcode for operators (e.g. "M" for unary minus). */
     opcode: FormulaOpcode;
+    /** Present only on synthetic `special` tokens emitted by
+     * ExtractSpecialForms: the already-resolved LET/lambda-call result or
+     * an unevaluated LAMBDA closure. */
+    specialValue?: FormulaValueResult | FormulaLambdaClosure;
     [key: string]: any;
   }
 
@@ -278,6 +295,12 @@ declare namespace SocialCalc {
       foperand: FormulaOperand[],
       sheet: Sheet,
     ): void;
+    function LambdaArrayFunctions(
+      fname: string,
+      operand: FormulaOperand[],
+      foperand: FormulaOperand[],
+      sheet: Sheet,
+    ): void;
     const TokenOpExpansion: { [op: string]: string };
     const TypeLookupTable: { [key: string]: { [subtype: string]: string } };
 
@@ -312,6 +335,52 @@ declare namespace SocialCalc {
       sheet: Sheet,
       allowrangereturn?: boolean | number,
     ): FormulaEvaluateResult;
+    /**
+     * Recursively resolves LET/LAMBDA special forms (and immediate/named
+     * lambda invocation syntax) in a token array before standard RPN
+     * conversion. Returns the token array unchanged (same reference) when no
+     * LET/LAMBDA/bound-lambda-call is present, so ordinary formulas pay zero
+     * extra cost. Splices resolved literal results (or unresolved lambda
+     * closures) in as synthetic `special` tokens.
+     */
+    function ExtractSpecialForms(
+      parseinfo: FormulaParseToken[],
+      sheet: Sheet,
+      scope: FormulaScopeFrame[],
+    ): FormulaParseToken[];
+
+    /**
+     * Full formula-token evaluation used for LET value/calc expressions and
+     * LAMBDA bodies: runs ExtractSpecialForms then the standard
+     * ConvertInfixToPolish/EvaluatePolish pipeline under the given lexical
+     * scope (temporarily installed on `sheet.formulaScope` for LookupName).
+     */
+    function EvaluateFormulaTokens(
+      tokens: FormulaParseToken[],
+      sheet: Sheet,
+      scope: FormulaScopeFrame[],
+      allowrangereturn?: boolean | number,
+    ): FormulaEvaluateResult;
+
+    /** Invokes a LAMBDA closure with already-evaluated argument values. */
+    function InvokeLambda(
+      sheet: Sheet,
+      closure: FormulaLambdaClosure,
+      args: FormulaValueResult[],
+    ): FormulaEvaluateResult;
+
+    // ------------------------------------------------------------
+    // Pure LemmaScript-mirrored binding/scope/shape policy helpers
+    // ------------------------------------------------------------
+    /** 0 = OK, 1 = too few args, 2 = too many args. */
+    function ClassifyArity(paramCount: number, argCount: number): number;
+    /** Innermost (last) true index in `matches`, or -1 if none. */
+    function ResolveScopeIndex(matches: boolean[]): number;
+    /** 0 = OK, 1 = recursion limit exceeded. */
+    function RecursionStatus(depth: number, maxDepth: number): number;
+    function ShapesMatch(rows1: number, cols1: number, rows2: number, cols2: number): boolean;
+    function IsValidRectShape(rows: number, cols: number): boolean;
+    const LAMBDA_MAX_DEPTH: number;
 
     function LookupResultType(
       type1: FormulaOperandType,

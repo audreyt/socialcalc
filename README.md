@@ -152,6 +152,52 @@ the same compaction pass as cell/sheet style attributes. The bundled
 list plus an add/edit/delete/reorder editor form built entirely on this
 command surface.
 
+### LET, LAMBDA, and lambda-array functions
+
+`LET` and `LAMBDA` add Excel-compatible local bindings and user-defined
+functions on top of the existing formula engine, with real lexical scope,
+closures, and callable named lambdas:
+
+- `LET(name1, value1, [name2, value2, ...], calculation)` binds one or more
+  names to values sequentially (each later value/the final `calculation` can
+  reference every earlier name), evaluates each value exactly once, and
+  returns `calculation`. A later name of the same spelling shadows the
+  earlier one (innermost binding wins). Names may not be blank, a reserved
+  builtin function name used as the sole occupant of a scope frame without a
+  call, or shaped like a cell coordinate (`A1`, `$B$2`, ...) — the latter
+  keeps every formula-reference rewrite (copy/fill/move/insert/delete)
+  coord-only, so a bound name is never mistaken for a cell reference.
+- `LAMBDA([param1, param2, ...], calculation)` defines a function value.
+  Called immediately as `LAMBDA(...)(arg1, arg2, ...)`, bound to a name via
+  `LET` and invoked through that name (`LET(f, LAMBDA(x,x*x), f(4))`), or
+  stored in a workbook name (Name Manager / `sheet.names`) and called as
+  `MYFUNC(arg1, ...)` from any formula. A `LAMBDA` closes over its defining
+  `LET` scope, so nested/recursive/mutually-recursive definitions work
+  (`=LAMBDA(n,IF(n<=1,1,n*FACT(n-1)))` bound to the name `FACT`). Calling
+  with the wrong number of arguments is `#VALUE!`; a `LAMBDA` written as a
+  cell's entire formula without ever being invoked is also `#VALUE!` (it
+  isn't a plottable/storable scalar). Recursion depth is bounded (fails fast
+  with `#NUM!` well before the host JS call stack) rather than unbounded.
+- `MAP(array1, [array2, ...], lambda)` applies `lambda` element-wise across
+  one or more same-shaped arrays/ranges, producing a result of the same
+  shape.
+- `REDUCE(initial_value, array, lambda)` accumulates `lambda(accumulator,
+value)` left-to-right/top-to-bottom over `array`, starting from
+  `initial_value`, and returns the final accumulator.
+- `SCAN(initial_value, array, lambda)` is `REDUCE` but returns every
+  intermediate accumulator as an array the same shape as `array`, instead of
+  only the final value.
+- `BYROW(array, lambda)` / `BYCOL(array, lambda)` apply `lambda` to each row
+  (as a 1-row array) or column (as a 1-column array) of `array` and return a
+  single column/row of per-row/per-column results.
+- `MAKEARRAY(rows, cols, lambda)` builds a `rows` x `cols` array by calling
+  `lambda(row, col)` (1-based) for every cell. `rows`/`cols` must be positive
+  integers.
+
+Every lambda-array function's result is a dynamic array and flows through
+the same spill pipeline as `SORT`/`UNIQUE` above (anchor cell, `#SPILL!` on
+collision, formula-owned spill children, save/copy/move semantics).
+
 ## Trust boundary and host security
 
 SocialCalc has two rendering modes. The legacy mode preserves historical output

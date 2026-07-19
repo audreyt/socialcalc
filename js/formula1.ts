@@ -66,7 +66,16 @@ FormulaMut.ParseState = {
   specialvalue: 9,
 };
 
-FormulaMut.TokenType = { num: 1, coord: 2, op: 3, name: 4, error: 5, string: 6, space: 7 };
+FormulaMut.TokenType = {
+  num: 1,
+  coord: 2,
+  op: 3,
+  name: 4,
+  error: 5,
+  string: 6,
+  space: 7,
+  special: 8,
+};
 
 FormulaMut.CharClass = {
   num: 1,
@@ -238,6 +247,12 @@ FormulaMut.SpecialConstants = {
 FormulaMut.SPILL_MAX_COL = 702;
 FormulaMut.SPILL_MAX_ROW = 65536;
 FormulaMut.SPILL_MAX_CELLS = 100000;
+// Bounded recursion depth for LAMBDA self/mutual recursion (matches the
+// spreadsheet's other bounded-iteration guards). Chosen well above any
+// legitimate recursive formula depth while still failing fast (well within
+// default stack limits) on runaway self-reference before the host JS
+// engine's own call-stack ceiling.
+FormulaMut.LAMBDA_MAX_DEPTH = 200;
 FormulaMut.PlanSpillStatus = function (anchorCol, anchorRow, rows, cols, maxCol, maxRow, maxCells) {
   if (!(rows > 0 && cols > 0)) return 1;
   if (
@@ -400,11 +415,441 @@ FormulaMut.evaluate_parsed_formula = function (parseinfo, sheet, allowrangeretur
 
   var revpolish;
 
-  revpolish = scf.ConvertInfixToPolish(parseinfo); // result is either an array or a string with error text
+  var resolved = scf.ExtractSpecialForms(parseinfo, sheet, sheet.formulaScope || []);
 
-  result = scf.EvaluatePolish(parseinfo, revpolish, sheet, allowrangereturn);
+  revpolish = scf.ConvertInfixToPolish(resolved); // result is either an array or a string with error text
+
+  result = scf.EvaluatePolish(resolved, revpolish, sheet, allowrangereturn);
 
   return result;
+};
+
+// ------------------------------------------------------------------------
+// LET / LAMBDA / higher-order array functions.
+//
+// Architecture: LET and LAMBDA are syntactic special forms, not ordinary
+// functions — their arguments are not eagerly evaluated left-to-right by
+// the shared RPN machinery, because (a) LET must bind name[k] into scope
+// *before* value[k+1] is parsed/evaluated (sequential let*-style binding,
+// with each name visible to every later value/body expression), and
+// (b) LAMBDA must capture its body as an *unevaluated* token span (a
+// closure) so MAP/REDUCE/etc. can invoke it once per element instead of
+// once total.
+//
+// ExtractSpecialForms walks the flat token array *before* RPN conversion,
+// looking for NAME("LET"|"LAMBDA") "(" ... ")" spans (balanced parens,
+// comma-split at depth 0, same technique formula-ref.ts is not exposed to
+// — this operates on live parseinfo, not a formula string). Each such span
+// is replaced by exactly one synthetic `special` token holding the already-
+// computed result (LET) or an unevaluated closure (LAMBDA). The rest of
+// the token stream — and every existing formula that contains no LET/
+// LAMBDA — is untouched and pays zero extra parsing/evaluation cost.
+//
+// Bound-lambda call syntax `LAMBDA(...)(args)` / `name(args)` where `name`
+// resolves to a closure is handled the same way: once the LAMBDA span
+// collapses to one `special` token, a directly-following "(" balanced span
+// is recognized as a call and evaluated immediately, so `LAMBDA(x,x+1)(5)`
+// and named-lambda calls both flow through InvokeLambda before RPN ever
+// sees them. This keeps the RPN evaluator and its `function_start`/name
+// dispatch (formula-parse.ts's ConvertInfixToPolish, formula1.ts's
+// EvaluatePolish/CalculateFunction) completely unaware that lambdas exist.
+//
+// Lexical scope is threaded as `sheet.formulaScope: FormulaScopeFrame[]`
+// (a stack of frames, innermost last) — mirroring the existing
+// `sheet.checknamecirc` convention of using the sheet object as the
+// ambient per-recalc-call context. LookupName consults it before falling
+// back to sheet.names, so a LET/LAMBDA-bound identifier shadows (but never
+// mutates) global named ranges, and nested scopes shadow each other with
+// standard lexical (innermost-wins) resolution — mirrored exactly by the
+// pure `ResolveScopeIndex` facade in formula-parse.ts.
+// ------------------------------------------------------------------------
+
+/** Matches formula-parse.ts's coordregex: LET/LAMBDA params shaped like a
+ * cell reference (A1, $B$2, ...) are rejected up front (Excel behavior),
+ * which keeps every existing coord-only rewrite path (formula-ref.ts's
+ * OffsetFormulaCoords/AdjustFormulaCoords/ReplaceFormulaCoords, and
+ * EvaluatePolish's tokentype.coord branch) unaware LET/LAMBDA exist: a
+ * bound parameter can never tokenize as tokentype.coord. */
+var lambdaParamCoordRegex = /^\$?[A-Z]{1,2}\$?[1-9]\d*$/;
+
+function isValidLambdaParamName(text: string, ttype: number): boolean {
+  var scf = SocialCalc.Formula;
+  if (ttype !== scf.TokenType.name) return false;
+  if (lambdaParamCoordRegex.test(text)) return false;
+  if (scf.SpecialConstants && scf.SpecialConstants[text]) return false;
+  return true;
+}
+
+/** Finds the index of the ")" matching an "(" at `openIndex`, honoring
+ * nested parens. Returns -1 if unbalanced. */
+function findMatchingParen(tokens: SocialCalc.FormulaParseToken[], openIndex: number): number {
+  var scf = SocialCalc.Formula;
+  var depth = 0;
+  for (var i = openIndex; i < tokens.length; i++) {
+    var t = tokens[i]!;
+    if (t.type === scf.TokenType.op && t.text === "(") depth++;
+    else if (t.type === scf.TokenType.op && t.text === ")") {
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+/** Splits the tokens strictly between a "(" and its matching ")" into
+ * comma-separated argument spans (each span is itself a token array),
+ * honoring nested parens. Empty argument list -> []. */
+function splitArgSpans(
+  tokens: SocialCalc.FormulaParseToken[],
+  openIndex: number,
+  closeIndex: number,
+): SocialCalc.FormulaParseToken[][] {
+  var scf = SocialCalc.Formula;
+  var spans: SocialCalc.FormulaParseToken[][] = [];
+  var current: SocialCalc.FormulaParseToken[] = [];
+  var depth = 0;
+  for (var i = openIndex + 1; i < closeIndex; i++) {
+    var t = tokens[i]!;
+    if (t.type === scf.TokenType.op && t.text === "(") {
+      depth++;
+      current.push(t);
+    } else if (t.type === scf.TokenType.op && t.text === ")") {
+      depth--;
+      current.push(t);
+    } else if (t.type === scf.TokenType.op && t.text === "," && depth === 0) {
+      spans.push(current);
+      current = [];
+    } else {
+      current.push(t);
+    }
+  }
+  if (openIndex + 1 !== closeIndex || current.length) spans.push(current);
+  return spans;
+}
+
+/** Parses one LAMBDA parameter span (a single comma-delimited arg between
+ * "LAMBDA(" and its matching ")"). Since splitArgSpans splits on top-level
+ * commas, a param span can never itself contain a comma token -- so a
+ * valid param is exactly one name token; anything else (empty span,
+ * multiple tokens with no operator between them, or an invalid name) is
+ * rejected. Returns null on malformed input. */
+function parseLambdaParamSpan(span: SocialCalc.FormulaParseToken[]): string[] | null {
+  if (span.length !== 1) return null;
+  var t = span[0]!;
+  if (!isValidLambdaParamName(t.text, t.type)) return null;
+  return [t.text.toUpperCase()];
+}
+
+/** Builds the FormulaScopeFrame binding one LET/LAMBDA name to an already-
+ * computed value/type/error result. */
+function makeScopeFrame(
+  name: string,
+  result: SocialCalc.FormulaValueResult,
+): SocialCalc.FormulaScopeFrame {
+  var frame: SocialCalc.FormulaScopeFrame = {};
+  frame[name] = result;
+  return frame;
+}
+
+/**
+ * Evaluates a token span (LET value/calc expression, LAMBDA body, or an
+ * argument passed to a higher-order function) under a given lexical scope.
+ * Installs `scope` on `sheet.formulaScope` for the duration of evaluation
+ * (restoring the previous value afterward, supporting reentrancy for
+ * nested LET/LAMBDA/MAP/... calls) so LookupName and everything built on
+ * it (OperandValueAndType, arithmetic, function calls) transparently see
+ * bound names. Runs ExtractSpecialForms first so nested LET/LAMBDA forms
+ * within this span resolve recursively.
+ */
+FormulaMut.EvaluateFormulaTokens = function (tokens, sheet, scope, allowrangereturn) {
+  var scf = SocialCalc.Formula;
+  var previousScope = sheet.formulaScope;
+  sheet.formulaScope = scope;
+  try {
+    var resolved = scf.ExtractSpecialForms(tokens, sheet, scope);
+    var revpolish = scf.ConvertInfixToPolish(resolved);
+    return scf.EvaluatePolish(resolved, revpolish, sheet, allowrangereturn);
+  } finally {
+    sheet.formulaScope = previousScope;
+  }
+};
+
+/**
+ * Invokes a LAMBDA closure with already-evaluated argument values. Checks
+ * arity via the pure ClassifyArity facade and enforces the bounded
+ * recursion guard via RecursionStatus before evaluating the body, so a
+ * self/mutually-recursive LAMBDA fails fast with #NUM! instead of
+ * exhausting the JS call stack.
+ */
+FormulaMut.InvokeLambda = function (sheet, closure, args) {
+  var scf = SocialCalc.Formula;
+  var arity = scf.ClassifyArity(closure.params.length, args.length);
+  if (arity !== 0) {
+    return {
+      value: 0,
+      type: "e#VALUE!",
+      error: SocialCalc.Constants.s_calcerrincorrectargstofunction + " LAMBDA. ",
+    };
+  }
+
+  var depth = (sheet.lambdaDepth || 0) + 1;
+  if (scf.RecursionStatus(depth, scf.LAMBDA_MAX_DEPTH) !== 0) {
+    return { value: 0, type: "e#NUM!", error: SocialCalc.Constants.s_calcerrnumericoverflow };
+  }
+
+  var frame: SocialCalc.FormulaScopeFrame = {};
+  for (var i = 0; i < closure.params.length; i++) {
+    frame[closure.params[i]!] = args[i]!;
+  }
+  var callScope = closure.scope.concat([frame]);
+
+  sheet.lambdaDepth = depth;
+  try {
+    return scf.EvaluateFormulaTokens(closure.bodyTokens, sheet, callScope, true);
+  } finally {
+    sheet.lambdaDepth = depth - 1;
+  }
+};
+
+/** Resolves one LET(...) span (already located by ExtractSpecialForms) into
+ * a `special` token holding the fully-evaluated final value. LET binds
+ * name[k] -> value[k] sequentially (each later value/the final calculation
+ * expression can reference every earlier name), matching Excel's
+ * left-to-right let* semantics. */
+function resolveLetSpan(
+  argSpans: SocialCalc.FormulaParseToken[][],
+  sheet: SocialCalc.Sheet,
+  outerScope: SocialCalc.FormulaScopeFrame[],
+): SocialCalc.FormulaValueResult {
+  var scf = SocialCalc.Formula;
+  if (argSpans.length < 3 || argSpans.length % 2 === 0) {
+    return {
+      value: 0,
+      type: "e#VALUE!",
+      error: SocialCalc.Constants.s_calcerrincorrectargstofunction + " LET. ",
+    };
+  }
+  var scope = outerScope.slice();
+  var pairCount = (argSpans.length - 1) / 2;
+  for (var p = 0; p < pairCount; p++) {
+    var nameSpan = argSpans[p * 2]!;
+    if (nameSpan.length !== 1 || !isValidLambdaParamName(nameSpan[0]!.text, nameSpan[0]!.type)) {
+      return {
+        value: 0,
+        type: "e#NAME?",
+        error: SocialCalc.Constants.s_calcerrunknownname + " in LET",
+      };
+    }
+    var boundName = nameSpan[0]!.text.toUpperCase();
+    var valueResult = scf.EvaluateFormulaTokens(argSpans[p * 2 + 1]!, sheet, scope, true);
+    scope = scope.concat([makeScopeFrame(boundName, valueResult)]);
+  }
+  return scf.EvaluateFormulaTokens(argSpans[argSpans.length - 1]!, sheet, scope, true);
+}
+
+/** Resolves one LAMBDA(...) span into a `special` token holding an
+ * unevaluated closure: params (from every arg but the last) and the body
+ * (the last arg, kept as raw tokens) plus the current lexical scope
+ * snapshot (for closures over an enclosing LET). */
+function resolveLambdaSpan(
+  argSpans: SocialCalc.FormulaParseToken[][],
+  scope: SocialCalc.FormulaScopeFrame[],
+): SocialCalc.FormulaValueResult | SocialCalc.FormulaLambdaClosure {
+  if (argSpans.length < 1) {
+    return {
+      value: 0,
+      type: "e#VALUE!",
+      error: SocialCalc.Constants.s_calcerrincorrectargstofunction + " LAMBDA. ",
+    };
+  }
+  var paramSpans = argSpans.slice(0, argSpans.length - 1);
+  var bodyTokens = argSpans[argSpans.length - 1]!;
+  var params: string[] = [];
+  for (var i = 0; i < paramSpans.length; i++) {
+    var names = parseLambdaParamSpan(paramSpans[i]!);
+    if (!names || names.length !== 1) {
+      return {
+        value: 0,
+        type: "e#VALUE!",
+        error: SocialCalc.Constants.s_calcerrincorrectargstofunction + " LAMBDA. ",
+      };
+    }
+    params.push(names[0]!);
+  }
+  if (!bodyTokens.length) {
+    return {
+      value: 0,
+      type: "e#VALUE!",
+      error: SocialCalc.Constants.s_calcerrincorrectargstofunction + " LAMBDA. ",
+    };
+  }
+  return { params: params, bodyTokens: bodyTokens, scope: scope };
+}
+
+/** True when `result` is an unevaluated closure rather than a resolved
+ * scalar/array/coord/range value. */
+function isLambdaClosure(
+  result: SocialCalc.FormulaValueResult | SocialCalc.FormulaLambdaClosure,
+): result is SocialCalc.FormulaLambdaClosure {
+  return "params" in result;
+}
+
+/**
+ * Resolves one IF(cond,true_val[,false_val]) span lazily: evaluates only
+ * the condition eagerly, then evaluates *only* the taken branch. This is
+ * the one exception to "LET/LAMBDA don't change any existing formula's
+ * evaluation order": SocialCalc's shipping IfFunction (used by every
+ * ordinary top-level formula) is intentionally left untouched -- it's a
+ * FunctionList entry whose args are eagerly evaluated by the standard RPN
+ * pipeline like every other function, and changing that would be a
+ * pervasive, unrelated behavioral change (e.g. IF(cond,1,1/0) no longer
+ * erroring on the untaken branch).
+ *
+ * Instead, ExtractSpecialForms only intercepts IF this way *inside an
+ * active LET/LAMBDA scope* (scope.length > 0): that is exactly the
+ * evaluation context self/mutually-recursive LAMBDA bodies run in, and
+ * short-circuiting IF there is required for recursion to terminate at all
+ * -- eager evaluation of a recursive branch would call the lambda body
+ * again unconditionally regardless of the base case, and even with the
+ * bounded recursion guard could only ever produce #NUM!, never a real
+ * result (see the failing-without-this-fix FACT/mutual-recursion tests).
+ */
+function resolveIfSpan(
+  argSpans: SocialCalc.FormulaParseToken[][],
+  sheet: SocialCalc.Sheet,
+  scope: SocialCalc.FormulaScopeFrame[],
+): SocialCalc.FormulaValueResult {
+  var scf = SocialCalc.Formula;
+  if (argSpans.length < 2 || argSpans.length > 3) {
+    return {
+      value: 0,
+      type: "e#VALUE!",
+      error: SocialCalc.Constants.s_calcerrincorrectargstofunction + " IF. ",
+    };
+  }
+  var cond = scf.EvaluateFormulaTokens(argSpans[0]!, sheet, scope, true);
+  var t = cond.type.charAt(0);
+  if (t === "e") return cond;
+  if (t !== "n" && t !== "b") return { value: 0, type: "e#VALUE!", error: "" };
+  if (cond.value) {
+    return scf.EvaluateFormulaTokens(argSpans[1]!, sheet, scope, true);
+  }
+  if (argSpans.length === 3) {
+    return scf.EvaluateFormulaTokens(argSpans[2]!, sheet, scope, true);
+  }
+  return { value: 0, type: "n" };
+}
+
+/**
+ * Recursively resolves LET/LAMBDA special forms and bound-lambda-call
+ * syntax in a token array. See the architecture comment above. Returns the
+ * SAME array reference (untouched) whenever no NAME("LET"|"LAMBDA") token
+ * is present, so ordinary formulas pay zero extra cost -- checked with a
+ * cheap upfront scan before doing any splicing work.
+ */
+FormulaMut.ExtractSpecialForms = function (parseinfo, sheet, scope) {
+  var scf = SocialCalc.Formula;
+  var tokentype = scf.TokenType;
+  var lazyIf = scope.length > 0;
+
+  var isSpecialCallToken = function (
+    t: SocialCalc.FormulaParseToken,
+    next: SocialCalc.FormulaParseToken | undefined,
+  ) {
+    if (t.type !== tokentype.name || !next || next.type !== tokentype.op || next.text !== "(") {
+      return false;
+    }
+    return t.text === "LET" || t.text === "LAMBDA" || (lazyIf && t.text === "IF");
+  };
+
+  var hasSpecial = false;
+  for (var k = 0; k < parseinfo.length; k++) {
+    if (isSpecialCallToken(parseinfo[k]!, parseinfo[k + 1])) {
+      hasSpecial = true;
+      break;
+    }
+  }
+  if (!hasSpecial) return parseinfo;
+
+  var out: SocialCalc.FormulaParseToken[] = [];
+  for (var i = 0; i < parseinfo.length; i++) {
+    var tok = parseinfo[i]!;
+    if (!isSpecialCallToken(tok, parseinfo[i + 1])) {
+      out.push(tok);
+      continue;
+    }
+
+    var openIndex = i + 1;
+    var closeIndex = findMatchingParen(parseinfo, openIndex);
+    if (closeIndex === -1) {
+      out.push(tok); // unbalanced -- let the normal parser surface the error
+      continue;
+    }
+    var spans = splitArgSpans(parseinfo, openIndex, closeIndex);
+
+    if (tok.text === "IF") {
+      // IF's branches must stay UNRESOLVED here -- resolveIfSpan evaluates
+      // (and recurses into ExtractSpecialForms for) only the taken one.
+      out.push({
+        text: "IF(...)",
+        type: tokentype.special,
+        opcode: 0,
+        specialValue: resolveIfSpan(spans, sheet, scope),
+      });
+      i = closeIndex; // outer for-loop increments past it
+      continue;
+    }
+
+    // NOTE: argument spans are intentionally left as raw tokens here, not
+    // pre-resolved via ExtractSpecialForms. resolveLetSpan/resolveLambdaSpan
+    // each call EvaluateFormulaTokens (which itself runs ExtractSpecialForms)
+    // on every span at the correct time with the correct scope -- LET's
+    // value[k] must resolve under the *accumulating* scope as of value[k],
+    // not the scope active where LET itself appears, and a LAMBDA body must
+    // stay completely unevaluated (that's the whole point of a closure)
+    // until InvokeLambda runs it under the call-site scope. Pre-resolving
+    // here would bake in the wrong scope and break both nested LET
+    // shadowing and LAMBDA laziness/closures.
+
+    var resolved: SocialCalc.FormulaValueResult | SocialCalc.FormulaLambdaClosure =
+      tok.text === "LET" ? resolveLetSpan(spans, sheet, scope) : resolveLambdaSpan(spans, scope);
+
+    var nextIndex = closeIndex + 1;
+    // Bound-lambda call syntax: `LAMBDA(...)(args)` or a scope-bound
+    // `name(args)` that just resolved to a closure. Only fires when "("
+    // immediately follows with no operator in between (never mistakes
+    // `LAMBDA(...)+SUM(...)` for a call).
+    while (
+      isLambdaClosure(resolved) &&
+      parseinfo[nextIndex] &&
+      parseinfo[nextIndex]!.type === tokentype.op &&
+      parseinfo[nextIndex]!.text === "("
+    ) {
+      var callOpen = nextIndex;
+      var callClose = findMatchingParen(parseinfo, callOpen);
+      if (callClose === -1) break;
+      var callSpans = splitArgSpans(parseinfo, callOpen, callClose);
+      var argResults: SocialCalc.FormulaValueResult[] = [];
+      var argError: SocialCalc.FormulaValueResult | null = null;
+      for (var a = 0; a < callSpans.length; a++) {
+        var resolvedArgSpan = scf.ExtractSpecialForms(callSpans[a]!, sheet, scope);
+        var argVal = scf.EvaluateFormulaTokens(resolvedArgSpan, sheet, scope, true);
+        if (argVal.type.charAt(0) === "e" && !argError) argError = argVal;
+        argResults.push(argVal);
+      }
+      resolved = argError || scf.InvokeLambda(sheet, resolved, argResults);
+      nextIndex = callClose + 1;
+    }
+
+    out.push({
+      text: tok.text === "LET" ? "LET(...)" : "LAMBDA(...)",
+      type: tokentype.special,
+      opcode: 0,
+      specialValue: resolved,
+    });
+    i = nextIndex - 1; // -1: outer for-loop increments
+  }
+  return out;
 };
 
 //
@@ -527,6 +972,14 @@ FormulaMut.EvaluatePolish = function (parseinfo, revpolish, sheet, allowrangeret
       PushOperand("coord", ttext);
     } else if (ttype == tokentype.string) {
       PushOperand("t", ttext);
+    } else if (ttype == tokentype.special) {
+      var specialValue = (prii as SocialCalc.FormulaParseToken).specialValue!;
+      if ("params" in specialValue) {
+        PushOperand("lambda", specialValue); // unevaluated closure
+      } else {
+        PushOperand(specialValue.type, specialValue.value);
+        if (specialValue.error) errortext = errortext || specialValue.error;
+      }
     } else if (ttype == tokentype.op) {
       if (operand.length <= 0) {
         // Nothing on the stack...
@@ -629,7 +1082,12 @@ FormulaMut.EvaluatePolish = function (parseinfo, revpolish, sheet, allowrangeret
         }
         value2 = operand_value_and_type(sheet, operand);
         value1 = operand_value_and_type(sheet, operand);
-        if (value1.type.charAt(0) == "n" && value2.type.charAt(0) == "n") {
+        if (value1.type == "lambda" || value2.type == "lambda") {
+          // LAMBDA closures have no comparison semantics -- fail closed
+          // instead of falling into the text branch's .toLowerCase() call,
+          // which would throw on the raw closure object.
+          PushOperand("e#VALUE!", 0);
+        } else if (value1.type.charAt(0) == "n" && value2.type.charAt(0) == "n") {
           // compare two numbers
           cond = 0;
           if (ttext == "<") {
@@ -984,6 +1442,22 @@ FormulaMut.LookupName = function (sheet, name, isEnd) {
   var value: any = {};
   var startedwalk = false;
 
+  var scopeIndex = -1;
+  var scope = sheet.formulaScope;
+  if (scope && scope.length) {
+    var nameUpper = name.toUpperCase();
+    var matches: boolean[] = [];
+    for (var si = 0; si < scope.length; si++) matches.push(nameUpper in scope[si]!);
+    scopeIndex = SocialCalc.Formula.ResolveScopeIndex(matches);
+  }
+  if (scopeIndex >= 0) {
+    var bound = scope![scopeIndex]![name.toUpperCase()]!;
+    // Return a fresh object -- callers (e.g. OperandValueAndType) mutate
+    // the result in place, and the same bound value may be looked up many
+    // times (each MAP/BYROW element, recursive LAMBDA call, ...).
+    return { value: bound.value, type: bound.type, error: bound.error };
+  }
+
   if (names[name.toUpperCase()]) {
     // is name defined?
 
@@ -1006,7 +1480,17 @@ FormulaMut.LookupName = function (sheet, name, isEnd) {
       sheet.checknamecirc[name] = true;
 
       parseinfo = SocialCalc.Formula.ParseFormulaIntoTokens(value.value.substring(1));
-      value = SocialCalc.Formula.evaluate_parsed_formula(parseinfo, sheet, 1); // parse formula, allowing range return
+      // Global name definitions are evaluated in an empty lexical scope --
+      // a LET/LAMBDA scope active at the *call* site must never leak into
+      // a global name's own definition (that would let a local binding
+      // silently shadow an unrelated global the definition references).
+      var outerFormulaScope = sheet.formulaScope;
+      sheet.formulaScope = [];
+      try {
+        value = SocialCalc.Formula.evaluate_parsed_formula(parseinfo, sheet, 1); // parse formula, allowing range return
+      } finally {
+        sheet.formulaScope = outerFormulaScope;
+      }
 
       delete sheet.checknamecirc[name]; // done with us
       if (startedwalk) {
@@ -1479,6 +1963,41 @@ FormulaMut.CalculateFunction = function (fname, operand, sheet, coord) {
   var scf = SocialCalc.Formula;
   var errortext: any = "";
 
+  // A LET/LAMBDA-bound name shadows a same-named builtin function (Excel
+  // behavior: `LAMBDA(n, IF(n=0,1,n))` must bind the parameter, not
+  // dispatch to the builtin N() function). Must run before FunctionList
+  // lookup below, since a bound name like N/T/C/R would otherwise always
+  // resolve to the builtin (fobj truthy) with the wrong arity/semantics.
+  var scope = sheet.formulaScope;
+  if (scope && scope.length) {
+    var fnameUpper = fname.toUpperCase();
+    var scopeMatches: boolean[] = [];
+    for (var fsi = 0; fsi < scope.length; fsi++) scopeMatches.push(fnameUpper in scope[fsi]!);
+    var fscopeIndex = scf.ResolveScopeIndex(scopeMatches);
+    if (fscopeIndex >= 0) {
+      var boundValue = scope[fscopeIndex]![fnameUpper]!;
+      var hasCallArgs = operand.length > 0 && operand[operand.length - 1]!.type !== "start";
+      if (boundValue.type === "lambda" && hasCallArgs) {
+        var boundClosure = boundValue.value as SocialCalc.FormulaLambdaClosure;
+        var boundFoperand: any[] = [];
+        scf.CopyFunctionArgs(operand, boundFoperand);
+        var boundArgs: SocialCalc.FormulaValueResult[] = [];
+        while (boundFoperand.length) boundArgs.push(scf.OperandValueAndType(sheet, boundFoperand));
+        var boundResult = scf.InvokeLambda(sheet, boundClosure, boundArgs);
+        scf.PushOperand(operand, boundResult.type, boundResult.value);
+        return boundResult.error || "";
+      }
+      // Bare reference to a bound (non-lambda, or lambda-with-no-call-args)
+      // name: pop the RPN "start" sentinel if present and push it as a
+      // resolvable "name" operand -- LookupName's scope check picks it up.
+      if (operand.length && operand[operand.length - 1]!.type === "start") {
+        operand.pop();
+      }
+      scf.PushOperand(operand, "name", fname);
+      return "";
+    }
+  }
+
   fobj = scf.FunctionList[fname];
 
   if (fobj) {
@@ -1524,6 +2043,31 @@ FormulaMut.CalculateFunction = function (fname, operand, sheet, coord) {
       // no arguments - name or zero arg function
       operand.pop();
       scf.PushOperand(operand, "name", ttext);
+    } else if (sheet.names && sheet.names[ttext.toUpperCase()]) {
+      // Named-lambda call syntax: MYFUNC(args) where the name MYFUNC is
+      // defined as `=LAMBDA(...)`. Not routed through ExtractSpecialForms'
+      // bound-lambda-call handling (that only sees LET/LAMBDA literal
+      // spans) -- CalculateFunction is where every other bare-name call
+      // already dispatches, so this is the natural single interception
+      // point for both anonymous (`LAMBDA(...)(...)`) and named calls.
+      var namedLookup = scf.LookupName(sheet, ttext);
+      if (namedLookup.type !== "lambda") {
+        errortext = scf.FunctionArgsError(fname, operand);
+        return errortext;
+      }
+      var namedClosure = namedLookup.value as SocialCalc.FormulaLambdaClosure;
+      foperand = [];
+      scf.CopyFunctionArgs(operand, foperand); // reverses: last call-arg at index 0
+      var callArgs: SocialCalc.FormulaValueResult[] = [];
+      // Consume from the end (source order) -- matches every other
+      // FunctionList implementation's convention, and correctly drains a
+      // range-typed arg's tail (StepThroughRangeDown) from the same array.
+      while (foperand.length) {
+        callArgs.push(scf.OperandValueAndType(sheet, foperand));
+      }
+      var callResult = scf.InvokeLambda(sheet, namedClosure, callArgs);
+      scf.PushOperand(operand, callResult.type, callResult.value);
+      if (callResult.error) errortext = callResult.error;
     } else {
       errortext = SocialCalc.Constants.s_sheetfuncunknownfunction + " " + ttext + ". ";
     }
@@ -1767,6 +2311,20 @@ FormulaMut.SeriesFunctions = function (fname, operand, foperand, sheet) {
 
   while (foperand.length > 0) {
     value1 = operand_value_and_type(sheet, foperand);
+    if (value1.type == "array") {
+      // A row/column vector materialized by BYROW/BYCOL/MAP/etc (or any
+      // future array-typed intermediate) is opaque to this loop's
+      // otherwise-scalar-only draining unless flattened back onto
+      // foperand first, in the row-major cell order it was produced.
+      var arr = value1.value as SocialCalc.FormulaArrayValue;
+      for (var ar = arr.rows - 1; ar >= 0; ar--) {
+        for (var ac = arr.cols - 1; ac >= 0; ac--) {
+          var cell = arr.cells[ar]![ac]! as SocialCalc.FormulaValueResult;
+          foperand.push({ type: cell.type, value: cell.value });
+        }
+      }
+      continue;
+    }
     t = value1.type.charAt(0);
     if (t == "n") count += 1;
     if (t != "b") counta += 1;
@@ -13053,3 +13611,203 @@ FormulaMut.FunctionList["WRAPCOLS"] = [
   "lookup",
 ];
 FormulaMut.FunctionList["EXPAND"] = [FormulaMut.ArrayShapeFunctions, -2, "expand", null, "lookup"];
+
+// ------------------------------------------------------------------------
+// MAP / REDUCE / SCAN / BYROW / BYCOL / MAKEARRAY — lambda-array functions.
+// Each shares the DynamicArrayFunctions convention: the pure per-cell
+// value is an ordinary FormulaValueResult, and the family's output is a
+// typed FormulaArrayValue rectangle consumed by the existing spill layer
+// unmodified (see MaterializeArray/MaterializeSpill above).
+// ------------------------------------------------------------------------
+
+/** Requires the given already-resolved operand to be a lambda closure;
+ * returns null (caller fails with #VALUE!) otherwise. */
+function requireLambdaOperand(
+  op: SocialCalc.FormulaValueResult,
+): SocialCalc.FormulaLambdaClosure | null {
+  if (op.type !== "lambda") return null;
+  return op.value as SocialCalc.FormulaLambdaClosure;
+}
+
+FormulaMut.LambdaArrayFunctions = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+  // foperand is reversed by CopyFunctionArgs (index 0 = LAST source-order
+  // arg). TopOfStackValueAndType/OperandValueAndType pop from the *end* of
+  // foperand, so repeated calls drain it in original left-to-right source
+  // order -- the same convention every other FunctionList implementation
+  // (RANK, SORT/UNIQUE, ...) relies on. TopOfStackValueAndType resolves a
+  // bare name but leaves range/coord/array/lambda operands untouched
+  // (exactly what MaterializeArray/requireLambdaOperand need); use
+  // OperandValueAndType instead only where a fully resolved scalar is
+  // wanted (REDUCE/SCAN's initial accumulator value).
+  var top = function () {
+    return scf.TopOfStackValueAndType(sheet, foperand);
+  };
+  var fail = function (errortype?: SocialCalc.FormulaOperandType) {
+    operand.push({ type: errortype || "e#VALUE!", value: 0 });
+  };
+
+  if (fname === "MAP") {
+    if (foperand.length < 2) return (fail(), undefined);
+    var arrayCount = foperand.length - 1;
+    var arrays: (SocialCalc.FormulaArrayValue | null)[] = [];
+    for (var ma = 0; ma < arrayCount; ma++) {
+      arrays.push(scf.MaterializeArray(sheet, top()));
+    }
+    var closure = requireLambdaOperand(top());
+    if (!closure || arrays.some((a) => a === null)) return (fail(), undefined);
+    var mats = arrays as SocialCalc.FormulaArrayValue[];
+    var rows = mats[0]!.rows,
+      cols = mats[0]!.cols;
+    if (!mats.every((m) => m.rows === rows && m.cols === cols)) return (fail(), undefined);
+    if (closure.params.length !== mats.length) return (fail(), undefined);
+    var outCells: SocialCalc.FormulaArrayCell[][] = [];
+    for (var r = 0; r < rows; r++) {
+      var outRow: SocialCalc.FormulaArrayCell[] = [];
+      for (var c = 0; c < cols; c++) {
+        var args = mats.map((m) => m.cells[r]![c]! as SocialCalc.FormulaValueResult);
+        var res = scf.InvokeLambda(sheet, closure, args);
+        outRow.push({ type: res.type, value: res.value });
+      }
+      outCells.push(outRow);
+    }
+    operand.push({ type: "array", value: { rows: rows, cols: cols, cells: outCells } });
+    return;
+  }
+
+  if (fname === "REDUCE") {
+    if (foperand.length !== 3) return (fail(), undefined);
+    var initial = scf.OperandValueAndType(sheet, foperand);
+    var arrayVal = scf.MaterializeArray(sheet, top());
+    var reduceClosure = requireLambdaOperand(top());
+    if (!arrayVal || !reduceClosure || reduceClosure.params.length !== 2)
+      return (fail(), undefined);
+    var acc: SocialCalc.FormulaValueResult = initial;
+    for (var rr = 0; rr < arrayVal.rows; rr++) {
+      for (var cc = 0; cc < arrayVal.cols; cc++) {
+        acc = scf.InvokeLambda(sheet, reduceClosure, [
+          acc,
+          arrayVal.cells[rr]![cc]! as SocialCalc.FormulaValueResult,
+        ]);
+        if (acc.type.charAt(0) === "e") {
+          operand.push({ type: acc.type, value: acc.value });
+          return;
+        }
+      }
+    }
+    operand.push({ type: acc.type, value: acc.value });
+    return;
+  }
+
+  if (fname === "SCAN") {
+    if (foperand.length !== 3) return (fail(), undefined);
+    var scanInitial = scf.OperandValueAndType(sheet, foperand);
+    var scanArray = scf.MaterializeArray(sheet, top());
+    var scanClosure = requireLambdaOperand(top());
+    if (!scanArray || !scanClosure || scanClosure.params.length !== 2) return (fail(), undefined);
+    var scanAcc: SocialCalc.FormulaValueResult = scanInitial;
+    var scanOut: SocialCalc.FormulaArrayCell[][] = [];
+    for (var sr = 0; sr < scanArray.rows; sr++) {
+      var scanRow: SocialCalc.FormulaArrayCell[] = [];
+      for (var sc = 0; sc < scanArray.cols; sc++) {
+        scanAcc = scf.InvokeLambda(sheet, scanClosure, [
+          scanAcc,
+          scanArray.cells[sr]![sc]! as SocialCalc.FormulaValueResult,
+        ]);
+        scanRow.push({ type: scanAcc.type, value: scanAcc.value });
+      }
+      scanOut.push(scanRow);
+    }
+    operand.push({
+      type: "array",
+      value: { rows: scanArray.rows, cols: scanArray.cols, cells: scanOut },
+    });
+    return;
+  }
+
+  if (fname === "BYROW" || fname === "BYCOL") {
+    if (foperand.length !== 2) return (fail(), undefined);
+    var srcArray = scf.MaterializeArray(sheet, top());
+    var byClosure = requireLambdaOperand(top());
+    if (!srcArray || !byClosure || byClosure.params.length !== 1) return (fail(), undefined);
+    var byRow = fname === "BYROW";
+    var outerCount = byRow ? srcArray.rows : srcArray.cols;
+    var innerCount = byRow ? srcArray.cols : srcArray.rows;
+    var byResults: SocialCalc.FormulaArrayCell[] = [];
+    for (var oi = 0; oi < outerCount; oi++) {
+      var lineCells: SocialCalc.FormulaArrayCell[] = [];
+      for (var ii = 0; ii < innerCount; ii++) {
+        lineCells.push(byRow ? srcArray.cells[oi]![ii]! : srcArray.cells[ii]![oi]!);
+      }
+      var lineArrayResult: SocialCalc.FormulaValueResult = {
+        type: "array",
+        value: byRow
+          ? { rows: 1, cols: innerCount, cells: [lineCells] }
+          : { rows: innerCount, cols: 1, cells: lineCells.map((c) => [c]) },
+      };
+      var lineRes = scf.InvokeLambda(sheet, byClosure, [lineArrayResult]);
+      byResults.push({ type: lineRes.type, value: lineRes.value });
+    }
+    // BYROW -> one result per row, stacked as an outerCount x 1 column.
+    // BYCOL -> one result per column, laid out as a 1 x outerCount row.
+    operand.push({
+      type: "array",
+      value: byRow
+        ? { rows: outerCount, cols: 1, cells: byResults.map((c) => [c]) }
+        : { rows: 1, cols: outerCount, cells: [byResults] },
+    });
+    return;
+  }
+
+  if (fname === "MAKEARRAY") {
+    if (foperand.length !== 3) return (fail(), undefined);
+    var rowsOperand = scf.OperandAsNumber(sheet, foperand);
+    var colsOperand = scf.OperandAsNumber(sheet, foperand);
+    var makeClosure = requireLambdaOperand(top());
+    var rowCount = Number(rowsOperand.value),
+      colCount = Number(colsOperand.value);
+    if (
+      rowsOperand.type.charAt(0) !== "n" ||
+      colsOperand.type.charAt(0) !== "n" ||
+      !scf.IsValidRectShape(rowCount, colCount) ||
+      Math.floor(rowCount) !== rowCount ||
+      Math.floor(colCount) !== colCount ||
+      !makeClosure ||
+      makeClosure.params.length !== 2
+    ) {
+      return (fail(), undefined);
+    }
+    var makeCells: SocialCalc.FormulaArrayCell[][] = [];
+    for (var mr = 1; mr <= rowCount; mr++) {
+      var makeRow: SocialCalc.FormulaArrayCell[] = [];
+      for (var mc = 1; mc <= colCount; mc++) {
+        var makeRes = scf.InvokeLambda(sheet, makeClosure, [
+          { type: "n", value: mr },
+          { type: "n", value: mc },
+        ]);
+        makeRow.push({ type: makeRes.type, value: makeRes.value });
+      }
+      makeCells.push(makeRow);
+    }
+    operand.push({
+      type: "array",
+      value: { rows: rowCount, cols: colCount, cells: makeCells },
+    });
+    return;
+  }
+
+  fail();
+};
+
+FormulaMut.FunctionList["MAP"] = [FormulaMut.LambdaArrayFunctions, -2, "map", null, "lookup"];
+FormulaMut.FunctionList["REDUCE"] = [FormulaMut.LambdaArrayFunctions, 3, "reduce", null, "lookup"];
+FormulaMut.FunctionList["SCAN"] = [FormulaMut.LambdaArrayFunctions, 3, "scan", null, "lookup"];
+FormulaMut.FunctionList["BYROW"] = [FormulaMut.LambdaArrayFunctions, 2, "byrow", null, "lookup"];
+FormulaMut.FunctionList["BYCOL"] = [FormulaMut.LambdaArrayFunctions, 2, "bycol", null, "lookup"];
+FormulaMut.FunctionList["MAKEARRAY"] = [
+  FormulaMut.LambdaArrayFunctions,
+  3,
+  "makearray",
+  null,
+  "lookup",
+];

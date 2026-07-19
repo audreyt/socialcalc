@@ -6085,6 +6085,13 @@ SC.RecalcTimerRoutine = function () {
     cell = sheet.cells[coord] as any;
     cell.parseinfo.coord = coord;
     eresult = scf.evaluate_parsed_formula(cell.parseinfo, sheet, false);
+    if (eresult.type === "lambda") {
+      // A LAMBDA that reached the end of evaluation without being invoked
+      // (e.g. bare `=LAMBDA(x,x+1)` in a cell, as opposed to a name
+      // definition consumed only via LookupName/InvokeLambda) is not a
+      // valid cell value.
+      eresult = { value: 0, type: "e#VALUE!", error: "" };
+    }
     if (eresult.type === "array") {
       var spillvalue = SocialCalc.MaterializeSpill(sheet, coord, eresult);
       eresult =

@@ -117,4 +117,7 @@ lean_lib CondFmt where
 lean_lib Validation where
   srcDir := "lemma"
   roots := #[`«validation.types», `«validation.def», `«validation.proof»]
+lean_lib LambdaScope where
+  srcDir := "lemma"
+  roots := #[`«lambda-scope.types», `«lambda-scope.def», `«lambda-scope.proof»]
   extraDepTargets := #[``downloadDependencies]

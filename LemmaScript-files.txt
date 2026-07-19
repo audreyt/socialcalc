@@ -14,3 +14,4 @@ lemma/condfmt.ts
 lemma/workbook.ts
 lemma/chart.ts
 lemma/validation.ts
+lemma/lambda-scope.ts

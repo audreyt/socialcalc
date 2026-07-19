@@ -559,6 +559,12 @@
     s_fdef_AVERAGE: 'Averages the values. ',
     s_fdef_ADDRESS:
       'Returns a reference (as text) for the given row and column numbers. abs_num selects absolute/relative: 1 = absolute row & column (e.g., "$A$1"), 2 = absolute row/relative column ("A$1"), 3 = relative row/absolute column ("$A1"), 4 = both relative ("A1", the default is 1). a1 (default TRUE) selects A1-style; FALSE selects R1C1-style. sheet_text, if given, is prefixed with "!" and quoted if it is not a bare name. ',
+    s_fdef_BYCOL:
+      'Applies lambda to each column of array (as a 1-column array) and returns a single row of per-column results. ',
+    s_fdef_BYROW:
+      'Applies lambda to each row of array (as a 1-row array) and returns a single column of per-row results. ',
+    s_farg_bycol: 'array, lambda',
+    s_farg_byrow: 'array, lambda',
     s_fdef_CHOOSE: 'Returns the value specified by the index. The values may be ranges of cells. ',
     s_fdef_COLUMN:
       'Returns the column number of the given reference (or of the cell containing the formula if reference is omitted). ',
@@ -655,6 +661,12 @@
     s_fdef_LOG: 'Returns the logarithm of the value using the specified base. ',
     s_fdef_LOG10: 'Returns the base 10 logarithm of the value. ',
     s_fdef_LOWER: 'Returns the text value with all uppercase characters converted to lowercase. ',
+    s_fdef_MAKEARRAY:
+      "Returns an array of the given size (rows x cols, both positive integers) where each cell's value is lambda(row, col), 1-based. ",
+    s_fdef_MAP:
+      'Applies lambda element-wise to one or more same-shaped arrays/ranges and returns a result of the same shape. ',
+    s_farg_makearray: 'rows, cols, lambda',
+    s_farg_map: 'array1, [array2, ...], lambda',
     s_fdef_MATCH:
       'Look for the matching value for the given value in the range and return position (the first is 1) in that range. If rangelookup is 1 (the default) and not 0, match if within numeric brackets (match<=value) instead of exact match. If rangelookup is -1, act like 1 but the bracket is match>=value. ',
     s_fdef_MAX: 'Returns the maximum of the numeric values. ',
@@ -744,6 +756,12 @@
       'Returns the first matching substring of text against regular_expression, or the first capturing group if the pattern has exactly one; #N/A if no match. ',
     s_fdef_REGEXREPLACE:
       'Replaces every match of regular_expression in text with replacement; replacement may use \\1..\\9 to refer to captured groups. ',
+    s_fdef_REDUCE:
+      'Accumulates lambda(accumulator, value) left-to-right/top-to-bottom over array, starting from initial_value, and returns the final accumulator. ',
+    s_fdef_SCAN:
+      'Like REDUCE, but returns every intermediate accumulator as an array the same shape as array, instead of only the final value. ',
+    s_farg_reduce: 'initial_value, array, lambda',
+    s_farg_scan: 'initial_value, array, lambda',
     s_farg_sort: 'range, [sort_column], [is_ascending], [sort_column2, is_ascending2, ...]',
     s_farg_unique: 'range, [by_column], [exactly_once]',
     s_fdef_FILTER:
@@ -5961,6 +5979,13 @@ More comments yet to come...
       cell = sheet.cells[coord];
       cell.parseinfo.coord = coord;
       eresult = scf.evaluate_parsed_formula(cell.parseinfo, sheet, false);
+      if (eresult.type === 'lambda') {
+        eresult = {
+          value: 0,
+          type: 'e#VALUE!',
+          error: '',
+        };
+      }
       if (eresult.type === 'array') {
         var spillvalue = SocialCalc.MaterializeSpill(sheet, coord, eresult);
         eresult =
@@ -16090,6 +16115,7 @@ More comments yet to come...
     error: 5,
     string: 6,
     space: 7,
+    special: 8,
   };
   FormulaMut.CharClass = {
     num: 1,
@@ -16257,6 +16283,7 @@ More comments yet to come...
   FormulaMut.SPILL_MAX_COL = 702;
   FormulaMut.SPILL_MAX_ROW = 65536;
   FormulaMut.SPILL_MAX_CELLS = 1e5;
+  FormulaMut.LAMBDA_MAX_DEPTH = 200;
   FormulaMut.PlanSpillStatus = function (
     anchorCol,
     anchorRow,
@@ -16392,9 +16419,276 @@ More comments yet to come...
     var result;
     var scf = SocialCalc.Formula;
     var revpolish;
-    revpolish = scf.ConvertInfixToPolish(parseinfo);
-    result = scf.EvaluatePolish(parseinfo, revpolish, sheet, allowrangereturn);
+    var resolved = scf.ExtractSpecialForms(parseinfo, sheet, sheet.formulaScope || []);
+    revpolish = scf.ConvertInfixToPolish(resolved);
+    result = scf.EvaluatePolish(resolved, revpolish, sheet, allowrangereturn);
     return result;
+  };
+  var lambdaParamCoordRegex = /^\$?[A-Z]{1,2}\$?[1-9]\d*$/;
+  function isValidLambdaParamName(text, ttype) {
+    var scf = SocialCalc.Formula;
+    if (ttype !== scf.TokenType.name) return false;
+    if (lambdaParamCoordRegex.test(text)) return false;
+    if (scf.SpecialConstants && scf.SpecialConstants[text]) return false;
+    return true;
+  }
+  function findMatchingParen(tokens, openIndex) {
+    var scf = SocialCalc.Formula;
+    var depth = 0;
+    for (var i = openIndex; i < tokens.length; i++) {
+      var t = tokens[i];
+      if (t.type === scf.TokenType.op && t.text === '(') depth++;
+      else if (t.type === scf.TokenType.op && t.text === ')') {
+        depth--;
+        if (depth === 0) return i;
+      }
+    }
+    return -1;
+  }
+  function splitArgSpans(tokens, openIndex, closeIndex) {
+    var scf = SocialCalc.Formula;
+    var spans = [];
+    var current = [];
+    var depth = 0;
+    for (var i = openIndex + 1; i < closeIndex; i++) {
+      var t = tokens[i];
+      if (t.type === scf.TokenType.op && t.text === '(') {
+        depth++;
+        current.push(t);
+      } else if (t.type === scf.TokenType.op && t.text === ')') {
+        depth--;
+        current.push(t);
+      } else if (t.type === scf.TokenType.op && t.text === ',' && depth === 0) {
+        spans.push(current);
+        current = [];
+      } else {
+        current.push(t);
+      }
+    }
+    if (openIndex + 1 !== closeIndex || current.length) spans.push(current);
+    return spans;
+  }
+  function parseLambdaParamSpan(span) {
+    if (span.length !== 1) return null;
+    var t = span[0];
+    if (!isValidLambdaParamName(t.text, t.type)) return null;
+    return [t.text.toUpperCase()];
+  }
+  function makeScopeFrame(name, result) {
+    var frame = {};
+    frame[name] = result;
+    return frame;
+  }
+  FormulaMut.EvaluateFormulaTokens = function (tokens, sheet, scope, allowrangereturn) {
+    var scf = SocialCalc.Formula;
+    var previousScope = sheet.formulaScope;
+    sheet.formulaScope = scope;
+    try {
+      var resolved = scf.ExtractSpecialForms(tokens, sheet, scope);
+      var revpolish = scf.ConvertInfixToPolish(resolved);
+      return scf.EvaluatePolish(resolved, revpolish, sheet, allowrangereturn);
+    } finally {
+      sheet.formulaScope = previousScope;
+    }
+  };
+  FormulaMut.InvokeLambda = function (sheet, closure, args) {
+    var scf = SocialCalc.Formula;
+    var arity = scf.ClassifyArity(closure.params.length, args.length);
+    if (arity !== 0) {
+      return {
+        value: 0,
+        type: 'e#VALUE!',
+        error: SocialCalc.Constants.s_calcerrincorrectargstofunction + ' LAMBDA. ',
+      };
+    }
+    var depth = (sheet.lambdaDepth || 0) + 1;
+    if (scf.RecursionStatus(depth, scf.LAMBDA_MAX_DEPTH) !== 0) {
+      return {
+        value: 0,
+        type: 'e#NUM!',
+        error: SocialCalc.Constants.s_calcerrnumericoverflow,
+      };
+    }
+    var frame = {};
+    for (var i = 0; i < closure.params.length; i++) {
+      frame[closure.params[i]] = args[i];
+    }
+    var callScope = closure.scope.concat([frame]);
+    sheet.lambdaDepth = depth;
+    try {
+      return scf.EvaluateFormulaTokens(closure.bodyTokens, sheet, callScope, true);
+    } finally {
+      sheet.lambdaDepth = depth - 1;
+    }
+  };
+  function resolveLetSpan(argSpans, sheet, outerScope) {
+    var scf = SocialCalc.Formula;
+    if (argSpans.length < 3 || argSpans.length % 2 === 0) {
+      return {
+        value: 0,
+        type: 'e#VALUE!',
+        error: SocialCalc.Constants.s_calcerrincorrectargstofunction + ' LET. ',
+      };
+    }
+    var scope = outerScope.slice();
+    var pairCount = (argSpans.length - 1) / 2;
+    for (var p = 0; p < pairCount; p++) {
+      var nameSpan = argSpans[p * 2];
+      if (nameSpan.length !== 1 || !isValidLambdaParamName(nameSpan[0].text, nameSpan[0].type)) {
+        return {
+          value: 0,
+          type: 'e#NAME?',
+          error: SocialCalc.Constants.s_calcerrunknownname + ' in LET',
+        };
+      }
+      var boundName = nameSpan[0].text.toUpperCase();
+      var valueResult = scf.EvaluateFormulaTokens(argSpans[p * 2 + 1], sheet, scope, true);
+      scope = scope.concat([makeScopeFrame(boundName, valueResult)]);
+    }
+    return scf.EvaluateFormulaTokens(argSpans[argSpans.length - 1], sheet, scope, true);
+  }
+  function resolveLambdaSpan(argSpans, scope) {
+    if (argSpans.length < 1) {
+      return {
+        value: 0,
+        type: 'e#VALUE!',
+        error: SocialCalc.Constants.s_calcerrincorrectargstofunction + ' LAMBDA. ',
+      };
+    }
+    var paramSpans = argSpans.slice(0, argSpans.length - 1);
+    var bodyTokens = argSpans[argSpans.length - 1];
+    var params = [];
+    for (var i = 0; i < paramSpans.length; i++) {
+      var names = parseLambdaParamSpan(paramSpans[i]);
+      if (!names || names.length !== 1) {
+        return {
+          value: 0,
+          type: 'e#VALUE!',
+          error: SocialCalc.Constants.s_calcerrincorrectargstofunction + ' LAMBDA. ',
+        };
+      }
+      params.push(names[0]);
+    }
+    if (!bodyTokens.length) {
+      return {
+        value: 0,
+        type: 'e#VALUE!',
+        error: SocialCalc.Constants.s_calcerrincorrectargstofunction + ' LAMBDA. ',
+      };
+    }
+    return {
+      params,
+      bodyTokens,
+      scope,
+    };
+  }
+  function isLambdaClosure(result) {
+    return 'params' in result;
+  }
+  function resolveIfSpan(argSpans, sheet, scope) {
+    var scf = SocialCalc.Formula;
+    if (argSpans.length < 2 || argSpans.length > 3) {
+      return {
+        value: 0,
+        type: 'e#VALUE!',
+        error: SocialCalc.Constants.s_calcerrincorrectargstofunction + ' IF. ',
+      };
+    }
+    var cond = scf.EvaluateFormulaTokens(argSpans[0], sheet, scope, true);
+    var t = cond.type.charAt(0);
+    if (t === 'e') return cond;
+    if (t !== 'n' && t !== 'b')
+      return {
+        value: 0,
+        type: 'e#VALUE!',
+        error: '',
+      };
+    if (cond.value) {
+      return scf.EvaluateFormulaTokens(argSpans[1], sheet, scope, true);
+    }
+    if (argSpans.length === 3) {
+      return scf.EvaluateFormulaTokens(argSpans[2], sheet, scope, true);
+    }
+    return {
+      value: 0,
+      type: 'n',
+    };
+  }
+  FormulaMut.ExtractSpecialForms = function (parseinfo, sheet, scope) {
+    var scf = SocialCalc.Formula;
+    var tokentype = scf.TokenType;
+    var lazyIf = scope.length > 0;
+    var isSpecialCallToken = function (t, next) {
+      if (t.type !== tokentype.name || !next || next.type !== tokentype.op || next.text !== '(') {
+        return false;
+      }
+      return t.text === 'LET' || t.text === 'LAMBDA' || (lazyIf && t.text === 'IF');
+    };
+    var hasSpecial = false;
+    for (var k = 0; k < parseinfo.length; k++) {
+      if (isSpecialCallToken(parseinfo[k], parseinfo[k + 1])) {
+        hasSpecial = true;
+        break;
+      }
+    }
+    if (!hasSpecial) return parseinfo;
+    var out = [];
+    for (var i = 0; i < parseinfo.length; i++) {
+      var tok = parseinfo[i];
+      if (!isSpecialCallToken(tok, parseinfo[i + 1])) {
+        out.push(tok);
+        continue;
+      }
+      var openIndex = i + 1;
+      var closeIndex = findMatchingParen(parseinfo, openIndex);
+      if (closeIndex === -1) {
+        out.push(tok);
+        continue;
+      }
+      var spans = splitArgSpans(parseinfo, openIndex, closeIndex);
+      if (tok.text === 'IF') {
+        out.push({
+          text: 'IF(...)',
+          type: tokentype.special,
+          opcode: 0,
+          specialValue: resolveIfSpan(spans, sheet, scope),
+        });
+        i = closeIndex;
+        continue;
+      }
+      var resolved =
+        tok.text === 'LET' ? resolveLetSpan(spans, sheet, scope) : resolveLambdaSpan(spans, scope);
+      var nextIndex = closeIndex + 1;
+      while (
+        isLambdaClosure(resolved) &&
+        parseinfo[nextIndex] &&
+        parseinfo[nextIndex].type === tokentype.op &&
+        parseinfo[nextIndex].text === '('
+      ) {
+        var callOpen = nextIndex;
+        var callClose = findMatchingParen(parseinfo, callOpen);
+        if (callClose === -1) break;
+        var callSpans = splitArgSpans(parseinfo, callOpen, callClose);
+        var argResults = [];
+        var argError = null;
+        for (var a = 0; a < callSpans.length; a++) {
+          var resolvedArgSpan = scf.ExtractSpecialForms(callSpans[a], sheet, scope);
+          var argVal = scf.EvaluateFormulaTokens(resolvedArgSpan, sheet, scope, true);
+          if (argVal.type.charAt(0) === 'e' && !argError) argError = argVal;
+          argResults.push(argVal);
+        }
+        resolved = argError || scf.InvokeLambda(sheet, resolved, argResults);
+        nextIndex = callClose + 1;
+      }
+      out.push({
+        text: tok.text === 'LET' ? 'LET(...)' : 'LAMBDA(...)',
+        type: tokentype.special,
+        opcode: 0,
+        specialValue: resolved,
+      });
+      i = nextIndex - 1;
+    }
+    return out;
   };
   if (typeof SocialCalc.debug_log === 'undefined') SocialCalc.debug_log = [];
   SocialCalc.DebugLog = function (_logObject) {};
@@ -16466,6 +16760,14 @@ More comments yet to come...
         PushOperand('coord', ttext);
       } else if (ttype == tokentype.string) {
         PushOperand('t', ttext);
+      } else if (ttype == tokentype.special) {
+        var specialValue = prii.specialValue;
+        if ('params' in specialValue) {
+          PushOperand('lambda', specialValue);
+        } else {
+          PushOperand(specialValue.type, specialValue.value);
+          if (specialValue.error) errortext = errortext || specialValue.error;
+        }
       } else if (ttype == tokentype.op) {
         if (operand.length <= 0) {
           return missingOperandError;
@@ -16544,7 +16846,9 @@ More comments yet to come...
           }
           value2 = operand_value_and_type(sheet, operand);
           value1 = operand_value_and_type(sheet, operand);
-          if (value1.type.charAt(0) == 'n' && value2.type.charAt(0) == 'n') {
+          if (value1.type == 'lambda' || value2.type == 'lambda') {
+            PushOperand('e#VALUE!', 0);
+          } else if (value1.type.charAt(0) == 'n' && value2.type.charAt(0) == 'n') {
             cond = 0;
             if (ttext == '<') {
               cond = value1.value < value2.value ? 1 : 0;
@@ -16719,6 +17023,22 @@ More comments yet to come...
     var names = sheet.names;
     var value = {};
     var startedwalk = false;
+    var scopeIndex = -1;
+    var scope = sheet.formulaScope;
+    if (scope && scope.length) {
+      var nameUpper = name.toUpperCase();
+      var matches = [];
+      for (var si = 0; si < scope.length; si++) matches.push(nameUpper in scope[si]);
+      scopeIndex = SocialCalc.Formula.ResolveScopeIndex(matches);
+    }
+    if (scopeIndex >= 0) {
+      var bound = scope[scopeIndex][name.toUpperCase()];
+      return {
+        value: bound.value,
+        type: bound.type,
+        error: bound.error,
+      };
+    }
     if (names[name.toUpperCase()]) {
       value.value = names[name.toUpperCase()].definition;
       if (value.value.charAt(0) == '=') {
@@ -16734,7 +17054,13 @@ More comments yet to come...
         }
         sheet.checknamecirc[name] = true;
         parseinfo = SocialCalc.Formula.ParseFormulaIntoTokens(value.value.substring(1));
-        value = SocialCalc.Formula.evaluate_parsed_formula(parseinfo, sheet, 1);
+        var outerFormulaScope = sheet.formulaScope;
+        sheet.formulaScope = [];
+        try {
+          value = SocialCalc.Formula.evaluate_parsed_formula(parseinfo, sheet, 1);
+        } finally {
+          sheet.formulaScope = outerFormulaScope;
+        }
         delete sheet.checknamecirc[name];
         if (startedwalk) {
           delete sheet.checknamecirc;
@@ -17015,6 +17341,33 @@ More comments yet to come...
     var foperand;
     var scf = SocialCalc.Formula;
     var errortext = '';
+    var scope = sheet.formulaScope;
+    if (scope && scope.length) {
+      var fnameUpper = fname.toUpperCase();
+      var scopeMatches = [];
+      for (var fsi = 0; fsi < scope.length; fsi++) scopeMatches.push(fnameUpper in scope[fsi]);
+      var fscopeIndex = scf.ResolveScopeIndex(scopeMatches);
+      if (fscopeIndex >= 0) {
+        var boundValue = scope[fscopeIndex][fnameUpper];
+        var hasCallArgs = operand.length > 0 && operand[operand.length - 1].type !== 'start';
+        if (boundValue.type === 'lambda' && hasCallArgs) {
+          var boundClosure = boundValue.value;
+          var boundFoperand = [];
+          scf.CopyFunctionArgs(operand, boundFoperand);
+          var boundArgs = [];
+          while (boundFoperand.length)
+            boundArgs.push(scf.OperandValueAndType(sheet, boundFoperand));
+          var boundResult = scf.InvokeLambda(sheet, boundClosure, boundArgs);
+          scf.PushOperand(operand, boundResult.type, boundResult.value);
+          return boundResult.error || '';
+        }
+        if (operand.length && operand[operand.length - 1].type === 'start') {
+          operand.pop();
+        }
+        scf.PushOperand(operand, 'name', fname);
+        return '';
+      }
+    }
     fobj = scf.FunctionList[fname];
     if (fobj) {
       foperand = [];
@@ -17048,6 +17401,22 @@ More comments yet to come...
       if (operand.length && operand[operand.length - 1].type == 'start') {
         operand.pop();
         scf.PushOperand(operand, 'name', ttext);
+      } else if (sheet.names && sheet.names[ttext.toUpperCase()]) {
+        var namedLookup = scf.LookupName(sheet, ttext);
+        if (namedLookup.type !== 'lambda') {
+          errortext = scf.FunctionArgsError(fname, operand);
+          return errortext;
+        }
+        var namedClosure = namedLookup.value;
+        foperand = [];
+        scf.CopyFunctionArgs(operand, foperand);
+        var callArgs = [];
+        while (foperand.length) {
+          callArgs.push(scf.OperandValueAndType(sheet, foperand));
+        }
+        var callResult = scf.InvokeLambda(sheet, namedClosure, callArgs);
+        scf.PushOperand(operand, callResult.type, callResult.value);
+        if (callResult.error) errortext = callResult.error;
       } else {
         errortext = SocialCalc.Constants.s_sheetfuncunknownfunction + ' ' + ttext + '. ';
       }
@@ -17164,6 +17533,19 @@ More comments yet to come...
     var sumsq = 0;
     while (foperand.length > 0) {
       value1 = operand_value_and_type(sheet, foperand);
+      if (value1.type == 'array') {
+        var arr = value1.value;
+        for (var ar = arr.rows - 1; ar >= 0; ar--) {
+          for (var ac = arr.cols - 1; ac >= 0; ac--) {
+            var cell = arr.cells[ar][ac];
+            foperand.push({
+              type: cell.type,
+              value: cell.value,
+            });
+          }
+        }
+        continue;
+      }
       t = value1.type.charAt(0);
       if (t == 'n') count += 1;
       if (t != 'b') counta += 1;
@@ -25986,6 +26368,232 @@ More comments yet to come...
     null,
     'lookup',
   ];
+  function requireLambdaOperand(op) {
+    if (op.type !== 'lambda') return null;
+    return op.value;
+  }
+  FormulaMut.LambdaArrayFunctions = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var top = function () {
+      return scf.TopOfStackValueAndType(sheet, foperand);
+    };
+    var fail = function (errortype) {
+      operand.push({
+        type: errortype || 'e#VALUE!',
+        value: 0,
+      });
+    };
+    if (fname === 'MAP') {
+      if (foperand.length < 2) return (fail(), undefined);
+      var arrayCount = foperand.length - 1;
+      var arrays = [];
+      for (var ma = 0; ma < arrayCount; ma++) {
+        arrays.push(scf.MaterializeArray(sheet, top()));
+      }
+      var closure = requireLambdaOperand(top());
+      if (!closure || arrays.some((a) => a === null)) return (fail(), undefined);
+      var mats = arrays;
+      var rows = mats[0].rows,
+        cols = mats[0].cols;
+      if (!mats.every((m) => m.rows === rows && m.cols === cols)) return (fail(), undefined);
+      if (closure.params.length !== mats.length) return (fail(), undefined);
+      var outCells = [];
+      for (var r = 0; r < rows; r++) {
+        var outRow = [];
+        for (var c = 0; c < cols; c++) {
+          var args = mats.map((m) => m.cells[r][c]);
+          var res = scf.InvokeLambda(sheet, closure, args);
+          outRow.push({
+            type: res.type,
+            value: res.value,
+          });
+        }
+        outCells.push(outRow);
+      }
+      operand.push({
+        type: 'array',
+        value: {
+          rows,
+          cols,
+          cells: outCells,
+        },
+      });
+      return;
+    }
+    if (fname === 'REDUCE') {
+      if (foperand.length !== 3) return (fail(), undefined);
+      var initial = scf.OperandValueAndType(sheet, foperand);
+      var arrayVal = scf.MaterializeArray(sheet, top());
+      var reduceClosure = requireLambdaOperand(top());
+      if (!arrayVal || !reduceClosure || reduceClosure.params.length !== 2)
+        return (fail(), undefined);
+      var acc = initial;
+      for (var rr = 0; rr < arrayVal.rows; rr++) {
+        for (var cc = 0; cc < arrayVal.cols; cc++) {
+          acc = scf.InvokeLambda(sheet, reduceClosure, [acc, arrayVal.cells[rr][cc]]);
+          if (acc.type.charAt(0) === 'e') {
+            operand.push({
+              type: acc.type,
+              value: acc.value,
+            });
+            return;
+          }
+        }
+      }
+      operand.push({
+        type: acc.type,
+        value: acc.value,
+      });
+      return;
+    }
+    if (fname === 'SCAN') {
+      if (foperand.length !== 3) return (fail(), undefined);
+      var scanInitial = scf.OperandValueAndType(sheet, foperand);
+      var scanArray = scf.MaterializeArray(sheet, top());
+      var scanClosure = requireLambdaOperand(top());
+      if (!scanArray || !scanClosure || scanClosure.params.length !== 2) return (fail(), undefined);
+      var scanAcc = scanInitial;
+      var scanOut = [];
+      for (var sr = 0; sr < scanArray.rows; sr++) {
+        var scanRow = [];
+        for (var sc = 0; sc < scanArray.cols; sc++) {
+          scanAcc = scf.InvokeLambda(sheet, scanClosure, [scanAcc, scanArray.cells[sr][sc]]);
+          scanRow.push({
+            type: scanAcc.type,
+            value: scanAcc.value,
+          });
+        }
+        scanOut.push(scanRow);
+      }
+      operand.push({
+        type: 'array',
+        value: {
+          rows: scanArray.rows,
+          cols: scanArray.cols,
+          cells: scanOut,
+        },
+      });
+      return;
+    }
+    if (fname === 'BYROW' || fname === 'BYCOL') {
+      if (foperand.length !== 2) return (fail(), undefined);
+      var srcArray = scf.MaterializeArray(sheet, top());
+      var byClosure = requireLambdaOperand(top());
+      if (!srcArray || !byClosure || byClosure.params.length !== 1) return (fail(), undefined);
+      var byRow = fname === 'BYROW';
+      var outerCount = byRow ? srcArray.rows : srcArray.cols;
+      var innerCount = byRow ? srcArray.cols : srcArray.rows;
+      var byResults = [];
+      for (var oi = 0; oi < outerCount; oi++) {
+        var lineCells = [];
+        for (var ii = 0; ii < innerCount; ii++) {
+          lineCells.push(byRow ? srcArray.cells[oi][ii] : srcArray.cells[ii][oi]);
+        }
+        var lineArrayResult = {
+          type: 'array',
+          value: byRow
+            ? {
+                rows: 1,
+                cols: innerCount,
+                cells: [lineCells],
+              }
+            : {
+                rows: innerCount,
+                cols: 1,
+                cells: lineCells.map((c) => [c]),
+              },
+        };
+        var lineRes = scf.InvokeLambda(sheet, byClosure, [lineArrayResult]);
+        byResults.push({
+          type: lineRes.type,
+          value: lineRes.value,
+        });
+      }
+      operand.push({
+        type: 'array',
+        value: byRow
+          ? {
+              rows: outerCount,
+              cols: 1,
+              cells: byResults.map((c) => [c]),
+            }
+          : {
+              rows: 1,
+              cols: outerCount,
+              cells: [byResults],
+            },
+      });
+      return;
+    }
+    if (fname === 'MAKEARRAY') {
+      if (foperand.length !== 3) return (fail(), undefined);
+      var rowsOperand = scf.OperandAsNumber(sheet, foperand);
+      var colsOperand = scf.OperandAsNumber(sheet, foperand);
+      var makeClosure = requireLambdaOperand(top());
+      var rowCount = Number(rowsOperand.value),
+        colCount = Number(colsOperand.value);
+      if (
+        rowsOperand.type.charAt(0) !== 'n' ||
+        colsOperand.type.charAt(0) !== 'n' ||
+        !scf.IsValidRectShape(rowCount, colCount) ||
+        Math.floor(rowCount) !== rowCount ||
+        Math.floor(colCount) !== colCount ||
+        !makeClosure ||
+        makeClosure.params.length !== 2
+      ) {
+        return (fail(), undefined);
+      }
+      var makeCells = [];
+      for (var mr = 1; mr <= rowCount; mr++) {
+        var makeRow = [];
+        for (var mc = 1; mc <= colCount; mc++) {
+          var makeRes = scf.InvokeLambda(sheet, makeClosure, [
+            {
+              type: 'n',
+              value: mr,
+            },
+            {
+              type: 'n',
+              value: mc,
+            },
+          ]);
+          makeRow.push({
+            type: makeRes.type,
+            value: makeRes.value,
+          });
+        }
+        makeCells.push(makeRow);
+      }
+      operand.push({
+        type: 'array',
+        value: {
+          rows: rowCount,
+          cols: colCount,
+          cells: makeCells,
+        },
+      });
+      return;
+    }
+    fail();
+  };
+  FormulaMut.FunctionList['MAP'] = [FormulaMut.LambdaArrayFunctions, -2, 'map', null, 'lookup'];
+  FormulaMut.FunctionList['REDUCE'] = [
+    FormulaMut.LambdaArrayFunctions,
+    3,
+    'reduce',
+    null,
+    'lookup',
+  ];
+  FormulaMut.FunctionList['SCAN'] = [FormulaMut.LambdaArrayFunctions, 3, 'scan', null, 'lookup'];
+  FormulaMut.FunctionList['BYROW'] = [FormulaMut.LambdaArrayFunctions, 2, 'byrow', null, 'lookup'];
+  FormulaMut.FunctionList['BYCOL'] = [FormulaMut.LambdaArrayFunctions, 2, 'bycol', null, 'lookup'];
+  FormulaMut.FunctionList['MAKEARRAY'] = [
+    FormulaMut.LambdaArrayFunctions,
+    3,
+    'makearray',
+    null,
+    'lookup',
+  ];
 
   // Pure formula parse / token / type helpers.
   // Shipping source extracted from formula1 for full typecheck + LemmaScript.
@@ -26252,7 +26860,12 @@ More comments yet to come...
       pii = parseinfo[i];
       ttype = pii.type;
       ttext = pii.text;
-      if (ttype == tokentype.num || ttype == tokentype.coord || ttype == tokentype.string) {
+      if (
+        ttype == tokentype.num ||
+        ttype == tokentype.coord ||
+        ttype == tokentype.string ||
+        ttype == tokentype.special
+      ) {
         revpolish.push(i);
       } else if (ttype == tokentype.name) {
         parsestack.push(i);
@@ -26374,6 +26987,26 @@ More comments yet to come...
     operand.pop();
     return;
   };
+  FormulaParseMut.ClassifyArity = function (paramCount, argCount) {
+    if (argCount < paramCount) return 1;
+    if (argCount > paramCount) return 2;
+    return 0;
+  };
+  FormulaParseMut.ResolveScopeIndex = function (matches) {
+    for (var i = matches.length - 1; i >= 0; i--) {
+      if (matches[i]) return i;
+    }
+    return -1;
+  };
+  FormulaParseMut.RecursionStatus = function (depth, maxDepth) {
+    return depth > maxDepth ? 1 : 0;
+  };
+  FormulaParseMut.ShapesMatch = function (rows1, cols1, rows2, cols2) {
+    return rows1 === rows2 && cols1 === cols2;
+  };
+  FormulaParseMut.IsValidRectShape = function (rows, cols) {
+    return Number.isFinite(rows) && Number.isFinite(cols) && rows > 0 && cols > 0;
+  };
 
   // Pure formula operand-stack helpers.
   // Shipping source extracted from formula1 for full typecheck + LemmaScript.
@@ -26414,6 +27047,11 @@ More comments yet to come...
     var t, valueinfo;
     var operandinfo = SocialCalc.Formula.OperandValueAndType(sheet, operand);
     t = operandinfo.type.charAt(0);
+    if (operandinfo.type == 'lambda') {
+      operandinfo.value = 0;
+      operandinfo.type = 'e#VALUE!';
+      return operandinfo;
+    }
     if (t == 'n') {
       operandinfo.value = operandinfo.value - 0;
     } else if (t == 'b') {
@@ -26442,6 +27080,11 @@ More comments yet to come...
     var t;
     var operandinfo = SocialCalc.Formula.OperandValueAndType(sheet, operand);
     t = operandinfo.type.charAt(0);
+    if (operandinfo.type == 'lambda') {
+      operandinfo.value = '';
+      operandinfo.type = 'e#VALUE!';
+      return operandinfo;
+    }
     if (t == 't') {
     } else if (t == 'n') {
       operandinfo.value = SocialCalc.format_number_for_display

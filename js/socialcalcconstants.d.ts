@@ -627,6 +627,18 @@ declare namespace SocialCalc {
     s_farg_wraprows: string;
     s_farg_wrapcols: string;
     s_farg_expand: string;
+    s_fdef_MAP: string;
+    s_fdef_REDUCE: string;
+    s_fdef_SCAN: string;
+    s_fdef_BYROW: string;
+    s_fdef_BYCOL: string;
+    s_fdef_MAKEARRAY: string;
+    s_farg_map: string;
+    s_farg_reduce: string;
+    s_farg_scan: string;
+    s_farg_byrow: string;
+    s_farg_bycol: string;
+    s_farg_makearray: string;
     s_fdef_VLOOKUP: string;
     s_fdef_WEEKDAY: string;
     s_fdef_YEAR: string;

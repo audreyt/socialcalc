@@ -738,6 +738,12 @@ ConstantsRoot.Constants = {
   s_fdef_AVERAGE: "Averages the values. ",
   s_fdef_ADDRESS:
     'Returns a reference (as text) for the given row and column numbers. abs_num selects absolute/relative: 1 = absolute row & column (e.g., "$A$1"), 2 = absolute row/relative column ("A$1"), 3 = relative row/absolute column ("$A1"), 4 = both relative ("A1", the default is 1). a1 (default TRUE) selects A1-style; FALSE selects R1C1-style. sheet_text, if given, is prefixed with "!" and quoted if it is not a bare name. ',
+  s_fdef_BYCOL:
+    "Applies lambda to each column of array (as a 1-column array) and returns a single row of per-column results. ",
+  s_fdef_BYROW:
+    "Applies lambda to each row of array (as a 1-row array) and returns a single column of per-row results. ",
+  s_farg_bycol: "array, lambda",
+  s_farg_byrow: "array, lambda",
   s_fdef_CHOOSE: "Returns the value specified by the index. The values may be ranges of cells. ",
   s_fdef_COLUMN:
     "Returns the column number of the given reference (or of the cell containing the formula if reference is omitted). ",
@@ -833,6 +839,12 @@ ConstantsRoot.Constants = {
   s_fdef_LOG: "Returns the logarithm of the value using the specified base. ",
   s_fdef_LOG10: "Returns the base 10 logarithm of the value. ",
   s_fdef_LOWER: "Returns the text value with all uppercase characters converted to lowercase. ",
+  s_fdef_MAKEARRAY:
+    "Returns an array of the given size (rows x cols, both positive integers) where each cell's value is lambda(row, col), 1-based. ",
+  s_fdef_MAP:
+    "Applies lambda element-wise to one or more same-shaped arrays/ranges and returns a result of the same shape. ",
+  s_farg_makearray: "rows, cols, lambda",
+  s_farg_map: "array1, [array2, ...], lambda",
   s_fdef_MATCH:
     "Look for the matching value for the given value in the range and return position (the first is 1) in that range. If rangelookup is 1 (the default) and not 0, match if within numeric brackets (match<=value) instead of exact match. If rangelookup is -1, act like 1 but the bracket is match>=value. ",
   s_fdef_MAX: "Returns the maximum of the numeric values. ",
@@ -922,6 +934,12 @@ ConstantsRoot.Constants = {
     "Returns the first matching substring of text against regular_expression, or the first capturing group if the pattern has exactly one; #N/A if no match. ",
   s_fdef_REGEXREPLACE:
     "Replaces every match of regular_expression in text with replacement; replacement may use \\1..\\9 to refer to captured groups. ",
+  s_fdef_REDUCE:
+    "Accumulates lambda(accumulator, value) left-to-right/top-to-bottom over array, starting from initial_value, and returns the final accumulator. ",
+  s_fdef_SCAN:
+    "Like REDUCE, but returns every intermediate accumulator as an array the same shape as array, instead of only the final value. ",
+  s_farg_reduce: "initial_value, array, lambda",
+  s_farg_scan: "initial_value, array, lambda",
   s_farg_sort: "range, [sort_column], [is_ascending], [sort_column2, is_ascending2, ...]",
   s_farg_unique: "range, [by_column], [exactly_once]",
   s_fdef_FILTER:
