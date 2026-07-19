@@ -725,5 +725,58 @@ declare namespace SocialCalc {
     dorecalc?: boolean,
   ): string;
   function ConvertOtherFormatToSave(inputstr: string, inputformat: string): string;
-  function SetConvertedCell(sheet: Sheet, cr: string, rawvalue: string | number): void;
+  function SetConvertedCell(
+    sheet: Sheet,
+    cr: string,
+    rawvalue: string | number,
+    decimalChar?: string,
+  ): void;
+
+  // Interoperability helpers (BOM, locale-numeric, quote-aware substitution,
+  // named-range/coord validation) shared by the CSV/TSV locale variants, the
+  // normalized-workbook ingestion seam, and the FODS exporter.
+  function HasUtf8Bom(s: string): boolean;
+  function StripUtf8Bom(s: string): string;
+  function GroupingCharFor(decimalChar: string): string;
+  function ParseLocaleNumericToken(
+    tvalue: string,
+    decimalChar: string,
+  ): { ok: boolean; value: number; percent: boolean };
+  function ReplaceUnquotedFormulaChar(text: string, from: string, to: string): string;
+  function NormalizeNamedRangeName(raw: string): string;
+  function IsValidNamedRangeName(raw: string): boolean;
+  function IsValidNormalizedCellCoord(key: string): boolean;
+
+  // Normalized-workbook ingestion seam (see js/socialcalc-3.ts's
+  // "Normalized-workbook ingestion seam" section for the full contract).
+  interface NormalizedCellData {
+    value?: string | number;
+    formula?: string;
+    bold?: boolean;
+    italic?: boolean;
+    align?: "left" | "center" | "right";
+    comment?: string;
+  }
+  interface NormalizedSheet {
+    name?: string;
+    formulaSeparator?: ";" | ",";
+    cells: { [coord: string]: NormalizedCellData };
+    names?: { [name: string]: string };
+  }
+  interface NormalizedWorkbook {
+    sheets: NormalizedSheet[];
+  }
+  function CreateSheetSaveFromNormalizedSheet(
+    normalizedSheet: NormalizedSheet,
+    skipped?: string[],
+  ): string;
+  function CreateSpreadsheetSaveFromNormalizedWorkbook(normalizedWorkbook: NormalizedWorkbook): {
+    sheetNames: string[];
+    sheetSaves: { [name: string]: string };
+  };
+
+  // FODS (OpenDocument Flat XML Spreadsheet) export.
+  function XmlEscape(text: string): string;
+  function TranslateFormulaToOpenFormula(formula: string): { ok: boolean; text: string };
+  function CreateFodsFromNormalizedWorkbook(normalizedWorkbook: NormalizedWorkbook): string;
 }

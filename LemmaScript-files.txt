@@ -8,3 +8,4 @@ lemma/finance-policy.ts
 lemma/statistics.ts
 lemma/visibility.ts
 lemma/xlookup.ts
+lemma/number-parse.ts

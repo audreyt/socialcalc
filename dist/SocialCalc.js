@@ -7036,6 +7036,107 @@ More comments yet to come...
     }
     return result;
   };
+  SC.HasUtf8Bom = function (s) {
+    return s.length > 0 && s.charCodeAt(0) === 65279;
+  };
+  SC.StripUtf8Bom = function (s) {
+    return SocialCalc.HasUtf8Bom(s) ? s.slice(1) : s;
+  };
+  SC.GroupingCharFor = function (decimalChar) {
+    if (decimalChar === '.') return ',';
+    if (decimalChar === ',') return '.';
+    return '';
+  };
+  SC.ParseLocaleNumericToken = function (tvalue, decimalChar) {
+    var groupChar = SocialCalc.GroupingCharFor(decimalChar);
+    if (groupChar === '')
+      return {
+        ok: false,
+        value: 0,
+        percent: false,
+      };
+    var raw = tvalue;
+    var percent = false;
+    if (raw.length > 0 && raw.charAt(raw.length - 1) === '%') {
+      percent = true;
+      raw = raw.slice(0, -1);
+    }
+    var allowed = decimalChar === '.' ? /^[-+]?[0-9.,]+$/ : /^[-+]?[0-9,.]+$/;
+    if (!allowed.test(raw) || !/[0-9]/.test(raw)) {
+      return {
+        ok: false,
+        value: 0,
+        percent: false,
+      };
+    }
+    var groupSplit = raw.split(groupChar);
+    var stripped = groupSplit.join('');
+    var decimalParts = stripped.split(decimalChar);
+    if (decimalParts.length > 2)
+      return {
+        ok: false,
+        value: 0,
+        percent: false,
+      };
+    var normalized = decimalChar === '.' ? stripped : decimalParts.join('.');
+    var num = normalized - 0;
+    return {
+      ok: true,
+      value: percent ? num / 100 : num,
+      percent,
+    };
+  };
+  SC.ReplaceUnquotedFormulaChar = function (text, from, to) {
+    var result = '';
+    var inQuote = false;
+    var i = 0;
+    while (i < text.length) {
+      var ch = text.charAt(i);
+      if (ch === "'" || ch === '"') {
+        if (inQuote && i + 1 < text.length && text.charAt(i + 1) === ch) {
+          result += ch + ch;
+          i += 2;
+          continue;
+        }
+        inQuote = !inQuote;
+        result += ch;
+        i += 1;
+        continue;
+      }
+      if (!inQuote && ch === from) {
+        result += to;
+      } else {
+        result += ch;
+      }
+      i += 1;
+    }
+    return result;
+  };
+  SC.NormalizeNamedRangeName = function (raw) {
+    return raw.toUpperCase().replace(/[^A-Z0-9_.]/g, '');
+  };
+  SC.IsValidNamedRangeName = function (raw) {
+    return raw.length > 0 && SocialCalc.NormalizeNamedRangeName(raw) === raw;
+  };
+  SC.IsValidNormalizedCellCoord = function (key) {
+    var i = 0;
+    var letters = 0;
+    while (i < key.length && key.charAt(i) >= 'A' && key.charAt(i) <= 'Z') {
+      letters++;
+      i++;
+      if (letters > 2) return false;
+    }
+    if (letters === 0) return false;
+    if (i >= key.length) return false;
+    if (key.charAt(i) === '0') return false;
+    var digits = 0;
+    while (i < key.length) {
+      if (key.charAt(i) < '0' || key.charAt(i) > '9') return false;
+      digits++;
+      i++;
+    }
+    return digits > 0;
+  };
   SC.ConvertSaveToOtherFormat = function (savestr, outputformat, dorecalc) {
     var sheet, context, clipextents, div, ele, row, col, cr, cell, str;
     var result = '';
@@ -7082,6 +7183,10 @@ More comments yet to come...
       result = div.innerHTML;
       return result;
     }
+    var isExcelVariant = outputformat == 'csv-excel' || outputformat == 'tab-excel';
+    var effectiveOutputFormat =
+      outputformat == 'csv-excel' ? 'csv' : outputformat == 'tab-excel' ? 'tab' : outputformat;
+    var rowTerminator = isExcelVariant ? '\r\n' : '\n';
     for (row = clipextents.cr1.row; row <= clipextents.cr2.row; row++) {
       for (col = clipextents.cr1.col; col <= clipextents.cr2.col; col++) {
         cr = SocialCalc.crToCoord(col, row);
@@ -7091,7 +7196,7 @@ More comments yet to come...
         } else {
           str = SocialCalc.FormatCellForExport(sheet, cell, cr);
         }
-        if (outputformat == 'csv') {
+        if (effectiveOutputFormat == 'csv') {
           if (str.indexOf('"') != -1) {
             str = str.replace(/"/g, '""');
           }
@@ -7101,7 +7206,7 @@ More comments yet to come...
           if (col > clipextents.cr1.col) {
             str = ',' + str;
           }
-        } else if (outputformat == 'tab') {
+        } else if (effectiveOutputFormat == 'tab') {
           if (str.indexOf('\n') != -1) {
             if (str.indexOf('"') != -1) {
               str = str.replace(/"/g, '""');
@@ -7114,7 +7219,10 @@ More comments yet to come...
         }
         result += str;
       }
-      result += '\n';
+      result += rowTerminator;
+    }
+    if (isExcelVariant) {
+      result = '﻿' + result;
     }
     return result;
   };
@@ -7136,16 +7244,23 @@ More comments yet to come...
       col++;
       if (col > maxc) maxc = col;
       cr = SocialCalc.crToCoord(col, row);
-      SocialCalc.SetConvertedCell(sheet, cr, value);
+      SocialCalc.SetConvertedCell(sheet, cr, value, decimalChar);
       value = '';
     };
     if (inputformat == 'scsave') {
       return inputstr;
     }
+    var delimiter = inputformat == 'csv-eu' ? ';' : inputformat == 'csv' ? ',' : '	';
+    var decimalChar = inputformat == 'csv-eu' ? ',' : '.';
+    var effectiveFormat = inputformat == 'csv-eu' ? 'csv-eu' : inputformat == 'csv' ? 'csv' : 'tab';
+    if (inputformat != 'csv' && inputformat != 'tab' && inputformat != 'csv-eu') {
+      return result;
+    }
+    inputstr = SocialCalc.StripUtf8Bom(inputstr);
     sheet = new SocialCalc.Sheet();
     lines = inputstr.split(/\r\n|\n/);
     maxc = 0;
-    if (inputformat == 'csv') {
+    if (effectiveFormat == 'csv' || effectiveFormat == 'csv-eu') {
       row = 0;
       inquote = false;
       for (i = 0; i < lines.length; i++) {
@@ -7176,7 +7291,7 @@ More comments yet to come...
             }
             continue;
           }
-          if (ch == ',' && !inquote) {
+          if (ch == delimiter && !inquote) {
             AddCell();
           } else {
             value += ch;
@@ -7192,7 +7307,7 @@ More comments yet to come...
         result = sheet.CreateSheetSave('A1:' + SocialCalc.crToCoord(maxc, row));
       }
     }
-    if (inputformat == 'tab') {
+    if (effectiveFormat == 'tab') {
       row = 0;
       inquote = false;
       for (i = 0; i < lines.length; i++) {
@@ -7247,7 +7362,7 @@ More comments yet to come...
     }
     return result;
   };
-  SC.SetConvertedCell = function (sheet, cr, rawvalue) {
+  SC.SetConvertedCell = function (sheet, cr, rawvalue, decimalChar) {
     var cell, value;
     cell = sheet.GetAssuredCell(cr);
     if (typeof rawvalue == 'string' && rawvalue.charAt(0) == '=') {
@@ -7259,6 +7374,28 @@ More comments yet to come...
       delete cell.displaystring;
       delete cell.parseinfo;
       return;
+    }
+    if (decimalChar === ',' && typeof rawvalue == 'string') {
+      var locale = SocialCalc.ParseLocaleNumericToken(rawvalue, ',');
+      if (locale.ok) {
+        if (locale.percent) {
+          cell.datatype = 'c';
+          cell.valuetype = 'n%';
+          cell.datavalue = locale.value;
+          cell.formula = rawvalue;
+        } else {
+          cell.datatype = 'v';
+          cell.valuetype = 'n';
+          cell.datavalue = locale.value;
+        }
+        return;
+      }
+      if (rawvalue.indexOf(',') !== -1) {
+        cell.datatype = 't';
+        cell.valuetype = 't';
+        cell.datavalue = rawvalue;
+        return;
+      }
     }
     value = SocialCalc.DetermineValueType(rawvalue);
     if (value.type == 'n' && value.value == rawvalue) {
@@ -7275,6 +7412,382 @@ More comments yet to come...
       cell.datavalue = value.value;
       cell.formula = rawvalue;
     }
+  };
+  SC.CreateSheetSaveFromNormalizedSheet = function (normalizedSheet, skipped) {
+    var sheet = new SocialCalc.Sheet();
+    var maxcol = 0;
+    var maxrow = 0;
+    var coord;
+    var ndata;
+    var cr;
+    var cells = (normalizedSheet && normalizedSheet.cells) || {};
+    for (coord in cells) {
+      if (!SocialCalc.IsValidNormalizedCellCoord(coord)) {
+        if (skipped) skipped.push('cell:' + coord);
+        continue;
+      }
+      ndata = cells[coord];
+      if (!ndata || typeof ndata != 'object') {
+        if (skipped) skipped.push('cell:' + coord);
+        continue;
+      }
+      cr = SocialCalc.coordToCr(coord);
+      if (typeof ndata.formula == 'string' && ndata.formula.length > 0) {
+        var formulaText = ndata.formula;
+        if (normalizedSheet && normalizedSheet.formulaSeparator === ';') {
+          formulaText = SocialCalc.ReplaceUnquotedFormulaChar(formulaText, ';', ',');
+        }
+        SocialCalc.SetConvertedCell(sheet, coord, '=' + formulaText);
+      } else if (ndata.value !== undefined && ndata.value !== null) {
+        SocialCalc.SetConvertedCell(sheet, coord, ndata.value);
+      } else {
+        if (skipped) skipped.push('cell:' + coord);
+        continue;
+      }
+      var cell = sheet.cells[coord];
+      if (cr.col > maxcol) maxcol = cr.col;
+      if (cr.row > maxrow) maxrow = cr.row;
+      if (ndata.bold || ndata.italic) {
+        var fontstyle = ndata.italic ? 'italic' : 'normal';
+        var fontweight = ndata.bold ? 'bold' : 'normal';
+        cell.font = sheet.GetStyleNum('font', fontstyle + ' ' + fontweight + ' * *');
+      }
+      if (ndata.align == 'left' || ndata.align == 'center' || ndata.align == 'right') {
+        cell.cellformat = sheet.GetStyleNum('cellformat', ndata.align);
+      }
+      if (typeof ndata.comment == 'string' && ndata.comment.length > 0) {
+        cell.comment = ndata.comment;
+      }
+    }
+    sheet.attribs.lastcol = maxcol;
+    sheet.attribs.lastrow = maxrow;
+    var names = (normalizedSheet && normalizedSheet.names) || {};
+    var name;
+    for (name in names) {
+      if (!SocialCalc.IsValidNamedRangeName(name)) {
+        if (skipped) skipped.push('name:' + name);
+        continue;
+      }
+      if (typeof names[name] != 'string' || names[name].length == 0) {
+        if (skipped) skipped.push('name:' + name);
+        continue;
+      }
+      sheet.names[name] = {
+        desc: '',
+        definition: names[name],
+      };
+    }
+    return sheet.CreateSheetSave();
+  };
+  SC.CreateSpreadsheetSaveFromNormalizedWorkbook = function (normalizedWorkbook) {
+    var sheets = (normalizedWorkbook && normalizedWorkbook.sheets) || [];
+    var sheetNames = [];
+    var sheetSaves = {};
+    var used = {};
+    for (var i = 0; i < sheets.length; i++) {
+      var ns = sheets[i];
+      var baseName =
+        ns && typeof ns.name == 'string' && ns.name.length > 0 ? ns.name : 'Sheet' + (i + 1);
+      var name = baseName;
+      var suffix = 2;
+      while (used[name]) {
+        name = baseName + ' (' + suffix + ')';
+        suffix++;
+      }
+      used[name] = true;
+      sheetNames.push(name);
+      sheetSaves[name] = SocialCalc.CreateSheetSaveFromNormalizedSheet(ns);
+    }
+    return {
+      sheetNames,
+      sheetSaves,
+    };
+  };
+  SC.XmlEscape = function (text) {
+    var s = SocialCalc.special_chars(text + '');
+    return s.replace(/'/g, '&apos;');
+  };
+  SC.TranslateFormulaToOpenFormula = function (formula) {
+    var scf = SocialCalc.Formula;
+    var tokentype = scf.TokenType;
+    var parseinfo;
+    try {
+      parseinfo = scf.ParseFormulaIntoTokens(formula);
+    } catch {
+      return {
+        ok: false,
+        text: '',
+      };
+    }
+    var out = '';
+    var i;
+    for (i = 0; i < parseinfo.length; i++) {
+      var ttype = parseinfo[i].type;
+      var ttext = parseinfo[i].text;
+      if (ttype === tokentype.op && ttext === '!') {
+        return {
+          ok: false,
+          text: '',
+        };
+      }
+      if (ttype === tokentype.coord) {
+        var isRangeStart =
+          i + 2 < parseinfo.length &&
+          parseinfo[i + 1].type === tokentype.op &&
+          parseinfo[i + 1].text === ':' &&
+          parseinfo[i + 2].type === tokentype.coord;
+        var isRangeEnd =
+          i >= 2 &&
+          parseinfo[i - 1].type === tokentype.op &&
+          parseinfo[i - 1].text === ':' &&
+          parseinfo[i - 2].type === tokentype.coord;
+        if (isRangeStart) {
+          out += '[.' + ttext + ':.' + parseinfo[i + 2].text + ']';
+        } else if (isRangeEnd) {
+        } else {
+          out += '[.' + ttext + ']';
+        }
+        continue;
+      }
+      if (ttype === tokentype.op && ttext === ':') {
+        var prevIsCoord = i > 0 && parseinfo[i - 1].type === tokentype.coord;
+        var nextIsCoord = i + 1 < parseinfo.length && parseinfo[i + 1].type === tokentype.coord;
+        if (prevIsCoord && nextIsCoord) continue;
+        out += ttext;
+        continue;
+      }
+      if (ttype === tokentype.op && ttext === ',') {
+        out += ';';
+        continue;
+      }
+      if (ttype === tokentype.string) {
+        out += '"' + ttext.replace(/"/g, '""') + '"';
+        continue;
+      }
+      out += ttext;
+    }
+    return {
+      ok: true,
+      text: out,
+    };
+  };
+  SC.CreateFodsFromNormalizedWorkbook = function (normalizedWorkbook) {
+    var sheets = (normalizedWorkbook && normalizedWorkbook.sheets) || [];
+    var esc = SocialCalc.XmlEscape;
+    var styleKeyToName = {};
+    var styleDefs = [];
+    var nextStyleId = 1;
+    function styleNameFor(bold, italic, align) {
+      if (!bold && !italic && !align) return null;
+      var boldKey = bold ? 'b' : '';
+      var italicKey = italic ? 'i' : '';
+      var alignKey = align || '';
+      var key = boldKey + italicKey + alignKey;
+      if (styleKeyToName[key]) return styleKeyToName[key];
+      var name = 'ce' + nextStyleId++;
+      styleKeyToName[key] = name;
+      var textProps = '';
+      if (bold || italic) {
+        var fontWeight = bold ? 'bold' : 'normal';
+        var fontStyle = italic ? 'italic' : 'normal';
+        textProps =
+          '<style:text-properties fo:font-weight="' +
+          fontWeight +
+          '" style:font-style="' +
+          fontStyle +
+          '"/>';
+      }
+      var cellProps = '';
+      if (align) {
+        cellProps = '<style:paragraph-properties fo:text-align="' + align + '"/>';
+      }
+      styleDefs.push(
+        '<style:style style:name="' +
+          name +
+          '" style:family="table-cell">' +
+          cellProps +
+          textProps +
+          '</style:style>',
+      );
+      return name;
+    }
+    var sheetXml = [];
+    var namedRangeXml = [];
+    for (var s = 0; s < sheets.length; s++) {
+      var ns = sheets[s];
+      var sheetName =
+        ns && typeof ns.name == 'string' && ns.name.length > 0 ? ns.name : 'Sheet' + (s + 1);
+      var cells = (ns && ns.cells) || {};
+      var coords = [];
+      for (var coord in cells) {
+        if (SocialCalc.IsValidNormalizedCellCoord(coord)) coords.push(coord);
+      }
+      coords.sort(function (a, b) {
+        var ca = SocialCalc.coordToCr(a);
+        var cb = SocialCalc.coordToCr(b);
+        return ca.row - cb.row || ca.col - cb.col;
+      });
+      var maxrow = 0;
+      var maxcol = 0;
+      var byRow = {};
+      for (var ci = 0; ci < coords.length; ci++) {
+        var cr = SocialCalc.coordToCr(coords[ci]);
+        if (cr.row > maxrow) maxrow = cr.row;
+        if (cr.col > maxcol) maxcol = cr.col;
+        if (!byRow[cr.row]) byRow[cr.row] = {};
+        byRow[cr.row][cr.col] = coords[ci];
+      }
+      var rowsXml = '';
+      for (var r = 1; r <= maxrow; r++) {
+        var rowCells = byRow[r];
+        if (!rowCells) rowCells = {};
+        var rowXml = '';
+        for (var c = 1; c <= maxcol; c++) {
+          var cellCoord = rowCells[c];
+          if (!cellCoord) {
+            rowXml += '<table:table-cell/>';
+            continue;
+          }
+          var ndata = cells[cellCoord];
+          var styleName = styleNameFor(ndata.bold, ndata.italic, ndata.align);
+          var styleAttr = styleName ? ' table:style-name="' + styleName + '"' : '';
+          if (typeof ndata.formula == 'string' && ndata.formula.length > 0) {
+            var translated = SocialCalc.TranslateFormulaToOpenFormula(ndata.formula);
+            var hasCachedValue = typeof ndata.value == 'number';
+            if (translated.ok) {
+              var formulaAttr = ' table:formula="of:=' + esc(translated.text) + '"';
+              if (hasCachedValue) {
+                rowXml +=
+                  '<table:table-cell' +
+                  formulaAttr +
+                  ' office:value-type="float" office:value="' +
+                  ndata.value +
+                  '"' +
+                  styleAttr +
+                  '><text:p>' +
+                  esc(ndata.value + '') +
+                  '</text:p></table:table-cell>';
+              } else {
+                rowXml +=
+                  '<table:table-cell' +
+                  formulaAttr +
+                  styleAttr +
+                  '><text:p></text:p></table:table-cell>';
+              }
+            } else if (hasCachedValue) {
+              rowXml +=
+                '<table:table-cell office:value-type="float" office:value="' +
+                ndata.value +
+                '"' +
+                styleAttr +
+                '><text:p>' +
+                esc(ndata.value + '') +
+                '</text:p></table:table-cell>';
+            } else {
+              rowXml +=
+                '<table:table-cell office:value-type="string"' +
+                styleAttr +
+                '><text:p>' +
+                esc('=' + ndata.formula) +
+                '</text:p></table:table-cell>';
+            }
+          } else if (typeof ndata.value == 'number') {
+            rowXml +=
+              '<table:table-cell office:value-type="float" office:value="' +
+              ndata.value +
+              '"' +
+              styleAttr +
+              '>' +
+              (typeof ndata.comment == 'string' && ndata.comment.length > 0
+                ? '<office:annotation><text:p>' +
+                  esc(ndata.comment) +
+                  '</text:p></office:annotation>'
+                : '') +
+              '<text:p>' +
+              esc(ndata.value + '') +
+              '</text:p></table:table-cell>';
+          } else {
+            var textValue = ndata.value == null ? '' : ndata.value + '';
+            rowXml +=
+              '<table:table-cell office:value-type="string"' +
+              styleAttr +
+              '>' +
+              (typeof ndata.comment == 'string' && ndata.comment.length > 0
+                ? '<office:annotation><text:p>' +
+                  esc(ndata.comment) +
+                  '</text:p></office:annotation>'
+                : '') +
+              '<text:p>' +
+              esc(textValue) +
+              '</text:p></table:table-cell>';
+          }
+        }
+        rowsXml += '<table:table-row>' + rowXml + '</table:table-row>';
+      }
+      sheetXml.push(
+        '<table:table table:name="' + esc(sheetName) + '">' + rowsXml + '</table:table>',
+      );
+      var names = (ns && ns.names) || {};
+      for (var name in names) {
+        if (!SocialCalc.IsValidNamedRangeName(name)) continue;
+        if (typeof names[name] != 'string' || names[name].length == 0) continue;
+        var def = names[name];
+        var defParts = def.split(':');
+        if (defParts.length > 2) continue;
+        var defPartsValid = true;
+        for (var dp = 0; dp < defParts.length; dp++) {
+          if (!SocialCalc.IsValidNormalizedCellCoord(defParts[dp])) defPartsValid = false;
+        }
+        if (!defPartsValid) continue;
+        function dollarize(a1) {
+          var firstDigit = 0;
+          while (firstDigit < a1.length && a1.charCodeAt(firstDigit) < 48) firstDigit++;
+          while (firstDigit < a1.length && a1.charCodeAt(firstDigit) > 57) firstDigit++;
+          return '$' + a1.slice(0, firstDigit) + '$' + a1.slice(firstDigit);
+        }
+        var needsQuoting = !/^[A-Za-z_][A-Za-z0-9_]*$/.test(sheetName);
+        var quotedSheetName = needsQuoting
+          ? "'" + esc(sheetName).replace(/'/g, "''") + "'"
+          : esc(sheetName);
+        var sheetPrefix = '$' + quotedSheetName + '.';
+        var baseCell = sheetPrefix + dollarize(defParts[0]);
+        var rangeAddress =
+          defParts.length === 2
+            ? sheetPrefix + dollarize(defParts[0]) + ':' + sheetPrefix + dollarize(defParts[1])
+            : baseCell;
+        namedRangeXml.push(
+          '<table:named-range table:name="' +
+            esc(name) +
+            '" table:base-cell-address="' +
+            baseCell +
+            '" table:cell-range-address="' +
+            rangeAddress +
+            '"/>',
+        );
+      }
+    }
+    var namedExpressionsXml =
+      namedRangeXml.length > 0
+        ? '<table:named-expressions>' + namedRangeXml.join('') + '</table:named-expressions>'
+        : '';
+    return (
+      '<?xml version="1.0" encoding="UTF-8"?>' +
+      '<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" ' +
+      'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" ' +
+      'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" ' +
+      'xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" ' +
+      'xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" ' +
+      'xmlns:of="urn:oasis:names:tc:opendocument:xmlns:of:1.2" ' +
+      'office:version="1.2" office:mimetype="application/vnd.oasis.opendocument.spreadsheet">' +
+      '<office:automatic-styles>' +
+      styleDefs.join('') +
+      '</office:automatic-styles>' +
+      '<office:body><office:spreadsheet>' +
+      sheetXml.join('') +
+      namedExpressionsXml +
+      '</office:spreadsheet></office:body>' +
+      '</office:document>'
+    );
   };
 
   // In-place TypeScript conversion of socialcalctableeditor.js (SocialCalc global script).

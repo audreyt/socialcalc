@@ -420,8 +420,15 @@ shipping bundle.
 - `lemma/xlookup.ts`: XMATCH/XLOOKUP match_mode/search_mode legality,
   binary-search/wildcard incompatibility, exact-before-approximate-before-
   miss outcome precedence, and if_not_found fallback — 7 Dafny VCs.
+- `lemma/number-parse.ts`: fixed-locale numeric classification policy
+  (groupingCharFor — explicit decimal/grouping character, NOT an
+  autodetecting tie-break), isAsciiDigit, isNameChar — 4 Dafny VCs.
+  Remaining functions (normalizeNamedRangeName, isValidNamedRangeName,
+  isValidNormalizedCellCoord, replaceUnquotedChar, hasBom/stripBom) are
+  runtime-locked (charAt/charCodeAt loops unsupported by the Dafny backend),
+  cross-checked by `test/lemma-number-parse-facade.test.ts`.
 
-Total: **101 VCs (26 + 5 + 3 + 15 + 29 + 3 + 3 + 3 + 7 + 7)**.
+Total: **105 VCs (26 + 5 + 3 + 15 + 29 + 3 + 3 + 3 + 7 + 7 + 4)**.
 
 After a facade edit:
 

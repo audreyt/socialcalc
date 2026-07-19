@@ -7974,6 +7974,191 @@ SC.ParseCellLinkText = function (str: any) {
   return result;
 };
 
+// *************************************
+//
+// Interoperability helpers: BOM handling, locale-numeric parsing, and
+// quote-aware unquoted-character substitution shared by the CSV/TSV
+// locale-import variants, the normalized-workbook ingestion seam, and the
+// FODS exporter below. Pure mirrors are verified in lemma/number-parse.ts;
+// test/lemma-number-parse-facade.test.ts cross-checks these shipping
+// functions against that facade so both stay in lock-step.
+//
+// *************************************
+
+// result = SocialCalc.HasUtf8Bom(s)
+//
+// True iff s begins with a literal U+FEFF byte-order-mark code unit (the
+// character a UTF-8-with-BOM file decodes to at offset 0). Pure/no I/O:
+// callers are responsible for decoding file bytes to a JS string first.
+
+/** @param {string} s */
+SC.HasUtf8Bom = function (s: any): boolean {
+  return s.length > 0 && s.charCodeAt(0) === 0xfeff;
+};
+
+// result = SocialCalc.StripUtf8Bom(s)
+//
+// Strips a single leading U+FEFF BOM if present; returns s unchanged
+// otherwise. Never strips more than one code unit, so an actual leading
+// U+FEFF cell value beyond position 0 is untouched.
+
+/** @param {string} s */
+SC.StripUtf8Bom = function (s: any): string {
+  return SocialCalc.HasUtf8Bom(s) ? s.slice(1) : s;
+};
+
+// result = SocialCalc.GroupingCharFor(decimalChar)
+//
+// Explicit-locale decimal-point classifier -- NOT an autodetecting tie-
+// break. The caller declares the locale's decimal character up front
+// (decimalChar is exactly "," or "."); the OTHER character is therefore
+// ALWAYS the thousands-grouping separator in that locale, regardless of
+// which one occurs later in the string. A "rightmost separator wins"
+// heuristic was considered and rejected: under a fixed EU locale it would
+// misclassify a pure-grouping token like "1.234" (dot only, no comma) as
+// dot-decimal 1.234 instead of the intended grouped integer 1234, silently
+// corrupting the value. Fixed-locale mode must never guess.
+// Returns the grouping character to strip unconditionally, or "" if
+// decimalChar is neither "," nor ".".
+// Pure mirror verified as lemma/number-parse.ts#groupingCharFor.
+
+/** @param {string} decimalChar */
+SC.GroupingCharFor = function (decimalChar: any): string {
+  if (decimalChar === ".") return ",";
+  if (decimalChar === ",") return ".";
+  return "";
+};
+
+// result = SocialCalc.ParseLocaleNumericToken(tvalue, decimalChar)
+//
+// Classifies a numeric-shaped token under an explicit fixed locale:
+// decimalChar (must be "," or ".") is always the decimal point;
+// GroupingCharFor(decimalChar) is always the thousands-grouping character
+// and every occurrence of it is stripped unconditionally (never guessed
+// from position). Returns {ok:true, value:number} on a recognized numeric
+// token (optionally %-suffixed, in which case value is already divided by
+// 100 and percent is true), or {ok:false} if the token is not
+// numeric-shaped, has more than one decimal point, or decimalChar is
+// invalid.
+
+/** @param {string} tvalue @param {string} decimalChar */
+SC.ParseLocaleNumericToken = function (
+  tvalue: any,
+  decimalChar: any,
+): { ok: boolean; value: number; percent: boolean } {
+  var groupChar = SocialCalc.GroupingCharFor(decimalChar);
+  if (groupChar === "") return { ok: false, value: 0, percent: false };
+  var raw = tvalue;
+  var percent = false;
+  if (raw.length > 0 && raw.charAt(raw.length - 1) === "%") {
+    percent = true;
+    raw = raw.slice(0, -1);
+  }
+  var allowed = decimalChar === "." ? /^[-+]?[0-9.,]+$/ : /^[-+]?[0-9,.]+$/;
+  if (!allowed.test(raw) || !/[0-9]/.test(raw)) {
+    return { ok: false, value: 0, percent: false };
+  }
+  // strip every grouping-character occurrence unconditionally (fixed locale, no guessing)
+  var groupSplit = raw.split(groupChar);
+  var stripped = groupSplit.join("");
+  // exactly zero or one decimalChar remains after grouping strip
+  var decimalParts = stripped.split(decimalChar);
+  if (decimalParts.length > 2) return { ok: false, value: 0, percent: false };
+  // After the regex check (must contain at least one digit) and the
+  // decimalParts length check (at most one decimal separator), the
+  // normalized string is always a sequence of digits with at most one
+  // decimal point -- always parseable as a number, never NaN.
+  // The `isNaN` guard that was here was provably unreachable and removed.
+  var normalized = decimalChar === "." ? stripped : decimalParts.join(".");
+  var num = normalized - 0;
+  return { ok: true, value: percent ? num / 100 : num, percent: percent };
+};
+
+// result = SocialCalc.ReplaceUnquotedFormulaChar(text, from, to)
+//
+// Quote-aware single-character substitution matching SocialCalc's formula
+// lexer's quote model exactly (both ' and " open/close the same quote
+// class; a doubled quote char while inside a quoted run is a literal
+// escaped quote). Used only by the explicit opt-in ingestion-time formula
+// separator normalization below -- never by the parser itself.
+// Pure mirror verified as lemma/number-parse.ts#replaceUnquotedChar.
+
+/** @param {string} text @param {string} from @param {string} to */
+SC.ReplaceUnquotedFormulaChar = function (text: any, from: any, to: any): string {
+  var result = "";
+  var inQuote = false;
+  var i = 0;
+  while (i < text.length) {
+    var ch = text.charAt(i);
+    if (ch === "'" || ch === '"') {
+      if (inQuote && i + 1 < text.length && text.charAt(i + 1) === ch) {
+        result += ch + ch;
+        i += 2;
+        continue;
+      }
+      inQuote = !inQuote;
+      result += ch;
+      i += 1;
+      continue;
+    }
+    if (!inQuote && ch === from) {
+      result += to;
+    } else {
+      result += ch;
+    }
+    i += 1;
+  }
+  return result;
+};
+
+// result = SocialCalc.NormalizeNamedRangeName(raw)
+//
+// Upper-cases and strips every character outside [A-Z0-9_.] -- pure mirror
+// of the shipping "name" command's normalization
+// (name.toUpperCase().replace(/[^A-Z0-9_.]/g, "")).
+
+/** @param {string} raw */
+SC.NormalizeNamedRangeName = function (raw: any): string {
+  return raw.toUpperCase().replace(/[^A-Z0-9_.]/g, "");
+};
+
+// result = SocialCalc.IsValidNamedRangeName(raw)
+//
+// True iff raw is non-empty and already in normalized form (round-trips
+// through NormalizeNamedRangeName unchanged).
+
+/** @param {string} raw */
+SC.IsValidNamedRangeName = function (raw: any): boolean {
+  return raw.length > 0 && SocialCalc.NormalizeNamedRangeName(raw) === raw;
+};
+
+// result = SocialCalc.IsValidNormalizedCellCoord(key)
+//
+// True iff key is a syntactically valid, unqualified, uppercase A1 cell
+// coordinate (1-2 letters A-Z, no leading-zero digits) -- lexical shape
+// only; column ZZ/row-1 band bounds are the caller's job (coordToCr).
+
+/** @param {string} key */
+SC.IsValidNormalizedCellCoord = function (key: any): boolean {
+  var i = 0;
+  var letters = 0;
+  while (i < key.length && key.charAt(i) >= "A" && key.charAt(i) <= "Z") {
+    letters++;
+    i++;
+    if (letters > 2) return false;
+  }
+  if (letters === 0) return false;
+  if (i >= key.length) return false;
+  if (key.charAt(i) === "0") return false;
+  var digits = 0;
+  while (i < key.length) {
+    if (key.charAt(i) < "0" || key.charAt(i) > "9") return false;
+    digits++;
+    i++;
+  }
+  return digits > 0;
+};
+
 //
 // result = SocialCalc.ConvertSaveToOtherFormat(savestr, outputformat, dorecalc)
 //
@@ -8026,6 +8211,22 @@ SC.ConvertSaveToOtherFormat = function (savestr: any, outputformat: any, dorecal
     return result;
   }
 
+  // "csv-excel"/"tab-excel" are opt-in Windows/Excel-friendly variants:
+  // a leading UTF-8 BOM (so Excel auto-detects UTF-8 instead of guessing
+  // the system codepage) and CRLF row terminators (RFC 4180 line ending).
+  // The legacy "csv"/"tab" outputs below are completely unaffected -- same
+  // code path, same LF terminator, same lack of BOM -- so every existing
+  // caller/test/fixture byte-for-byte matches prior behavior.
+  var isExcelVariant = outputformat == "csv-excel" || outputformat == "tab-excel";
+  var effectiveOutputFormat =
+    outputformat == "csv-excel" ? "csv" : outputformat == "tab-excel" ? "tab" : outputformat;
+  var rowTerminator = isExcelVariant ? "\r\n" : "\n";
+
+  // Legacy behavior for any OTHER outputformat (including entirely unknown
+  // values) is preserved exactly: fall through to the loop below and emit
+  // unformatted values with no separator at all (neither the "csv" nor
+  // "tab" branch inside the loop matches, so `str` is appended as-is).
+
   for (row = clipextents.cr1.row; row <= clipextents.cr2.row; row++) {
     for (col = clipextents.cr1.col; col <= clipextents.cr2.col; col++) {
       cr = SocialCalc.crToCoord(col, row);
@@ -8037,7 +8238,7 @@ SC.ConvertSaveToOtherFormat = function (savestr: any, outputformat: any, dorecal
         str = (SocialCalc as any).FormatCellForExport(sheet, cell, cr);
       }
 
-      if (outputformat == "csv") {
+      if (effectiveOutputFormat == "csv") {
         if (str.indexOf('"') != -1) {
           str = str.replace(/"/g, '""'); // double quotes
         }
@@ -8047,7 +8248,7 @@ SC.ConvertSaveToOtherFormat = function (savestr: any, outputformat: any, dorecal
         if (col > clipextents.cr1.col) {
           str = "," + str; // add commas
         }
-      } else if (outputformat == "tab") {
+      } else if (effectiveOutputFormat == "tab") {
         if (str.indexOf("\n") != -1) {
           // if multiple lines
           if (str.indexOf('"') != -1) {
@@ -8061,7 +8262,11 @@ SC.ConvertSaveToOtherFormat = function (savestr: any, outputformat: any, dorecal
       }
       result += str;
     }
-    result += "\n";
+    result += rowTerminator;
+  }
+
+  if (isExcelVariant) {
+    result = "\ufeff" + result;
   }
 
   return result;
@@ -8094,7 +8299,7 @@ SC.ConvertOtherFormatToSave = function (inputstr: any, inputformat: any) {
     col++;
     if (col > maxc) maxc = col;
     cr = SocialCalc.crToCoord(col, row);
-    SocialCalc.SetConvertedCell(sheet, cr, value);
+    SocialCalc.SetConvertedCell(sheet, cr, value, decimalChar);
     value = "";
   };
 
@@ -8102,12 +8307,29 @@ SC.ConvertOtherFormatToSave = function (inputstr: any, inputformat: any) {
     return inputstr;
   }
 
+  // Locale CSV variant: "csv-eu" uses ";" as the field delimiter and ","
+  // as the decimal point (comma-decimal European convention), matching the
+  // delimiter Excel/LibreOffice write when the OS locale's list separator
+  // is a comma (so "," can't double as both delimiter and decimal). The
+  // legacy "csv"/"tab" formats are BYTE-IDENTICAL to their pre-existing
+  // behavior except for the new leading-BOM strip below, which is safe by
+  // construction: a leading U+FEFF was never valid CSV/TSV content.
+  var delimiter = inputformat == "csv-eu" ? ";" : inputformat == "csv" ? "," : "\t";
+  var decimalChar = inputformat == "csv-eu" ? "," : ".";
+  var effectiveFormat = inputformat == "csv-eu" ? "csv-eu" : inputformat == "csv" ? "csv" : "tab";
+
+  if (inputformat != "csv" && inputformat != "tab" && inputformat != "csv-eu") {
+    return result;
+  }
+
+  inputstr = SocialCalc.StripUtf8Bom(inputstr);
+
   sheet = new SocialCalc.Sheet();
 
   lines = inputstr.split(/\r\n|\n/);
 
   maxc = 0;
-  if (inputformat == "csv") {
+  if (effectiveFormat == "csv" || effectiveFormat == "csv-eu") {
     row = 0;
     inquote = false;
     for (i = 0; i < lines.length; i++) {
@@ -8142,7 +8364,7 @@ SC.ConvertOtherFormatToSave = function (inputstr: any, inputformat: any) {
           }
           continue;
         }
-        if (ch == "," && !inquote) {
+        if (ch == delimiter && !inquote) {
           AddCell();
         } else {
           value += ch;
@@ -8159,7 +8381,7 @@ SC.ConvertOtherFormatToSave = function (inputstr: any, inputformat: any) {
     }
   }
 
-  if (inputformat == "tab") {
+  if (effectiveFormat == "tab") {
     row = 0;
     inquote = false;
     for (i = 0; i < lines.length; i++) {
@@ -8228,8 +8450,13 @@ SC.ConvertOtherFormatToSave = function (inputstr: any, inputformat: any) {
 // Sets the cell cr with a value and type determined from rawvalue
 //
 
-/** @param {any} sheet @param {any} cr @param {any} rawvalue */
-SC.SetConvertedCell = function (sheet: any, cr: any, rawvalue: any) {
+// The optional decimalChar parameter enables locale-aware numeric parsing
+// ("," for the "csv-eu" input variant); when omitted or ".", behavior is
+// BYTE-IDENTICAL to the pre-existing single-argument SetConvertedCell
+// (DetermineValueType alone, no locale branch taken).
+
+/** @param {any} sheet @param {any} cr @param {any} rawvalue @param {any} [decimalChar] */
+SC.SetConvertedCell = function (sheet: any, cr: any, rawvalue: any, decimalChar: any): void {
   var cell, value;
 
   cell = sheet.GetAssuredCell(cr);
@@ -8243,6 +8470,43 @@ SC.SetConvertedCell = function (sheet: any, cr: any, rawvalue: any) {
     delete cell.displaystring;
     delete cell.parseinfo;
     return;
+  }
+
+  if (decimalChar === "," && typeof rawvalue == "string") {
+    var locale = SocialCalc.ParseLocaleNumericToken(rawvalue, ",");
+    if (locale.ok) {
+      if (locale.percent) {
+        // Mirror the legacy DetermineValueType "special number types" branch
+        // (datatype "c" + preserved original text) so a locale percent
+        // literal round-trips identically to a non-locale one: re-editing
+        // the cell shows the original "15,1%" text, not a bare "0.151".
+        cell.datatype = "c";
+        cell.valuetype = "n%";
+        cell.datavalue = locale.value;
+        cell.formula = rawvalue;
+      } else {
+        cell.datatype = "v";
+        cell.valuetype = "n";
+        cell.datavalue = locale.value;
+      }
+      return;
+    }
+    if (rawvalue.indexOf(",") !== -1) {
+      // A comma-bearing token that FAILED explicit EU-locale numeric
+      // parsing must not fall through to DetermineValueType's US-locale
+      // comma-thousands regex: that regex would silently reinterpret a
+      // malformed EU-locale token under the OPPOSITE locale's rules (e.g.
+      // "1,2,3" -- malformed under EU comma-decimal parsing -- would
+      // otherwise be reparsed as the US-locale grouped integer 123, a
+      // surprising cross-locale reinterpretation, not an honest "not a
+      // number"). Under an explicit fixed locale, a token containing the
+      // locale's decimal character that fails that locale's parse is text,
+      // full stop -- never silently retried under a different locale.
+      cell.datatype = "t";
+      cell.valuetype = "t";
+      cell.datavalue = rawvalue;
+      return;
+    }
   }
 
   value = SocialCalc.DetermineValueType(rawvalue);
@@ -8264,4 +8528,637 @@ SC.SetConvertedCell = function (sheet: any, cr: any, rawvalue: any) {
     cell.datavalue = value.value;
     cell.formula = rawvalue;
   }
+};
+
+// *************************************
+//
+// Normalized-workbook ingestion seam
+//
+// A dependency-free bridge from a plain, already-parsed, TRUSTED structured
+// JSON object (produced by a HOST-SUPPLIED external parser -- e.g. an XLSX
+// or ODS reader -- outside this package) into one or more SocialCalc-native
+// scsave strings. This module does NOT parse any binary/zip/XML format
+// itself; it only maps an already-normalized in-memory shape onto the
+// existing Sheet/cell/style primitives (SetConvertedCell, GetStyleNum,
+// ExecuteSheetCommand's "name define"). Untrusted input handling (schema
+// validation, size limits, hostile-content sanitization before this point)
+// is the CALLER's responsibility -- same trust boundary the rest of the
+// save/load path assumes (see README.md's "Trust boundary" section).
+//
+// *************************************
+
+// result = SocialCalc.CreateSheetSaveFromNormalizedSheet(normalizedSheet)
+//
+// result = SocialCalc.CreateSheetSaveFromNormalizedSheet(normalizedSheet, skipped)
+//
+// normalizedSheet: {
+//   name?: string,                     // informational only, not embedded in scsave
+//   formulaSeparator?: ";" | ",",      // opt-in: ";" rewrites formula text to
+//                                      // native "," syntax before parsing (quote-aware)
+//   cells: { [coord: string]: {        // coord: uppercase A1, e.g. "B7"
+//     value?: string | number,         // plain value (no locale ambiguity: numbers are JS numbers)
+//     formula?: string,                // formula text WITHOUT leading "="; overrides value if present
+//     bold?: boolean,
+//     italic?: boolean,
+//     align?: "left" | "center" | "right",
+//     comment?: string,
+//   } },
+//   names?: { [name: string]: string },  // named-range definitions, e.g. {"TOTAL": "B1:B10"}
+// }
+//
+// Returns a full scsave string (SocialCalc.CreateSheetSave output). A
+// malformed coord/name key is SKIPPED (never aborts the whole sheet) --
+// coord keys must pass IsValidNormalizedCellCoord and land in the [1,702]
+// column / >=1 row band; name keys must pass IsValidNamedRangeName. This is
+// a "trusted input" ingestion seam (the host's external parser is assumed
+// to have already validated/sanitized the source document per README.md's
+// trust-boundary section), so a skip is a HOST-ADAPTER BUG SIGNAL, not
+// expected steady-state input -- pass an optional `skipped` array to
+// collect every skipped key (as "cell:B7" / "name:1BAD") instead of
+// silently dropping it, so a caller can log/assert on it during
+// integration rather than losing the signal.
+// Font style/weight strings are interned via GetStyleNum, so two cells
+// sharing {bold:true} share one font-table slot in the emitted scsave
+// (same dedup GetStyleNum already gives every "set coord font ..." command).
+
+/** @param {any} normalizedSheet @param {string[]} [skipped] */
+SC.CreateSheetSaveFromNormalizedSheet = function (normalizedSheet: any, skipped: any): string {
+  var sheet = new SocialCalc.Sheet();
+  var maxcol = 0;
+  var maxrow = 0;
+  var coord: any;
+  var ndata: any;
+  var cr: any;
+
+  var cells = (normalizedSheet && normalizedSheet.cells) || {};
+  for (coord in cells) {
+    if (!SocialCalc.IsValidNormalizedCellCoord(coord)) {
+      if (skipped) skipped.push("cell:" + coord);
+      continue;
+    }
+    ndata = cells[coord];
+    if (!ndata || typeof ndata != "object") {
+      if (skipped) skipped.push("cell:" + coord);
+      continue;
+    }
+
+    // No further column/row band check is needed here: coord already
+    // passed IsValidNormalizedCellCoord above, which by construction (1-2
+    // uppercase A-Z letters => col in [1,702]; no-leading-zero digit run
+    // => row >= 1) already guarantees cr lands in SocialCalc's supported
+    // band. Exhaustively verified: no string accepted by
+    // IsValidNormalizedCellCoord ever produces col>702 or row<1.
+    cr = SocialCalc.coordToCr(coord);
+
+    if (typeof ndata.formula == "string" && ndata.formula.length > 0) {
+      // Opt-in per-sheet formula separator normalization: when the caller
+      // marks normalizedSheet.formulaSeparator === ";" (semicolon-authored
+      // formula text, as some non-US-locale spreadsheet exports emit), the
+      // formula is rewritten to SocialCalc's native comma-separated syntax
+      // BEFORE parsing -- normalized once at ingestion, never inside the
+      // shared formula tokenizer/parser (which stays locale-agnostic; see
+      // js/formula-parse.ts).
+      //
+      // REQUIRED PRECONDITION -- formulaSeparator:";" is a PURE separator
+      // swap, not a locale-numeric translator: ndata.formula MUST already
+      // use "." as its decimal point (e.g. "SUM(1.5;2.5)", never
+      // "SUM(1,5;2,5)"). A comma-decimal formula under this flag is
+      // UNDETECTABLE-BY-DESIGN from an argument-separator comma once both
+      // become ",": "SUM(1,5;2,5)" -> "SUM(1,5,2,5)" silently reparses as
+      // FOUR arguments (1, 5, 2, 5), not two decimals (1.5, 2.5). There is
+      // no purely lexical way to disambiguate a decimal comma from an
+      // argument-separator comma after the rewrite -- this is a REAL,
+      // documented, non-recoverable ambiguity, not an oversight. The host
+      // adapter (the same layer that decided formulaSeparator===";" from
+      // its source format) MUST normalize decimal commas to dots in
+      // formula text BEFORE calling this seam; this function does not and
+      // cannot detect a violation.
+      //
+      // ReplaceUnquotedFormulaChar is quote-aware, so a literal ";" inside
+      // a string-literal argument is left untouched. Every other formula
+      // in the sheet (formulaSeparator omitted/"," ) is completely
+      // unaffected -- same code path, no rewrite performed.
+      var formulaText = ndata.formula;
+      if (normalizedSheet && normalizedSheet.formulaSeparator === ";") {
+        formulaText = SocialCalc.ReplaceUnquotedFormulaChar(formulaText, ";", ",");
+      }
+      SocialCalc.SetConvertedCell(sheet, coord, "=" + formulaText);
+    } else if (ndata.value !== undefined && ndata.value !== null) {
+      SocialCalc.SetConvertedCell(sheet, coord, ndata.value);
+    } else {
+      if (skipped) skipped.push("cell:" + coord);
+      continue; // no content: skip creating the cell entirely
+    }
+
+    // SetConvertedCell always creates the cell via GetAssuredCell, so
+    // sheet.cells[coord] is always truthy here -- no null guard needed.
+    var cell = sheet.cells[coord];
+
+    if (cr.col > maxcol) maxcol = cr.col;
+    if (cr.row > maxrow) maxrow = cr.row;
+
+    if (ndata.bold || ndata.italic) {
+      var fontstyle = ndata.italic ? "italic" : "normal";
+      var fontweight = ndata.bold ? "bold" : "normal";
+      cell.font = sheet.GetStyleNum("font", fontstyle + " " + fontweight + " * *");
+    }
+    if (ndata.align == "left" || ndata.align == "center" || ndata.align == "right") {
+      cell.cellformat = sheet.GetStyleNum("cellformat", ndata.align);
+    }
+    if (typeof ndata.comment == "string" && ndata.comment.length > 0) {
+      cell.comment = ndata.comment;
+    }
+  }
+
+  sheet.attribs.lastcol = maxcol;
+  sheet.attribs.lastrow = maxrow;
+
+  var names = (normalizedSheet && normalizedSheet.names) || {};
+  var name: any;
+  for (name in names) {
+    if (!SocialCalc.IsValidNamedRangeName(name)) {
+      if (skipped) skipped.push("name:" + name);
+      continue;
+    }
+    if (typeof names[name] != "string" || names[name].length == 0) {
+      if (skipped) skipped.push("name:" + name);
+      continue;
+    }
+    sheet.names[name] = { desc: "", definition: names[name] };
+  }
+
+  return sheet.CreateSheetSave();
+};
+
+// result = SocialCalc.CreateSpreadsheetSaveFromNormalizedWorkbook(normalizedWorkbook)
+//
+// normalizedWorkbook: { sheets: normalizedSheet[] } (see
+// CreateSheetSaveFromNormalizedSheet above for the per-sheet shape).
+//
+// Returns an object { sheetNames: string[], sheetSaves: { [name: string]:
+// string } } -- one scsave string per input sheet, keyed by a de-duplicated
+// display name (informational; SocialCalc itself has no native concept of
+// a bundled multi-sheet document -- see AGENTS.md's cross-sheet formula
+// ("'Sheet1'!A1") LoadSheet-callback model). A host embedding multiple
+// sheets in one page/document assigns each returned save string to its own
+// SocialCalc.Sheet / SpreadsheetControl instance and wires cross-sheet
+// formula resolution through SocialCalc.Formula.SheetCache /
+// RecalcInfo.LoadSheet, keyed by these same sheetNames.
+// Empty/missing sheets array returns { sheetNames: [], sheetSaves: {} }.
+
+/** @param {any} normalizedWorkbook */
+SC.CreateSpreadsheetSaveFromNormalizedWorkbook = function (normalizedWorkbook: any): {
+  sheetNames: string[];
+  sheetSaves: { [name: string]: string };
+} {
+  var sheets = (normalizedWorkbook && normalizedWorkbook.sheets) || [];
+  var sheetNames: string[] = [];
+  var sheetSaves: { [name: string]: string } = {};
+  var used: { [name: string]: boolean } = {};
+
+  for (var i = 0; i < sheets.length; i++) {
+    var ns = sheets[i];
+    var baseName =
+      ns && typeof ns.name == "string" && ns.name.length > 0 ? ns.name : "Sheet" + (i + 1);
+    var name = baseName;
+    var suffix = 2;
+    while (used[name]) {
+      name = baseName + " (" + suffix + ")";
+      suffix++;
+    }
+    used[name] = true;
+    sheetNames.push(name);
+    sheetSaves[name] = SocialCalc.CreateSheetSaveFromNormalizedSheet(ns);
+  }
+
+  return { sheetNames: sheetNames, sheetSaves: sheetSaves };
+};
+
+// *************************************
+//
+// FODS (OpenDocument Flat XML Spreadsheet) export
+//
+// Standards-valid single-file OpenDocument Spreadsheet XML per the OASIS
+// ODF spreadsheet schema's flat form (ODF 1.2 permits either a zipped
+// package OR a single flat XML document -- no ZIP/deflate dependency is
+// needed for the flat form; see the LOC digital-formats registry entry for
+// ODS: https://www.loc.gov/preservation/digital/formats/fdd/fdd000439.shtml).
+// Formula translation targets the OpenFormula "of:" canonical form (cell
+// references as "[.A1]"/"[.A1:.B2]", ";" as the argument separator).
+//
+// *************************************
+
+// result = SocialCalc.XmlEscape(text)
+//
+// XML 1.0 text/attribute-content escaping: &, <, >, and ' and " (special_chars
+// only covers &<>" -- FODS also emits single-quoted formula/style attributes
+// in some contexts, so ' is escaped too for defense in depth even though the
+// current emitter only uses double-quoted attributes).
+
+/** @param {string} text */
+SC.XmlEscape = function (text: any): string {
+  var s = SocialCalc.special_chars(text + "");
+  return s.replace(/'/g, "&apos;");
+};
+
+// result = SocialCalc.TranslateFormulaToOpenFormula(formula)
+//
+// Best-effort translation of a SocialCalc formula body (no leading "=")
+// into the OpenFormula canonical form used by ODF's table:formula
+// attribute (prefixed "of:=" by the caller). Walks the shared formula
+// tokenizer's token stream (js/formula-parse.ts's ParseFormulaIntoTokens --
+// same lexer the evaluator uses, so this never diverges from what
+// SocialCalc itself parses) and re-emits:
+//   - a coord immediately followed by ":" then another coord -> combined
+//     into ONE bracketed range reference "[.A1:.B2]" (OpenFormula ranges
+//     are a single reference, not two references joined by ":");
+//   - a lone coord -> "[.A1]";
+//   - the "," argument separator -> ";" (OpenFormula's canonical
+//     separator; SocialCalc's own "," stays internal-only, never emitted);
+//   - string literals -> re-quoted with " and internal " doubled (same
+//     literal escaping both formats already use);
+//   - everything else (function names, numbers, other operators) passed
+//     through unchanged -- SocialCalc's function names already match their
+//     ODF/OpenFormula counterparts for the common set (SUM, IF, VLOOKUP,
+//     COUNT, AVERAGE, etc).
+// Sheet-qualified references (formulas containing "!") are NOT translated
+// (returned as an untranslated marker) -- OpenFormula's cross-sheet syntax
+// ("[$SheetName.A1]") differs enough from a token-substitution pass that a
+// wrong translation would be worse than an honest failure; the caller
+// falls back to exporting the cell's last-computed value only.
+
+/**
+ * @param {string} formula
+ * Intentional JS-boundary guard: TypeScript's `formula: string` signature
+ * is not enforced at runtime for host/EtherCalc callers invoking this
+ * public export directly from plain JavaScript. A non-string `formula`
+ * (null/undefined/object/etc.) throws inside ParseFormulaIntoTokens; that
+ * is caught here and reported as {ok:false} -- an honest translation
+ * failure -- rather than an uncaught exception propagating out of an
+ * export/import code path. Every STRING input, however malformed
+ * (unterminated quotes/parens, control characters, empty string, oversized
+ * exponents), is handled by the tokenizer without throwing.
+ */
+SC.TranslateFormulaToOpenFormula = function (formula: any): { ok: boolean; text: string } {
+  var scf = SocialCalc.Formula;
+  var tokentype = scf.TokenType;
+  var parseinfo: any;
+  try {
+    parseinfo = scf.ParseFormulaIntoTokens(formula);
+  } catch {
+    return { ok: false, text: "" };
+  }
+
+  var out = "";
+  var i: number;
+  for (i = 0; i < parseinfo.length; i++) {
+    var ttype = parseinfo[i].type;
+    var ttext = parseinfo[i].text;
+
+    if (ttype === tokentype.op && ttext === "!") {
+      return { ok: false, text: "" }; // sheet-qualified: not translated
+    }
+
+    if (ttype === tokentype.coord) {
+      var isRangeStart =
+        i + 2 < parseinfo.length &&
+        parseinfo[i + 1].type === tokentype.op &&
+        parseinfo[i + 1].text === ":" &&
+        parseinfo[i + 2].type === tokentype.coord;
+      var isRangeEnd =
+        i >= 2 &&
+        parseinfo[i - 1].type === tokentype.op &&
+        parseinfo[i - 1].text === ":" &&
+        parseinfo[i - 2].type === tokentype.coord;
+      if (isRangeStart) {
+        out += "[." + ttext + ":." + parseinfo[i + 2].text + "]";
+      } else if (isRangeEnd) {
+        // already emitted as part of the range-start branch above; skip
+      } else {
+        out += "[." + ttext + "]";
+      }
+      continue;
+    }
+
+    if (ttype === tokentype.op && ttext === ":") {
+      var prevIsCoord = i > 0 && parseinfo[i - 1].type === tokentype.coord;
+      var nextIsCoord = i + 1 < parseinfo.length && parseinfo[i + 1].type === tokentype.coord;
+      if (prevIsCoord && nextIsCoord) continue; // consumed by the range-start branch
+      out += ttext;
+      continue;
+    }
+
+    if (ttype === tokentype.op && ttext === ",") {
+      out += ";";
+      continue;
+    }
+
+    if (ttype === tokentype.string) {
+      out += '"' + ttext.replace(/"/g, '""') + '"';
+      continue;
+    }
+
+    out += ttext;
+  }
+
+  return { ok: true, text: out };
+};
+
+// result = SocialCalc.CreateFodsFromNormalizedWorkbook(normalizedWorkbook)
+//
+// Returns a complete, standards-valid ODF 1.2 flat-XML spreadsheet
+// document (application/vnd.oasis.opendocument.spreadsheet, flat form) as
+// a single string -- pure XML text assembly, no ZIP/deflate step. Encodes,
+// per input sheet: cell values (numbers, text, dates-as-numbers with a
+// generic numeric style), formulas (translated via
+// TranslateFormulaToOpenFormula when possible, else exported as a plain
+// value with no table:formula attribute -- a formula that cannot be
+// losslessly translated degrades to its last value rather than emitting
+// a broken formula string), bold/italic/alignment cell styles (deduped:
+// identical {bold,italic,align} combinations share one
+// <style:style> definition), and named ranges (as
+// <table:named-range> elements, one per NormalizedSheet.names entry,
+// base-cell-address/cell-range-address qualified against that sheet's own
+// name -- matching each normalized sheet's own local `names` map).
+
+/** @param {any} normalizedWorkbook */
+SC.CreateFodsFromNormalizedWorkbook = function (normalizedWorkbook: any): string {
+  var sheets = (normalizedWorkbook && normalizedWorkbook.sheets) || [];
+  var esc = SocialCalc.XmlEscape;
+
+  // Style table: dedup identical {bold,italic,align} combinations into one
+  // <style:style name="ceN"> definition, referenced by table:style-name.
+  var styleKeyToName: { [key: string]: string } = {};
+  var styleDefs: string[] = [];
+  var nextStyleId = 1;
+
+  /** @param {boolean} bold @param {boolean} italic @param {string} align */
+  function styleNameFor(bold: any, italic: any, align: any): string | null {
+    if (!bold && !italic && !align) return null;
+    var boldKey = bold ? "b" : "";
+    var italicKey = italic ? "i" : "";
+    var alignKey = align || "";
+    var key = boldKey + italicKey + alignKey;
+    if (styleKeyToName[key]) return styleKeyToName[key];
+    var name = "ce" + nextStyleId++;
+    styleKeyToName[key] = name;
+    var textProps = "";
+    if (bold || italic) {
+      var fontWeight = bold ? "bold" : "normal";
+      var fontStyle = italic ? "italic" : "normal";
+      textProps =
+        '<style:text-properties fo:font-weight="' +
+        fontWeight +
+        '" style:font-style="' +
+        fontStyle +
+        '"/>';
+    }
+    var cellProps = "";
+    if (align) {
+      cellProps = '<style:paragraph-properties fo:text-align="' + align + '"/>';
+    }
+    styleDefs.push(
+      '<style:style style:name="' +
+        name +
+        '" style:family="table-cell">' +
+        cellProps +
+        textProps +
+        "</style:style>",
+    );
+    return name;
+  }
+
+  var sheetXml: string[] = [];
+  var namedRangeXml: string[] = [];
+
+  for (var s = 0; s < sheets.length; s++) {
+    var ns = sheets[s];
+    var sheetName =
+      ns && typeof ns.name == "string" && ns.name.length > 0 ? ns.name : "Sheet" + (s + 1);
+
+    var cells = (ns && ns.cells) || {};
+    var coords: string[] = [];
+    for (var coord in cells) {
+      if (SocialCalc.IsValidNormalizedCellCoord(coord)) coords.push(coord);
+    }
+    coords.sort(function (a: string, b: string) {
+      var ca = SocialCalc.coordToCr(a);
+      var cb = SocialCalc.coordToCr(b);
+      return ca.row - cb.row || ca.col - cb.col;
+    });
+
+    var maxrow = 0;
+    var maxcol = 0;
+    var byRow: { [row: number]: { [col: number]: string } } = {};
+    for (var ci = 0; ci < coords.length; ci++) {
+      var cr = SocialCalc.coordToCr(coords[ci]);
+      if (cr.row > maxrow) maxrow = cr.row;
+      if (cr.col > maxcol) maxcol = cr.col;
+      if (!byRow[cr.row]) byRow[cr.row] = {};
+      byRow[cr.row][cr.col] = coords[ci];
+    }
+
+    var rowsXml = "";
+    for (var r = 1; r <= maxrow; r++) {
+      var rowCells = byRow[r];
+      if (!rowCells) rowCells = {};
+      var rowXml = "";
+      for (var c = 1; c <= maxcol; c++) {
+        var cellCoord = rowCells[c];
+        if (!cellCoord) {
+          rowXml += "<table:table-cell/>";
+          continue;
+        }
+        var ndata = cells[cellCoord];
+        var styleName = styleNameFor(ndata.bold, ndata.italic, ndata.align);
+        var styleAttr = styleName ? ' table:style-name="' + styleName + '"' : "";
+
+        if (typeof ndata.formula == "string" && ndata.formula.length > 0) {
+          // Formula cells cache their last-computed result the same way
+          // every real .fods writer does: office:value/office:value-type
+          // reflect the CACHED VALUE, not a live recalculation (ODF
+          // consumers use the cached value until they choose to recalc).
+          // ndata.value, when the caller supplies it alongside ndata.formula,
+          // is that cached result. Without a translatable formula AND
+          // without a supplied value there is nothing safe to cache, so the
+          // cell falls back to a string cell holding the raw formula text
+          // (prefixed "=") rather than silently dropping the cell's content.
+          var translated = SocialCalc.TranslateFormulaToOpenFormula(ndata.formula);
+          var hasCachedValue = typeof ndata.value == "number";
+          if (translated.ok) {
+            var formulaAttr = ' table:formula="of:=' + esc(translated.text) + '"';
+            if (hasCachedValue) {
+              rowXml +=
+                "<table:table-cell" +
+                formulaAttr +
+                ' office:value-type="float" office:value="' +
+                ndata.value +
+                '"' +
+                styleAttr +
+                "><text:p>" +
+                esc(ndata.value + "") +
+                "</text:p></table:table-cell>";
+            } else {
+              rowXml +=
+                "<table:table-cell" +
+                formulaAttr +
+                styleAttr +
+                "><text:p></text:p></table:table-cell>";
+            }
+          } else if (hasCachedValue) {
+            // untranslatable formula (e.g. sheet-qualified) but a cached
+            // value was supplied: export the value, no table:formula.
+            rowXml +=
+              '<table:table-cell office:value-type="float" office:value="' +
+              ndata.value +
+              '"' +
+              styleAttr +
+              "><text:p>" +
+              esc(ndata.value + "") +
+              "</text:p></table:table-cell>";
+          } else {
+            // nothing translatable and nothing cached: preserve content as
+            // the raw formula text rather than dropping the cell.
+            rowXml +=
+              '<table:table-cell office:value-type="string"' +
+              styleAttr +
+              "><text:p>" +
+              esc("=" + ndata.formula) +
+              "</text:p></table:table-cell>";
+          }
+        } else if (typeof ndata.value == "number") {
+          rowXml +=
+            '<table:table-cell office:value-type="float" office:value="' +
+            ndata.value +
+            '"' +
+            styleAttr +
+            ">" +
+            (typeof ndata.comment == "string" && ndata.comment.length > 0
+              ? "<office:annotation><text:p>" + esc(ndata.comment) + "</text:p></office:annotation>"
+              : "") +
+            "<text:p>" +
+            esc(ndata.value + "") +
+            "</text:p></table:table-cell>";
+        } else {
+          var textValue = ndata.value == null ? "" : ndata.value + "";
+          rowXml +=
+            '<table:table-cell office:value-type="string"' +
+            styleAttr +
+            ">" +
+            (typeof ndata.comment == "string" && ndata.comment.length > 0
+              ? "<office:annotation><text:p>" + esc(ndata.comment) + "</text:p></office:annotation>"
+              : "") +
+            "<text:p>" +
+            esc(textValue) +
+            "</text:p></table:table-cell>";
+        }
+      }
+      rowsXml += "<table:table-row>" + rowXml + "</table:table-row>";
+    }
+
+    sheetXml.push('<table:table table:name="' + esc(sheetName) + '">' + rowsXml + "</table:table>");
+
+    var names = (ns && ns.names) || {};
+    for (var name in names) {
+      if (!SocialCalc.IsValidNamedRangeName(name)) continue;
+      if (typeof names[name] != "string" || names[name].length == 0) continue;
+      var def = names[name];
+      var defParts = def.split(":");
+      // Every def part must be a valid, unqualified A1 coordinate
+      // (IsValidNormalizedCellCoord) -- a malformed definition (e.g. the
+      // empty-endpoint shape ":") must NOT emit a named range at all,
+      // rather than silently degrading into a malformed
+      // table:cell-range-address like "$Sheet.$:$Sheet.$" (empty column/row
+      // component -- not valid ODF, and inconsistent with
+      // table:base-cell-address's own "A1" fallback for the same input).
+      if (defParts.length > 2) continue;
+      var defPartsValid = true;
+      for (var dp = 0; dp < defParts.length; dp++) {
+        if (!SocialCalc.IsValidNormalizedCellCoord(defParts[dp])) defPartsValid = false;
+      }
+      if (!defPartsValid) continue;
+      // table:base-cell-address / table:cell-range-address use the ODF
+      // CellAddress/CellRangeAddress attribute-value grammar --
+      // "$SheetName.$Column$Row" (single) or
+      // "$SheetName.$Column$Row:$SheetName.$Column$Row" (range, sheet
+      // qualifier repeated on EACH endpoint) -- a DIFFERENT syntax from
+      // table:formula's bracketed OpenFormula reference ("[.A1:.B2]",
+      // single sheet qualifier). An earlier version used the bracketed
+      // form here (and, before that, a single non-repeated sheet
+      // qualifier); both confirmed wrong by round-tripping through real
+      // LibreOffice (26.2.4.2): the bracketed form was unparseable and
+      // silently degraded to the sentinel "$A$0" (row 0, an otherwise-
+      // impossible ODF address).
+      // Sheet names that are not a bare [A-Za-z_][A-Za-z0-9_]* identifier
+      // (e.g. containing a space) must be single-quoted per ODF's
+      // QuotedSheetName production, with an embedded "'" doubled.
+      // dollarize splits a coord that already passed
+      // IsValidNormalizedCellCoord above on the letter/digit boundary
+      // (the first digit index is always present for such a coord) and
+      // inserts "$" before the column-letter run and again before the
+      // digit run. No regex-match null check is needed: every input here
+      // is 1-2 uppercase A-Z letters followed by a no-leading-zero digit
+      // run, so the boundary scan always finds a digit, and there is no
+      // fallback branch.
+      /** @param {string} a1 */
+      function dollarize(a1: string): string {
+        var firstDigit = 0;
+        while (firstDigit < a1.length && a1.charCodeAt(firstDigit) < 48) firstDigit++;
+        while (firstDigit < a1.length && a1.charCodeAt(firstDigit) > 57) firstDigit++;
+        return "$" + a1.slice(0, firstDigit) + "$" + a1.slice(firstDigit);
+      }
+      var needsQuoting = !/^[A-Za-z_][A-Za-z0-9_]*$/.test(sheetName);
+      var quotedSheetName = needsQuoting
+        ? "'" + esc(sheetName).replace(/'/g, "''") + "'"
+        : esc(sheetName);
+      var sheetPrefix = "$" + quotedSheetName + ".";
+      var baseCell = sheetPrefix + dollarize(defParts[0]);
+      var rangeAddress =
+        defParts.length === 2
+          ? sheetPrefix + dollarize(defParts[0]) + ":" + sheetPrefix + dollarize(defParts[1])
+          : baseCell;
+      namedRangeXml.push(
+        '<table:named-range table:name="' +
+          esc(name) +
+          '" table:base-cell-address="' +
+          baseCell +
+          '" table:cell-range-address="' +
+          rangeAddress +
+          '"/>',
+      );
+    }
+  }
+
+  // ODF 1.2 office:spreadsheet content model places table:named-expressions
+  // (if present) AFTER every table:table element, alongside
+  // database-ranges/data-pilot-tables -- confirmed empirically against real
+  // LibreOffice (26.2.4.2): a document with named-expressions BEFORE its
+  // tables round-tripped through `soffice --headless --convert-to fods`
+  // re-emits it AFTER the tables, matching this order. Every
+  // table:named-range must be wrapped inside exactly one
+  // table:named-expressions container -- a bare table:named-range at the
+  // office:spreadsheet level is well-formed XML but schema-invalid ODF.
+  var namedExpressionsXml =
+    namedRangeXml.length > 0
+      ? "<table:named-expressions>" + namedRangeXml.join("") + "</table:named-expressions>"
+      : "";
+
+  return (
+    '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" ' +
+    'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" ' +
+    'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" ' +
+    'xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" ' +
+    'xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" ' +
+    'xmlns:of="urn:oasis:names:tc:opendocument:xmlns:of:1.2" ' +
+    'office:version="1.2" office:mimetype="application/vnd.oasis.opendocument.spreadsheet">' +
+    "<office:automatic-styles>" +
+    styleDefs.join("") +
+    "</office:automatic-styles>" +
+    "<office:body><office:spreadsheet>" +
+    sheetXml.join("") +
+    namedExpressionsXml +
+    "</office:spreadsheet></office:body>" +
+    "</office:document>"
+  );
 };

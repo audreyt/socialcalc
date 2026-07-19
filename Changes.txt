@@ -1,3 +1,69 @@
+==============================================================================
+Unreleased — interoperability improvements
+==============================================================================
+
+CSV/TSV import/export
+- UTF-8 BOM is now stripped from csv/tab/csv-eu import input (fixes corrupted
+  first cell on every Excel-exported UTF-8 CSV). Default csv/tab output is
+  byte-identical to prior behavior.
+- New "csv-eu" input format: ";" field delimiter + "," decimal point
+  (European/continental comma-decimal convention). Legacy "csv"/"tab" are
+  completely unaffected. Uses an explicit fixed-locale policy (NOT an
+  autodetecting tie-break) — under csv-eu, "," is always the decimal, "."
+  is always thousands grouping, never guessed from position. A comma-bearing
+  token that fails locale numeric parsing becomes text rather than silently
+  reinterpreted under US-locale comma-thousands rules.
+- New "csv-excel"/"tab-excel" output formats: BOM prefix + CRLF row
+  terminators for Windows/Excel-friendly export. Default "csv"/"tab" output
+  is byte-identical (no BOM, LF only).
+
+Normalized-workbook ingestion seam
+- `SC.CreateSheetSaveFromNormalizedSheet(normalizedSheet, skipped?)`: maps a
+  plain, already-parsed, TRUSTED structured JSON object into a SocialCalc
+  native scsave string using existing Sheet/cell/style primitives
+  (SetConvertedCell, GetStyleNum). No binary/zip/XML format parsing — this
+  is the seam a HOST-SUPPLIED external parser (XLSX/ODS reader in the host
+  adapter or EtherCalc server) targets. Skipped coord/name keys are
+  collected in the optional `skipped` array as "cell:B7"/"name:1BAD".
+- `SC.CreateSpreadsheetSaveFromNormalizedWorkbook(normalizedWorkbook)`: maps
+  multiple sheets at once, de-duplicating sheet names, returning one scsave
+  string per sheet keyed by display name.
+- Optional per-sheet `formulaSeparator: ";"` flag normalizes semicolon-
+  authored formula text to SocialCalc's native comma-separated syntax
+  BEFORE parsing — quote-aware, never touches the shared tokenizer/parser.
+  Documented hard precondition: decimal commas must already be "." before
+  calling with this flag (non-recoverable ambiguity documented in source).
+
+FODS (OpenDocument Flat XML Spreadsheet) export
+- `SC.CreateFodsFromNormalizedWorkbook(normalizedWorkbook)`: emits a
+  standards-valid ODF 1.2 flat-XML spreadsheet document (no ZIP/deflate
+  dependency). Encodes cell values (numbers, text), formulas (translated
+  to OpenFormula "of:" canonical form via the shared formula tokenizer:
+  cell refs → "[.A1]", ranges → "[.A1:.B2]", "," → ";"), cached formula
+  results (office:value), bold/italic/alignment cell styles (deduped via
+  <office:automatic-styles>), cell comments (office:annotation), and
+  named ranges (table:named-range with CellAddress/CellRangeAddress grammar).
+  Verified by real LibreOffice 26.2.4.2 `soffice --convert-to fods`
+  round-trip (formula, cached value, named-range address, and element order
+  all preserved). Sheet names requiring quoting are single-quoted per ODF
+  QuotedSheetName. Named-range definitions are validated (coord-shaped)
+  before emission; malformed defs are skipped rather than producing broken
+  cell-range-address values.
+
+Formal verification
+- Added `lemma/number-parse.ts` facade (5th LemmaScript module):
+  `groupingCharFor` (explicit-locale decimal/grouping classifier, NOT an
+  autodetecting tie-break), `isAsciiDigit`, `isNameChar`,
+  `normalizeNamedRangeName`, `isValidNamedRangeName`,
+  `isValidNormalizedCellCoord`, `replaceUnquotedChar` (quote-aware formula
+  separator normalization), `hasBom`/`stripBom`. 4 Dafny VCs verified
+  (groupingCharFor, isAsciiDigit, isNameChar); remaining functions are
+  runtime-locked (charAt loops unsupported by the Dafny backend, same
+  convention as lemma/lookup-result.ts's typeChar0/parsePipeRow). Lean
+  types/def/proof generated; `verify:dafny` and `verify:lean` pass. Total
+  Dafny VC count: 52 (was 48).
+
+
 Changes
 =======
 
