@@ -417,8 +417,11 @@ shipping bundle.
   manual/filter hide union, clear isolation (each axis independently
   owned), idempotent filter-recompute, and filter-data-band membership — 7
   Dafny VCs.
+- `lemma/xlookup.ts`: XMATCH/XLOOKUP match_mode/search_mode legality,
+  binary-search/wildcard incompatibility, exact-before-approximate-before-
+  miss outcome precedence, and if_not_found fallback — 7 Dafny VCs.
 
-Total: **94 VCs (26 + 5 + 3 + 15 + 29 + 3 + 3 + 3 + 7)**.
+Total: **101 VCs (26 + 5 + 3 + 15 + 29 + 3 + 3 + 3 + 7 + 7)**.
 
 After a facade edit:
 
@@ -475,6 +478,11 @@ Facade oracle mapping:
   facade against `RowEffectivelyHidden` over every manual/filter boolean
   combination and proves recompute-on-recalc converges without drift in the
   shipping runtime.
+- xlookup: shipping `Formula.DecodeXLookupModes` (mode legality/
+  compatibility) and the exact-before-approximate-before-miss precedence
+  wrapped by `Formula.ScanLookupVector`/`XMatchFunction`/`XLookupFunction`.
+  `test/lemma-xlookup-facade.test.ts` cross-checks mode acceptance and
+  outcome precedence against live `XMATCH()`/`XLOOKUP()` formula evaluation.
 
 ## Mutation testing
 

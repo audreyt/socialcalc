@@ -7,3 +7,4 @@ lemma/weekday-policy.ts
 lemma/finance-policy.ts
 lemma/statistics.ts
 lemma/visibility.ts
+lemma/xlookup.ts

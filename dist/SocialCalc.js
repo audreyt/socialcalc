@@ -747,6 +747,10 @@
     s_fdef_VARP: 'Returns the variance of the numeric values. ',
     s_fdef_VLOOKUP:
       'Look for the matching value for the given value in the range and return the corresponding value in the cell specified by the column offset. If rangelookup is 1 (the default) and not 0, match if within numeric brackets (match>=value) instead of exact match. ',
+    s_fdef_XMATCH:
+      'Returns the relative position (the first is 1) of lookup_value in lookup_array (a single row or column). match_mode: 0 exact (default), -1 exact or next smaller, 1 exact or next larger, 2 wildcard (*, ?, ~). search_mode: 1 first-to-last (default), -1 last-to-first, 2 binary ascending, -2 binary descending (assumes sorted; wildcard match_mode cannot combine with binary search_mode). Returns #N/A if not found. ',
+    s_fdef_XLOOKUP:
+      'Looks for lookup_value in lookup_array (a single row or column) and returns the corresponding entry from return_array at the matched position; if return_array is wider/taller than one row/column, the full corresponding row/column is returned. if_not_found is returned verbatim when no match is found (default #N/A). match_mode and search_mode behave as in XMATCH. ',
     s_fdef_WEEKDAY:
       'Returns the day of week specified by the date value. If type is 1 (the default), Sunday is day and Saturday is day 7. If type is 2, Monday is day 1 and Sunday is day 7. If type is 3, Monday is day 0 and Sunday is day 6. ',
     s_fdef_YEAR: 'Returns the year part of a date value. ',
@@ -825,6 +829,9 @@
     s_farg_hms: 'hour, minute, second',
     s_farg_txt: 'text',
     s_farg_vlookup: 'value, range, col, [rangelookup]',
+    s_farg_xmatch: 'lookup_value, lookup_array, [match_mode], [search_mode]',
+    s_farg_xlookup:
+      'lookup_value, lookup_array, return_array, [if_not_found], [match_mode], [search_mode]',
     s_farg_weekday: 'date, [type]',
     s_farg_dt: 'date',
     s_farg_rangen: 'range1, range2, ...',
@@ -16096,6 +16103,300 @@ More comments yet to come...
     '',
     'lookup',
   ];
+  FormulaMut.DecodeXLookupModes = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var PushOperand = function (t, v) {
+      operand.push({
+        type: t,
+        value: v,
+      });
+    };
+    var matchMode = 0,
+      searchMode = 1;
+    if (foperand.length) {
+      var m = scf.OperandAsNumber(sheet, foperand);
+      if (m.type.charAt(0) != 'n') {
+        PushOperand('e#VALUE!', 0);
+        return null;
+      }
+      matchMode = Math.floor(Number(m.value));
+      if (matchMode < -1 || matchMode > 2) {
+        scf.FunctionArgsError(fname, operand);
+        return null;
+      }
+    }
+    if (foperand.length) {
+      var s = scf.OperandAsNumber(sheet, foperand);
+      if (s.type.charAt(0) != 'n') {
+        PushOperand('e#VALUE!', 0);
+        return null;
+      }
+      searchMode = Math.floor(Number(s.value));
+      if (searchMode !== 1 && searchMode !== -1 && searchMode !== 2 && searchMode !== -2) {
+        scf.FunctionArgsError(fname, operand);
+        return null;
+      }
+    }
+    if ((searchMode === 2 || searchMode === -2) && matchMode === 2) {
+      scf.FunctionArgsError(fname, operand);
+      return null;
+    }
+    return {
+      matchMode,
+      searchMode,
+    };
+  };
+  FormulaMut.DecodeLookupVector = function (sheet, operandValue) {
+    var scf = SocialCalc.Formula;
+    var array = scf.MaterializeArray(sheet, operandValue);
+    if (!array) return null;
+    if (array.rows > 1 && array.cols > 1) return null;
+    var byColumn = array.cols == 1;
+    var length = byColumn ? array.rows : array.cols;
+    var cells = [];
+    for (var i = 0; i < length; i++) {
+      cells.push(byColumn ? array.cells[i][0] : array.cells[0][i]);
+    }
+    return {
+      cells,
+      length,
+      byColumn,
+      array,
+    };
+  };
+  FormulaMut.CompareLookupCell = function (lookupvalue, cell) {
+    var ctype = cell.type.charAt(0);
+    var cvalue = cell.value;
+    if (ctype == 'n') cvalue = cvalue - 0;
+    if (lookupvalue.type != ctype) return null;
+    if (ctype == 'n') {
+      var nv = lookupvalue.value;
+      return cvalue < nv ? -1 : cvalue > nv ? 1 : 0;
+    }
+    if (ctype == 't') {
+      var ctext = (cvalue + '').toLowerCase();
+      var tv = lookupvalue.value;
+      return ctext < tv ? -1 : ctext > tv ? 1 : 0;
+    }
+    return null;
+  };
+  FormulaMut.ScanLookupVector = function (lookupvalue, vector, matchMode, searchMode) {
+    var scf = SocialCalc.Formula;
+    var cells = vector.cells,
+      length = vector.length;
+    if (matchMode == 2) {
+      if (lookupvalue.type != 't') {
+        for (var w = 0; w < length; w++) {
+          var idxw = searchMode == -1 ? length - 1 - w : w;
+          var cw = cells[idxw];
+          if (cw.type.charAt(0) == lookupvalue.type && cw.value == lookupvalue.value) return idxw;
+        }
+        return -1;
+      }
+      var pattern = new RegExp(scf.WildcardPatternToRegex(lookupvalue.value));
+      for (var i = 0; i < length; i++) {
+        var idx = searchMode == -1 ? length - 1 - i : i;
+        var cell = cells[idx];
+        if (cell.type.charAt(0) != 't') continue;
+        var text = (cell.value + '').toLowerCase();
+        if (pattern.test(text)) return idx;
+      }
+      return -1;
+    }
+    if (searchMode == 2 || searchMode == -2) {
+      var lo = 0,
+        hi = length - 1,
+        exactIdx = -1,
+        boundaryIdx = -1;
+      while (lo <= hi) {
+        var mid = (lo + hi) >> 1;
+        var cmp = scf.CompareLookupCell(lookupvalue, cells[mid]);
+        if (cmp === null) {
+          if (searchMode == 2) hi = mid - 1;
+          else lo = mid + 1;
+          continue;
+        }
+        if (searchMode == -2) cmp = -cmp;
+        if (cmp === 0) {
+          exactIdx = mid;
+          break;
+        } else if (cmp < 0) {
+          if (matchMode == -1) boundaryIdx = mid;
+          lo = mid + 1;
+        } else {
+          if (matchMode == 1) boundaryIdx = mid;
+          hi = mid - 1;
+        }
+      }
+      if (exactIdx >= 0) return exactIdx;
+      if (matchMode == -1 || matchMode == 1) return boundaryIdx;
+      return -1;
+    }
+    var bestIdx = -1;
+    for (var k = 0; k < length; k++) {
+      var order = searchMode == -1 ? length - 1 - k : k;
+      var c = scf.CompareLookupCell(lookupvalue, cells[order]);
+      if (c === null) continue;
+      if (c === 0) return order;
+      if (matchMode == -1 && c < 0) {
+        if (
+          bestIdx < 0 ||
+          scf.CompareLookupCell(
+            {
+              type: lookupvalue.type,
+              value: cells[bestIdx].value,
+            },
+            cells[order],
+          ) > 0
+        ) {
+          bestIdx = order;
+        }
+      } else if (matchMode == 1 && c > 0) {
+        if (
+          bestIdx < 0 ||
+          scf.CompareLookupCell(
+            {
+              type: lookupvalue.type,
+              value: cells[bestIdx].value,
+            },
+            cells[order],
+          ) < 0
+        ) {
+          bestIdx = order;
+        }
+      }
+    }
+    return bestIdx;
+  };
+  FormulaMut.XMatchFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var PushOperand = function (t, v) {
+      operand.push({
+        type: t,
+        value: v,
+      });
+    };
+    var lookupvalue = scf.OperandValueAndType(sheet, foperand);
+    if (lookupvalue.type.charAt(0) == 'e') {
+      PushOperand(lookupvalue.type, 0);
+      return;
+    }
+    lookupvalue = {
+      type: lookupvalue.type.charAt(0),
+      value: lookupvalue.value,
+    };
+    if (lookupvalue.type == 'n') lookupvalue.value = lookupvalue.value - 0;
+    else if (lookupvalue.type == 't') lookupvalue.value = (lookupvalue.value + '').toLowerCase();
+    var arrayOperand = scf.TopOfStackValueAndType(sheet, foperand);
+    var modes = scf.DecodeXLookupModes(fname, operand, foperand, sheet);
+    if (!modes) return;
+    if (foperand.length) {
+      scf.FunctionArgsError(fname, operand);
+      return 0;
+    }
+    var vector = scf.DecodeLookupVector(sheet, arrayOperand);
+    if (!vector) {
+      scf.FunctionArgsError(fname, operand);
+      return 0;
+    }
+    var idx = scf.ScanLookupVector(lookupvalue, vector, modes.matchMode, modes.searchMode);
+    if (idx < 0) {
+      PushOperand('e#N/A', 0);
+      return;
+    }
+    PushOperand('n', idx + 1);
+  };
+  SocialCalc.Formula.FunctionList['XMATCH'] = [
+    SocialCalc.Formula.XMatchFunction,
+    -2,
+    'xmatch',
+    '',
+    'lookup',
+  ];
+  FormulaMut.XLookupFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var PushOperand = function (t, v) {
+      operand.push({
+        type: t,
+        value: v,
+      });
+    };
+    var lookupvalue = scf.OperandValueAndType(sheet, foperand);
+    if (lookupvalue.type.charAt(0) == 'e') {
+      PushOperand(lookupvalue.type, 0);
+      return;
+    }
+    lookupvalue = {
+      type: lookupvalue.type.charAt(0),
+      value: lookupvalue.value,
+    };
+    if (lookupvalue.type == 'n') lookupvalue.value = lookupvalue.value - 0;
+    else if (lookupvalue.type == 't') lookupvalue.value = (lookupvalue.value + '').toLowerCase();
+    var lookupArrayOperand = scf.TopOfStackValueAndType(sheet, foperand);
+    var returnArrayOperand = scf.TopOfStackValueAndType(sheet, foperand);
+    var haveIfNotFound = false,
+      ifNotFound = null;
+    if (foperand.length) {
+      ifNotFound = scf.TopOfStackValueAndType(sheet, foperand);
+      haveIfNotFound = true;
+    }
+    var modes = scf.DecodeXLookupModes(fname, operand, foperand, sheet);
+    if (!modes) return;
+    if (foperand.length) {
+      scf.FunctionArgsError(fname, operand);
+      return 0;
+    }
+    var lookupVector = scf.DecodeLookupVector(sheet, lookupArrayOperand);
+    if (!lookupVector) {
+      scf.FunctionArgsError(fname, operand);
+      return 0;
+    }
+    var returnArray = scf.MaterializeArray(sheet, returnArrayOperand);
+    if (!returnArray) {
+      scf.FunctionArgsError(fname, operand);
+      return 0;
+    }
+    var returnAxisLength = lookupVector.byColumn ? returnArray.rows : returnArray.cols;
+    if (returnAxisLength != lookupVector.length) {
+      scf.FunctionArgsError(fname, operand);
+      return 0;
+    }
+    var idx = scf.ScanLookupVector(lookupvalue, lookupVector, modes.matchMode, modes.searchMode);
+    if (idx < 0) {
+      if (haveIfNotFound) {
+        PushOperand(ifNotFound.type, ifNotFound.value);
+      } else {
+        PushOperand('e#N/A', 0);
+      }
+      return;
+    }
+    var crossExtent = lookupVector.byColumn ? returnArray.cols : returnArray.rows;
+    if (crossExtent == 1) {
+      var scalar = lookupVector.byColumn ? returnArray.cells[idx][0] : returnArray.cells[0][idx];
+      PushOperand(scalar.type, scalar.value);
+      return;
+    }
+    var outCells = lookupVector.byColumn
+      ? [returnArray.cells[idx].slice()]
+      : returnArray.cells.map(function (row) {
+          return [row[idx]];
+        });
+    operand.push({
+      type: 'array',
+      value: {
+        rows: lookupVector.byColumn ? 1 : returnArray.rows,
+        cols: lookupVector.byColumn ? returnArray.cols : 1,
+        cells: outCells,
+      },
+    });
+  };
+  SocialCalc.Formula.FunctionList['XLOOKUP'] = [
+    SocialCalc.Formula.XLookupFunction,
+    -3,
+    'xlookup',
+    '',
+    'lookup',
+  ];
   FormulaMut.IndexFunction = function (fname, operand, foperand, sheet) {
     var range, sheetname, indexinfo, rowindex, colindex, result, resulttype;
     var scf = SocialCalc.Formula;
@@ -20494,6 +20795,19 @@ More comments yet to come...
     }
     return result;
   };
+  FormulaMut.WildcardPatternToRegex = function (pattern) {
+    if (pattern == '*') {
+      return '^.+$';
+    }
+    var basestring = pattern.split('').reverse().join('');
+    basestring = basestring
+      .replace(/\?(?=[^~])|\?$/g, '?.')
+      .replace(/\?~/g, '?\\')
+      .replace(/\*(?=[^~])|\*$/g, '*.')
+      .replace(/\*~/, '*\\');
+    basestring = basestring.split('').reverse().join('');
+    return '^' + basestring + '$';
+  };
   FormulaMut.TestCriteria = function (value, type, criteria) {
     var comparitor, basestring, basevalue, cond, testvalue;
     if (criteria == null) {
@@ -20514,18 +20828,7 @@ More comments yet to come...
       } else {
         if (criteria.search(/([^~]\*|^\*)/) != -1 || criteria.search(/([^~]\?|^\?)/) != -1) {
           comparitor = 'regex';
-          if (criteria == '*') {
-            basestring = '.+';
-          } else {
-            basestring = criteria.split('').reverse().join('');
-            basestring = basestring
-              .replace(/\?(?=[^~])|\?$/g, '?.')
-              .replace(/\?~/g, '?\\')
-              .replace(/\*(?=[^~])|\*$/g, '*.')
-              .replace(/\*~/, '*\\');
-            basestring = basestring.split('').reverse().join('');
-          }
-          basestring = '^' + basestring + '$';
+          basestring = SocialCalc.Formula.WildcardPatternToRegex(criteria);
         } else {
           comparitor = 'none';
           basestring = criteria;

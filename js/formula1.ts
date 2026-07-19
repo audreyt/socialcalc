@@ -3825,6 +3825,407 @@ SocialCalc.Formula.FunctionList["VLOOKUP"] = [
 
 /*
 #
+# XMATCH(lookup_value, lookup_array, [match_mode], [search_mode])
+# XLOOKUP(lookup_value, lookup_array, return_array, [if_not_found], [match_mode], [search_mode])
+#
+# Modern lookup pair, Excel/Google Sheets cross-compatible.
+#
+# match_mode: 0 exact (default), -1 exact-or-next-smaller, 1 exact-or-next-larger, 2 wildcard.
+# search_mode: 1 first-to-last (default), -1 last-to-first, 2 binary ascending, -2 binary descending.
+#
+# Binary search_mode (2/-2) requires match_mode 0/-1/1 (never combined with
+# wildcard match_mode 2); an incompatible or out-of-range mode combination
+# is rejected with #VALUE! per FunctionArgsError, matching the established
+# SocialCalc policy of #VALUE! for malformed function arguments (see
+# LookupFunctions' rangelookup handling above). A genuine two-dimensional
+# lookup_array (nrows>1 and ncols>1) and, for XLOOKUP, a return_array whose
+# lookup-axis length does not match lookup_array's are both shape errors and
+# also reported as #VALUE!, again matching FunctionArgsError precedent
+# rather than inventing a new error family. Absence of a match yields #N/A
+# (or the caller's if_not_found for XLOOKUP), consistent with MATCH/VLOOKUP.
+#
+*/
+
+/**
+ * Validate and normalize the [match_mode] / [search_mode] optional args
+ * shared by XMATCH and XLOOKUP. Returns null and pushes #VALUE! on any
+ * invalid/incompatible combination; otherwise returns the normalized pair.
+ *
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.DecodeXLookupModes = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+  var PushOperand = function (t: any, v: any) {
+    operand.push({ type: t, value: v });
+  };
+  var matchMode = 0,
+    searchMode = 1;
+  if (foperand.length) {
+    var m = scf.OperandAsNumber(sheet, foperand);
+    if (m.type.charAt(0) != "n") {
+      PushOperand("e#VALUE!", 0);
+      return null;
+    }
+    matchMode = Math.floor(Number(m.value));
+    if (matchMode < -1 || matchMode > 2) {
+      scf.FunctionArgsError(fname, operand);
+      return null;
+    }
+  }
+  if (foperand.length) {
+    var s = scf.OperandAsNumber(sheet, foperand);
+    if (s.type.charAt(0) != "n") {
+      PushOperand("e#VALUE!", 0);
+      return null;
+    }
+    searchMode = Math.floor(Number(s.value));
+    if (searchMode !== 1 && searchMode !== -1 && searchMode !== 2 && searchMode !== -2) {
+      scf.FunctionArgsError(fname, operand);
+      return null;
+    }
+  }
+  if ((searchMode === 2 || searchMode === -2) && matchMode === 2) {
+    // Binary search assumes sorted order; wildcard scanning is not a sorted
+    // comparison, so Excel/Sheets never combine the two.
+    scf.FunctionArgsError(fname, operand);
+    return null;
+  }
+  return { matchMode: matchMode, searchMode: searchMode };
+};
+
+/**
+ * Decode a single 1-D lookup_array/return_array argument to a flat list of
+ * {value, type} cells plus its length, reusing DecodeRangeParts/MaterializeArray
+ * conventions. Returns null (2D shape) or the decoded vector.
+ *
+ * @param {any} sheet
+ * @param {any} operandValue
+ */
+FormulaMut.DecodeLookupVector = function (sheet, operandValue) {
+  var scf = SocialCalc.Formula;
+  var array = scf.MaterializeArray(sheet, operandValue);
+  if (!array) return null;
+  if (array.rows > 1 && array.cols > 1) return null; // must be a single row or column
+  var byColumn = array.cols == 1; // vertical vector (or 1x1): walk down rows
+  var length = byColumn ? array.rows : array.cols;
+  var cells: SocialCalc.FormulaArrayCell[] = [];
+  for (var i = 0; i < length; i++) {
+    cells.push(byColumn ? array.cells[i]![0]! : array.cells[0]![i]!);
+  }
+  return { cells: cells, length: length, byColumn: byColumn, array: array };
+};
+
+/**
+ * Compare a lookup cell's typed value against lookupvalue using the
+ * lowercased-text / numeric General type rules shared with LookupFunctions.
+ * Returns -1/0/1 (only well-defined when both sides are the same general
+ * type; NaN-equivalent "incomparable" is signalled by returning null).
+ *
+ * @param {any} lookupvalue normalized {type, value} (type is single-char; text already lowercased)
+ * @param {any} cell {type, value}
+ */
+FormulaMut.CompareLookupCell = function (lookupvalue, cell) {
+  var ctype = cell.type.charAt(0); // Cell always carries a valuetype ("b" default; never falsy)
+  var cvalue = cell.value;
+  if (ctype == "n") cvalue = (cvalue as any) - 0;
+  if (lookupvalue.type != ctype) return null;
+  if (ctype == "n") {
+    var nv = lookupvalue.value as number;
+    return (cvalue as number) < nv ? -1 : (cvalue as number) > nv ? 1 : 0;
+  }
+  if (ctype == "t") {
+    var ctext = ((cvalue as any) + "").toLowerCase();
+    var tv = lookupvalue.value as string;
+    return ctext < tv ? -1 : ctext > tv ? 1 : 0;
+  }
+  return null; // errors/blanks never approximate-compare
+};
+
+/**
+ * Scan a decoded lookup vector for XMATCH/XLOOKUP's chosen match_mode /
+ * search_mode, returning the 0-based index of the winning cell or -1.
+ *
+ * @param {any} lookupvalue normalized {type, value}
+ * @param {any} vector {cells, length}
+ * @param {number} matchMode
+ * @param {number} searchMode
+ */
+FormulaMut.ScanLookupVector = function (lookupvalue, vector, matchMode, searchMode) {
+  var scf = SocialCalc.Formula;
+  var cells = vector.cells,
+    length = vector.length;
+
+  if (matchMode == 2) {
+    // Wildcard: only text lookup values can carry a pattern; scan first-to-last
+    // or last-to-first (never binary -- rejected earlier by DecodeXLookupModes).
+    if (lookupvalue.type != "t") {
+      for (var w = 0; w < length; w++) {
+        var idxw = searchMode == -1 ? length - 1 - w : w;
+        var cw = cells[idxw]!;
+        // Cells reaching here always carry a type from MaterializeArray's
+        // Cell-constructor default ("b" for absent), never a falsy value.
+        if (cw.type.charAt(0) == lookupvalue.type && cw.value == lookupvalue.value) return idxw;
+      }
+      return -1;
+    }
+    var pattern = new RegExp(scf.WildcardPatternToRegex(lookupvalue.value as string));
+    for (var i = 0; i < length; i++) {
+      var idx = searchMode == -1 ? length - 1 - i : i;
+      var cell = cells[idx]!;
+      if (cell.type.charAt(0) != "t") continue;
+      var text = ((cell.value as any) + "").toLowerCase();
+      if (pattern.test(text)) return idx;
+    }
+    return -1;
+  }
+
+  if (searchMode == 2 || searchMode == -2) {
+    // Binary search: assumes lookup_array is sorted ascending (2) or
+    // descending (-2). Standard binary search producing the exact index,
+    // or (for approximate modes) the insertion boundary's neighbor.
+    var lo = 0,
+      hi = length - 1,
+      exactIdx = -1,
+      boundaryIdx = -1; // last-seen index on the "acceptable" side while narrowing
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      var cmp = scf.CompareLookupCell(lookupvalue, cells[mid]);
+      if (cmp === null) {
+        // Incomparable (type mismatch/error/blank): treat as past the target
+        // in ascending order, before it in descending, so it never masks a
+        // real match; nudge the search away from it.
+        if (searchMode == 2) hi = mid - 1;
+        else lo = mid + 1;
+        continue;
+      }
+      if (searchMode == -2) cmp = -cmp; // descending: invert comparison direction
+      if (cmp === 0) {
+        exactIdx = mid;
+        break;
+      } else if (cmp < 0) {
+        // cells[mid] < lookupvalue in the effective ascending sense
+        if (matchMode == -1) boundaryIdx = mid; // candidate "next smaller"
+        lo = mid + 1;
+      } else {
+        if (matchMode == 1) boundaryIdx = mid; // candidate "next larger"
+        hi = mid - 1;
+      }
+    }
+    if (exactIdx >= 0) return exactIdx;
+    if (matchMode == -1 || matchMode == 1) return boundaryIdx;
+    return -1;
+  }
+
+  // Linear search_mode 1/-1, match_mode 0 (exact) or -1/1 (approximate).
+  // Approximate modes scan the whole vector for the true closest
+  // smaller/larger qualifying value (no sortedness assumed), mirroring
+  // XMATCH's documented independence from legacy MATCH's sorted-bracket scan.
+  // CompareLookupCell only reports sign, so "closest" candidates are
+  // resolved by comparing each new qualifying cell against the current best
+  // candidate directly (not by comparing signs against lookupvalue).
+  var bestIdx = -1;
+  for (var k = 0; k < length; k++) {
+    var order = searchMode == -1 ? length - 1 - k : k;
+    var c = scf.CompareLookupCell(lookupvalue, cells[order]);
+    if (c === null) continue;
+    if (c === 0) return order; // exact match always wins immediately
+    if (matchMode == -1 && c < 0) {
+      // cells[order] < lookupvalue: candidate "next smaller"; prefer the
+      // largest such value seen (closest from below). bestIdx, once set,
+      // always points at a cell of lookupvalue's own type (it was recorded
+      // under this same c<0/c>0 guard), so re-comparing it against another
+      // cell of that type can never be incomparable -- only `bestIdx < 0`
+      // (no candidate yet) needs checking before comparing.
+      if (
+        bestIdx < 0 ||
+        scf.CompareLookupCell(
+          { type: lookupvalue.type, value: cells[bestIdx]!.value },
+          cells[order],
+        )! > 0
+      ) {
+        bestIdx = order;
+      }
+    } else if (matchMode == 1 && c > 0) {
+      // cells[order] > lookupvalue: candidate "next larger"; prefer the
+      // smallest such value seen (closest from above). Same bestIdx-type
+      // invariant as the next-smaller branch above.
+      if (
+        bestIdx < 0 ||
+        scf.CompareLookupCell(
+          { type: lookupvalue.type, value: cells[bestIdx]!.value },
+          cells[order],
+        )! < 0
+      ) {
+        bestIdx = order;
+      }
+    }
+  }
+  return bestIdx;
+};
+
+/**
+ * XMATCH(lookup_value, lookup_array, [match_mode], [search_mode])
+ *
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.XMatchFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+  var PushOperand = function (t: any, v: any) {
+    operand.push({ type: t, value: v });
+  };
+
+  var lookupvalue = scf.OperandValueAndType(sheet, foperand);
+  if (lookupvalue.type.charAt(0) == "e") {
+    PushOperand(lookupvalue.type, 0);
+    return;
+  }
+  lookupvalue = { type: lookupvalue.type.charAt(0), value: lookupvalue.value };
+  if (lookupvalue.type == "n") lookupvalue.value = (lookupvalue.value as any) - 0;
+  else if (lookupvalue.type == "t")
+    lookupvalue.value = ((lookupvalue.value as any) + "").toLowerCase();
+
+  var arrayOperand = scf.TopOfStackValueAndType(sheet, foperand);
+  var modes = scf.DecodeXLookupModes(fname, operand, foperand, sheet);
+  if (!modes) return;
+  if (foperand.length) {
+    scf.FunctionArgsError(fname, operand);
+    return 0;
+  }
+
+  var vector = scf.DecodeLookupVector(sheet, arrayOperand);
+  if (!vector) {
+    scf.FunctionArgsError(fname, operand);
+    return 0;
+  }
+
+  var idx = scf.ScanLookupVector(lookupvalue, vector, modes.matchMode, modes.searchMode);
+  if (idx < 0) {
+    PushOperand("e#N/A", 0);
+    return;
+  }
+  PushOperand("n", idx + 1);
+};
+
+SocialCalc.Formula.FunctionList["XMATCH"] = [
+  SocialCalc.Formula.XMatchFunction,
+  -2,
+  "xmatch",
+  "",
+  "lookup",
+];
+
+/**
+ * XLOOKUP(lookup_value, lookup_array, return_array, [if_not_found], [match_mode], [search_mode])
+ *
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.XLookupFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+  var PushOperand = function (t: any, v: any) {
+    operand.push({ type: t, value: v });
+  };
+
+  var lookupvalue = scf.OperandValueAndType(sheet, foperand);
+  if (lookupvalue.type.charAt(0) == "e") {
+    PushOperand(lookupvalue.type, 0);
+    return;
+  }
+  lookupvalue = { type: lookupvalue.type.charAt(0), value: lookupvalue.value };
+  if (lookupvalue.type == "n") lookupvalue.value = (lookupvalue.value as any) - 0;
+  else if (lookupvalue.type == "t")
+    lookupvalue.value = ((lookupvalue.value as any) + "").toLowerCase();
+
+  var lookupArrayOperand = scf.TopOfStackValueAndType(sheet, foperand);
+  var returnArrayOperand = scf.TopOfStackValueAndType(sheet, foperand);
+
+  var haveIfNotFound = false,
+    ifNotFound: any = null;
+  if (foperand.length) {
+    // if_not_found is taken verbatim (any type, including errors/text/numbers);
+    // it is only consumed on a no-match outcome, never evaluated otherwise.
+    ifNotFound = scf.TopOfStackValueAndType(sheet, foperand);
+    haveIfNotFound = true;
+  }
+  var modes = scf.DecodeXLookupModes(fname, operand, foperand, sheet);
+  if (!modes) return;
+  if (foperand.length) {
+    scf.FunctionArgsError(fname, operand);
+    return 0;
+  }
+
+  var lookupVector = scf.DecodeLookupVector(sheet, lookupArrayOperand);
+  if (!lookupVector) {
+    scf.FunctionArgsError(fname, operand);
+    return 0;
+  }
+  var returnArray = scf.MaterializeArray(sheet, returnArrayOperand);
+  if (!returnArray) {
+    scf.FunctionArgsError(fname, operand);
+    return 0;
+  }
+  // return_array's extent along the lookup axis must match lookup_array's
+  // length; its cross-axis extent is free (spills a full row/column of
+  // results), matching XLOOKUP's row-or-column result semantics.
+  var returnAxisLength = lookupVector.byColumn ? returnArray.rows : returnArray.cols;
+  if (returnAxisLength != lookupVector.length) {
+    scf.FunctionArgsError(fname, operand);
+    return 0;
+  }
+
+  var idx = scf.ScanLookupVector(lookupvalue, lookupVector, modes.matchMode, modes.searchMode);
+  if (idx < 0) {
+    if (haveIfNotFound) {
+      PushOperand(ifNotFound.type, ifNotFound.value);
+    } else {
+      PushOperand("e#N/A", 0);
+    }
+    return;
+  }
+
+  var crossExtent = lookupVector.byColumn ? returnArray.cols : returnArray.rows;
+  if (crossExtent == 1) {
+    // Scalar return: the single cell at idx along the lookup axis.
+    var scalar = lookupVector.byColumn ? returnArray.cells[idx]![0]! : returnArray.cells[0]![idx]!;
+    PushOperand(scalar.type, scalar.value);
+    return;
+  }
+  // 2-D return: the full cross-axis row/column at idx, spilling through the
+  // existing dynamic-array pipeline (MaterializeArray/DynamicArrayFunctions
+  // convention: push a typed {rows, cols, cells} array value).
+  var outCells: SocialCalc.FormulaArrayCell[][] = lookupVector.byColumn
+    ? [returnArray.cells[idx]!.slice()]
+    : returnArray.cells.map(function (row) {
+        return [row[idx]!];
+      });
+  operand.push({
+    type: "array",
+    value: {
+      rows: lookupVector.byColumn ? 1 : returnArray.rows,
+      cols: lookupVector.byColumn ? returnArray.cols : 1,
+      cells: outCells,
+    },
+  });
+};
+
+SocialCalc.Formula.FunctionList["XLOOKUP"] = [
+  SocialCalc.Formula.XLookupFunction,
+  -3,
+  "xlookup",
+  "",
+  "lookup",
+];
+
+/*
+#
 # INDEX(range, rownum, colnum)
 #
 */
@@ -9826,6 +10227,33 @@ FormulaMut.OrderRangeParts = function (coord1: string, coord2: string) {
 // Returns true or false
 //
 
+//
+// SocialCalc.Formula.WildcardPatternToRegex(pattern)
+//
+// Converts an Excel/Sheets-style wildcard criteria string to an anchored
+// regex source string. * matches any sequence, ? matches one character,
+// ~ escapes a literal following *, ?, or ~. Shared by TestCriteria
+// (COUNTIF/SUMIF/D* criteria) and the XMATCH/XLOOKUP match_mode=2 scan.
+//
+
+/** @param {string} pattern */
+FormulaMut.WildcardPatternToRegex = function (pattern) {
+  if (pattern == "*") {
+    // "*" means cell contains 'anything'
+    return "^.+$";
+  }
+  // convert Excel syntax to regex syntax. * -> .*    ? -> .?    ~* -> \*    ~? -> \?
+  // there are no negative lookbehinds in Javascript. Reverse the string and do negative lookaheads on ~? and ~*
+  var basestring = pattern.split("").reverse().join("");
+  basestring = basestring
+    .replace(/\?(?=[^~])|\?$/g, "?.")
+    .replace(/\?~/g, "?\\")
+    .replace(/\*(?=[^~])|\*$/g, "*.")
+    .replace(/\*~/, "*\\");
+  basestring = basestring.split("").reverse().join("");
+  return "^" + basestring + "$";
+};
+
 /**
  * @param {any} value
  * @param {any} type
@@ -9858,21 +10286,7 @@ FormulaMut.TestCriteria = function (value, type, criteria) {
       // check for '*' or '?' in search string - wildcard
       if (criteria.search(/([^~]\*|^\*)/) != -1 || criteria.search(/([^~]\?|^\?)/) != -1) {
         comparitor = "regex";
-        if (criteria == "*") {
-          // "*" means cell contains 'anything'
-          basestring = ".+";
-        } else {
-          // convert Excel syntax to regex syntax. * -> .*    ? -> .?    ~* -> \*    ~? -> \?
-          // there are no negative lookbehinds in Javascript. Reverse the string and do negative lookaheads on ~? and ~*
-          basestring = criteria.split("").reverse().join("");
-          basestring = basestring
-            .replace(/\?(?=[^~])|\?$/g, "?.")
-            .replace(/\?~/g, "?\\")
-            .replace(/\*(?=[^~])|\*$/g, "*.")
-            .replace(/\*~/, "*\\");
-          basestring = basestring.split("").reverse().join("");
-        }
-        basestring = "^" + basestring + "$";
+        basestring = SocialCalc.Formula.WildcardPatternToRegex(criteria);
       } else {
         comparitor = "none";
         basestring = criteria;

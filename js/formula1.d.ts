@@ -429,6 +429,48 @@ declare namespace SocialCalc {
       fieldtype: FormulaOperandType,
     ): number;
     const LookupFunctions: FormulaFunctionImpl;
+
+    /** Normalized {type, value} pair: single-char general type ("n"/"t"/"b"/"e..."), text lowercased. */
+    interface NormalizedLookupValue {
+      type: FormulaOperandType;
+      value: unknown;
+    }
+    interface XLookupModes {
+      matchMode: number;
+      searchMode: number;
+    }
+    interface DecodedLookupVector {
+      cells: FormulaArrayCell[];
+      length: number;
+      byColumn: boolean;
+      array: FormulaArrayValue;
+    }
+    /** Validates/normalizes shared [match_mode]/[search_mode] XMATCH/XLOOKUP args; pushes #VALUE! and returns null on any invalid/incompatible combination. */
+    function DecodeXLookupModes(
+      fname: string,
+      operand: FormulaOperand[],
+      foperand: FormulaOperand[],
+      sheet: Sheet,
+    ): XLookupModes | null;
+    /** Decodes a 1-D lookup_array/return_array operand to a flat cell vector; null on a genuine 2-D shape. */
+    function DecodeLookupVector(
+      sheet: Sheet,
+      operandValue: FormulaValueResult,
+    ): DecodedLookupVector | null;
+    /** -1/0/1 ordering of a lookup cell against a normalized lookup value; null when not comparable (type mismatch/error/blank). */
+    function CompareLookupCell(
+      lookupvalue: NormalizedLookupValue,
+      cell: FormulaArrayCell,
+    ): number | null;
+    /** Scans a decoded lookup vector per match_mode/search_mode; 0-based winning index or -1. */
+    function ScanLookupVector(
+      lookupvalue: NormalizedLookupValue,
+      vector: DecodedLookupVector,
+      matchMode: number,
+      searchMode: number,
+    ): number;
+    const XMatchFunction: FormulaFunctionImpl;
+    const XLookupFunction: FormulaFunctionImpl;
     const IndexFunction: FormulaFunctionImpl;
     const CountifSumifFunctions: FormulaFunctionImpl;
     const SumifsFunction: FormulaFunctionImpl;
@@ -566,6 +608,8 @@ declare namespace SocialCalc {
      */
     function OrderRangeParts(coord1: string, coord2: string): FormulaRangeParts;
     function TestCriteria(value: any, type: FormulaOperandType, criteria: any): boolean;
+    /** Converts an Excel/Sheets wildcard criteria string to an anchored regex source. */
+    function WildcardPatternToRegex(pattern: string): string;
   }
 
   namespace TriggerIoAction {

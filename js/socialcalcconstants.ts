@@ -922,6 +922,10 @@ ConstantsRoot.Constants = {
   s_fdef_VARP: "Returns the variance of the numeric values. ",
   s_fdef_VLOOKUP:
     "Look for the matching value for the given value in the range and return the corresponding value in the cell specified by the column offset. If rangelookup is 1 (the default) and not 0, match if within numeric brackets (match>=value) instead of exact match. ",
+  s_fdef_XMATCH:
+    "Returns the relative position (the first is 1) of lookup_value in lookup_array (a single row or column). match_mode: 0 exact (default), -1 exact or next smaller, 1 exact or next larger, 2 wildcard (*, ?, ~). search_mode: 1 first-to-last (default), -1 last-to-first, 2 binary ascending, -2 binary descending (assumes sorted; wildcard match_mode cannot combine with binary search_mode). Returns #N/A if not found. ",
+  s_fdef_XLOOKUP:
+    "Looks for lookup_value in lookup_array (a single row or column) and returns the corresponding entry from return_array at the matched position; if return_array is wider/taller than one row/column, the full corresponding row/column is returned. if_not_found is returned verbatim when no match is found (default #N/A). match_mode and search_mode behave as in XMATCH. ",
   s_fdef_WEEKDAY:
     "Returns the day of week specified by the date value. If type is 1 (the default), Sunday is day and Saturday is day 7. If type is 2, Monday is day 1 and Sunday is day 7. If type is 3, Monday is day 0 and Sunday is day 6. ",
   s_fdef_YEAR: "Returns the year part of a date value. ",
@@ -1001,6 +1005,9 @@ ConstantsRoot.Constants = {
   s_farg_hms: "hour, minute, second",
   s_farg_txt: "text",
   s_farg_vlookup: "value, range, col, [rangelookup]",
+  s_farg_xmatch: "lookup_value, lookup_array, [match_mode], [search_mode]",
+  s_farg_xlookup:
+    "lookup_value, lookup_array, return_array, [if_not_found], [match_mode], [search_mode]",
   s_farg_weekday: "date, [type]",
   s_farg_dt: "date",
   s_farg_rangen: "range1, range2, ...",
