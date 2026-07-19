@@ -5,8 +5,9 @@ Generated for the `harden/secure-rendering` opt-in security policy
 This is a complete enumeration of every `innerHTML =` assignment and every
 `href`/`src` attribute-value construction site across
 `js/socialcalc-3.ts`, `js/socialcalcpopup.ts`,
-`js/socialcalcspreadsheetcontrol.ts`, `js/socialcalctableeditor.ts`, and
-`js/socialcalcviewer.ts`, classified by the origin of the data that reaches
+`js/socialcalcspreadsheetcontrol.ts`, `js/socialcalctableeditor.ts`,
+`js/socialcalcviewer.ts`, and `js/chart.ts`, classified by the origin of
+the data that reaches
 the sink, with the applied mitigation (if any) and the test that exercises
 it.
 
@@ -31,7 +32,7 @@ A sink needs protection only if it is `sheet-derived` or consumes a
 
 | Category                                                                                                                                                                                         | Count                                                                                                                                                                                                                                                                 |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Total `innerHTML =` assignment sites (grep-verified: `socialcalc-3.ts` 5, `socialcalcpopup.ts` 12, `socialcalcspreadsheetcontrol.ts` 15, `socialcalctableeditor.ts` 19, `socialcalcviewer.ts` 1) | 52                                                                                                                                                                                                                                                                    |
+| Total `innerHTML =` assignment sites (grep-verified: `socialcalc-3.ts` 5, `socialcalcpopup.ts` 12, `socialcalcspreadsheetcontrol.ts` 15, `socialcalctableeditor.ts` 19, `socialcalcviewer.ts` 1, `chart.ts` 1) | 53                                                                                                                                                                                                                                                                    |
 | Direct `.src=`/`.href=` DOM property assignments (grep-verified)                                                                                                                                 | 7 (all in `socialcalcspreadsheetcontrol.ts`, all static)                                                                                                                                                                                                              |
 | Dynamic (string-concatenated) `href="`/`src="` construction sites feeding an `innerHTML=` sink                                                                                                   | 3 (`format_text_for_display` text-url, text-image; `expand_text_link`) — all in `js/socialcalc-3.ts`, all previously unprotected, all now protected                                                                                                                   |
 | **static** (no action; literal/numeric/internal-debug/fixed-registry content only)                                                                                                               | 39                                                                                                                                                                                                                                                                    |
@@ -168,6 +169,23 @@ sites counted in the summary table.
 | `SpreadsheetViewerStatuslineCallback` (`spreadsheet.statuslineDiv.innerHTML = slstr`) | `innerHTML=`              | **sheet-derived** (via `calcloading` sheetname, and `editor.ecell.coord` which is always a well-formed coordinate string) | protected at the shared `EditorGetStatuslineString` source | see statusline tests above |
 | `this.statuslineHTML` template                                                        | `innerHTML=` (downstream) | static                                                                                                                    | n/a                                                        | —                          |
 
+## `js/chart.ts`
+
+This module adds one new DOM sink (`entry.container.innerHTML =`, the
+per-chart overlay div) plus a pure, non-DOM SVG string generator; the
+dialog UI listed below uses only `.value`/`.textContent` assignments, never
+`innerHTML`.
+
+| Symbol | Sink | Origin | Mitigation | Test |
+| --- | --- | --- | --- | --- |
+| `mountOrUpdateChartOverlay` (`entry.container.innerHTML = Chart.RenderChartSVG(...)`, `js/chart.ts:1324`) | `innerHTML=` | **sheet-derived** — the overlay's only content is the SVG string built from cell values/labels | `RenderChartSVG` routes every sheet-derived string (chart title, axis labels, series/category names pulled from cells) through `Chart.SanitizeLabel` (strips control chars, collapses newlines/tabs, truncates) then `Chart.EscapeSvgText`/`Chart.EscapeSvgAttr` (XML-escapes `&<>`/`&<>"` respectively) before it reaches an SVG `<text>` node or a double-quoted attribute value; every other SVG token (coordinates, dimensions, palette colors, chart-type-derived shape markup) is generated from clamped numeric fields or a closed internal palette, never from cell content | `e2e/chart.spec.ts` → "a hostile cell label never becomes live markup inside the rendered overlay SVG" (real-browser `</text><script>` payload injected via a sheet cell, confirmed inert — no `window.__xssFired`); `test/chart-svg-render.test.ts` (unit-level escaping/closed-palette/numeric-text-blank-error cell coverage) |
+| `Chart.RenderChartSVG` return value (pure string builder, no DOM touch) | n/a — not a DOM sink itself, only a source for the row above | sheet-derived (source range cell values/labels) | see above; additionally degrades to a plain string with no external network/canvas/font reference, so it is safe to call — and its output is byte-deterministic — even outside a DOM environment | `test/chart-svg-render.test.ts`, `test/lemma-chart-facade.test.ts` (pure facade proofs) |
+| `Chart.OpenChartDialog`'s form fields (`rangeField.input.value`, `titleField.input.value`, `typeSelect.value`, checkbox `.checked`) | DOM property assignment, not `innerHTML=` | sheet-derived when editing an existing chart (prefilled from `existing.sourceranges`/`existing.title`) | `.value`/`.checked` property assignment can never be parsed as markup regardless of content — no sanitization needed at this sink; the eventual `chart set`/`chart create` command re-sanitizes title/axis labels via `Chart.SanitizeLabel` in `socialcalc-3.ts`'s command handler before they ever reach `RenderChartSVG` | `test/chart-editor-ui.test.ts` → "OpenChartDialog (edit) prefills every field from the existing chart" |
+| Overlay chrome (move/resize handles, delete button, dialog labels/buttons) | none (built via `document.createElement` + `.style.*`/`.className`/`.textContent`, never `innerHTML`) | static (fixed literal strings/styles only) | n/a | — |
+
+No `.href=`/`.src=` sinks exist in this module — SVG output never embeds a
+URL from any source (charts have no image/link elements).
+
 ## Host-callback contract established by this policy
 
 Every `SocialCalc.Callbacks.*` function that can receive sheet-authored
@@ -184,7 +202,7 @@ be XSS-aware:
 
 - Enumeration performed via `grep -n '\.innerHTML\s*=[^=]'` and
   `grep -n '\.(href|src)\s*=[^=]'` / `grep -n 'href=|src=|<img |<a '` across
-  all five files (see the harden/secure-rendering session transcript for
+  all six files (see the harden/secure-rendering session transcript for
   the exact commands), then every match traced to its data source by
   reading the enclosing function.
 - No brittle line-number or source-text assertions were added to the test

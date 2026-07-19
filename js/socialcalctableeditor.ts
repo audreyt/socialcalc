@@ -1268,6 +1268,8 @@ TableEditorSC.EditorSheetStatusCallback = function (
         }
       }
 
+      SocialCalc.Chart.RefreshChartOverlays(editor);
+
       return;
 
     case "calcstart":
@@ -1284,6 +1286,7 @@ TableEditorSC.EditorSheetStatusCallback = function (
     case "calcfinished":
       signalstatus(status);
       editor.ScheduleRender(false);
+      SocialCalc.Chart.RefreshChartOverlays(editor);
       return;
 
     case "schedrender":

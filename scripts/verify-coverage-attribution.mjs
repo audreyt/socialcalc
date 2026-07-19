@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const vpBin = resolve(repoRoot, "node_modules/.bin/vp");
 const expectedSources = [
+  "js/chart.ts",
   "js/formatnumber2.ts",
   "js/formula-operand.ts",
   "js/formula-parse.ts",

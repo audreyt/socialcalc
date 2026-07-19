@@ -266,6 +266,21 @@ export const testsByFile = {
   ],
 
   "socialcalctableeditor.ts": editorTests,
+
+  // Pure model/save/render/command facade (js/chart.ts) plus its editor
+  // overlay/drag/dialog UI section. socialcalc-3.ts's `chart` command
+  // cases only get exercised through these files (grep -rl "SC.Chart\.\|
+  // sheet.charts\|\"chart " test/*.test.ts), not through any of the
+  // formula/sheet-core suites above.
+  "chart.ts": [
+    "test/chart-basic.test.ts",
+    "test/chart-editor-ui.test.ts",
+    "test/chart-persistence.test.ts",
+    "test/chart-structural-adjustment.test.ts",
+    "test/chart-svg-render.test.ts",
+    "test/chart-undo.test.ts",
+    "test/lemma-chart-facade.test.ts",
+  ],
   "socialcalcpopup.ts": [
     "test/ui-coverage.test.ts",
     "test/popup-viewer-coverage.test.ts",

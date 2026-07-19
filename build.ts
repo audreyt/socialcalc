@@ -135,6 +135,7 @@ const umdWrapperBottom = `// Closing half of a UMD IIFE. Inlined in build.ts —
 const coreFiles = [
   "socialcalcconstants.js",
   "socialcalc-3.js",
+  "chart.ts",
   "socialcalctableeditor.js",
   "formatnumber2.js",
   "formula1.js",

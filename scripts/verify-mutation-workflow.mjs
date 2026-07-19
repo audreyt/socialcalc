@@ -66,8 +66,8 @@ assert.equal(
 // registry must have exactly the same 11 keys.
 assert.equal(
   ALL_MUTATE_FILES.length,
-  11,
-  "release mutation matrix must contain all 11 shipping modules",
+  12,
+  "release mutation matrix must contain all 12 shipping modules",
 );
 const baseline = JSON.parse(readFileSync("stryker-mutation-baseline.json", "utf8"));
 assert.deepEqual(
@@ -124,5 +124,5 @@ for (const source of [mutation, release]) {
 }
 
 console.log(
-  "mutation/release workflow contracts: 11 targets, fail-closed matrix/artifacts/baselines, caller context, pins, and deadlock-safe concurrency verified",
+  "mutation/release workflow contracts: 12 targets, fail-closed matrix/artifacts/baselines, caller context, pins, and deadlock-safe concurrency verified",
 );

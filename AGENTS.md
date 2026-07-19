@@ -438,8 +438,14 @@ shipping bundle.
   index clamping, active-tab retargeting after delete/hide, reorder target
   clamping, and cross-sheet-reference rewrite classification (unchanged/
   renamed/broken-to-#REF!) on sheet rename/delete — 9 Dafny VCs.
+- `lemma/chart.ts`: chart-type/source-shape validity, series/category axis
+  mapping, per-type minimum-series and combined source-acceptance
+  decisions, running axis-domain min/max, zero-baseline inclusion policy
+  and its min/max clamping, degenerate-domain detection, sheet-bounds and
+  pixel-dimension validity/clamping, and overlay placement-status
+  precedence (bounds before dimensions) — 16 Dafny VCs.
 
-Total: **136 VCs (36 + 5 + 3 + 17 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2 + 8 + 9)**.
+Total: **152 VCs (36 + 5 + 3 + 17 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2 + 8 + 9 + 16)**.
 
 After a facade edit:
 

@@ -202,6 +202,7 @@ declare namespace SocialCalc {
     condfmtNextId: number;
     condfmtRulesVersion: number;
     condfmtValueVersion: number;
+    charts: { [id: string]: ChartObject };
     layouts: string[];
     layouthash: { [key: string]: number };
     fonts: string[];

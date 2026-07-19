@@ -12,7 +12,7 @@ name: Mutation
 #   enough to gate a PR; thresholds.break is a real number measured from an
 #   actual run (see stryker.config.mjs's CRITICAL_BREAK_THRESHOLD comment),
 #   not guessed.
-# - full (MUTATE_TARGET set per leg): all 11 shipping modules, gated
+# - full (MUTATE_TARGET set per leg): all 12 shipping modules, gated
 #   individually as a GitHub Actions matrix — one job per module, each
 #   mutating only that module against the exact test subset
 #   stryker-file.mjs's `testsByFile` maps to it, not the whole suite. This
@@ -46,7 +46,7 @@ name: Mutation
 # modules have both a fresh report AND a stryker-mutation-baseline.json
 # entry that's actually `measured: true` with a passing score —
 # scripts/mutate-release-gate.mjs is the same check `vp run
-# mutate:release-gate` runs locally. All 11 modules in the registry are now
+# mutate:release-gate` runs locally. All 12 modules in the registry are now
 # `measured: true`, so release-gate enforces both a fresh per-module report
 # and each module's passing threshold on any enforced release call.
 #
@@ -88,7 +88,7 @@ on:
         type: string
         default: full
       enforce_release:
-        description: "Run release-gate: hard-fail unless all 11 modules have a measured, passing baseline"
+        description: "Run release-gate: hard-fail unless all 12 modules have a measured, passing baseline"
         type: boolean
         default: false
 
@@ -274,7 +274,7 @@ jobs:
   # module's measured baseline threshold and required fresh report in release
   # runs.
   release-gate:
-    name: mutation (release gate — all 11 modules enforced)
+    name: mutation (release gate — all 12 modules enforced)
     needs: mutate-full
     # `inputs.enforce_release` alone is enough to scope this to a real
     # workflow_call with `enforce_release: true`: that input only exists

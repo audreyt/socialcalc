@@ -306,7 +306,7 @@ function main() {
     cwd,
   });
 
-  console.log("Mutation release gate — all 11 shipping modules:\n");
+  console.log("Mutation release gate — all 12 shipping modules:\n");
   for (const { file, status, detail } of rows) {
     console.log(`${status}  ${file}  ${detail}`);
   }
@@ -319,7 +319,7 @@ function main() {
   }
 
   console.log(
-    "\nRelease gate PASSED: all 11 modules measured, reported, and at or above their floor.",
+    "\nRelease gate PASSED: all 12 modules measured, reported, and at or above their floor.",
   );
 }
 

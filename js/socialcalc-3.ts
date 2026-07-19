@@ -870,6 +870,7 @@ SC.ResetSheet = function (sheet: any, _reload: any) {
   sheet.condfmtNextId = 1; // monotonic id counter, stable across reorders/deletes
   sheet.condfmtRulesVersion = 0; // bumped whenever a rule/range/formula changes (invalidates range index)
   sheet.condfmtValueVersion = 0; // bumped whenever a cell value could have changed (invalidates duplicate/unique counts)
+  sheet.charts = {}; // chart id -> SocialCalc.ChartObject; never overwrites cell data (js/chart.ts)
   sheet.layouts = [];
   sheet.layouthash = {};
   sheet.fonts = [];
@@ -1060,6 +1061,10 @@ SC.Sheet.prototype.RecalcSheet = function () {
 //
 //    name:name:description:value - name definition, name in uppercase, with value being "B5", "A1:B7", or "=formula";
 //                                  description and value are encoded.
+//    chart:id:type:anchorcoord:widthpx:heightpx:seriesinrows:hastitle:title:haslegend:legendposition:xaxislabel:yaxislabel:sourceranges
+//                              - chart object (see js/chart.ts); type is a numeric SocialCalc.Chart.TYPE_* code,
+//                                sourceranges is one or more A1 range strings joined by "|"; id/title/
+//                                legendposition/xaxislabel/yaxislabel/each sourcerange are encoded (added in v1.5+chart)
 //    font:fontnum:value - text of font definition (style weight size family) for font fontnum
 //                         "*" for "style weight", size, or family, means use default (first look to sheet, then builtin)
 //    color:colornum:rgbvalue - text of color definition (e.g., rgb(255,255,255)) for color colornum
@@ -1276,6 +1281,10 @@ SC.ParseSheetSave = function (savedsheet: any, sheetobj: any) {
         if (parts[1] - 0 >= sheetobj.condfmtNextId) {
           sheetobj.condfmtNextId = parts[1] - 0 + 1;
         }
+        break;
+      case "chart":
+        var chart = SocialCalc.Chart.ChartFromSaveParts(parts);
+        sheetobj.charts[chart.id] = chart;
         break;
       case "layout":
         parts = lines[i].match(/^layout:(\d+):(.+)$/); // layouts can have ":" in them
@@ -1726,6 +1735,15 @@ SC.CreateSheetSave = function (sheetobj: any, range: any, canonicalize: any) {
     );
   }
 
+  if (!range) {
+    // Charts are anchored sheet objects, not cell content: omit them from
+    // range/clipboard saves (like sheet-wide attributes are omitted there),
+    // include them only in full-sheet saves. Sorted by id for determinism.
+    var chartIds = Object.keys(sheetobj.charts).sort();
+    for (i = 0; i < chartIds.length; i++) {
+      result.push(SocialCalc.Chart.ChartToSaveLine(sheetobj.charts[chartIds[i]]));
+    }
+  }
   if (range) {
     result.push(
       "copiedfrom:" +
@@ -3911,6 +3929,17 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
         }
       }
 
+      for (name in sheet.charts) {
+        // update chart anchor/source ranges for the inserted row/col
+        SocialCalc.Chart.AdjustChartForStructuralChange(
+          sheet.charts[name],
+          cr1.col,
+          coloffset,
+          cr1.row,
+          rowoffset,
+        );
+      }
+
       for (row = attribs.lastrow; row >= rowend && cmd1 == "insertrow"; row--) {
         // copy the row attributes forward
         rownext = row + rowoffset;
@@ -4153,6 +4182,17 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
               ].join("\t"),
           );
         }
+      }
+
+      for (name in sheet.charts) {
+        // update chart anchor/source ranges for the deleted row/col
+        SocialCalc.Chart.AdjustChartForStructuralChange(
+          sheet.charts[name],
+          cr1.col,
+          coloffset,
+          cr1.row,
+          rowoffset,
+        );
       }
 
       for (row = rowstart; row <= lastrow - rowoffset && cmd1 == "deleterow"; row++) {
@@ -4615,6 +4655,11 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
         }
       }
 
+      for (name in sheet.charts) {
+        // update chart anchor/source ranges for the moved rectangle
+        SocialCalc.Chart.ReplaceChartCoords(sheet.charts[name], movedto);
+      }
+
       attribs.needsrecalc = "yes";
       break;
 
@@ -5046,6 +5091,166 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
         }
       }
       attribs.needsrecalc = "yes";
+      break;
+
+    // chart create id anchorcoord widthpx heightpx charttype seriesinrows sourceranges
+    //   (sourceranges is one or more A1 ranges joined by "|", whole rest encoded)
+    // chart delete id
+    // chart move id anchorcoord
+    // chart resize id widthpx heightpx
+    // chart set id attrname value  (attrname: title/hastitle/haslegend/legendposition/
+    //   xaxislabel/yaxislabel/charttype/seriesinrows/sourceranges; value encoded)
+    case "chart":
+      what = cmd.NextToken();
+      name = cmd.NextToken(); // chart id
+      sheet.renderneeded = true;
+
+      if (what == "create") {
+        var anchorTok = cmd.NextToken();
+        var widthTok = cmd.NextToken();
+        var heightTok = cmd.NextToken();
+        var typeTok = cmd.NextToken();
+        var seriesInRowsTok = cmd.NextToken();
+        rest = cmd.RestOfString(); // sourceranges, "|"-joined A1 ranges
+        var newChart = new SocialCalc.ChartObject(name);
+        newChart.anchorcoord = anchorTok || "A1";
+        newChart.widthpx = SocialCalc.Chart.ClampDimension(+widthTok || 480);
+        newChart.heightpx = SocialCalc.Chart.ClampDimension(+heightTok || 320);
+        newChart.charttype = SocialCalc.Chart.IsValidChartType(+typeTok)
+          ? +typeTok
+          : SocialCalc.Chart.TYPE_COLUMN;
+        newChart.seriesinrows = seriesInRowsTok == "1";
+        newChart.sourceranges = rest ? rest.split("|") : [];
+        sheet.charts[name] = newChart;
+        if (saveundo) changes.AddUndo("chart delete " + name);
+      } else if (what == "delete") {
+        cell = sheet.charts[name];
+        if (cell) {
+          if (saveundo) {
+            changes.AddUndo(
+              "chart set " + name + " yaxislabel " + SocialCalc.encodeForSave(cell.yaxislabel),
+            );
+            changes.AddUndo(
+              "chart set " + name + " xaxislabel " + SocialCalc.encodeForSave(cell.xaxislabel),
+            );
+            changes.AddUndo(
+              "chart set " +
+                name +
+                " legendposition " +
+                SocialCalc.encodeForSave(cell.legendposition),
+            );
+            changes.AddUndo("chart set " + name + " haslegend " + (cell.haslegend ? "1" : "0"));
+            changes.AddUndo("chart set " + name + " hastitle " + (cell.hastitle ? "1" : "0"));
+            changes.AddUndo("chart set " + name + " title " + SocialCalc.encodeForSave(cell.title));
+            changes.AddUndo(
+              "chart create " +
+                name +
+                " " +
+                cell.anchorcoord +
+                " " +
+                cell.widthpx +
+                " " +
+                cell.heightpx +
+                " " +
+                cell.charttype +
+                " " +
+                (cell.seriesinrows ? "1" : "0") +
+                " " +
+                cell.sourceranges.join("|"),
+            );
+          }
+          delete sheet.charts[name];
+        }
+      } else if (what == "move") {
+        rest = cmd.RestOfString();
+        cell = sheet.charts[name];
+        if (cell) {
+          if (saveundo) changes.AddUndo("chart move " + name + " " + cell.anchorcoord);
+          cell.anchorcoord = rest;
+        }
+      } else if (what == "resize") {
+        rest = cmd.RestOfString();
+        cell = sheet.charts[name];
+        if (cell) {
+          if (saveundo)
+            changes.AddUndo("chart resize " + name + " " + cell.widthpx + " " + cell.heightpx);
+          var sizeParts = rest.split(" ");
+          cell.widthpx = SocialCalc.Chart.ClampDimension(+sizeParts[0] || cell.widthpx);
+          cell.heightpx = SocialCalc.Chart.ClampDimension(+sizeParts[1] || cell.heightpx);
+        }
+      } else if (what == "set") {
+        attrib = cmd.NextToken();
+        val = SocialCalc.decodeFromSave(cmd.RestOfString());
+        cell = sheet.charts[name];
+        if (cell) {
+          switch (attrib) {
+            case "title":
+              if (saveundo)
+                changes.AddUndo(
+                  "chart set " + name + " title " + SocialCalc.encodeForSave(cell.title),
+                );
+              cell.title = SocialCalc.Chart.SanitizeLabel(val, 120);
+              break;
+            case "hastitle":
+              if (saveundo)
+                changes.AddUndo("chart set " + name + " hastitle " + (cell.hastitle ? "1" : "0"));
+              cell.hastitle = val == "1";
+              break;
+            case "haslegend":
+              if (saveundo)
+                changes.AddUndo("chart set " + name + " haslegend " + (cell.haslegend ? "1" : "0"));
+              cell.haslegend = val == "1";
+              break;
+            case "legendposition":
+              if (saveundo)
+                changes.AddUndo(
+                  "chart set " +
+                    name +
+                    " legendposition " +
+                    SocialCalc.encodeForSave(cell.legendposition),
+                );
+              cell.legendposition = /^(right|bottom|none)$/.test(val) ? val : "right";
+              break;
+            case "xaxislabel":
+              if (saveundo)
+                changes.AddUndo(
+                  "chart set " + name + " xaxislabel " + SocialCalc.encodeForSave(cell.xaxislabel),
+                );
+              cell.xaxislabel = SocialCalc.Chart.SanitizeLabel(val, 60);
+              break;
+            case "yaxislabel":
+              if (saveundo)
+                changes.AddUndo(
+                  "chart set " + name + " yaxislabel " + SocialCalc.encodeForSave(cell.yaxislabel),
+                );
+              cell.yaxislabel = SocialCalc.Chart.SanitizeLabel(val, 60);
+              break;
+            case "charttype":
+              if (saveundo) changes.AddUndo("chart set " + name + " charttype " + cell.charttype);
+              if (SocialCalc.Chart.IsValidChartType(+val)) cell.charttype = +val;
+              break;
+            case "seriesinrows":
+              if (saveundo)
+                changes.AddUndo(
+                  "chart set " + name + " seriesinrows " + (cell.seriesinrows ? "1" : "0"),
+                );
+              cell.seriesinrows = val == "1";
+              break;
+            case "sourceranges":
+              if (saveundo)
+                changes.AddUndo(
+                  "chart set " +
+                    name +
+                    " sourceranges " +
+                    SocialCalc.encodeForSave(cell.sourceranges.join("|")),
+                );
+              cell.sourceranges = val ? val.split("|") : [];
+              break;
+            default:
+              errortext = scc.s_escUnknownSetCoordCmd + cmdstr;
+          }
+        }
+      }
       break;
 
     case "recalc":

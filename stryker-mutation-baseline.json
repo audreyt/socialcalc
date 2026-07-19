@@ -82,6 +82,13 @@
       "break": 71,
       "measuredAt": "2026-07-14",
       "score": "71.88"
+    },
+    "js/chart.ts": {
+      "measured": true,
+      "minimumMutants": 1218,
+      "break": 56,
+      "measuredAt": "2026-07-19",
+      "score": "56.81"
     }
   }
 }

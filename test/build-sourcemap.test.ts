@@ -126,6 +126,7 @@ sourcemapDescribe("SOCIALCALC_COVERAGE=1 vp build: dist/SocialCalc.js sourcemap"
     const expectedSources = [
       "../js/socialcalcconstants.ts",
       "../js/socialcalc-3.ts",
+      "../js/chart.ts",
       "../js/socialcalctableeditor.ts",
       "../js/formatnumber2.ts",
       "../js/formula1.ts",
