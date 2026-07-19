@@ -4,22 +4,22 @@
 // a behavioral one, but it carries none of the flakiness risk wall-clock
 // timing does.
 //
-// Baseline measured 2026-07-12 against this worktree's `vp build` output:
-// dist/SocialCalc.js was 719,438 bytes (committed) / 716,908 bytes (freshly
-// rebuilt — Oxc/Bun.Transpiler version drift between environments produces
-// a few hundred bytes of difference; see AGENTS.md's build-determinism
-// notes). The budget below uses a wide, conservative band around that
-// measurement so ordinary source changes never trip it, while a genuine
-// regression (an accidentally bundled dependency, a lost build step, a
-// truncated build) would.
+// Baseline re-measured 2026-07-19 against this worktree's `vp build` output
+// on the `compat/integration` branch after workbook/charts/data-validation/
+// lambda-formulas/pivot-tables/criteria-functions/html-clipboard-paste were
+// all merged on top of the original 2026-07-12 719,438-byte single-feature
+// baseline: dist/SocialCalc.js is 1,293,735 bytes. The budget below uses a
+// wide, conservative band around that measurement so ordinary source
+// changes never trip it, while a genuine regression (an accidentally
+// bundled dependency, a lost build step, a truncated build) would.
 import { statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, test } from "vite-plus/test";
 
-const MEASURED_BASELINE_BYTES = 719_438;
+const MEASURED_BASELINE_BYTES = 1_293_735;
 const MIN_BYTES = 400_000; // catches a truncated or empty build
-const MAX_BYTES = 1_200_000; // catches accidental bloat (~1.7x baseline)
+const MAX_BYTES = 1_700_000; // catches accidental bloat (~1.3x baseline)
 
 describe("shipping bundle size budget", () => {
   test("dist/SocialCalc.js stays within a conservative band around the measured baseline", () => {

@@ -111,9 +111,25 @@ describe("readManifest — real LemmaScript-files.txt", () => {
   test("returns the exact tracked facade list, in file order", () => {
     expect(readManifest()).toEqual([
       "lemma/a1.ts",
+      "lemma/branch.ts",
       "lemma/eval-ops.ts",
       "lemma/lookup-result.ts",
       "lemma/spill.ts",
+      "lemma/weekday-policy.ts",
+      "lemma/finance-policy.ts",
+      "lemma/statistics.ts",
+      "lemma/visibility.ts",
+      "lemma/xlookup.ts",
+      "lemma/number-parse.ts",
+      "lemma/protect.ts",
+      "lemma/condfmt.ts",
+      "lemma/workbook.ts",
+      "lemma/chart.ts",
+      "lemma/validation.ts",
+      "lemma/lambda-scope.ts",
+      "lemma/pivot.ts",
+      "lemma/criteria.ts",
+      "lemma/html-table.ts",
     ]);
   });
 });
@@ -195,9 +211,25 @@ describe("CLI — regen / lean-gen dispatch exact per-facade lsc invocation", ()
       const calls = readFileSync(capture, "utf8").trimEnd().split("\n");
       expect(calls).toEqual([
         "regen --backend=dafny lemma/a1.ts",
+        "regen --backend=dafny lemma/branch.ts",
         "regen --backend=dafny lemma/eval-ops.ts",
         "regen --backend=dafny lemma/lookup-result.ts",
         "regen --backend=dafny lemma/spill.ts",
+        "regen --backend=dafny lemma/weekday-policy.ts",
+        "regen --backend=dafny lemma/finance-policy.ts",
+        "regen --backend=dafny lemma/statistics.ts",
+        "regen --backend=dafny lemma/visibility.ts",
+        "regen --backend=dafny lemma/xlookup.ts",
+        "regen --backend=dafny lemma/number-parse.ts",
+        "regen --backend=dafny lemma/protect.ts",
+        "regen --backend=dafny lemma/condfmt.ts",
+        "regen --backend=dafny lemma/workbook.ts",
+        "regen --backend=dafny lemma/chart.ts",
+        "regen --backend=dafny lemma/validation.ts",
+        "regen --backend=dafny lemma/lambda-scope.ts",
+        "regen --backend=dafny lemma/pivot.ts",
+        "regen --backend=dafny lemma/criteria.ts",
+        "regen --backend=dafny lemma/html-table.ts",
       ]);
     } finally {
       rmSync(temp, { force: true, recursive: true });
@@ -220,9 +252,25 @@ describe("CLI — regen / lean-gen dispatch exact per-facade lsc invocation", ()
       const calls = readFileSync(capture, "utf8").trimEnd().split("\n");
       expect(calls).toEqual([
         "gen --backend=lean lemma/a1.ts",
+        "gen --backend=lean lemma/branch.ts",
         "gen --backend=lean lemma/eval-ops.ts",
         "gen --backend=lean lemma/lookup-result.ts",
         "gen --backend=lean lemma/spill.ts",
+        "gen --backend=lean lemma/weekday-policy.ts",
+        "gen --backend=lean lemma/finance-policy.ts",
+        "gen --backend=lean lemma/statistics.ts",
+        "gen --backend=lean lemma/visibility.ts",
+        "gen --backend=lean lemma/xlookup.ts",
+        "gen --backend=lean lemma/number-parse.ts",
+        "gen --backend=lean lemma/protect.ts",
+        "gen --backend=lean lemma/condfmt.ts",
+        "gen --backend=lean lemma/workbook.ts",
+        "gen --backend=lean lemma/chart.ts",
+        "gen --backend=lean lemma/validation.ts",
+        "gen --backend=lean lemma/lambda-scope.ts",
+        "gen --backend=lean lemma/pivot.ts",
+        "gen --backend=lean lemma/criteria.ts",
+        "gen --backend=lean lemma/html-table.ts",
       ]);
     } finally {
       rmSync(temp, { force: true, recursive: true });
@@ -233,7 +281,7 @@ describe("CLI — regen / lean-gen dispatch exact per-facade lsc invocation", ()
     const temp = mkdtempSync(join(tmpdir(), "socialcalc-lemmascript-cli-"));
     const capture = join(temp, "calls.txt");
     const fakeLsc = join(temp, "lsc");
-    // Fail on the second call (eval-ops) to prove regen doesn't silently
+    // Fail on the third call (eval-ops) to prove regen doesn't silently
     // continue past a real lsc failure.
     writeFileSync(
       fakeLsc,
@@ -248,9 +296,10 @@ describe("CLI — regen / lean-gen dispatch exact per-facade lsc invocation", ()
       });
       expect(result.status).not.toBe(0);
       const calls = readFileSync(capture, "utf8").trimEnd().split("\n");
-      // Only a1 and eval-ops ran; lookup-result/spill never got a chance.
+      // Only a1, branch, and eval-ops ran; lookup-result/spill never got a chance.
       expect(calls).toEqual([
         "regen --backend=dafny lemma/a1.ts",
+        "regen --backend=dafny lemma/branch.ts",
         "regen --backend=dafny lemma/eval-ops.ts",
       ]);
     } finally {
@@ -266,7 +315,7 @@ describe("CLI — assert-lean against the real repo", () => {
       encoding: "utf8",
     });
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stdout).toContain("4 facade(s)");
+    expect(result.stdout).toContain("20 facade(s)");
     expect(result.stdout).toContain("spill");
   });
 
