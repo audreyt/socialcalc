@@ -2,6 +2,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import {
   ERR_DIV0,
+  ERR_NA,
   ERR_REF,
   ERR_VALUE,
   TY_N,
@@ -11,6 +12,7 @@ import {
   divType,
   fromValueType,
   isErrorType,
+  isNAType,
   toValueType,
 } from "../lemma/eval-ops";
 import { loadSocialCalc } from "./helpers/socialcalc";
@@ -64,6 +66,19 @@ describe("lemma/eval-ops lattice laws (Dafny/Lean surface)", () => {
     expect(toValueType(TY_T)).toBe("t");
     expect(toValueType(2)).toBe("b");
     expect(toValueType(TY_N)).toBe("n");
+  });
+
+  test("isNAType distinguishes #N/A from other error codes", () => {
+    expect(isNAType(ERR_NA)).toBe(true);
+    expect(isNAType(ERR_REF)).toBe(false);
+    expect(isNAType(ERR_DIV0)).toBe(false);
+    expect(isNAType(ERR_VALUE)).toBe(false);
+    expect(isNAType(TY_N)).toBe(false);
+  });
+
+  test("fromValueType/toValueType round-trip #N/A", () => {
+    expect(fromValueType("e#N/A")).toBe(ERR_NA);
+    expect(toValueType(ERR_NA)).toBe("e#N/A");
   });
 });
 
@@ -121,5 +136,31 @@ describe("lemma/eval-ops vs shipping EvaluatePolish", () => {
       false,
     );
     expect(ok.type.charAt(0)).toBe("t");
+  });
+
+  test("isNAType matches shipping IFNA's catch-only-#N/A policy", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+
+    const naResult = SC.Formula.evaluate_parsed_formula(
+      SC.Formula.ParseFormulaIntoTokens("IFNA(NA(),1)"),
+      sheet,
+      false,
+    );
+    // isNAType(ERR_NA) is true: shipping IFNA catches #N/A and returns the
+    // fallback (1), not the error.
+    expect(isNAType(ERR_NA)).toBe(true);
+    expect(naResult.type).toBe("n");
+    expect(naResult.value).toBe(1);
+
+    const divResult = SC.Formula.evaluate_parsed_formula(
+      SC.Formula.ParseFormulaIntoTokens("IFNA(1/0,1)"),
+      sheet,
+      false,
+    );
+    // isNAType(ERR_DIV0) is false: shipping IFNA does NOT catch #DIV/0!,
+    // so the error propagates instead of the fallback.
+    expect(isNAType(ERR_DIV0)).toBe(false);
+    expect(fromValueType(divResult.type)).toBe(ERR_DIV0);
   });
 });

@@ -775,6 +775,8 @@ ConstantsRoot.Constants = {
   s_fdef_FALSE: 'Returns the logical value "false". ',
   s_fdef_FIND:
     'Returns the starting position within string2 of the first occurrence of string1 at or after "start". If start is omitted, 1 is assumed. ',
+  s_fdef_SEARCH:
+    'Returns the starting position within string2 of the first occurrence of string1 at or after "start", ignoring case. If start is omitted, 1 is assumed. ',
   s_fdef_FV:
     "Returns the future value of repeated payments of money invested at the given rate for the specified number of periods, with optional present value (default 0) and payment type (default 0 = at end of period, 1 = beginning of period). ",
   s_fdef_HLOOKUP:
@@ -782,6 +784,12 @@ ConstantsRoot.Constants = {
   s_fdef_HOUR: "Returns the hour portion of a time or date/time value. ",
   s_fdef_IF:
     "Results in true-value if logical-expression is TRUE or non-zero, otherwise results in false-value. ",
+  s_fdef_IFERROR:
+    "Returns value if it does not evaluate to an error, otherwise returns value_if_error. ",
+  s_fdef_IFNA:
+    "Returns value if it does not evaluate to the #N/A error, otherwise returns value_if_na. ",
+  s_fdef_IFS:
+    "Evaluates condition1, condition2, ... in order and returns the value paired with the first true condition; returns #N/A if none are true. ",
   s_fdef_INDEX:
     "Returns a cell or range reference for the specified row and column in the range. If range is 1-dimensional, then only one of rownum or colnum are needed. If range is 2-dimensional and rownum or colnum are zero, a reference to the range of just the specified column or row is returned. You can use the returned reference value in a range, e.g., sum(A1:INDEX(A2:A10,4)). ",
   s_fdef_INT: "Returns the value rounded down to the nearest integer (towards -infinity). ",
@@ -863,10 +871,29 @@ ConstantsRoot.Constants = {
   s_fdef_STDEVP: "Returns the standard deviation of the numeric values. ",
   s_fdef_SUBSTITUTE:
     'Returns text1 with the all occurrences of oldtext replaced by newtext. If "occurrence" is present, then only that occurrence is replaced. ',
+  s_fdef_SPLIT:
+    "Divides text around a specified delimiter and puts each fragment into a separate cell in the row. split_by_each (default true) treats every character of delimiter as a separate delimiter; remove_empty_text (default true) discards empty fragments. ",
   s_fdef_SORT:
     "Sorts rows of an array by one or more columns (defaults to the first column ascending); omitted direction defaults to ascending and negative directions descend, preserving stable source order for ties. ",
   s_fdef_UNIQUE:
     "Returns the unique rows or columns of an array; optionally returns values occurring exactly once. ",
+  s_fdef_SWITCH:
+    "Compares expression against each case in order and returns the value paired with the first match; returns the trailing default if given and no case matches, otherwise #N/A. ",
+  s_fdef_TEXTJOIN:
+    "Joins text1, text2, ... into a single text string separated by delimiter, optionally skipping empty items when ignore_empty is true. ",
+  s_fdef_JOIN:
+    "Joins value_or_array1, value_or_array2, ... into a single text string separated by delimiter, including empty items. ",
+  s_fdef_TEXTBEFORE:
+    "Returns the text before the instance_num-th occurrence of delimiter (counted from the end when negative); match_mode enables case-insensitive matching and match_end treats the string boundary as a delimiter; returns if_not_found (or #N/A) when delimiter is not found. ",
+  s_fdef_TEXTAFTER:
+    "Returns the text after the instance_num-th occurrence of delimiter (counted from the end when negative); match_mode enables case-insensitive matching and match_end treats the string boundary as a delimiter; returns if_not_found (or #N/A) when delimiter is not found. ",
+  s_fdef_TEXTSPLIT:
+    "Splits text into a rectangular array using col_delimiter and optional row_delimiter; ignore_empty discards empty fragments, match_mode enables case-insensitive matching, and pad_with (default #N/A) fills short rows. ",
+  s_fdef_REGEXMATCH: "Returns true if any part of text matches regular_expression. ",
+  s_fdef_REGEXEXTRACT:
+    "Returns the first matching substring of text against regular_expression, or the first capturing group if the pattern has exactly one; #N/A if no match. ",
+  s_fdef_REGEXREPLACE:
+    "Replaces every match of regular_expression in text with replacement; replacement may use \\1..\\9 to refer to captured groups. ",
   s_farg_sort: "range, [sort_column], [is_ascending], [sort_column2, is_ascending2, ...]",
   s_farg_unique: "range, [by_column], [exactly_once]",
   s_fdef_SUM:
@@ -976,6 +1003,20 @@ ConstantsRoot.Constants = {
   s_farg_yearfrac: "start_date, end_date, [basis]",
   s_farg_workday: "start_date, days_or_end_date, [holidays]",
   s_farg_workdayintl: "start_date, days_or_end_date, [weekend], [holidays]",
+  s_farg_iferror: "value, value_if_error",
+  s_farg_ifna: "value, value_if_na",
+  s_farg_ifs: "condition1, value1, [condition2, value2, ...]",
+  s_farg_switch: "expression, case1, value1, [case2, value2, ...], [default]",
+  s_farg_textjoin: "delimiter, ignore_empty, text1, [text2, ...]",
+  s_farg_join: "delimiter, value_or_array1, [value_or_array2, ...]",
+  s_farg_textbeforeafter:
+    "text, delimiter, [instance_num], [match_mode], [match_end], [if_not_found]",
+  s_farg_split: "text, delimiter, [split_by_each], [remove_empty_text]",
+  s_farg_textsplit:
+    "text, col_delimiter, [row_delimiter], [ignore_empty], [match_mode], [pad_with]",
+  s_farg_regexmatch: "text, regular_expression",
+  s_farg_regexextract: "text, regular_expression",
+  s_farg_regexreplace: "text, regular_expression, replacement",
 
   function_classlist: [
     "all",

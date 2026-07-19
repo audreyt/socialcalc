@@ -600,6 +600,8 @@
     s_fdef_FALSE: 'Returns the logical value "false". ',
     s_fdef_FIND:
       'Returns the starting position within string2 of the first occurrence of string1 at or after "start". If start is omitted, 1 is assumed. ',
+    s_fdef_SEARCH:
+      'Returns the starting position within string2 of the first occurrence of string1 at or after "start", ignoring case. If start is omitted, 1 is assumed. ',
     s_fdef_FV:
       'Returns the future value of repeated payments of money invested at the given rate for the specified number of periods, with optional present value (default 0) and payment type (default 0 = at end of period, 1 = beginning of period). ',
     s_fdef_HLOOKUP:
@@ -607,6 +609,12 @@
     s_fdef_HOUR: 'Returns the hour portion of a time or date/time value. ',
     s_fdef_IF:
       'Results in true-value if logical-expression is TRUE or non-zero, otherwise results in false-value. ',
+    s_fdef_IFERROR:
+      'Returns value if it does not evaluate to an error, otherwise returns value_if_error. ',
+    s_fdef_IFNA:
+      'Returns value if it does not evaluate to the #N/A error, otherwise returns value_if_na. ',
+    s_fdef_IFS:
+      'Evaluates condition1, condition2, ... in order and returns the value paired with the first true condition; returns #N/A if none are true. ',
     s_fdef_INDEX:
       'Returns a cell or range reference for the specified row and column in the range. If range is 1-dimensional, then only one of rownum or colnum are needed. If range is 2-dimensional and rownum or colnum are zero, a reference to the range of just the specified column or row is returned. You can use the returned reference value in a range, e.g., sum(A1:INDEX(A2:A10,4)). ',
     s_fdef_INT: 'Returns the value rounded down to the nearest integer (towards -infinity). ',
@@ -688,10 +696,29 @@
     s_fdef_STDEVP: 'Returns the standard deviation of the numeric values. ',
     s_fdef_SUBSTITUTE:
       'Returns text1 with the all occurrences of oldtext replaced by newtext. If "occurrence" is present, then only that occurrence is replaced. ',
+    s_fdef_SPLIT:
+      'Divides text around a specified delimiter and puts each fragment into a separate cell in the row. split_by_each (default true) treats every character of delimiter as a separate delimiter; remove_empty_text (default true) discards empty fragments. ',
     s_fdef_SORT:
       'Sorts rows of an array by one or more columns (defaults to the first column ascending); omitted direction defaults to ascending and negative directions descend, preserving stable source order for ties. ',
     s_fdef_UNIQUE:
       'Returns the unique rows or columns of an array; optionally returns values occurring exactly once. ',
+    s_fdef_SWITCH:
+      'Compares expression against each case in order and returns the value paired with the first match; returns the trailing default if given and no case matches, otherwise #N/A. ',
+    s_fdef_TEXTJOIN:
+      'Joins text1, text2, ... into a single text string separated by delimiter, optionally skipping empty items when ignore_empty is true. ',
+    s_fdef_JOIN:
+      'Joins value_or_array1, value_or_array2, ... into a single text string separated by delimiter, including empty items. ',
+    s_fdef_TEXTBEFORE:
+      'Returns the text before the instance_num-th occurrence of delimiter (counted from the end when negative); match_mode enables case-insensitive matching and match_end treats the string boundary as a delimiter; returns if_not_found (or #N/A) when delimiter is not found. ',
+    s_fdef_TEXTAFTER:
+      'Returns the text after the instance_num-th occurrence of delimiter (counted from the end when negative); match_mode enables case-insensitive matching and match_end treats the string boundary as a delimiter; returns if_not_found (or #N/A) when delimiter is not found. ',
+    s_fdef_TEXTSPLIT:
+      'Splits text into a rectangular array using col_delimiter and optional row_delimiter; ignore_empty discards empty fragments, match_mode enables case-insensitive matching, and pad_with (default #N/A) fills short rows. ',
+    s_fdef_REGEXMATCH: 'Returns true if any part of text matches regular_expression. ',
+    s_fdef_REGEXEXTRACT:
+      'Returns the first matching substring of text against regular_expression, or the first capturing group if the pattern has exactly one; #N/A if no match. ',
+    s_fdef_REGEXREPLACE:
+      'Replaces every match of regular_expression in text with replacement; replacement may use \\1..\\9 to refer to captured groups. ',
     s_farg_sort: 'range, [sort_column], [is_ascending], [sort_column2, is_ascending2, ...]',
     s_farg_unique: 'range, [by_column], [exactly_once]',
     s_fdef_SUM:
@@ -800,6 +827,20 @@
     s_farg_yearfrac: 'start_date, end_date, [basis]',
     s_farg_workday: 'start_date, days_or_end_date, [holidays]',
     s_farg_workdayintl: 'start_date, days_or_end_date, [weekend], [holidays]',
+    s_farg_iferror: 'value, value_if_error',
+    s_farg_ifna: 'value, value_if_na',
+    s_farg_ifs: 'condition1, value1, [condition2, value2, ...]',
+    s_farg_switch: 'expression, case1, value1, [case2, value2, ...], [default]',
+    s_farg_textjoin: 'delimiter, ignore_empty, text1, [text2, ...]',
+    s_farg_join: 'delimiter, value_or_array1, [value_or_array2, ...]',
+    s_farg_textbeforeafter:
+      'text, delimiter, [instance_num], [match_mode], [match_end], [if_not_found]',
+    s_farg_split: 'text, delimiter, [split_by_each], [remove_empty_text]',
+    s_farg_textsplit:
+      'text, col_delimiter, [row_delimiter], [ignore_empty], [match_mode], [pad_with]',
+    s_farg_regexmatch: 'text, regular_expression',
+    s_farg_regexextract: 'text, regular_expression',
+    s_farg_regexreplace: 'text, regular_expression, replacement',
     function_classlist: [
       'all',
       'stat',
@@ -15724,6 +15765,7 @@ More comments yet to come...
   SocialCalc.Formula.FunctionList['EXACT'] = [SocialCalc.Formula.ExactFunction, 2, '', '', 'text'];
   FormulaMut.ArgList = {
     FIND: [1, 1, 0],
+    SEARCH: [1, 1, 0],
     LEFT: [1, 0],
     LEN: [1],
     LOWER: [1],
@@ -15768,6 +15810,20 @@ More comments yet to come...
           result = 'Start is before string';
         } else {
           result = operand_value[2].indexOf(operand_value[1], offset);
+          if (result >= 0) {
+            result += 1;
+            resulttype = 'n';
+          } else {
+            result = 'Not found';
+          }
+        }
+        break;
+      case 'SEARCH':
+        offset = operand_type[3] ? operand_value[3] - 1 : 0;
+        if (offset < 0) {
+          result = 'Start is before string';
+        } else {
+          result = operand_value[2].toLowerCase().indexOf(operand_value[1].toLowerCase(), offset);
           if (result >= 0) {
             result += 1;
             resulttype = 'n';
@@ -15908,6 +15964,13 @@ More comments yet to come...
     return;
   };
   SocialCalc.Formula.FunctionList['FIND'] = [
+    SocialCalc.Formula.StringFunctions,
+    -2,
+    'find',
+    '',
+    'text',
+  ];
+  SocialCalc.Formula.FunctionList['SEARCH'] = [
     SocialCalc.Formula.StringFunctions,
     -2,
     'find',
@@ -18993,6 +19056,742 @@ More comments yet to come...
     'unique',
     null,
     'lookup',
+  ];
+  FormulaMut.IfErrorFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var valueResult = scf.OperandValueAndType(sheet, foperand);
+    var fallback = foperand.pop();
+    var caught = fname == 'IFNA' ? valueResult.type == 'e#N/A' : valueResult.type.charAt(0) == 'e';
+    if (caught) {
+      operand.push(fallback);
+    } else {
+      operand.push({
+        type: valueResult.type,
+        value: valueResult.value,
+      });
+    }
+  };
+  SocialCalc.Formula.FunctionList['IFERROR'] = [
+    SocialCalc.Formula.IfErrorFunction,
+    2,
+    'iferror',
+    '',
+    'test',
+  ];
+  SocialCalc.Formula.FunctionList['IFNA'] = [
+    SocialCalc.Formula.IfErrorFunction,
+    2,
+    'ifna',
+    '',
+    'test',
+  ];
+  FormulaMut.IfsFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    if (foperand.length % 2 != 0) {
+      scf.FunctionArgsError(fname, operand);
+      return;
+    }
+    while (foperand.length) {
+      var cond = scf.OperandValueAndType(sheet, foperand);
+      var val = foperand.pop();
+      var t = cond.type.charAt(0);
+      if (t == 'e') {
+        operand.push({
+          type: cond.type,
+          value: 0,
+        });
+        return;
+      }
+      if (t != 'n' && t != 'b') {
+        operand.push({
+          type: 'e#VALUE!',
+          value: 0,
+        });
+        return;
+      }
+      if (cond.value) {
+        operand.push(val);
+        return;
+      }
+    }
+    operand.push({
+      type: 'e#N/A',
+      value: 0,
+    });
+  };
+  SocialCalc.Formula.FunctionList['IFS'] = [SocialCalc.Formula.IfsFunction, -2, 'ifs', '', 'test'];
+  FormulaMut.SwitchFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var valuesEqual = function (v1, v2) {
+      var t1 = v1.type.charAt(0),
+        t2 = v2.type.charAt(0);
+      if (t1 == 'n' && t2 == 'n') return v1.value == v2.value;
+      var s1 = String(v1.value),
+        s2 = String(v2.value);
+      if (t1 == 'n') s1 = SocialCalc.format_number_for_display(v1.value, 'n', '');
+      else if (t1 == 'b') s1 = '';
+      if (t2 == 'n') s2 = SocialCalc.format_number_for_display(v2.value, 'n', '');
+      else if (t2 == 'b') s2 = '';
+      return s1.toLowerCase() == s2.toLowerCase();
+    };
+    var expr = scf.OperandValueAndType(sheet, foperand);
+    if (expr.type.charAt(0) == 'e') {
+      operand.push({
+        type: expr.type,
+        value: 0,
+      });
+      return;
+    }
+    while (foperand.length >= 2) {
+      var caseval = scf.OperandValueAndType(sheet, foperand);
+      var val = foperand.pop();
+      if (caseval.type.charAt(0) == 'e') {
+        operand.push({
+          type: caseval.type,
+          value: 0,
+        });
+        return;
+      }
+      if (valuesEqual(expr, caseval)) {
+        operand.push(val);
+        return;
+      }
+    }
+    if (foperand.length == 1) {
+      operand.push(foperand.pop());
+      return;
+    }
+    operand.push({
+      type: 'e#N/A',
+      value: 0,
+    });
+  };
+  SocialCalc.Formula.FunctionList['SWITCH'] = [
+    SocialCalc.Formula.SwitchFunction,
+    -3,
+    'switch',
+    '',
+    'test',
+  ];
+  FormulaMut.TextJoinCollect = function (sheet, foperand, delim, ignoreEmpty) {
+    var scf = SocialCalc.Formula;
+    var parts = [];
+    while (foperand.length) {
+      var item = scf.OperandAsText(sheet, foperand);
+      if (item.type.charAt(0) == 'e') {
+        return {
+          type: item.type,
+          value: 0,
+        };
+      }
+      var text = item.value;
+      if (!ignoreEmpty || text.length) parts.push(text);
+    }
+    return {
+      type: 't',
+      value: parts.join(delim),
+    };
+  };
+  FormulaMut.TextJoinFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var delim = scf.OperandAsText(sheet, foperand);
+    if (delim.type.charAt(0) == 'e') {
+      operand.push({
+        type: delim.type,
+        value: 0,
+      });
+      return;
+    }
+    var ignoreOp = scf.OperandAsNumber(sheet, foperand);
+    if (ignoreOp.type.charAt(0) == 'e') {
+      operand.push({
+        type: ignoreOp.type,
+        value: 0,
+      });
+      return;
+    }
+    operand.push(scf.TextJoinCollect(sheet, foperand, delim.value, ignoreOp.value != 0));
+  };
+  FormulaMut.JoinFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var delim = scf.OperandAsText(sheet, foperand);
+    if (delim.type.charAt(0) == 'e') {
+      operand.push({
+        type: delim.type,
+        value: 0,
+      });
+      return;
+    }
+    operand.push(scf.TextJoinCollect(sheet, foperand, delim.value, false));
+  };
+  SocialCalc.Formula.FunctionList['TEXTJOIN'] = [
+    SocialCalc.Formula.TextJoinFunction,
+    -3,
+    'textjoin',
+    '',
+    'text',
+  ];
+  SocialCalc.Formula.FunctionList['JOIN'] = [
+    SocialCalc.Formula.JoinFunction,
+    -2,
+    'join',
+    '',
+    'text',
+  ];
+  FormulaMut.TextBeforeAfterFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    if (foperand.length > 6) {
+      scf.FunctionArgsError(fname, operand);
+      return;
+    }
+    var textOp = scf.OperandAsText(sheet, foperand);
+    if (textOp.type.charAt(0) == 'e') {
+      operand.push({
+        type: textOp.type,
+        value: 0,
+      });
+      return;
+    }
+    var delimOp = scf.OperandAsText(sheet, foperand);
+    if (delimOp.type.charAt(0) == 'e') {
+      operand.push({
+        type: delimOp.type,
+        value: 0,
+      });
+      return;
+    }
+    var text = textOp.value;
+    var delim = delimOp.value;
+    if (text.length == 0) {
+      operand.push({
+        type: 'e#VALUE!',
+        value: 0,
+      });
+      return;
+    }
+    var instanceNum = 1;
+    if (foperand.length) {
+      var io = scf.OperandAsNumber(sheet, foperand);
+      if (io.type.charAt(0) == 'e') {
+        operand.push({
+          type: io.type,
+          value: 0,
+        });
+        return;
+      }
+      instanceNum = Math.trunc(io.value);
+      if (instanceNum == 0) {
+        operand.push({
+          type: 'e#VALUE!',
+          value: 0,
+        });
+        return;
+      }
+    }
+    var matchMode = 0;
+    if (foperand.length) {
+      var mo = scf.OperandAsNumber(sheet, foperand);
+      if (mo.type.charAt(0) == 'e') {
+        operand.push({
+          type: mo.type,
+          value: 0,
+        });
+        return;
+      }
+      matchMode = mo.value ? 1 : 0;
+    }
+    var matchEnd = 0;
+    if (foperand.length) {
+      var eo = scf.OperandAsNumber(sheet, foperand);
+      if (eo.type.charAt(0) == 'e') {
+        operand.push({
+          type: eo.type,
+          value: 0,
+        });
+        return;
+      }
+      matchEnd = eo.value ? 1 : 0;
+    }
+    var hasIfNotFound = false;
+    var ifNotFound = {
+      type: 'e#N/A',
+      value: 0,
+    };
+    if (foperand.length) {
+      hasIfNotFound = true;
+      ifNotFound = foperand.pop();
+    }
+    var positions = [];
+    if (delim.length > 0) {
+      var hay = matchMode ? text.toLowerCase() : text;
+      var needle = matchMode ? delim.toLowerCase() : delim;
+      var searchPos = 0;
+      while (true) {
+        var idx = hay.indexOf(needle, searchPos);
+        if (idx < 0) break;
+        positions.push(idx);
+        searchPos = idx + needle.length;
+      }
+    }
+    var n = positions.length;
+    var idx1based = instanceNum > 0 ? instanceNum : n + instanceNum + 1;
+    var found = idx1based >= 1 && idx1based <= n;
+    var pos = -1;
+    var delimLen = 0;
+    if (found) {
+      pos = positions[idx1based - 1];
+      delimLen = delim.length;
+    } else if (matchEnd) {
+      if (instanceNum > 0 && idx1based == n + 1) {
+        pos = text.length;
+      }
+      if (instanceNum < 0 && idx1based == 0) {
+        pos = 0;
+      }
+    }
+    if (pos < 0) {
+      if (hasIfNotFound) {
+        operand.push(ifNotFound);
+      } else {
+        operand.push({
+          type: 'e#N/A',
+          value: 0,
+        });
+      }
+      return;
+    }
+    var resultText =
+      fname == 'TEXTBEFORE' ? text.substring(0, pos) : text.substring(pos + delimLen);
+    scf.PushOperand(operand, 't', resultText);
+  };
+  SocialCalc.Formula.FunctionList['TEXTBEFORE'] = [
+    SocialCalc.Formula.TextBeforeAfterFunction,
+    -2,
+    'textbeforeafter',
+    '',
+    'text',
+  ];
+  SocialCalc.Formula.FunctionList['TEXTAFTER'] = [
+    SocialCalc.Formula.TextBeforeAfterFunction,
+    -2,
+    'textbeforeafter',
+    '',
+    'text',
+  ];
+  FormulaMut.SplitFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    if (foperand.length > 4) {
+      scf.FunctionArgsError(fname, operand);
+      return;
+    }
+    var textOp = scf.OperandAsText(sheet, foperand);
+    if (textOp.type.charAt(0) == 'e') {
+      operand.push({
+        type: textOp.type,
+        value: 0,
+      });
+      return;
+    }
+    var delimOp = scf.OperandAsText(sheet, foperand);
+    if (delimOp.type.charAt(0) == 'e') {
+      operand.push({
+        type: delimOp.type,
+        value: 0,
+      });
+      return;
+    }
+    var splitByEach = true;
+    if (foperand.length) {
+      var sb = scf.OperandAsNumber(sheet, foperand);
+      if (sb.type.charAt(0) == 'e') {
+        operand.push({
+          type: sb.type,
+          value: 0,
+        });
+        return;
+      }
+      splitByEach = sb.value != 0;
+    }
+    var removeEmpty = true;
+    if (foperand.length) {
+      var rm = scf.OperandAsNumber(sheet, foperand);
+      if (rm.type.charAt(0) == 'e') {
+        operand.push({
+          type: rm.type,
+          value: 0,
+        });
+        return;
+      }
+      removeEmpty = rm.value != 0;
+    }
+    var text = textOp.value;
+    var delim = delimOp.value;
+    var pieces;
+    if (delim.length == 0) {
+      pieces = [text];
+    } else if (splitByEach) {
+      var alternation = delim
+        .split('')
+        .map(function (ch) {
+          return ch.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
+        })
+        .join('|');
+      var charClass = '(?:' + alternation + ')';
+      pieces = text.split(new RegExp(charClass));
+    } else {
+      pieces = text.split(delim);
+    }
+    if (removeEmpty)
+      pieces = pieces.filter(function (p) {
+        return p.length > 0;
+      });
+    if (!pieces.length) pieces = [''];
+    var cells = pieces.map(function (p) {
+      return {
+        type: 't',
+        value: p,
+      };
+    });
+    operand.push({
+      type: 'array',
+      value: {
+        rows: 1,
+        cols: pieces.length,
+        cells: [cells],
+      },
+    });
+  };
+  SocialCalc.Formula.FunctionList['SPLIT'] = [
+    SocialCalc.Formula.SplitFunction,
+    -2,
+    'split',
+    '',
+    'text',
+  ];
+  FormulaMut.TextSplitFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    if (foperand.length > 6) {
+      scf.FunctionArgsError(fname, operand);
+      return;
+    }
+    var textOp = scf.OperandAsText(sheet, foperand);
+    if (textOp.type.charAt(0) == 'e') {
+      operand.push({
+        type: textOp.type,
+        value: 0,
+      });
+      return;
+    }
+    var colDelimOp = scf.OperandAsText(sheet, foperand);
+    if (colDelimOp.type.charAt(0) == 'e') {
+      operand.push({
+        type: colDelimOp.type,
+        value: 0,
+      });
+      return;
+    }
+    var rowDelim = '';
+    if (foperand.length) {
+      var rd = scf.OperandAsText(sheet, foperand);
+      if (rd.type.charAt(0) == 'e') {
+        operand.push({
+          type: rd.type,
+          value: 0,
+        });
+        return;
+      }
+      rowDelim = rd.value;
+    }
+    var ignoreEmpty = false;
+    if (foperand.length) {
+      var ie = scf.OperandAsNumber(sheet, foperand);
+      if (ie.type.charAt(0) == 'e') {
+        operand.push({
+          type: ie.type,
+          value: 0,
+        });
+        return;
+      }
+      ignoreEmpty = ie.value != 0;
+    }
+    var matchMode = 0;
+    if (foperand.length) {
+      var mm = scf.OperandAsNumber(sheet, foperand);
+      if (mm.type.charAt(0) == 'e') {
+        operand.push({
+          type: mm.type,
+          value: 0,
+        });
+        return;
+      }
+      matchMode = mm.value ? 1 : 0;
+    }
+    var padValue = {
+      type: 'e#N/A',
+      value: 0,
+    };
+    if (foperand.length) {
+      var pv = scf.OperandValueAndType(sheet, foperand);
+      if (pv.type.charAt(0) == 'e') {
+        operand.push({
+          type: pv.type,
+          value: 0,
+        });
+        return;
+      }
+      padValue = {
+        type: pv.type,
+        value: pv.value,
+      };
+    }
+    var text = textOp.value;
+    var colDelim = colDelimOp.value;
+    var splitOnce = function (s, delim) {
+      if (delim.length == 0) return [s];
+      var hay = matchMode ? s.toLowerCase() : s;
+      var needle = matchMode ? delim.toLowerCase() : delim;
+      var pieces = [];
+      var pos = 0;
+      while (true) {
+        var idx = hay.indexOf(needle, pos);
+        if (idx < 0) {
+          pieces.push(s.substring(pos));
+          break;
+        }
+        pieces.push(s.substring(pos, idx));
+        pos = idx + delim.length;
+      }
+      return pieces;
+    };
+    var rowsRaw = rowDelim.length ? splitOnce(text, rowDelim) : [text];
+    var grid = rowsRaw.map(function (r) {
+      return splitOnce(r, colDelim);
+    });
+    if (ignoreEmpty) {
+      grid = grid
+        .map(function (row) {
+          return row.filter(function (c) {
+            return c.length > 0;
+          });
+        })
+        .filter(function (row) {
+          return row.length > 0;
+        });
+      if (!grid.length) grid = [['']];
+    }
+    var maxCols = 0;
+    for (var ri = 0; ri < grid.length; ri++) maxCols = Math.max(maxCols, grid[ri].length);
+    var cells = grid.map(function (row) {
+      var out = [];
+      for (var c = 0; c < maxCols; c++) {
+        out.push(
+          c < row.length
+            ? {
+                type: 't',
+                value: row[c],
+              }
+            : {
+                type: padValue.type,
+                value: padValue.value,
+              },
+        );
+      }
+      return out;
+    });
+    operand.push({
+      type: 'array',
+      value: {
+        rows: cells.length,
+        cols: maxCols,
+        cells,
+      },
+    });
+  };
+  SocialCalc.Formula.FunctionList['TEXTSPLIT'] = [
+    SocialCalc.Formula.TextSplitFunction,
+    -2,
+    'textsplit',
+    '',
+    'text',
+  ];
+  FormulaMut.CompileRegex = function (pattern, flags) {
+    try {
+      return new RegExp(pattern, flags);
+    } catch {
+      return null;
+    }
+  };
+  FormulaMut.TranslateRegexReplacement = function (repl) {
+    var out = '';
+    for (var i = 0; i < repl.length; i++) {
+      var ch = repl.charAt(i);
+      if (ch == '$') {
+        out += '$$';
+        continue;
+      }
+      if (ch == '\\') {
+        var next = repl.charAt(i + 1);
+        if (next == '\\') {
+          out += '\\';
+          i++;
+          continue;
+        }
+        if (next >= '1' && next <= '9') {
+          out += '$' + next;
+          i++;
+          continue;
+        }
+        out += '\\';
+        continue;
+      }
+      out += ch;
+    }
+    return out;
+  };
+  FormulaMut.RegexMatchFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var textOp = scf.OperandAsText(sheet, foperand);
+    if (textOp.type.charAt(0) == 'e') {
+      operand.push({
+        type: textOp.type,
+        value: 0,
+      });
+      return;
+    }
+    var patOp = scf.OperandAsText(sheet, foperand);
+    if (patOp.type.charAt(0) == 'e') {
+      operand.push({
+        type: patOp.type,
+        value: 0,
+      });
+      return;
+    }
+    var re = scf.CompileRegex(patOp.value, '');
+    if (!re) {
+      operand.push({
+        type: 'e#VALUE!',
+        value: 0,
+      });
+      return;
+    }
+    operand.push({
+      type: 'nl',
+      value: re.test(textOp.value) ? 1 : 0,
+    });
+  };
+  FormulaMut.RegexExtractFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var textOp = scf.OperandAsText(sheet, foperand);
+    if (textOp.type.charAt(0) == 'e') {
+      operand.push({
+        type: textOp.type,
+        value: 0,
+      });
+      return;
+    }
+    var patOp = scf.OperandAsText(sheet, foperand);
+    if (patOp.type.charAt(0) == 'e') {
+      operand.push({
+        type: patOp.type,
+        value: 0,
+      });
+      return;
+    }
+    var re = scf.CompileRegex(patOp.value, '');
+    if (!re) {
+      operand.push({
+        type: 'e#VALUE!',
+        value: 0,
+      });
+      return;
+    }
+    var m = re.exec(textOp.value);
+    if (!m) {
+      operand.push({
+        type: 'e#N/A',
+        value: 0,
+      });
+      return;
+    }
+    var groups = m.length - 1;
+    if (groups <= 1) {
+      var text = groups == 1 ? m[1] || '' : m[0];
+      scf.PushOperand(operand, 't', text);
+      return;
+    }
+    var cells = [];
+    for (var g = 1; g <= groups; g++)
+      cells.push({
+        type: 't',
+        value: m[g] || '',
+      });
+    operand.push({
+      type: 'array',
+      value: {
+        rows: 1,
+        cols: groups,
+        cells: [cells],
+      },
+    });
+  };
+  FormulaMut.RegexReplaceFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var textOp = scf.OperandAsText(sheet, foperand);
+    if (textOp.type.charAt(0) == 'e') {
+      operand.push({
+        type: textOp.type,
+        value: 0,
+      });
+      return;
+    }
+    var patOp = scf.OperandAsText(sheet, foperand);
+    if (patOp.type.charAt(0) == 'e') {
+      operand.push({
+        type: patOp.type,
+        value: 0,
+      });
+      return;
+    }
+    var replOp = scf.OperandAsText(sheet, foperand);
+    if (replOp.type.charAt(0) == 'e') {
+      operand.push({
+        type: replOp.type,
+        value: 0,
+      });
+      return;
+    }
+    var re = scf.CompileRegex(patOp.value, 'g');
+    if (!re) {
+      operand.push({
+        type: 'e#VALUE!',
+        value: 0,
+      });
+      return;
+    }
+    var jsReplacement = scf.TranslateRegexReplacement(replOp.value);
+    var result = textOp.value.replace(re, jsReplacement);
+    scf.PushOperand(operand, 't', result);
+  };
+  SocialCalc.Formula.FunctionList['REGEXMATCH'] = [
+    SocialCalc.Formula.RegexMatchFunction,
+    2,
+    'regexmatch',
+    '',
+    'text',
+  ];
+  SocialCalc.Formula.FunctionList['REGEXEXTRACT'] = [
+    SocialCalc.Formula.RegexExtractFunction,
+    2,
+    'regexextract',
+    '',
+    'text',
+  ];
+  SocialCalc.Formula.FunctionList['REGEXREPLACE'] = [
+    SocialCalc.Formula.RegexReplaceFunction,
+    3,
+    'regexreplace',
+    '',
+    'text',
   ];
 
   // Pure formula parse / token / type helpers.

@@ -8,6 +8,9 @@ import «eval-ops.def»
 set_option loom.semantics.termination "total"
 set_option loom.semantics.choice "demonic"
 
+prove_correct isNAType by
+  unfold Pure.isNAType; loom_solve
+
 prove_correct isErrorType by
   unfold Pure.isErrorType; loom_solve
 

@@ -191,11 +191,10 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
   // — the second-largest StringLiteral survivor cluster in the file.
   //
   // RANK/MEDIAN/QUARTILE (audreyt/ethercalc#712, #726), SORT/UNIQUE (dynamic-array
-  // spill support), date arithmetic/workday functions, and PPMT/IPMT/MIRR/XNPV/XIRR
-  // were added after the 3.0.8 baseline was vendored, so the oracle bundle can
-  // never contain their s_fdef_/s_farg_ keys. Carve out exactly this named, closed
-  // set; byte-for-byte parity and totals (135/52) remain pinned so undocumented
-  // additions or removals fail loudly instead of silently passing through.
+  // The post-3.0.8 date, financial, logical/error, text, and regex keys have no
+  // oracle counterpart to diff against. Focused compatibility suites cover their
+  // registration, help text, and behavior; this test asserts every carved-out
+  // key has non-empty help text. SEARCH reuses FIND's s_farg_find definition.
   const postOracleFdefKeys = [
     "s_fdef_RANK",
     "s_fdef_MEDIAN",
@@ -217,6 +216,20 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
     "s_fdef_MIRR",
     "s_fdef_XNPV",
     "s_fdef_XIRR",
+    "s_fdef_SEARCH",
+    "s_fdef_IFERROR",
+    "s_fdef_IFNA",
+    "s_fdef_IFS",
+    "s_fdef_SPLIT",
+    "s_fdef_SWITCH",
+    "s_fdef_TEXTJOIN",
+    "s_fdef_JOIN",
+    "s_fdef_TEXTBEFORE",
+    "s_fdef_TEXTAFTER",
+    "s_fdef_TEXTSPLIT",
+    "s_fdef_REGEXMATCH",
+    "s_fdef_REGEXEXTRACT",
+    "s_fdef_REGEXREPLACE",
   ];
   const postOracleFargKeys = [
     "s_farg_rank",
@@ -233,10 +246,22 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
     "s_farg_mirr",
     "s_farg_xnpv",
     "s_farg_xirr",
+    "s_farg_iferror",
+    "s_farg_ifna",
+    "s_farg_ifs",
+    "s_farg_switch",
+    "s_farg_textjoin",
+    "s_farg_join",
+    "s_farg_textbeforeafter",
+    "s_farg_split",
+    "s_farg_textsplit",
+    "s_farg_regexmatch",
+    "s_farg_regexextract",
+    "s_farg_regexreplace",
   ];
 
-  expect(Object.keys(candidateFdef).length).toBe(135);
-  expect(Object.keys(candidateFarg).length).toBe(52);
+  expect(Object.keys(candidateFdef).length).toBe(149);
+  expect(Object.keys(candidateFarg).length).toBe(64);
 
   const legacyFdef = { ...candidateFdef };
   const legacyFarg = { ...candidateFarg };
@@ -248,9 +273,10 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
   expect(legacyFdef).toEqual(pickByPrefix(Oracle.Constants, "s_fdef_"));
   expect(legacyFarg).toEqual(pickByPrefix(Oracle.Constants, "s_farg_"));
 
-  // The post-3.0.8 date and financial keys have no oracle counterpart to diff
-  // against. Focused date-arithmetic/workday and financial-function tests cover
-  // their registration, help text, and behavior; this test asserts every
+  // The post-3.0.8 date, financial, logical/error, text, and regex keys have no
+  // oracle counterpart to diff against. Focused date/financial/logical/text/regex
+  // suites cover FunctionList, picker plumbing, and behavior; this test only
+  // asserts every carved-out key has non-empty help text.
   // carved-out key has non-empty help text.
   for (const key of postOracleFdefKeys) {
     expect(candidateFdef[key]).toBeTruthy();

@@ -80,6 +80,12 @@ lean_lib EvalOps where
   extraDepTargets := #[``downloadDependencies]
 
 @[default_target]
+lean_lib Branch where
+  srcDir := "lemma"
+  roots := #[`«branch.types», `«branch.def», `«branch.proof»]
+  extraDepTargets := #[``downloadDependencies]
+
+@[default_target]
 lean_lib LookupResult where
   srcDir := "lemma"
   roots := #[`«lookup-result.types», `«lookup-result.def», `«lookup-result.proof»]

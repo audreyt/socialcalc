@@ -488,10 +488,14 @@ declare namespace SocialCalc {
     s_fdef_FACT: string;
     s_fdef_FALSE: string;
     s_fdef_FIND: string;
+    s_fdef_SEARCH: string;
     s_fdef_FV: string;
     s_fdef_HLOOKUP: string;
     s_fdef_HOUR: string;
     s_fdef_IF: string;
+    s_fdef_IFERROR: string;
+    s_fdef_IFNA: string;
+    s_fdef_IFS: string;
     s_fdef_INDEX: string;
     s_fdef_INT: string;
     s_fdef_IRR: string;
@@ -547,6 +551,7 @@ declare namespace SocialCalc {
     s_fdef_STDEV: string;
     s_fdef_STDEVP: string;
     s_fdef_SUBSTITUTE: string;
+    s_fdef_SPLIT: string;
     s_fdef_SUM: string;
     s_fdef_SUMIF: string;
     s_fdef_SUMIFS: string;
@@ -564,6 +569,15 @@ declare namespace SocialCalc {
     s_fdef_VARP: string;
     s_fdef_SORT: string;
     s_fdef_UNIQUE: string;
+    s_fdef_SWITCH: string;
+    s_fdef_TEXTJOIN: string;
+    s_fdef_JOIN: string;
+    s_fdef_TEXTBEFORE: string;
+    s_fdef_TEXTAFTER: string;
+    s_fdef_TEXTSPLIT: string;
+    s_fdef_REGEXMATCH: string;
+    s_fdef_REGEXEXTRACT: string;
+    s_fdef_REGEXREPLACE: string;
     s_farg_sort: string;
     s_farg_unique: string;
     s_fdef_VLOOKUP: string;
@@ -614,6 +628,18 @@ declare namespace SocialCalc {
     s_farg_dt: string;
     s_farg_rangen: string;
     s_farg_vsig: string;
+    s_farg_iferror: string;
+    s_farg_ifna: string;
+    s_farg_ifs: string;
+    s_farg_switch: string;
+    s_farg_textjoin: string;
+    s_farg_join: string;
+    s_farg_textbeforeafter: string;
+    s_farg_split: string;
+    s_farg_textsplit: string;
+    s_farg_regexmatch: string;
+    s_farg_regexextract: string;
+    s_farg_regexreplace: string;
 
     // Function class list and labels
     function_classlist: string[];

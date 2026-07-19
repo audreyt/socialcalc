@@ -480,6 +480,29 @@ declare namespace SocialCalc {
     // I/O widget functions (BUTTON, TEXTBOX, COPYVALUE, EMAIL, PANEL, STYLE, etc.)
     const IoFunctions: FormulaFunctionImpl;
 
+    // Logical/error/text compatibility functions (IFERROR/IFNA/IFS/SWITCH,
+    // TEXTJOIN/JOIN, TEXTBEFORE/TEXTAFTER, SPLIT/TEXTSPLIT, REGEXMATCH/
+    // REGEXEXTRACT/REGEXREPLACE, SEARCH via StringFunctions).
+    const IfErrorFunction: FormulaFunctionImpl;
+    const IfsFunction: FormulaFunctionImpl;
+    const SwitchFunction: FormulaFunctionImpl;
+    function TextJoinCollect(
+      sheet: Sheet,
+      foperand: FormulaOperand[],
+      delim: string,
+      ignoreEmpty: boolean,
+    ): FormulaValueResult;
+    const TextJoinFunction: FormulaFunctionImpl;
+    const JoinFunction: FormulaFunctionImpl;
+    const TextBeforeAfterFunction: FormulaFunctionImpl;
+    const SplitFunction: FormulaFunctionImpl;
+    const TextSplitFunction: FormulaFunctionImpl;
+    function CompileRegex(pattern: string, flags: string): RegExp | null;
+    function TranslateRegexReplacement(repl: string): string;
+    const RegexMatchFunction: FormulaFunctionImpl;
+    const RegexExtractFunction: FormulaFunctionImpl;
+    const RegexReplaceFunction: FormulaFunctionImpl;
+
     // --------------------------------------------------------------
     // Parameter/range standardizers
     // --------------------------------------------------------------

@@ -5,6 +5,9 @@ import LemmaScript
 
 namespace Pure
 
+def isNAType (t : Int) : Bool :=
+  t = 13
+
 def isErrorType (t : Int) : Bool :=
   t = 10 ∨ t = 11 ∨ t = 12
 

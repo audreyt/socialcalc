@@ -31,6 +31,21 @@ export const ERR_REF = 10;
 export const ERR_DIV0 = 11;
 /** #VALUE! */
 export const ERR_VALUE = 12;
+/** #N/A (distinguished from the general error lattice; used by IFNA policy). */
+export const ERR_NA = 13;
+
+/**
+ * Whether a type code is specifically the #N/A error. Distinct from the
+ * general isErrorType lattice check (which only covers REF/DIV0/VALUE, the
+ * codes arithType/divType/concatType actually propagate) — IFNA needs to
+ * tell #N/A apart from every other error, so it gets its own pure classifier.
+ */
+export function isNAType(t: number): boolean {
+  //@ verify
+  //@ ensures \result === true || \result === false
+  //@ ensures \result === true <==> t === 13
+  return t === 13;
+}
 
 /**
  * Whether a type code is an error code (10+).
@@ -97,6 +112,7 @@ export function fromValueType(vt: string): number {
   if (vt.charAt(0) === "e") {
     if (vt.indexOf("#REF!") >= 0) return 10;
     if (vt.indexOf("#DIV/0!") >= 0) return 11;
+    if (vt.indexOf("#N/A") >= 0) return 13;
     if (vt.indexOf("#VALUE!") >= 0) return 12;
     return 12;
   }
@@ -112,6 +128,7 @@ export function toValueType(t: number): string {
   if (t === 10) return "e#REF!";
   if (t === 11) return "e#DIV/0!";
   if (t === 12) return "e#VALUE!";
+  if (t === 13) return "e#N/A";
   if (t === 1) return "t";
   if (t === 2) return "b";
   return "n";

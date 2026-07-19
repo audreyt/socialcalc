@@ -493,9 +493,11 @@ test("logical functions, IF and NA/error handling", async () => {
   expect(getDV("C6")).toBe(0);
   expect(getVT("C6")).toBe("nl");
   expect(getVT("C7")).toBe("e#N/A");
-  // IFERROR isn't in source → unknown function → error
-  expect(getVT("C8").charAt(0)).toBe("e");
-  expect(getVT("C9").charAt(0)).toBe("e");
+  // IFERROR is now a real function (js/formula1.ts IfErrorFunction): the
+  // error branch is caught and replaced by the fallback, the non-error
+  // branch passes through untouched.
+  expect(getDV("C8")).toBe(99);
+  expect(getDV("C9")).toBe(5);
 });
 
 test("string functions and their error branches", async () => {

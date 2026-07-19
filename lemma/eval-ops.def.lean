@@ -7,6 +7,12 @@ import «eval-ops.types»
 set_option loom.semantics.termination "total"
 set_option loom.semantics.choice "demonic"
 
+method isNAType (t : Int) return (res : Bool)
+  ensures res = true ∨ res = false
+  ensures res = true ↔ t = 13
+  do
+    return Pure.isNAType t
+
 method isErrorType (t : Int) return (res : Bool)
   ensures res = true ∨ res = false
   ensures res = true ↔ t = 10 ∨ t = 11 ∨ t = 12

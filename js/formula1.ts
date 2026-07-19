@@ -4323,6 +4323,7 @@ SocialCalc.Formula.FunctionList["EXACT"] = [SocialCalc.Formula.ExactFunction, 2,
 
 FormulaMut.ArgList = {
   FIND: [1, 1, 0],
+  SEARCH: [1, 1, 0],
   LEFT: [1, 0],
   LEN: [1],
   LOWER: [1],
@@ -4380,6 +4381,26 @@ FormulaMut.StringFunctions = function (fname, operand, foperand, sheet) {
         result = "Start is before string"; // !! not displayed, no need to translate
       } else {
         result = operand_value[2].indexOf(operand_value[1], offset); // (null string matches first char)
+        if (result >= 0) {
+          result += 1;
+          resulttype = "n";
+        } else {
+          result = "Not found"; // !! not displayed, error is e#VALUE!
+        }
+      }
+      break;
+
+    case "SEARCH":
+      // Case-insensitive FIND counterpart. No wildcard (?/*) support: this
+      // engine's FIND is a literal indexOf, so SEARCH stays a literal
+      // case-insensitive indexOf rather than diverging with wildcard syntax.
+      offset = operand_type[3] ? operand_value[3] - 1 : 0;
+      if (offset < 0) {
+        result = "Start is before string"; // !! not displayed, no need to translate
+      } else {
+        result = (operand_value[2] as string)
+          .toLowerCase()
+          .indexOf((operand_value[1] as string).toLowerCase(), offset);
         if (result >= 0) {
           result += 1;
           resulttype = "n";
@@ -4535,6 +4556,13 @@ FormulaMut.StringFunctions = function (fname, operand, foperand, sheet) {
 };
 
 SocialCalc.Formula.FunctionList["FIND"] = [
+  SocialCalc.Formula.StringFunctions,
+  -2,
+  "find",
+  "",
+  "text",
+];
+SocialCalc.Formula.FunctionList["SEARCH"] = [
   SocialCalc.Formula.StringFunctions,
   -2,
   "find",
@@ -8785,4 +8813,869 @@ FormulaMut.FunctionList["UNIQUE"] = [
   "unique",
   null,
   "lookup",
+];
+
+/*
+#
+# IFERROR(value,value_if_error)
+# IFNA(value,value_if_na)
+#
+# Both branches share a single "resolve value, catch a specific error class"
+# shape: IFERROR catches any error type, IFNA catches only #N/A. Like IF
+# (above), this evaluator is eager: value_if_error/value_if_na has already
+# been fully evaluated by the time this function runs (RPN evaluates the
+# argument sub-expression before the enclosing function token), even when
+# value did not error. Vendor Excel/Sheets IFERROR/IFNA are short-circuit and
+# never evaluate the unused branch. This only differs observably when the
+# unused branch has a side effect this engine tracks: a volatile marker
+# (NOW/TODAY/RAND) or an IO trigger (EMAILIF/BUTTON/etc. via
+# StoreIoEventFormula) is recorded even for the branch that is discarded.
+#
+*/
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.IfErrorFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+
+  var valueResult = scf.OperandValueAndType(sheet, foperand);
+  var fallback = foperand.pop() as SocialCalc.FormulaOperand;
+
+  var caught = fname == "IFNA" ? valueResult.type == "e#N/A" : valueResult.type.charAt(0) == "e";
+
+  if (caught) {
+    operand.push(fallback);
+  } else {
+    operand.push({ type: valueResult.type, value: valueResult.value });
+  }
+};
+
+SocialCalc.Formula.FunctionList["IFERROR"] = [
+  SocialCalc.Formula.IfErrorFunction,
+  2,
+  "iferror",
+  "",
+  "test",
+];
+SocialCalc.Formula.FunctionList["IFNA"] = [
+  SocialCalc.Formula.IfErrorFunction,
+  2,
+  "ifna",
+  "",
+  "test",
+];
+
+/*
+#
+# IFS(condition1,value1,[condition2,value2,...])
+#
+# Evaluates condition/value pairs left to right and returns the first value
+# whose condition is true (nonzero numeric/logical). #N/A if none match, an
+# odd argument count, or a non-numeric/non-logical condition raises
+# #VALUE!/propagates the condition's own error. Same eager-evaluation caveat
+# as IF/IFERROR: every condition and every paired value is fully evaluated
+# before IFS picks a winner (see lemma/branch.ts firstTrueIndex for the pure
+# "first true wins" policy this mirrors).
+#
+*/
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.IfsFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+
+  if (foperand.length % 2 != 0) {
+    scf.FunctionArgsError(fname, operand);
+    return;
+  }
+
+  while (foperand.length) {
+    var cond = scf.OperandValueAndType(sheet, foperand);
+    var val = foperand.pop() as SocialCalc.FormulaOperand;
+    var t = cond.type.charAt(0);
+    if (t == "e") {
+      operand.push({ type: cond.type, value: 0 });
+      return;
+    }
+    if (t != "n" && t != "b") {
+      operand.push({ type: "e#VALUE!", value: 0 });
+      return;
+    }
+    if (cond.value) {
+      operand.push(val);
+      return;
+    }
+  }
+
+  operand.push({ type: "e#N/A", value: 0 });
+};
+
+SocialCalc.Formula.FunctionList["IFS"] = [SocialCalc.Formula.IfsFunction, -2, "ifs", "", "test"];
+
+/*
+#
+# SWITCH(expression,case1,value1,[case2,value2,...],[default])
+#
+# Compares expression against each case using the same equality rule as the
+# "=" operator (numeric-numeric direct compare; otherwise both sides are
+# rendered to lowercase text, matching EvaluatePolish's comparison-operator
+# branch above) and returns the first matching value. A trailing unpaired
+# argument is the default, used when no case matches; with no default and no
+# match, returns #N/A.
+#
+*/
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.SwitchFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+
+  var valuesEqual = function (
+    v1: SocialCalc.FormulaValueResult,
+    v2: SocialCalc.FormulaValueResult,
+  ): boolean {
+    var t1 = v1.type.charAt(0),
+      t2 = v2.type.charAt(0);
+    if (t1 == "n" && t2 == "n") return v1.value == v2.value;
+    // SocialCalc.format_number_for_display is a hard, always-loaded
+    // dependency wherever the evaluator runs, so call it directly (mirrors
+    // EvaluatePolish's comparison-operator branch); no defensive fallback.
+    var s1: string = String(v1.value),
+      s2: string = String(v2.value);
+    if (t1 == "n") s1 = SocialCalc.format_number_for_display(v1.value, "n", "");
+    else if (t1 == "b") s1 = "";
+    if (t2 == "n") s2 = SocialCalc.format_number_for_display(v2.value, "n", "");
+    else if (t2 == "b") s2 = "";
+    return s1.toLowerCase() == s2.toLowerCase();
+  };
+
+  var expr = scf.OperandValueAndType(sheet, foperand);
+  if (expr.type.charAt(0) == "e") {
+    operand.push({ type: expr.type, value: 0 });
+    return;
+  }
+
+  while (foperand.length >= 2) {
+    var caseval = scf.OperandValueAndType(sheet, foperand);
+    var val = foperand.pop() as SocialCalc.FormulaOperand;
+    if (caseval.type.charAt(0) == "e") {
+      operand.push({ type: caseval.type, value: 0 });
+      return;
+    }
+    if (valuesEqual(expr, caseval)) {
+      operand.push(val);
+      return;
+    }
+  }
+
+  if (foperand.length == 1) {
+    operand.push(foperand.pop() as SocialCalc.FormulaOperand); // trailing default
+    return;
+  }
+
+  operand.push({ type: "e#N/A", value: 0 });
+};
+
+SocialCalc.Formula.FunctionList["SWITCH"] = [
+  SocialCalc.Formula.SwitchFunction,
+  -3,
+  "switch",
+  "",
+  "test",
+];
+
+/*
+#
+# TEXTJOIN(delimiter,ignore_empty,text1,[text2,...])
+# JOIN(delimiter,value_or_array1,[value_or_array2,...])
+#
+# TextJoinCollect flattens each remaining argument via OperandAsText, which
+# resolves ranges cell-by-cell through StepThroughRangeDown (row-major: outer
+# row loop, inner column loop) and follows names/cross-sheet coords the same
+# way every other range-consuming function does, so TEXTJOIN/JOIN automatically
+# inherit range, cross-sheet, and named-range flattening for free. The first
+# item that resolves to an error is returned immediately (error propagation);
+# no artificial string-length cap is added beyond the engine's existing text
+# handling. JOIN is the Sheets alias for TEXTJOIN with ignore_empty fixed to
+# FALSE (see lemma/branch.ts keepJoinItem/emitDelimiterBefore for the pure
+# keep/placement policy this mirrors).
+#
+*/
+
+/**
+ * @param {any} sheet
+ * @param {any[]} foperand
+ * @param {string} delim
+ * @param {boolean} ignoreEmpty
+ */
+FormulaMut.TextJoinCollect = function (sheet, foperand, delim, ignoreEmpty) {
+  var scf = SocialCalc.Formula;
+  var parts: string[] = [];
+
+  while (foperand.length) {
+    var item = scf.OperandAsText(sheet, foperand);
+    if (item.type.charAt(0) == "e") {
+      return { type: item.type, value: 0 };
+    }
+    var text = item.value as string;
+    if (!ignoreEmpty || text.length) parts.push(text);
+  }
+
+  return { type: "t", value: parts.join(delim) };
+};
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.TextJoinFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+
+  var delim = scf.OperandAsText(sheet, foperand);
+  if (delim.type.charAt(0) == "e") {
+    operand.push({ type: delim.type, value: 0 });
+    return;
+  }
+  var ignoreOp = scf.OperandAsNumber(sheet, foperand);
+  if (ignoreOp.type.charAt(0) == "e") {
+    operand.push({ type: ignoreOp.type, value: 0 });
+    return;
+  }
+
+  operand.push(scf.TextJoinCollect(sheet, foperand, delim.value as string, ignoreOp.value != 0));
+};
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.JoinFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+
+  var delim = scf.OperandAsText(sheet, foperand);
+  if (delim.type.charAt(0) == "e") {
+    operand.push({ type: delim.type, value: 0 });
+    return;
+  }
+
+  operand.push(scf.TextJoinCollect(sheet, foperand, delim.value as string, false));
+};
+
+SocialCalc.Formula.FunctionList["TEXTJOIN"] = [
+  SocialCalc.Formula.TextJoinFunction,
+  -3,
+  "textjoin",
+  "",
+  "text",
+];
+SocialCalc.Formula.FunctionList["JOIN"] = [SocialCalc.Formula.JoinFunction, -2, "join", "", "text"];
+
+/*
+#
+# TEXTBEFORE(text,delimiter,[instance_num],[match_mode],[match_end],[if_not_found])
+# TEXTAFTER(text,delimiter,[instance_num],[match_mode],[match_end],[if_not_found])
+#
+# instance_num counts delimiter occurrences from the left when positive, from
+# the right when negative (default 1); match_mode 0 = case-sensitive
+# (default), nonzero = case-insensitive; match_end nonzero treats the string
+# boundary in the counting direction as one additional virtual
+# zero-length delimiter (so TEXTAFTER(text,delim,-1,0,1) with no real
+# delimiter returns the whole string, and TEXTAFTER with match_end and an
+# instance one past the last real delimiter returns ""), matching documented
+# Excel TEXTBEFORE/TEXTAFTER match_end semantics. No array-of-delimiters
+# support: this engine has no array-constant literal syntax, so delimiter is
+# always a single scalar string. When the delimiter cannot be located,
+# if_not_found (left unevaluated until picked, like IF's branches) is
+# returned if supplied, else #N/A. Note: this engine's comma-argument parser
+# has no notion of an elided middle argument (a bare "TEXTAFTER(a,b,,,1)"
+# is a parse error, not "match_end=1 with match_mode defaulted") — to reach
+# a later optional argument, every earlier optional must be supplied
+# explicitly (e.g. TEXTAFTER(text,delim,-4,0,1)).
+#
+*/
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.TextBeforeAfterFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+
+  if (foperand.length > 6) {
+    scf.FunctionArgsError(fname, operand);
+    return;
+  }
+
+  var textOp = scf.OperandAsText(sheet, foperand);
+  if (textOp.type.charAt(0) == "e") {
+    operand.push({ type: textOp.type, value: 0 });
+    return;
+  }
+  var delimOp = scf.OperandAsText(sheet, foperand);
+  if (delimOp.type.charAt(0) == "e") {
+    operand.push({ type: delimOp.type, value: 0 });
+    return;
+  }
+  var text = textOp.value as string;
+  var delim = delimOp.value as string;
+
+  // Excel note: text must resolve to a non-empty string, else #VALUE!.
+  if (text.length == 0) {
+    operand.push({ type: "e#VALUE!", value: 0 });
+    return;
+  }
+
+  var instanceNum = 1;
+  if (foperand.length) {
+    var io = scf.OperandAsNumber(sheet, foperand);
+    if (io.type.charAt(0) == "e") {
+      operand.push({ type: io.type, value: 0 });
+      return;
+    }
+    instanceNum = Math.trunc(io.value as number);
+    if (instanceNum == 0) {
+      operand.push({ type: "e#VALUE!", value: 0 });
+      return;
+    }
+  }
+
+  var matchMode = 0;
+  if (foperand.length) {
+    var mo = scf.OperandAsNumber(sheet, foperand);
+    if (mo.type.charAt(0) == "e") {
+      operand.push({ type: mo.type, value: 0 });
+      return;
+    }
+    matchMode = mo.value ? 1 : 0;
+  }
+
+  var matchEnd = 0;
+  if (foperand.length) {
+    var eo = scf.OperandAsNumber(sheet, foperand);
+    if (eo.type.charAt(0) == "e") {
+      operand.push({ type: eo.type, value: 0 });
+      return;
+    }
+    matchEnd = eo.value ? 1 : 0;
+  }
+
+  var hasIfNotFound = false;
+  var ifNotFound: SocialCalc.FormulaOperand = { type: "e#N/A", value: 0 };
+  if (foperand.length) {
+    hasIfNotFound = true;
+    ifNotFound = foperand.pop() as SocialCalc.FormulaOperand;
+  }
+
+  var positions: number[] = [];
+  if (delim.length > 0) {
+    var hay = matchMode ? text.toLowerCase() : text;
+    var needle = matchMode ? delim.toLowerCase() : delim;
+    var searchPos = 0;
+    while (true) {
+      var idx = hay.indexOf(needle, searchPos);
+      if (idx < 0) break;
+      positions.push(idx);
+      searchPos = idx + needle.length;
+    }
+  }
+
+  var n = positions.length;
+  var idx1based = instanceNum > 0 ? instanceNum : n + instanceNum + 1;
+  var found = idx1based >= 1 && idx1based <= n;
+
+  var pos = -1;
+  var delimLen = 0;
+  if (found) {
+    pos = positions[idx1based - 1]!;
+    delimLen = delim.length;
+  } else if (matchEnd) {
+    if (instanceNum > 0 && idx1based == n + 1) {
+      pos = text.length; // virtual delimiter past the end
+    }
+    if (instanceNum < 0 && idx1based == 0) {
+      pos = 0; // virtual delimiter before the start
+    }
+  }
+
+  if (pos < 0) {
+    if (hasIfNotFound) {
+      operand.push(ifNotFound);
+    } else {
+      operand.push({ type: "e#N/A", value: 0 });
+    }
+    return;
+  }
+
+  var resultText = fname == "TEXTBEFORE" ? text.substring(0, pos) : text.substring(pos + delimLen);
+  scf.PushOperand(operand, "t", resultText);
+};
+
+SocialCalc.Formula.FunctionList["TEXTBEFORE"] = [
+  SocialCalc.Formula.TextBeforeAfterFunction,
+  -2,
+  "textbeforeafter",
+  "",
+  "text",
+];
+SocialCalc.Formula.FunctionList["TEXTAFTER"] = [
+  SocialCalc.Formula.TextBeforeAfterFunction,
+  -2,
+  "textbeforeafter",
+  "",
+  "text",
+];
+
+/*
+#
+# SPLIT(text,delimiter,[split_by_each],[remove_empty_text])
+#
+# Sheets SPLIT: split_by_each (default TRUE) treats every character in
+# delimiter as its own separate delimiter (e.g. delimiter=",;" splits on a
+# comma OR a semicolon, not the literal two-character string); FALSE treats
+# delimiter as one literal multi-character separator. remove_empty_text
+# (default TRUE) drops empty pieces produced by adjacent delimiters. Result
+# spills across one row (typed "array", consumed by the existing spill layer
+# the same way SORT/UNIQUE results are).
+#
+*/
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.SplitFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+
+  if (foperand.length > 4) {
+    scf.FunctionArgsError(fname, operand);
+    return;
+  }
+
+  var textOp = scf.OperandAsText(sheet, foperand);
+  if (textOp.type.charAt(0) == "e") {
+    operand.push({ type: textOp.type, value: 0 });
+    return;
+  }
+  var delimOp = scf.OperandAsText(sheet, foperand);
+  if (delimOp.type.charAt(0) == "e") {
+    operand.push({ type: delimOp.type, value: 0 });
+    return;
+  }
+
+  var splitByEach = true;
+  if (foperand.length) {
+    var sb = scf.OperandAsNumber(sheet, foperand);
+    if (sb.type.charAt(0) == "e") {
+      operand.push({ type: sb.type, value: 0 });
+      return;
+    }
+    splitByEach = sb.value != 0;
+  }
+
+  var removeEmpty = true;
+  if (foperand.length) {
+    var rm = scf.OperandAsNumber(sheet, foperand);
+    if (rm.type.charAt(0) == "e") {
+      operand.push({ type: rm.type, value: 0 });
+      return;
+    }
+    removeEmpty = rm.value != 0;
+  }
+
+  var text = textOp.value as string;
+  var delim = delimOp.value as string;
+
+  var pieces: string[];
+  if (delim.length == 0) {
+    pieces = [text];
+  } else if (splitByEach) {
+    var alternation = delim
+      .split("")
+      .map(function (ch) {
+        return ch.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
+      })
+      .join("|");
+    var charClass = "(?:" + alternation + ")";
+    pieces = text.split(new RegExp(charClass));
+  } else {
+    pieces = text.split(delim);
+  }
+  if (removeEmpty)
+    pieces = pieces.filter(function (p) {
+      return p.length > 0;
+    });
+  if (!pieces.length) pieces = [""];
+
+  var cells: SocialCalc.FormulaArrayCell[] = pieces.map(function (p) {
+    return { type: "t", value: p };
+  });
+  operand.push({ type: "array", value: { rows: 1, cols: pieces.length, cells: [cells] } });
+};
+
+SocialCalc.Formula.FunctionList["SPLIT"] = [
+  SocialCalc.Formula.SplitFunction,
+  -2,
+  "split",
+  "",
+  "text",
+];
+
+/*
+#
+# TEXTSPLIT(text,col_delimiter,[row_delimiter],[ignore_empty],[match_mode],[pad_with])
+#
+# col_delimiter/row_delimiter are single literal (possibly multi-character)
+# separators, matched as one token (unlike SPLIT's per-character mode); no
+# array-of-delimiters support (no array-constant syntax in this engine, same
+# limitation as TEXTBEFORE/TEXTAFTER). ignore_empty (default FALSE) drops
+# empty pieces from both axes. match_mode 0 = case-sensitive (default),
+# nonzero = case-insensitive. pad_with (default #N/A, matching Excel) fills
+# short rows so the result is a rectangular "array" for the spill layer.
+#
+*/
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.TextSplitFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+
+  if (foperand.length > 6) {
+    scf.FunctionArgsError(fname, operand);
+    return;
+  }
+
+  var textOp = scf.OperandAsText(sheet, foperand);
+  if (textOp.type.charAt(0) == "e") {
+    operand.push({ type: textOp.type, value: 0 });
+    return;
+  }
+  var colDelimOp = scf.OperandAsText(sheet, foperand);
+  if (colDelimOp.type.charAt(0) == "e") {
+    operand.push({ type: colDelimOp.type, value: 0 });
+    return;
+  }
+
+  var rowDelim = "";
+  if (foperand.length) {
+    var rd = scf.OperandAsText(sheet, foperand);
+    if (rd.type.charAt(0) == "e") {
+      operand.push({ type: rd.type, value: 0 });
+      return;
+    }
+    rowDelim = rd.value as string;
+  }
+
+  var ignoreEmpty = false;
+  if (foperand.length) {
+    var ie = scf.OperandAsNumber(sheet, foperand);
+    if (ie.type.charAt(0) == "e") {
+      operand.push({ type: ie.type, value: 0 });
+      return;
+    }
+    ignoreEmpty = ie.value != 0;
+  }
+
+  var matchMode = 0;
+  if (foperand.length) {
+    var mm = scf.OperandAsNumber(sheet, foperand);
+    if (mm.type.charAt(0) == "e") {
+      operand.push({ type: mm.type, value: 0 });
+      return;
+    }
+    matchMode = mm.value ? 1 : 0;
+  }
+
+  var padValue: SocialCalc.FormulaOperand = { type: "e#N/A", value: 0 };
+  if (foperand.length) {
+    var pv = scf.OperandValueAndType(sheet, foperand);
+    if (pv.type.charAt(0) == "e") {
+      operand.push({ type: pv.type, value: 0 });
+      return;
+    }
+    padValue = { type: pv.type, value: pv.value };
+  }
+
+  var text = textOp.value as string;
+  var colDelim = colDelimOp.value as string;
+
+  var splitOnce = function (s: string, delim: string): string[] {
+    if (delim.length == 0) return [s];
+    var hay = matchMode ? s.toLowerCase() : s;
+    var needle = matchMode ? delim.toLowerCase() : delim;
+    var pieces: string[] = [];
+    var pos = 0;
+    while (true) {
+      var idx = hay.indexOf(needle, pos);
+      if (idx < 0) {
+        pieces.push(s.substring(pos));
+        break;
+      }
+      pieces.push(s.substring(pos, idx));
+      pos = idx + delim.length;
+    }
+    return pieces;
+  };
+
+  var rowsRaw = rowDelim.length ? splitOnce(text, rowDelim) : [text];
+  var grid: string[][] = rowsRaw.map(function (r) {
+    return splitOnce(r, colDelim);
+  });
+
+  if (ignoreEmpty) {
+    grid = grid
+      .map(function (row) {
+        return row.filter(function (c) {
+          return c.length > 0;
+        });
+      })
+      .filter(function (row) {
+        return row.length > 0;
+      });
+    if (!grid.length) grid = [[""]];
+  }
+
+  var maxCols = 0;
+  for (var ri = 0; ri < grid.length; ri++) maxCols = Math.max(maxCols, grid[ri]!.length);
+
+  var cells: SocialCalc.FormulaArrayCell[][] = grid.map(function (row) {
+    var out: SocialCalc.FormulaArrayCell[] = [];
+    for (var c = 0; c < maxCols; c++) {
+      out.push(
+        c < row.length
+          ? { type: "t", value: row[c] }
+          : { type: padValue.type, value: padValue.value },
+      );
+    }
+    return out;
+  });
+
+  operand.push({ type: "array", value: { rows: cells.length, cols: maxCols, cells: cells } });
+};
+
+SocialCalc.Formula.FunctionList["TEXTSPLIT"] = [
+  SocialCalc.Formula.TextSplitFunction,
+  -2,
+  "textsplit",
+  "",
+  "text",
+];
+
+/*
+#
+# REGEXMATCH(text,regular_expression)
+# REGEXEXTRACT(text,regular_expression)
+# REGEXREPLACE(text,regular_expression,replacement)
+#
+# Uses JavaScript RegExp directly (this engine has no RE2 implementation);
+# an invalid pattern (RegExp constructor throw) is a deterministic compile
+# failure reported as #VALUE!, matching the task's "reject invalid patterns"
+# requirement. REGEXMATCH does an unanchored substring test (RE2's default
+# partial-match semantics, same as an unanchored JS RegExp.test). REGEXEXTRACT
+# returns the first capturing group when the pattern has exactly one group,
+# the whole match when it has none, or spills the groups across one row when
+# it has two or more (mirrors Sheets' documented "extracts the first
+# capturing group" rule for the single-group case, extended consistently via
+# this engine's existing array-spill path for the multi-group case); no match
+# is #N/A. REGEXREPLACE replaces every non-overlapping match (Sheets replaces
+# all matches) and translates Sheets/RE2 `\1`.."\9"` backreferences in
+# replacement into JS's `$1`.."$9"` (a literal `$` in replacement is escaped
+# to `$$` so it is never misread as a JS replacement token, and `\\` is a
+# literal backslash).
+#
+*/
+
+/**
+ * @param {string} pattern
+ * @param {string} flags
+ */
+FormulaMut.CompileRegex = function (pattern, flags) {
+  try {
+    return new RegExp(pattern, flags);
+  } catch {
+    return null;
+  }
+};
+
+/** @param {string} repl */
+FormulaMut.TranslateRegexReplacement = function (repl) {
+  var out = "";
+  for (var i = 0; i < repl.length; i++) {
+    var ch = repl.charAt(i);
+    if (ch == "$") {
+      out += "$$";
+      continue;
+    }
+    if (ch == "\\") {
+      var next = repl.charAt(i + 1);
+      if (next == "\\") {
+        out += "\\";
+        i++;
+        continue;
+      }
+      if (next >= "1" && next <= "9") {
+        out += "$" + next;
+        i++;
+        continue;
+      }
+      out += "\\"; // lone/unsupported escape: keep literal backslash
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+};
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.RegexMatchFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+
+  var textOp = scf.OperandAsText(sheet, foperand);
+  if (textOp.type.charAt(0) == "e") {
+    operand.push({ type: textOp.type, value: 0 });
+    return;
+  }
+  var patOp = scf.OperandAsText(sheet, foperand);
+  if (patOp.type.charAt(0) == "e") {
+    operand.push({ type: patOp.type, value: 0 });
+    return;
+  }
+
+  var re = scf.CompileRegex(patOp.value as string, "");
+  if (!re) {
+    operand.push({ type: "e#VALUE!", value: 0 });
+    return;
+  }
+
+  operand.push({ type: "nl", value: re.test(textOp.value as string) ? 1 : 0 });
+};
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.RegexExtractFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+
+  var textOp = scf.OperandAsText(sheet, foperand);
+  if (textOp.type.charAt(0) == "e") {
+    operand.push({ type: textOp.type, value: 0 });
+    return;
+  }
+  var patOp = scf.OperandAsText(sheet, foperand);
+  if (patOp.type.charAt(0) == "e") {
+    operand.push({ type: patOp.type, value: 0 });
+    return;
+  }
+
+  var re = scf.CompileRegex(patOp.value as string, "");
+  if (!re) {
+    operand.push({ type: "e#VALUE!", value: 0 });
+    return;
+  }
+
+  var m = re.exec(textOp.value as string);
+  if (!m) {
+    operand.push({ type: "e#N/A", value: 0 });
+    return;
+  }
+
+  var groups = m.length - 1;
+  if (groups <= 1) {
+    var text = groups == 1 ? m[1] || "" : m[0];
+    scf.PushOperand(operand, "t", text);
+    return;
+  }
+
+  var cells: SocialCalc.FormulaArrayCell[] = [];
+  for (var g = 1; g <= groups; g++) cells.push({ type: "t", value: m[g] || "" });
+  operand.push({ type: "array", value: { rows: 1, cols: groups, cells: [cells] } });
+};
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.RegexReplaceFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+
+  var textOp = scf.OperandAsText(sheet, foperand);
+  if (textOp.type.charAt(0) == "e") {
+    operand.push({ type: textOp.type, value: 0 });
+    return;
+  }
+  var patOp = scf.OperandAsText(sheet, foperand);
+  if (patOp.type.charAt(0) == "e") {
+    operand.push({ type: patOp.type, value: 0 });
+    return;
+  }
+  var replOp = scf.OperandAsText(sheet, foperand);
+  if (replOp.type.charAt(0) == "e") {
+    operand.push({ type: replOp.type, value: 0 });
+    return;
+  }
+
+  var re = scf.CompileRegex(patOp.value as string, "g");
+  if (!re) {
+    operand.push({ type: "e#VALUE!", value: 0 });
+    return;
+  }
+
+  var jsReplacement = scf.TranslateRegexReplacement(replOp.value as string);
+  var result = (textOp.value as string).replace(re, jsReplacement);
+  scf.PushOperand(operand, "t", result);
+};
+
+SocialCalc.Formula.FunctionList["REGEXMATCH"] = [
+  SocialCalc.Formula.RegexMatchFunction,
+  2,
+  "regexmatch",
+  "",
+  "text",
+];
+SocialCalc.Formula.FunctionList["REGEXEXTRACT"] = [
+  SocialCalc.Formula.RegexExtractFunction,
+  2,
+  "regexextract",
+  "",
+  "text",
+];
+SocialCalc.Formula.FunctionList["REGEXREPLACE"] = [
+  SocialCalc.Formula.RegexReplaceFunction,
+  3,
+  "regexreplace",
+  "",
+  "text",
 ];
