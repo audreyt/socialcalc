@@ -69,9 +69,13 @@ Formula functions and dynamic arrays
   `RANK.EQ`, `RANK.AVG`, `QUARTILE.INC`, `QUARTILE.EXC`, `PERCENTILE`,
   `PERCENTILE.INC`, `PERCENTILE.EXC`, `PERCENTRANK`, `PERCENTRANK.INC`, and
   `PERCENTRANK.EXC`. `RANK` is descending by default, tied values share the
-  best rank, and a missing value is `#N/A`; `MEDIAN` averages the middle pair;
-  inclusive quartiles truncate the quart argument toward zero before
-  validating 0..4.
+  best rank, and a missing value is `#N/A`; `RANK.AVG` averages tied ranks.
+  `MEDIAN` averages the middle pair and returns `#DIV/0!` when no numeric
+  input remains. Inclusive quartiles truncate the quart argument toward zero
+  before validating 0..4; invalid or empty quartiles return `#NUM!`. The
+  family shares numeric-only extraction, blank/text skipping, and
+  first-range-error propagation. The exact rank/quartile boundary policies
+  are verified by the 3-VC `lemma/statistics.ts` facade.
 - Added math and modern statistical compatibility functions `SIGN`, `GCD`,
   `LCM`, `MROUND`, `QUOTIENT`, `ROUNDUP`, `ROUNDDOWN`, `SUMSQ`, `STDEV.P`,
   `STDEV.S`, `VAR.P`, and `VAR.S`.
@@ -97,14 +101,22 @@ Formula functions and dynamic arrays
   `REGEXREPLACE`.
 - Added `XMATCH(lookup_value,lookup_array,[match_mode],[search_mode])` and
   `XLOOKUP(lookup_value,lookup_array,return_array,[if_not_found],[match_mode],
-  [search_mode])`. Exact, approximate, wildcard, reverse, and binary modes
-  are supported; shape mismatches are `#VALUE!`, misses are `#N/A` unless
-  `if_not_found` is supplied, and matching rows/columns spill through the
-  dynamic-array pipeline.
-- Added `COUNTIFS`, `AVERAGEIF`, `AVERAGEIFS`, `MAXIFS`, and `MINIFS`.
-  Criteria and aggregate ranges must have identical shapes; matched errors
-  propagate, average functions return `#DIV/0!` for no numeric matches, and
-  `MAXIFS`/`MINIFS` return zero for no matches.
+  [search_mode])`. `match_mode` supports exact (0), exact-or-next-smaller
+  (-1), exact-or-next-larger (1), and wildcard (2, with `*`, `?`, and `~`
+  escaping). `search_mode` supports first-to-last (1), last-to-first (-1),
+  and binary ascending/descending (2/-2, assuming sorted input); binary
+  search with wildcard matching is `#VALUE!`. Lookup and return vectors must
+  be single rows or columns of equal axis length. Misses are `#N/A` unless
+  `if_not_found` is supplied, and matched 2-D rows/columns spill through the
+  dynamic-array pipeline. The 7-VC `lemma/xlookup.ts` facade verifies mode
+  legality and exact-before-approximate-before-miss precedence.
+- Added `COUNTIFS`, `AVERAGEIF`, `AVERAGEIFS`, `MAXIFS`, and `MINIFS` without
+  changing the legacy `COUNTIF`/`SUMIF`/`SUMIFS` range-walk behavior. Every
+  criteria and aggregate range in the new family must have the same shape;
+  cross-sheet and named ranges are supported. Matched errors propagate,
+  average functions return `#DIV/0!` for no numeric matches, and
+  `MAXIFS`/`MINIFS` return zero for no matches. The 5-VC `lemma/criteria.ts`
+  facade verifies row eligibility and result/error precedence.
 
 Spreadsheet capabilities
 - Added optional workbook/multi-sheet mode with add, delete, rename, reorder,
