@@ -228,9 +228,7 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
     "s_farg_weeknum",
     "s_farg_yearfrac",
     "s_farg_workday",
-    "s_farg_workday_intl",
-    "s_farg_networkdays",
-    "s_farg_networkdays_intl",
+    "s_farg_workdayintl",
     "s_farg_ppmt",
     "s_farg_mirr",
     "s_farg_xnpv",
@@ -254,7 +252,6 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
   // against. Focused date-arithmetic/workday and financial-function tests cover
   // their registration, help text, and behavior; this test asserts every
   // carved-out key has non-empty help text.
-  // non-empty help text.
   for (const key of postOracleFdefKeys) {
     expect(candidateFdef[key]).toBeTruthy();
   }
