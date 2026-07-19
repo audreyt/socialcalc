@@ -652,7 +652,9 @@ SC.SpillOwnerForCoord = function (sheet: any, coord: any) {
 };
 SC.SpillCommandError = "Cannot change part of a spilled array.";
 SC.PrepareSpillMutation = function (sheet: any, ranges: any, blockAnchors: any) {
+  sheet.pivots = sheet.pivots || {};
   var anchors: any = {},
+    pivotAnchors: any = {},
     parsed: any[] = [],
     i: any,
     range: any,
@@ -683,12 +685,21 @@ SC.PrepareSpillMutation = function (sheet: any, ranges: any, blockAnchors: any) 
     }
     if (!covered) continue;
     if (cell.spillowner) return SC.SpillCommandError;
+    if (cell.pivotowner) return SC.Pivot.CommandError;
     if (cell.spillrows || cell.spillcols) {
       if (blockAnchors) return SC.SpillCommandError;
       anchors[coord] = cell;
     }
+    if (cell.pivotrows || cell.pivotcols) {
+      if (blockAnchors) return SC.Pivot.CommandError;
+      pivotAnchors[coord] = cell;
+    }
   }
   for (coord in anchors) SocialCalc.ClearSpill(sheet, anchors[coord]);
+  for (coord in pivotAnchors) {
+    SC.Pivot.ClearPivot(sheet, coord);
+    delete sheet.pivots[coord];
+  }
   return "";
 };
 SC.MaterializeSpill = function (sheet: any, coord: any, eresult: any) {
@@ -1310,6 +1321,10 @@ SC.ParseSheetSave = function (savedsheet: any, sheetobj: any) {
         var chart = SocialCalc.Chart.ChartFromSaveParts(parts);
         sheetobj.charts[chart.id] = chart;
         break;
+      case "pivot":
+        sheetobj.pivots = sheetobj.pivots || {};
+        sheetobj.pivots[parts[1]] = JSON.parse(SocialCalc.decodeFromSave(parts[2]));
+        break;
       case "layout":
         parts = lines[i].match(/^layout:(\d+):(.+)$/); // layouts can have ":" in them
         sheetobj.layouts[parts[1] - 0] = parts[2];
@@ -1365,6 +1380,7 @@ SC.ParseSheetSave = function (savedsheet: any, sheetobj: any) {
   }
   SocialCalc.SanitizeSpills(sheetobj);
   SocialCalc.RecomputeAutoFilters(sheetobj);
+  SocialCalc.Pivot.SanitizePivots(sheetobj);
 };
 
 //
@@ -1496,6 +1512,21 @@ SC.CellFromStringParts = function (sheet: any, cell: any, parts: any, j: any) {
       case "spillcol":
         cell.spillcol = parts[j++] - 0;
         break;
+      case "pivotrows":
+        cell.pivotrows = parts[j++] - 0;
+        break;
+      case "pivotcols":
+        cell.pivotcols = parts[j++] - 0;
+        break;
+      case "pivotowner":
+        cell.pivotowner = SocialCalc.decodeFromSave(parts[j++]);
+        break;
+      case "pivotrow":
+        cell.pivotrow = parts[j++] - 0;
+        break;
+      case "pivotcol":
+        cell.pivotcol = parts[j++] - 0;
+        break;
       default:
         throw SocialCalc.Constants.s_cfspUnknownCellType + " '" + t + "'";
     }
@@ -1590,14 +1621,27 @@ SC.CreateSheetSave = function (sheetobj: any, range: any, canonicalize: any) {
       coord = SocialCalc.crToCoord(col, row);
       cell = sheetobj.cells[coord];
       if (!cell) continue;
-      if (range && (cell.spillowner || cell.spillrows != null || cell.spillcols != null)) {
+      if (
+        range &&
+        (cell.spillowner ||
+          cell.spillrows != null ||
+          cell.spillcols != null ||
+          cell.pivotowner ||
+          cell.pivotrows != null ||
+          cell.pivotcols != null)
+      ) {
         cell = Object.assign({}, cell);
         delete cell.spillrows;
         delete cell.spillcols;
         delete cell.spillowner;
         delete cell.spillrow;
         delete cell.spillcol;
-        if (sheetobj.cells[coord].spillowner)
+        delete cell.pivotrows;
+        delete cell.pivotcols;
+        delete cell.pivotowner;
+        delete cell.pivotrow;
+        delete cell.pivotcol;
+        if (sheetobj.cells[coord].spillowner || sheetobj.cells[coord].pivotowner)
           cell.datatype = cell.valuetype && cell.valuetype.charAt(0) === "n" ? "v" : "t";
       }
       line = sheetobj.CellToString(cell);
@@ -1706,6 +1750,19 @@ SC.CreateSheetSave = function (sheetobj: any, range: any, canonicalize: any) {
     }
   }
 
+  if (!range && sheetobj.pivots) {
+    var pivotAnchorsSorted = Object.keys(sheetobj.pivots).sort();
+    for (i = 0; i < pivotAnchorsSorted.length; i++) {
+      var pivotAnchorSave = pivotAnchorsSorted[i];
+      result.push(
+        "pivot:" +
+          pivotAnchorSave +
+          ":" +
+          SocialCalc.encodeForSave(JSON.stringify(sheetobj.pivots[pivotAnchorSave])),
+      );
+    }
+  }
+
   var tblSaveNames: string[] = [];
   for (var tblSaveName in sheetobj.tables) tblSaveNames.push(tblSaveName);
   tblSaveNames.sort();
@@ -1806,7 +1863,7 @@ SC.CellToString = function (sheet: any, cell: any) {
   } else if (cell.datatype == "t") {
     if (cell.valuetype == SocialCalc.Constants.textdatadefaulttype) line += ":t:" + value;
     else line += ":vt:" + cell.valuetype + ":" + value;
-  } else if (cell.datatype == null && cell.spillowner) {
+  } else if (cell.datatype == null && (cell.spillowner || cell.pivotowner)) {
     line += ":vt:" + cell.valuetype + ":" + value;
   } else {
     formula = SocialCalc.encodeForSave(cell.formula);
@@ -1868,12 +1925,17 @@ SC.CellToString = function (sheet: any, cell: any) {
   if (cell.comment) line += ":comment:" + SocialCalc.encodeForSave(cell.comment);
   if (cell.validation) line += ":validation:" + SocialCalc.encodeForSave(cell.validation);
 
-  // Spill tags are compact optional fields; absent tags preserve legacy saves.
+  // Spill/pivot tags are compact optional fields; absent tags preserve legacy saves.
   if (cell.spillrows != null) line += ":spillrows:" + cell.spillrows;
   if (cell.spillcols != null) line += ":spillcols:" + cell.spillcols;
   if (cell.spillowner) line += ":spillowner:" + SocialCalc.encodeForSave(cell.spillowner);
   if (cell.spillrow != null) line += ":spillrow:" + cell.spillrow;
   if (cell.spillcol != null) line += ":spillcol:" + cell.spillcol;
+  if (cell.pivotrows != null) line += ":pivotrows:" + cell.pivotrows;
+  if (cell.pivotcols != null) line += ":pivotcols:" + cell.pivotcols;
+  if (cell.pivotowner) line += ":pivotowner:" + SocialCalc.encodeForSave(cell.pivotowner);
+  if (cell.pivotrow != null) line += ":pivotrow:" + cell.pivotrow;
+  if (cell.pivotcol != null) line += ":pivotcol:" + cell.pivotcol;
   return line;
 };
 
@@ -2808,6 +2870,10 @@ SC.SheetCommandsTimerRoutine = function (sci: any, parseobj: any, saveundo: any)
 //    table delete NAME
 //    table style NAME style
 //    table range NAME range
+//    definepivot anchor-coord encoded-json-definition
+//    deletepivot anchor-coord
+//    refreshpivot anchor-coord
+//    refreshpivotall
 //    recalc
 //    redisplay
 //    changedrendervalues
@@ -3927,6 +3993,7 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
         if (saveundo) changes.AddUndo("deleterow " + cr1.coord);
       }
       SocialCalc.ClearAllDerivedSpills(sheet);
+      SocialCalc.Pivot.ClearAllDerivedPivots(sheet);
 
       for (row = lastrow; row >= rowend; row--) {
         // copy the cells forward
@@ -4043,6 +4110,29 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
         );
       }
 
+      if (sheet.pivots) {
+        var shiftedPivotsIns: any = {};
+        for (var pivotAnchorIns in sheet.pivots) {
+          var shiftedAnchorIns = SocialCalc.AdjustFormulaCoords(
+            pivotAnchorIns,
+            cr1.col,
+            coloffset,
+            cr1.row,
+            rowoffset,
+          );
+          var pivotDefIns = sheet.pivots[pivotAnchorIns];
+          pivotDefIns.source = SocialCalc.AdjustFormulaCoords(
+            pivotDefIns.source,
+            cr1.col,
+            coloffset,
+            cr1.row,
+            rowoffset,
+          );
+          shiftedPivotsIns[shiftedAnchorIns] = pivotDefIns;
+        }
+        sheet.pivots = shiftedPivotsIns;
+      }
+
       for (row = attribs.lastrow; row >= rowend && cmd1 == "insertrow"; row--) {
         // copy the row attributes forward
         rownext = row + rowoffset;
@@ -4156,6 +4246,7 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
         }
       }
       SocialCalc.ClearAllDerivedSpills(sheet);
+      SocialCalc.Pivot.ClearAllDerivedPivots(sheet);
 
       for (row = rowstart; row <= lastrow - rowoffset; row++) {
         // copy the cells backwards - extra so no dup of last set
@@ -4310,6 +4401,34 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
           cr1.row,
           rowoffset,
         );
+      }
+
+      if (sheet.pivots) {
+        var shiftedPivotsDel: any = {};
+        for (var pivotAnchorDel in sheet.pivots) {
+          var shiftedAnchorDel = SocialCalc.AdjustFormulaCoords(
+            pivotAnchorDel,
+            cr1.col,
+            coloffset,
+            cr1.row,
+            rowoffset,
+          );
+          var pivotDefDel = sheet.pivots[pivotAnchorDel];
+          var shiftedSourceDel = SocialCalc.AdjustFormulaCoords(
+            pivotDefDel.source,
+            cr1.col,
+            coloffset,
+            cr1.row,
+            rowoffset,
+          );
+          if (shiftedAnchorDel.indexOf("#REF!") >= 0 || shiftedSourceDel.indexOf("#REF!") >= 0) {
+            SocialCalc.Pivot.ClearPivot(sheet, pivotAnchorDel);
+            continue;
+          }
+          pivotDefDel.source = shiftedSourceDel;
+          shiftedPivotsDel[shiftedAnchorDel] = pivotDefDel;
+        }
+        sheet.pivots = shiftedPivotsDel;
       }
 
       for (row = rowstart; row <= lastrow - rowoffset && cmd1 == "deleterow"; row++) {
@@ -5383,6 +5502,89 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
       }
       break;
 
+    case "definepivot": // definepivot anchor encoded-json-definition
+      what = cmd.NextToken();
+      rest = cmd.RestOfString();
+      cr1 = SocialCalc.coordToCr(what);
+      if (!(cr1.col >= 1 && cr1.row >= 1)) {
+        errortext = "Invalid pivot table anchor: " + what;
+        break;
+      }
+      cell = sheet.GetAssuredCell(what);
+      if (cell.spillowner || (cell.pivotowner && cell.pivotowner !== what)) {
+        errortext = SocialCalc.Pivot.CommandError;
+        break;
+      }
+      if (rest == "") {
+        errortext = "Missing pivot table definition";
+        break;
+      }
+      var pivotDefinition;
+      try {
+        pivotDefinition = JSON.parse(SocialCalc.decodeFromSave(rest));
+      } catch {
+        errortext = "Invalid pivot table definition JSON";
+        break;
+      }
+      var pivotValidationError = SocialCalc.Pivot.ValidateDefinition(pivotDefinition);
+      if (pivotValidationError) {
+        errortext = pivotValidationError;
+        break;
+      }
+      sheet.pivots = sheet.pivots || {};
+      if (saveundo) {
+        if (sheet.pivots[what]) {
+          changes.AddUndo(
+            "definepivot " +
+              what +
+              " " +
+              SocialCalc.encodeForSave(JSON.stringify(sheet.pivots[what])),
+          );
+        } else {
+          changes.AddUndo("deletepivot " + what);
+        }
+      }
+      sheet.pivots[what] = pivotDefinition;
+      errortext = SocialCalc.Pivot.RefreshPivot(sheet, what);
+      sheet.renderneeded = true;
+      sheet.changedrendervalues = true;
+      break;
+
+    case "deletepivot": // deletepivot anchor
+      what = cmd.NextToken();
+      if (sheet.pivots && sheet.pivots[what]) {
+        if (saveundo) {
+          changes.AddUndo(
+            "definepivot " +
+              what +
+              " " +
+              SocialCalc.encodeForSave(JSON.stringify(sheet.pivots[what])),
+          );
+        }
+        SocialCalc.Pivot.ClearPivot(sheet, what);
+        delete sheet.pivots[what];
+        cell = sheet.cells[what];
+        if (cell) {
+          cell.datavalue = "";
+          cell.datatype = null;
+          cell.valuetype = "b";
+          delete cell.errors;
+          delete cell.displaystring;
+        }
+      }
+      sheet.renderneeded = true;
+      sheet.changedrendervalues = true;
+      break;
+
+    case "refreshpivot": // refreshpivot anchor
+      what = cmd.NextToken();
+      errortext = SocialCalc.Pivot.RefreshPivot(sheet, what);
+      break;
+
+    case "refreshpivotall":
+      SocialCalc.Pivot.RefreshAllPivots(sheet);
+      break;
+
     case "recalc":
       attribs.needsrecalc = "yes"; // request recalc
       sheet.recalconce = true; // even if turned off
@@ -6163,6 +6365,7 @@ SC.RecalcTimerRoutine = function () {
   }
   sheet.spillTopologyChanged = false;
   sheet.spillTopologyRetried = false;
+  if (sheet.pivots) SocialCalc.Pivot.RefreshAllPivots(sheet);
 
   // Conservative dynamic-reference dependency policy: INDIRECT/OFFSET
   // targets are not visible to RecalcCheckCell's static token walk (the

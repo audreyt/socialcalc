@@ -2443,6 +2443,7 @@ TableEditorSC.EditorOpenCellEdit = function (editor: any) {
   if (!editor.inputBox) return true; // no input box, so no editing (happens on noEdit)
   if (editor.inputBox.element.disabled) return true; // multi-line: ignore
   if (editor.context.sheetobj.cells[editor.ecell.coord]?.spillowner) return true;
+  if (editor.context.sheetobj.cells[editor.ecell.coord]?.pivotowner) return true;
   editor.inputBox.ShowInputBox(true);
   editor.inputBox.Focus();
   editor.inputBox.SetText("");
@@ -2737,7 +2738,7 @@ TableEditorSC.EditorSaveEdit = function (editor: any, text: any) {
   }
 
   var liveCell = sheetobj.cells[wval.ecoord];
-  if (liveCell?.spillowner) {
+  if (liveCell?.spillowner || liveCell?.pivotowner) {
     editor.inputBox.ShowInputBox(false);
     editor.state = "start";
     editor.cellhandles.ShowCellHandles(true);

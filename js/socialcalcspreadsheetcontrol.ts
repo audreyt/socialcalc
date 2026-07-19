@@ -1204,6 +1204,76 @@ SpreadsheetControlSC.SpreadsheetControl = function (idPrefix: any) {
     onunclick: SocialCalc.SpreadsheetControlCondFmtOnunclick,
   });
 
+  // Pivot tables
+
+  this.tabnums.pivot = this.tabs.length;
+  this.tabs.push({
+    name: "pivot",
+    text: "Pivot",
+    html:
+      '<div id="%id.pivottools" style="display:none;">' +
+      '  <table cellspacing="0" cellpadding="0"><tr>' +
+      '   <td style="vertical-align:top;padding-right:12px;">' +
+      '    <div style="%tbt.">%loc!Existing Pivot Tables!</div>' +
+      '    <select id="%id.pivotlist" size="1" onchange="%s.SpreadsheetControlPivotChangedSelection();" onfocus="%s.CmdGotFocus(this);"><option selected>[New]</option></select>' +
+      "   </td>" +
+      '   <td style="vertical-align:top;padding-right:12px;width:100px;">' +
+      '    <div style="%tbt.">%loc!Anchor Cell!</div>' +
+      '    <input type="text" id="%id.pivotanchor" style="font-size:x-small;width:60px;" onfocus="%s.CmdGotFocus(this);">' +
+      '    <input type="button" id="%id.pivotanchorproposal" value="A1" onclick="%s.SpreadsheetControlPivotSetAnchor();" style="font-size:x-small;">' +
+      "   </td>" +
+      '   <td style="vertical-align:top;padding-right:12px;width:110px;">' +
+      '    <div style="%tbt.">%loc!Source Range!</div>' +
+      '    <input type="text" id="%id.pivotsource" style="font-size:x-small;width:70px;" onfocus="%s.CmdGotFocus(this);">' +
+      '    <input type="button" id="%id.pivotsourceproposal" value="A1" onclick="%s.SpreadsheetControlPivotSetSource();" style="font-size:x-small;">' +
+      "   </td>" +
+      '   <td style="vertical-align:top;padding-right:12px;">' +
+      '    <div style="%tbt.">%loc!Row Fields (comma-sep)!</div>' +
+      '    <input type="text" id="%id.pivotrowfields" style="font-size:x-small;width:100px;" onfocus="%s.CmdGotFocus(this);">' +
+      "   </td>" +
+      '   <td style="vertical-align:top;padding-right:12px;">' +
+      '    <div style="%tbt.">%loc!Column Fields (comma-sep)!</div>' +
+      '    <input type="text" id="%id.pivotcolfields" style="font-size:x-small;width:100px;" onfocus="%s.CmdGotFocus(this);">' +
+      "   </td>" +
+      "  </tr><tr>" +
+      '   <td style="vertical-align:top;padding-right:12px;padding-top:6px;">' +
+      '    <div style="%tbt.">%loc!Value Field!</div>' +
+      '    <input type="text" id="%id.pivotvaluefield" style="font-size:x-small;width:90px;" onfocus="%s.CmdGotFocus(this);">' +
+      "   </td>" +
+      '   <td style="vertical-align:top;padding-right:12px;padding-top:6px;">' +
+      '    <div style="%tbt.">%loc!Aggregation!</div>' +
+      '    <select id="%id.pivotaggregation" size="1" onfocus="%s.CmdGotFocus(this);">' +
+      '     <option value="sum" selected>%loc!Sum!</option>' +
+      '     <option value="count">%loc!Count!</option>' +
+      '     <option value="counta">%loc!CountA!</option>' +
+      '     <option value="average">%loc!Average!</option>' +
+      '     <option value="min">%loc!Min!</option>' +
+      '     <option value="max">%loc!Max!</option>' +
+      "    </select>" +
+      "   </td>" +
+      '   <td style="vertical-align:top;padding-right:12px;padding-top:6px;">' +
+      '    <div style="%tbt.">%loc!Filter (field=v1,v2)!</div>' +
+      '    <input type="text" id="%id.pivotfilter" style="font-size:x-small;width:130px;" onfocus="%s.CmdGotFocus(this);">' +
+      "   </td>" +
+      '   <td style="vertical-align:top;padding-top:6px;">' +
+      '    <div style="%tbt.">&nbsp;</div>' +
+      '    <label style="font-size:x-small;"><input type="checkbox" id="%id.pivotsubtotals">%loc!Subtotals!</label>&nbsp;' +
+      '    <label style="font-size:x-small;"><input type="checkbox" id="%id.pivotrowtotals">%loc!Row totals!</label>&nbsp;' +
+      '    <label style="font-size:x-small;"><input type="checkbox" id="%id.pivotcoltotals">%loc!Grand total!</label>' +
+      "   </td>" +
+      "  </tr><tr>" +
+      '   <td colspan="6" style="vertical-align:top;padding-top:6px;">' +
+      '    <input type="button" value="%loc!Create/Update!" onclick="%s.SpreadsheetControlPivotSave();" style="font-size:x-small;">' +
+      '    <input type="button" value="%loc!Refresh!" onclick="%s.SpreadsheetControlPivotRefresh();" style="font-size:x-small;">' +
+      '    <input type="button" value="%loc!Delete!" onclick="%s.SpreadsheetControlPivotDelete();" style="font-size:x-small;">' +
+      "   </td>" +
+      "  </tr></table>" +
+      "</div>",
+    view: "sheet",
+    onclick: SocialCalc.SpreadsheetControlPivotOnclick,
+    onunclick: SocialCalc.SpreadsheetControlPivotOnunclick,
+  });
+
   // Clipboard
 
   this.tabnums.clipboard = this.tabs.length;
@@ -4306,6 +4376,221 @@ SpreadsheetControlSC.SpreadsheetControlCondFmtMove = function (direction: any) {
   var newlist = /** @type {any} */ ((document as any).getElementById(idp + "condfmtlist"));
   SocialCalc.SelectOptionByValue(newlist, id);
   SocialCalc.SpreadsheetControlCondFmtChangedRule();
+};
+
+// Pivot tables
+
+/** @param {any} s @param {any} _t */
+SpreadsheetControlSC.SpreadsheetControlPivotOnclick = function (s: any, _t: any) {
+  s = SocialCalc.GetSpreadsheetControlObject() as any;
+  s.editor.RangeChangeCallback.pivot = SocialCalc.SpreadsheetControlPivotRangeChange;
+  s.editor.MoveECellCallback.pivot = SocialCalc.SpreadsheetControlPivotRangeChange;
+  SocialCalc.SpreadsheetControlPivotRangeChange(s.editor);
+  SocialCalc.SpreadsheetControlPivotFillList();
+  SocialCalc.SpreadsheetControlPivotChangedSelection();
+};
+
+/** @param {any} s @param {any} _t */
+SpreadsheetControlSC.SpreadsheetControlPivotOnunclick = function (s: any, _t: any) {
+  delete s.editor.RangeChangeCallback.pivot;
+  delete s.editor.MoveECellCallback.pivot;
+};
+
+/** @param {any} editor */
+SpreadsheetControlSC.SpreadsheetControlPivotRangeChange = function (editor: any) {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var anchorEle = /** @type {any} */ (
+    (document as any).getElementById(s.idPrefix + "pivotanchorproposal")
+  );
+  var sourceEle = /** @type {any} */ (
+    (document as any).getElementById(s.idPrefix + "pivotsourceproposal")
+  );
+  var coord;
+  var range;
+  if (editor.range.hasrange) {
+    coord = SocialCalc.crToCoord(editor.range.left, editor.range.top);
+    range =
+      SocialCalc.crToCoord(editor.range.left, editor.range.top) +
+      ":" +
+      SocialCalc.crToCoord(editor.range.right, editor.range.bottom);
+  } else {
+    coord = editor.ecell.coord;
+    range = editor.ecell.coord;
+  }
+  anchorEle.value = coord;
+  sourceEle.value = range;
+};
+
+SpreadsheetControlSC.SpreadsheetControlPivotSetAnchor = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  /** @type {any} */ ((document as any).getElementById(s.idPrefix + "pivotanchor")).value =
+    /** @type {any} */ ((document as any).getElementById(s.idPrefix + "pivotanchorproposal")).value;
+  SocialCalc.KeyboardFocus();
+};
+
+SpreadsheetControlSC.SpreadsheetControlPivotSetSource = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  /** @type {any} */ ((document as any).getElementById(s.idPrefix + "pivotsource")).value =
+    /** @type {any} */ ((document as any).getElementById(s.idPrefix + "pivotsourceproposal")).value;
+  SocialCalc.KeyboardFocus();
+};
+
+SpreadsheetControlSC.SpreadsheetControlPivotFillList = function () {
+  var SCLoc = SocialCalc.LocalizeString;
+  var anchor, i;
+  var anchorlist: string[] = [];
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var nl = /** @type {any} */ ((document as any).getElementById(s.idPrefix + "pivotlist"));
+  var currentanchor = /** @type {any} */ (
+    (document as any).getElementById(s.idPrefix + "pivotanchor")
+  ).value.toUpperCase();
+  for (anchor in s.sheet.pivots || {}) {
+    anchorlist.push(anchor);
+  }
+  anchorlist.sort();
+  nl.length = 0;
+  nl.options[0] = new Option(anchorlist.length > 0 ? SCLoc("[New]") : SCLoc("[None]"));
+  for (i = 0; i < anchorlist.length; i++) {
+    anchor = anchorlist[i];
+    nl.options[i + 1] = new Option(anchor, anchor);
+    if (anchor == currentanchor) nl.options[i + 1].selected = true;
+  }
+  if (currentanchor == "") nl.options[0].selected = true;
+};
+
+SpreadsheetControlSC.SpreadsheetControlPivotChangedSelection = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var nl = /** @type {any} */ ((document as any).getElementById(s.idPrefix + "pivotlist"));
+  var anchor = nl.options[nl.selectedIndex] ? nl.options[nl.selectedIndex].value : "";
+  var def = (s.sheet.pivots || {})[anchor];
+  var setval = function (id: string, value: string) {
+    /** @type {any} */ ((document as any).getElementById(s.idPrefix + id)).value = value;
+  };
+  var setchecked = function (id: string, value: boolean) {
+    /** @type {any} */ ((document as any).getElementById(s.idPrefix + id)).checked = value;
+  };
+  if (def) {
+    setval("pivotanchor", anchor);
+    setval("pivotsource", def.source || "");
+    setval("pivotrowfields", (def.rowFields || []).join(","));
+    setval("pivotcolfields", (def.colFields || []).join(","));
+    var vf = (def.valueFields || [])[0] || { field: "", agg: "sum" };
+    setval("pivotvaluefield", vf.field || "");
+    /** @type {any} */ ((document as any).getElementById(s.idPrefix + "pivotaggregation")).value =
+      vf.agg || "sum";
+    setval(
+      "pivotfilter",
+      (def.filters || [])
+        .map(function (f: any) {
+          return f.field + "=" + f.values.join(",");
+        })
+        .join(";"),
+    );
+    setchecked("pivotsubtotals", !!def.showSubtotals);
+    setchecked("pivotrowtotals", !!def.showRowTotals);
+    setchecked("pivotcoltotals", !!def.showColTotals);
+  } else {
+    setval("pivotanchor", "");
+    setval("pivotrowfields", "");
+    setval("pivotcolfields", "");
+    setval("pivotvaluefield", "");
+    setval("pivotfilter", "");
+    setchecked("pivotsubtotals", false);
+    setchecked("pivotrowtotals", false);
+    setchecked("pivotcoltotals", false);
+  }
+};
+
+/** Reads the pivot tab form fields into a SocialCalc.PivotDefinition-shaped object. */
+SpreadsheetControlSC.SpreadsheetControlPivotReadForm = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var getval = function (id: string) {
+    return /** @type {any} */ ((document as any).getElementById(s.idPrefix + id)).value;
+  };
+  var splitFields = function (str: string) {
+    return str
+      .split(",")
+      .map(function (v: string) {
+        return v.trim();
+      })
+      .filter(function (v: string) {
+        return v.length > 0;
+      });
+  };
+  var filterText = getval("pivotfilter").trim();
+  var filters = filterText
+    ? filterText.split(";").map(function (clause: string) {
+        var eq = clause.indexOf("=");
+        return {
+          field: clause.substring(0, eq).trim(),
+          values: clause
+            .substring(eq + 1)
+            .split(",")
+            .map(function (v: string) {
+              return v.trim();
+            }),
+        };
+      })
+    : [];
+  return {
+    anchor: getval("pivotanchor").toUpperCase(),
+    definition: {
+      source: getval("pivotsource"),
+      rowFields: splitFields(getval("pivotrowfields")),
+      colFields: splitFields(getval("pivotcolfields")),
+      valueFields: [
+        {
+          field: getval("pivotvaluefield"),
+          agg: /** @type {any} */ (
+            (document as any).getElementById(s.idPrefix + "pivotaggregation")
+          ).value,
+        },
+      ],
+      filters: filters,
+      showSubtotals: /** @type {any} */ (
+        (document as any).getElementById(s.idPrefix + "pivotsubtotals")
+      ).checked,
+      showRowTotals: /** @type {any} */ (
+        (document as any).getElementById(s.idPrefix + "pivotrowtotals")
+      ).checked,
+      showColTotals: /** @type {any} */ (
+        (document as any).getElementById(s.idPrefix + "pivotcoltotals")
+      ).checked,
+    },
+  };
+};
+
+SpreadsheetControlSC.SpreadsheetControlPivotSave = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var form = SocialCalc.SpreadsheetControlPivotReadForm();
+  SocialCalc.SetTab(s.tabs[0].name); // return to first tab
+  SocialCalc.KeyboardFocus();
+  if (!form.anchor) return;
+  s.ExecuteCommand(
+    "definepivot " + form.anchor + " " + SocialCalc.encodeForSave(JSON.stringify(form.definition)),
+  );
+};
+
+SpreadsheetControlSC.SpreadsheetControlPivotRefresh = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var anchor = /** @type {any} */ (
+    (document as any).getElementById(s.idPrefix + "pivotanchor")
+  ).value.toUpperCase();
+  SocialCalc.SetTab(s.tabs[0].name); // return to first tab
+  SocialCalc.KeyboardFocus();
+  if (!anchor) return;
+  s.ExecuteCommand("refreshpivot " + anchor);
+};
+
+SpreadsheetControlSC.SpreadsheetControlPivotDelete = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var anchor = /** @type {any} */ (
+    (document as any).getElementById(s.idPrefix + "pivotanchor")
+  ).value.toUpperCase();
+  SocialCalc.SetTab(s.tabs[0].name); // return to first tab
+  SocialCalc.KeyboardFocus();
+  if (!anchor) return;
+  s.ExecuteCommand("deletepivot " + anchor);
 };
 
 // Clipboard

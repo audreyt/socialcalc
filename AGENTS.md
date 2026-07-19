@@ -454,8 +454,16 @@ shipping bundle.
   (with a proven forall witness: the resolved frame binds the name and is
   the innermost such frame), recursion-depth guard, and MAKEARRAY/MAP/
   BYROW/BYCOL output-rectangle shape agreement — 6 Dafny VCs.
+- `lemma/pivot.ts`: pivot-table grouping/aggregation/output policy —
+  typed group-key rank ordering with stable tie-break, per-aggregate-
+  function numeric/non-blank contribution rules and running SUM/COUNT/
+  MIN/MAX accumulation, AVERAGE #DIV/0! status, output-rectangle
+  shape/bounds/budget precedence (mirrors spill.ts's planSpillStatus),
+  and transactional output-cell claim classification (allowed/
+  reclaimable/collision, covering foreign spill/pivot ownership) — 20
+  Dafny VCs.
 
-Total: **161 VCs (36 + 5 + 3 + 17 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2 + 8 + 9 + 16 + 3 + 6)**.
+Total: **181 VCs (36 + 5 + 3 + 17 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2 + 8 + 9 + 16 + 3 + 6 + 20)**.
 
 After a facade edit:
 

@@ -379,7 +379,14 @@ declare global {
           };
           cells: Record<
             string,
-            { datavalue: unknown; formula: string; errors?: string; color?: number } | undefined
+            | {
+                datavalue: unknown;
+                formula: string;
+                errors?: string;
+                color?: number;
+                pivotowner?: string;
+              }
+            | undefined
           >;
           rowattribs: {
             hide: Record<number, string>;

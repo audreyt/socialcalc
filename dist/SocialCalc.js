@@ -1506,7 +1506,9 @@ More comments yet to come...
   };
   SC.SpillCommandError = 'Cannot change part of a spilled array.';
   SC.PrepareSpillMutation = function (sheet, ranges, blockAnchors) {
+    sheet.pivots = sheet.pivots || {};
     var anchors = {},
+      pivotAnchors = {},
       parsed = [],
       i,
       range,
@@ -1537,12 +1539,21 @@ More comments yet to come...
       }
       if (!covered) continue;
       if (cell.spillowner) return SC.SpillCommandError;
+      if (cell.pivotowner) return SC.Pivot.CommandError;
       if (cell.spillrows || cell.spillcols) {
         if (blockAnchors) return SC.SpillCommandError;
         anchors[coord] = cell;
       }
+      if (cell.pivotrows || cell.pivotcols) {
+        if (blockAnchors) return SC.Pivot.CommandError;
+        pivotAnchors[coord] = cell;
+      }
     }
     for (coord in anchors) SocialCalc.ClearSpill(sheet, anchors[coord]);
+    for (coord in pivotAnchors) {
+      SC.Pivot.ClearPivot(sheet, coord);
+      delete sheet.pivots[coord];
+    }
     return '';
   };
   SC.MaterializeSpill = function (sheet, coord, eresult) {
@@ -1984,6 +1995,10 @@ More comments yet to come...
           var chart = SocialCalc.Chart.ChartFromSaveParts(parts);
           sheetobj.charts[chart.id] = chart;
           break;
+        case 'pivot':
+          sheetobj.pivots = sheetobj.pivots || {};
+          sheetobj.pivots[parts[1]] = JSON.parse(SocialCalc.decodeFromSave(parts[2]));
+          break;
         case 'layout':
           parts = lines[i].match(/^layout:(\d+):(.+)$/);
           sheetobj.layouts[parts[1] - 0] = parts[2];
@@ -2029,6 +2044,7 @@ More comments yet to come...
     }
     SocialCalc.SanitizeSpills(sheetobj);
     SocialCalc.RecomputeAutoFilters(sheetobj);
+    SocialCalc.Pivot.SanitizePivots(sheetobj);
   };
   SC.CellFromStringParts = function (sheet, cell, parts, j) {
     var t, v, ro;
@@ -2150,6 +2166,21 @@ More comments yet to come...
         case 'spillcol':
           cell.spillcol = parts[j++] - 0;
           break;
+        case 'pivotrows':
+          cell.pivotrows = parts[j++] - 0;
+          break;
+        case 'pivotcols':
+          cell.pivotcols = parts[j++] - 0;
+          break;
+        case 'pivotowner':
+          cell.pivotowner = SocialCalc.decodeFromSave(parts[j++]);
+          break;
+        case 'pivotrow':
+          cell.pivotrow = parts[j++] - 0;
+          break;
+        case 'pivotcol':
+          cell.pivotcol = parts[j++] - 0;
+          break;
         default:
           throw SocialCalc.Constants.s_cfspUnknownCellType + " '" + t + "'";
       }
@@ -2236,14 +2267,27 @@ More comments yet to come...
         coord = SocialCalc.crToCoord(col, row);
         cell = sheetobj.cells[coord];
         if (!cell) continue;
-        if (range && (cell.spillowner || cell.spillrows != null || cell.spillcols != null)) {
+        if (
+          range &&
+          (cell.spillowner ||
+            cell.spillrows != null ||
+            cell.spillcols != null ||
+            cell.pivotowner ||
+            cell.pivotrows != null ||
+            cell.pivotcols != null)
+        ) {
           cell = Object.assign({}, cell);
           delete cell.spillrows;
           delete cell.spillcols;
           delete cell.spillowner;
           delete cell.spillrow;
           delete cell.spillcol;
-          if (sheetobj.cells[coord].spillowner)
+          delete cell.pivotrows;
+          delete cell.pivotcols;
+          delete cell.pivotowner;
+          delete cell.pivotrow;
+          delete cell.pivotcol;
+          if (sheetobj.cells[coord].spillowner || sheetobj.cells[coord].pivotowner)
             cell.datatype = cell.valuetype && cell.valuetype.charAt(0) === 'n' ? 'v' : 't';
         }
         line = sheetobj.CellToString(cell);
@@ -2336,6 +2380,18 @@ More comments yet to come...
         );
       }
     }
+    if (!range && sheetobj.pivots) {
+      var pivotAnchorsSorted = Object.keys(sheetobj.pivots).sort();
+      for (i = 0; i < pivotAnchorsSorted.length; i++) {
+        var pivotAnchorSave = pivotAnchorsSorted[i];
+        result.push(
+          'pivot:' +
+            pivotAnchorSave +
+            ':' +
+            SocialCalc.encodeForSave(JSON.stringify(sheetobj.pivots[pivotAnchorSave])),
+        );
+      }
+    }
     var tblSaveNames = [];
     for (var tblSaveName in sheetobj.tables) tblSaveNames.push(tblSaveName);
     tblSaveNames.sort();
@@ -2419,7 +2475,7 @@ More comments yet to come...
     } else if (cell.datatype == 't') {
       if (cell.valuetype == SocialCalc.Constants.textdatadefaulttype) line += ':t:' + value;
       else line += ':vt:' + cell.valuetype + ':' + value;
-    } else if (cell.datatype == null && cell.spillowner) {
+    } else if (cell.datatype == null && (cell.spillowner || cell.pivotowner)) {
       line += ':vt:' + cell.valuetype + ':' + value;
     } else {
       formula = SocialCalc.encodeForSave(cell.formula);
@@ -2483,6 +2539,11 @@ More comments yet to come...
     if (cell.spillowner) line += ':spillowner:' + SocialCalc.encodeForSave(cell.spillowner);
     if (cell.spillrow != null) line += ':spillrow:' + cell.spillrow;
     if (cell.spillcol != null) line += ':spillcol:' + cell.spillcol;
+    if (cell.pivotrows != null) line += ':pivotrows:' + cell.pivotrows;
+    if (cell.pivotcols != null) line += ':pivotcols:' + cell.pivotcols;
+    if (cell.pivotowner) line += ':pivotowner:' + SocialCalc.encodeForSave(cell.pivotowner);
+    if (cell.pivotrow != null) line += ':pivotrow:' + cell.pivotrow;
+    if (cell.pivotcol != null) line += ':pivotcol:' + cell.pivotcol;
     return line;
   };
   SC.CanonicalizeSheet = function (sheetobj, full) {
@@ -4153,6 +4214,7 @@ More comments yet to come...
           if (saveundo) changes.AddUndo('deleterow ' + cr1.coord);
         }
         SocialCalc.ClearAllDerivedSpills(sheet);
+        SocialCalc.Pivot.ClearAllDerivedPivots(sheet);
         for (row = lastrow; row >= rowend; row--) {
           for (col = lastcol; col >= colend; col--) {
             crbase = SocialCalc.crToCoord(col, row);
@@ -4248,6 +4310,28 @@ More comments yet to come...
             rowoffset,
           );
         }
+        if (sheet.pivots) {
+          var shiftedPivotsIns = {};
+          for (var pivotAnchorIns in sheet.pivots) {
+            var shiftedAnchorIns = SocialCalc.AdjustFormulaCoords(
+              pivotAnchorIns,
+              cr1.col,
+              coloffset,
+              cr1.row,
+              rowoffset,
+            );
+            var pivotDefIns = sheet.pivots[pivotAnchorIns];
+            pivotDefIns.source = SocialCalc.AdjustFormulaCoords(
+              pivotDefIns.source,
+              cr1.col,
+              coloffset,
+              cr1.row,
+              rowoffset,
+            );
+            shiftedPivotsIns[shiftedAnchorIns] = pivotDefIns;
+          }
+          sheet.pivots = shiftedPivotsIns;
+        }
         for (row = attribs.lastrow; row >= rowend && cmd1 == 'insertrow'; row--) {
           rownext = row + rowoffset;
           for (attrib in sheet.rowattribs) {
@@ -4342,6 +4426,7 @@ More comments yet to come...
           }
         }
         SocialCalc.ClearAllDerivedSpills(sheet);
+        SocialCalc.Pivot.ClearAllDerivedPivots(sheet);
         for (row = rowstart; row <= lastrow - rowoffset; row++) {
           for (col = colstart; col <= lastcol - coloffset; col++) {
             cr = SocialCalc.crToCoord(col + coloffset, row + rowoffset);
@@ -4479,6 +4564,33 @@ More comments yet to come...
             cr1.row,
             rowoffset,
           );
+        }
+        if (sheet.pivots) {
+          var shiftedPivotsDel = {};
+          for (var pivotAnchorDel in sheet.pivots) {
+            var shiftedAnchorDel = SocialCalc.AdjustFormulaCoords(
+              pivotAnchorDel,
+              cr1.col,
+              coloffset,
+              cr1.row,
+              rowoffset,
+            );
+            var pivotDefDel = sheet.pivots[pivotAnchorDel];
+            var shiftedSourceDel = SocialCalc.AdjustFormulaCoords(
+              pivotDefDel.source,
+              cr1.col,
+              coloffset,
+              cr1.row,
+              rowoffset,
+            );
+            if (shiftedAnchorDel.indexOf('#REF!') >= 0 || shiftedSourceDel.indexOf('#REF!') >= 0) {
+              SocialCalc.Pivot.ClearPivot(sheet, pivotAnchorDel);
+              continue;
+            }
+            pivotDefDel.source = shiftedSourceDel;
+            shiftedPivotsDel[shiftedAnchorDel] = pivotDefDel;
+          }
+          sheet.pivots = shiftedPivotsDel;
         }
         for (row = rowstart; row <= lastrow - rowoffset && cmd1 == 'deleterow'; row++) {
           rowbefore = row + rowoffset;
@@ -5488,6 +5600,85 @@ More comments yet to come...
           }
         }
         break;
+      case 'definepivot':
+        what = cmd.NextToken();
+        rest = cmd.RestOfString();
+        cr1 = SocialCalc.coordToCr(what);
+        if (!(cr1.col >= 1 && cr1.row >= 1)) {
+          errortext = 'Invalid pivot table anchor: ' + what;
+          break;
+        }
+        cell = sheet.GetAssuredCell(what);
+        if (cell.spillowner || (cell.pivotowner && cell.pivotowner !== what)) {
+          errortext = SocialCalc.Pivot.CommandError;
+          break;
+        }
+        if (rest == '') {
+          errortext = 'Missing pivot table definition';
+          break;
+        }
+        var pivotDefinition;
+        try {
+          pivotDefinition = JSON.parse(SocialCalc.decodeFromSave(rest));
+        } catch {
+          errortext = 'Invalid pivot table definition JSON';
+          break;
+        }
+        var pivotValidationError = SocialCalc.Pivot.ValidateDefinition(pivotDefinition);
+        if (pivotValidationError) {
+          errortext = pivotValidationError;
+          break;
+        }
+        sheet.pivots = sheet.pivots || {};
+        if (saveundo) {
+          if (sheet.pivots[what]) {
+            changes.AddUndo(
+              'definepivot ' +
+                what +
+                ' ' +
+                SocialCalc.encodeForSave(JSON.stringify(sheet.pivots[what])),
+            );
+          } else {
+            changes.AddUndo('deletepivot ' + what);
+          }
+        }
+        sheet.pivots[what] = pivotDefinition;
+        errortext = SocialCalc.Pivot.RefreshPivot(sheet, what);
+        sheet.renderneeded = true;
+        sheet.changedrendervalues = true;
+        break;
+      case 'deletepivot':
+        what = cmd.NextToken();
+        if (sheet.pivots && sheet.pivots[what]) {
+          if (saveundo) {
+            changes.AddUndo(
+              'definepivot ' +
+                what +
+                ' ' +
+                SocialCalc.encodeForSave(JSON.stringify(sheet.pivots[what])),
+            );
+          }
+          SocialCalc.Pivot.ClearPivot(sheet, what);
+          delete sheet.pivots[what];
+          cell = sheet.cells[what];
+          if (cell) {
+            cell.datavalue = '';
+            cell.datatype = null;
+            cell.valuetype = 'b';
+            delete cell.errors;
+            delete cell.displaystring;
+          }
+        }
+        sheet.renderneeded = true;
+        sheet.changedrendervalues = true;
+        break;
+      case 'refreshpivot':
+        what = cmd.NextToken();
+        errortext = SocialCalc.Pivot.RefreshPivot(sheet, what);
+        break;
+      case 'refreshpivotall':
+        SocialCalc.Pivot.RefreshAllPivots(sheet);
+        break;
       case 'recalc':
         attribs.needsrecalc = 'yes';
         sheet.recalconce = true;
@@ -6060,6 +6251,7 @@ More comments yet to come...
     }
     sheet.spillTopologyChanged = false;
     sheet.spillTopologyRetried = false;
+    if (sheet.pivots) SocialCalc.Pivot.RefreshAllPivots(sheet);
     if (sheet.hasDynamicRef && !sheet.dynamicRefRetried) {
       sheet.dynamicRefRetried = true;
       sheet.hasDynamicRef = false;
@@ -9938,6 +10130,751 @@ More comments yet to come...
     return overlay;
   };
 
+  // SocialCalc.Pivot — pivot-table engine.
+  //
+  // A pivot table is a named, ownership-tracked output region (mirrors the
+  // dynamic-array "spill" runtime in socialcalc-3.ts: SC.MaterializeSpill /
+  // SC.ClearSpill / SC.SanitizeSpills / SC.PrepareSpillMutation) computed from
+  // a rectangular source range with a header row. Definitions live in
+  // `sheet.pivots[anchorCoord]`; materialized output cells are ordinary
+  // SocialCalc.Cell objects tagged `pivotowner`/`pivotrow`/`pivotcol` (the
+  // anchor cell itself additionally carries `pivotrows`/`pivotcols`), exactly
+  // paralleling `spillowner`/`spillrow`/`spillcol`/`spillrows`/`spillcols`.
+  // Output cells are read-only to direct edits (see PrepareSpillMutation's
+  // pivot-ownership checks in socialcalc-3.ts and the editor input guards in
+  // socialcalctableeditor.ts) and are only ever rewritten by
+  // SC.Pivot.RefreshPivot / RefreshAllPivots.
+  //
+  // Pure decision cores (typed group-key ordering, aggregate contribution/
+  // error classification, output-shape/collision policy) are mirrored,
+  // verified, and cross-checked in lemma/pivot.ts /
+  // test/lemma-pivot-facade.test.ts — see that file for the Dafny/Lean-backed
+  // specification these functions must match bit-for-bit.
+
+  // SocialCalc is defined by socialcalcconstants.js, and `SC` is the `const SC
+  // = SocialCalc as any` alias declared once at top-level scope by
+  // socialcalc-3.ts (which concatenates before this file in the UMD bundle,
+  // and shares this file's global script scope — no module boundary, so the
+  // declaration is visible here without a re-import).
+
+  SC.Pivot = {};
+  SC.Pivot.MAX_COL = 702;
+  SC.Pivot.MAX_ROW = 65536;
+  SC.Pivot.MAX_CELLS = 1e5;
+  SC.Pivot.AGG_SUM = 0;
+  SC.Pivot.AGG_COUNT = 1;
+  SC.Pivot.AGG_COUNTA = 2;
+  SC.Pivot.AGG_AVERAGE = 3;
+  SC.Pivot.AGG_MIN = 4;
+  SC.Pivot.AGG_MAX = 5;
+  SC.Pivot.AggCode = {
+    sum: SC.Pivot.AGG_SUM,
+    count: SC.Pivot.AGG_COUNT,
+    counta: SC.Pivot.AGG_COUNTA,
+    average: SC.Pivot.AGG_AVERAGE,
+    min: SC.Pivot.AGG_MIN,
+    max: SC.Pivot.AGG_MAX,
+  };
+  SC.Pivot.AggLabel = {
+    sum: 'Sum',
+    count: 'Count',
+    counta: 'CountA',
+    average: 'Average',
+    min: 'Min',
+    max: 'Max',
+  };
+  SC.Pivot.CommandError =
+    'Cannot change part of a pivot table output. Delete or refresh the pivot table instead.';
+  SC.Pivot.TypeRank = function (typeChar) {
+    if (typeChar === 'n') return 0;
+    if (typeChar === 't') return 1;
+    if (typeChar === 'e') return 2;
+    return 3;
+  };
+  SC.Pivot.CompareGroupKey = function (rankA, rankB, sameTypeCompare, indexA, indexB) {
+    if (rankA !== rankB) return rankA < rankB ? -1 : 1;
+    if (sameTypeCompare !== 0) return sameTypeCompare;
+    if (indexA < indexB) return -1;
+    if (indexA > indexB) return 1;
+    return 0;
+  };
+  SC.Pivot.IsNumericType = function (typeChar) {
+    return typeChar === 'n';
+  };
+  SC.Pivot.IsBlankType = function (typeChar) {
+    return typeChar === 'b';
+  };
+  SC.Pivot.AggregateContributesNumeric = function (typeChar) {
+    return SC.Pivot.IsNumericType(typeChar);
+  };
+  SC.Pivot.AggregateContributesCountA = function (typeChar) {
+    return !SC.Pivot.IsBlankType(typeChar);
+  };
+  SC.Pivot.AggregateContributes = function (aggFn, typeChar) {
+    if (aggFn === SC.Pivot.AGG_COUNTA) return SC.Pivot.AggregateContributesCountA(typeChar);
+    return SC.Pivot.AggregateContributesNumeric(typeChar);
+  };
+  SC.Pivot.NextSum = function (sum, contributes, value) {
+    return contributes ? sum + value : sum;
+  };
+  SC.Pivot.NextCount = function (count, contributes) {
+    return contributes ? count + 1 : count;
+  };
+  SC.Pivot.NextMin = function (min, hasMin, contributes, value) {
+    if (!contributes) return min;
+    if (!hasMin) return value;
+    return value < min ? value : min;
+  };
+  SC.Pivot.NextMax = function (max, hasMax, contributes, value) {
+    if (!contributes) return max;
+    if (!hasMax) return value;
+    return value > max ? value : max;
+  };
+  SC.Pivot.AggregateStatus = function (aggFn, numericCount) {
+    return aggFn === SC.Pivot.AGG_AVERAGE && numericCount === 0 ? 1 : 0;
+  };
+  SC.Pivot.PlanPivotStatus = function (anchorCol, anchorRow, rows, cols, maxCol, maxRow, maxCells) {
+    if (!(rows > 0 && cols > 0)) return 1;
+    if (
+      !(
+        anchorCol >= 1 &&
+        anchorRow >= 1 &&
+        anchorCol + cols - 1 <= maxCol &&
+        anchorRow + rows - 1 <= maxRow
+      )
+    )
+      return 2;
+    if (rows * cols > maxCells) return 3;
+    return 0;
+  };
+  SC.Pivot.ClassifyPivotClaim = function (
+    isAnchorCell,
+    isBlank,
+    isOwnedBySamePivot,
+    isForeignOwned,
+    hasUserContent,
+    isMergedTarget,
+  ) {
+    if (isAnchorCell) return 0;
+    if (isForeignOwned || hasUserContent || isMergedTarget) return 2;
+    return isBlank || isOwnedBySamePivot ? 1 : 2;
+  };
+  SC.Pivot.CellTypeChar = function (sheet, coord) {
+    var cell = sheet.cells[coord];
+    if (!cell) return 'b';
+    return cell.valuetype ? cell.valuetype.charAt(0) : 'b';
+  };
+  SC.Pivot.GroupKeyFor = function (sheet, coord) {
+    var cell = sheet.cells[coord];
+    var t = SC.Pivot.CellTypeChar(sheet, coord);
+    var rank = SC.Pivot.TypeRank(t);
+    if (t === 'n') {
+      var nv = cell.datavalue;
+      return {
+        rank,
+        type: 'n',
+        key: 'n:' + nv,
+        sortValue: nv,
+        label: '' + nv,
+      };
+    }
+    if (t === 'e') {
+      var ev = '' + (cell.errors || cell.datavalue || '#VALUE!');
+      return {
+        rank,
+        type: 'e',
+        key: 'e:' + ev,
+        sortValue: ev,
+        label: ev,
+      };
+    }
+    if (t === 'b') {
+      return {
+        rank,
+        type: 'b',
+        key: 'b:',
+        sortValue: '',
+        label: '(blank)',
+      };
+    }
+    var tv = '' + cell.datavalue;
+    return {
+      rank,
+      type: 't',
+      key: 't:' + tv,
+      sortValue: tv,
+      label: tv,
+    };
+  };
+  SC.Pivot.SameTypeCompare = function (a, b) {
+    if (a.type !== b.type) return 0;
+    if (a.sortValue === b.sortValue) return 0;
+    return a.sortValue < b.sortValue ? -1 : 1;
+  };
+  SC.Pivot.HeaderCellFor = function (groupKey) {
+    if (groupKey.type === 'b')
+      return {
+        value: '(blank)',
+        type: 't',
+      };
+    if (groupKey.type === 'e')
+      return {
+        value: groupKey.sortValue,
+        type: 'e',
+      };
+    return {
+      value: groupKey.sortValue,
+      type: groupKey.type,
+    };
+  };
+  SC.Pivot.VALID_AGG = {
+    sum: 1,
+    count: 1,
+    counta: 1,
+    average: 1,
+    min: 1,
+    max: 1,
+  };
+  SC.Pivot.ValidateDefinition = function (definition) {
+    if (!definition || typeof definition !== 'object') return 'Missing pivot table definition';
+    if (typeof definition.source !== 'string' || !definition.source)
+      return 'Missing pivot source range';
+    var r = SocialCalc.ParseRange(definition.source);
+    if (r.cr2.row <= r.cr1.row)
+      return 'Pivot source must include a header row and at least one data row';
+    if (!Array.isArray(definition.rowFields)) return 'rowFields must be an array';
+    if (!Array.isArray(definition.colFields)) return 'colFields must be an array';
+    if (!Array.isArray(definition.valueFields) || definition.valueFields.length === 0)
+      return 'valueFields must be a non-empty array';
+    var i;
+    for (i = 0; i < definition.rowFields.length; i++)
+      if (typeof definition.rowFields[i] !== 'string') return 'rowFields must contain field names';
+    for (i = 0; i < definition.colFields.length; i++)
+      if (typeof definition.colFields[i] !== 'string') return 'colFields must contain field names';
+    for (i = 0; i < definition.valueFields.length; i++) {
+      var vf = definition.valueFields[i];
+      if (!vf || typeof vf.field !== 'string' || !SC.Pivot.VALID_AGG[vf.agg])
+        return 'valueFields entries need a field and a valid aggregation (sum/count/counta/average/min/max)';
+    }
+    if (definition.filters) {
+      if (!Array.isArray(definition.filters)) return 'filters must be an array';
+      for (i = 0; i < definition.filters.length; i++) {
+        var f = definition.filters[i];
+        if (!f || typeof f.field !== 'string' || !Array.isArray(f.values))
+          return 'filters entries need a field and an array of allowed values';
+      }
+    }
+    return '';
+  };
+  SC.Pivot.IntersectMembers = function (a, b) {
+    var setB = {};
+    var i;
+    for (i = 0; i < b.length; i++) setB[b[i]] = true;
+    var out = [];
+    for (i = 0; i < a.length; i++) if (setB[a[i]]) out.push(a[i]);
+    return out;
+  };
+  SC.Pivot.BuildTable = function (sheet, definition) {
+    var range = SocialCalc.ParseRange(definition.source);
+    var cr1 = range.cr1,
+      cr2 = range.cr2;
+    if (cr2.row <= cr1.row)
+      return { error: 'Pivot source must include a header row and at least one data row' };
+    var headers = [];
+    var headerCol = {};
+    var usedNames = {};
+    var col;
+    for (col = cr1.col; col <= cr2.col; col++) {
+      var hcoord = SocialCalc.crToCoord(col, cr1.row);
+      var hcell = sheet.cells[hcoord];
+      var name =
+        hcell && hcell.datavalue != null && hcell.datavalue !== ''
+          ? '' + hcell.datavalue
+          : SocialCalc.rcColname(col);
+      if (usedNames[name]) name = name + '_' + SocialCalc.rcColname(col);
+      usedNames[name] = true;
+      headers.push(name);
+      headerCol[name] = col;
+    }
+    var checkField = function (f) {
+      return headerCol[f] !== undefined;
+    };
+    var i;
+    for (i = 0; i < definition.rowFields.length; i++)
+      if (!checkField(definition.rowFields[i]))
+        return { error: 'Unknown pivot field: ' + definition.rowFields[i] };
+    for (i = 0; i < definition.colFields.length; i++)
+      if (!checkField(definition.colFields[i]))
+        return { error: 'Unknown pivot field: ' + definition.colFields[i] };
+    for (i = 0; i < definition.valueFields.length; i++)
+      if (!checkField(definition.valueFields[i].field))
+        return { error: 'Unknown pivot field: ' + definition.valueFields[i].field };
+    var filters = definition.filters || [];
+    for (i = 0; i < filters.length; i++)
+      if (!checkField(filters[i].field))
+        return { error: 'Unknown pivot field: ' + filters[i].field };
+    var dataRows = [];
+    var row;
+    for (row = cr1.row + 1; row <= cr2.row; row++) {
+      var included = true;
+      for (i = 0; i < filters.length && included; i++) {
+        var fc = SocialCalc.crToCoord(headerCol[filters[i].field], row);
+        var gk = SC.Pivot.GroupKeyFor(sheet, fc);
+        if (filters[i].values.indexOf(gk.label) < 0) included = false;
+      }
+      if (included) dataRows.push({ row });
+    }
+    var keysFor = function (fields, rowObj) {
+      return fields.map(function (f) {
+        return SC.Pivot.GroupKeyFor(sheet, SocialCalc.crToCoord(headerCol[f], rowObj.row));
+      });
+    };
+    var distinctGroups = function (fields) {
+      var seen = {};
+      var groups = [];
+      var di;
+      for (di = 0; di < dataRows.length; di++) {
+        var keys = keysFor(fields, dataRows[di]);
+        var sig = keys
+          .map(function (k) {
+            return k.key;
+          })
+          .join('');
+        if (!seen[sig]) {
+          seen[sig] = {
+            keys,
+            sig,
+            firstIndex: di,
+            members: [],
+          };
+          groups.push(seen[sig]);
+        }
+        seen[sig].members.push(di);
+      }
+      groups.sort(function (ga, gb) {
+        var lvl;
+        for (lvl = 0; lvl < fields.length; lvl++) {
+          var a = ga.keys[lvl],
+            b = gb.keys[lvl];
+          var same = SC.Pivot.SameTypeCompare(a, b);
+          var c = SC.Pivot.CompareGroupKey(a.rank, b.rank, same, 0, 0);
+          if (c !== 0) return c;
+        }
+        return SC.Pivot.CompareGroupKey(0, 0, 0, ga.firstIndex, gb.firstIndex);
+      });
+      return groups;
+    };
+    var rowGroups = distinctGroups(definition.rowFields);
+    var colGroups = distinctGroups(definition.colFields);
+    if (colGroups.length === 0)
+      colGroups = [
+        {
+          keys: [],
+          sig: '',
+          firstIndex: 0,
+          members: [],
+        },
+      ];
+    var aggregate = function (members, valueField) {
+      var col2 = headerCol[valueField.field];
+      var sum = 0,
+        count = 0,
+        counta = 0,
+        hasMin = false,
+        min = 0,
+        hasMax = false,
+        max = 0;
+      var mi;
+      for (mi = 0; mi < members.length; mi++) {
+        var coord = SocialCalc.crToCoord(col2, dataRows[members[mi]].row);
+        var t = SC.Pivot.CellTypeChar(sheet, coord);
+        var contributesNumeric = SC.Pivot.AggregateContributesNumeric(t);
+        var contributesA = SC.Pivot.AggregateContributesCountA(t);
+        var val = 0;
+        if (contributesNumeric) {
+          val = sheet.cells[coord].datavalue;
+        }
+        sum = SC.Pivot.NextSum(sum, contributesNumeric, val);
+        min = SC.Pivot.NextMin(min, hasMin, contributesNumeric, val);
+        max = SC.Pivot.NextMax(max, hasMax, contributesNumeric, val);
+        if (contributesNumeric) {
+          hasMin = true;
+          hasMax = true;
+        }
+        count = SC.Pivot.NextCount(count, contributesNumeric);
+        counta = SC.Pivot.NextCount(counta, contributesA);
+      }
+      var aggFn = SC.Pivot.AggCode[valueField.agg];
+      var status = SC.Pivot.AggregateStatus(aggFn, count);
+      if (status === 1)
+        return {
+          value: '#DIV/0!',
+          type: 'e',
+        };
+      var result;
+      if (valueField.agg === 'sum') result = sum;
+      else if (valueField.agg === 'count') result = count;
+      else if (valueField.agg === 'counta') result = counta;
+      else if (valueField.agg === 'average') result = sum / count;
+      else if (valueField.agg === 'min') result = min;
+      else result = max;
+      return {
+        value: result,
+        type: 'n',
+      };
+    };
+    return {
+      headers,
+      headerCol,
+      dataRows,
+      rowGroups,
+      colGroups,
+      aggregate,
+    };
+  };
+  SC.Pivot.ColumnHeaderLabel = function (colGroup, definition, valueField) {
+    var parts = colGroup.keys.map(function (k) {
+      return k.type === 'b' ? '(blank)' : '' + k.sortValue;
+    });
+    var base = parts.join(' / ');
+    if (definition.valueFields.length > 1) {
+      var vlabel =
+        valueField.label || SC.Pivot.AggLabel[valueField.agg] + ' of ' + valueField.field;
+      return base ? base + ' | ' + vlabel : vlabel;
+    }
+    return base;
+  };
+  SC.Pivot.RenderGrid = function (built, definition) {
+    var rowFieldCount = definition.rowFields.length;
+    var valueFields = definition.valueFields;
+    var colGroups = built.colGroups;
+    var showRowTotals = !!definition.showRowTotals;
+    var showColTotals = !!definition.showColTotals;
+    var showSubtotals = rowFieldCount > 1 && definition.showSubtotals !== false;
+    var valueColBlocks =
+      colGroups.length * valueFields.length + (showRowTotals ? valueFields.length : 0);
+    var headerCols = Math.max(rowFieldCount, 1);
+    var totalCols = headerCols + valueColBlocks;
+    var grid = [];
+    var headerRow = [];
+    var i;
+    if (rowFieldCount === 0) {
+      headerRow.push({
+        value: '',
+        type: 't',
+      });
+    } else {
+      for (i = 0; i < rowFieldCount; i++)
+        headerRow.push({
+          value: definition.rowFields[i],
+          type: 't',
+        });
+    }
+    var cg, vf;
+    for (cg = 0; cg < colGroups.length; cg++) {
+      for (vf = 0; vf < valueFields.length; vf++) {
+        headerRow.push({
+          value: SC.Pivot.ColumnHeaderLabel(colGroups[cg], definition, valueFields[vf]),
+          type: 't',
+        });
+      }
+    }
+    if (showRowTotals) {
+      for (vf = 0; vf < valueFields.length; vf++) {
+        var vlabel =
+          valueFields.length > 1
+            ? 'Total | ' +
+              (valueFields[vf].label ||
+                SC.Pivot.AggLabel[valueFields[vf].agg] + ' of ' + valueFields[vf].field)
+            : 'Total';
+        headerRow.push({
+          value: vlabel,
+          type: 't',
+        });
+      }
+    }
+    grid.push(headerRow);
+    var emitDataRow = function (labelCells, members) {
+      var out = labelCells.slice();
+      for (cg = 0; cg < colGroups.length; cg++) {
+        var scoped = SC.Pivot.IntersectMembers(members, colGroups[cg].members);
+        for (vf = 0; vf < valueFields.length; vf++)
+          out.push(built.aggregate(scoped, valueFields[vf]));
+      }
+      if (showRowTotals) {
+        for (vf = 0; vf < valueFields.length; vf++)
+          out.push(built.aggregate(members, valueFields[vf]));
+      }
+      grid.push(out);
+    };
+    var blankLabelCells = function (n) {
+      var out = [];
+      for (var k = 0; k < n; k++)
+        out.push({
+          value: '',
+          type: 'b',
+        });
+      return out;
+    };
+    var outerSig = null;
+    var outerLabel = '';
+    var outerMembers = [];
+    var flushSubtotal = function () {
+      var labelCells = blankLabelCells(headerCols);
+      labelCells[0] = {
+        value: outerLabel + ' Total',
+        type: 't',
+      };
+      emitDataRow(labelCells, outerMembers);
+    };
+    var rg;
+    for (rg = 0; rg < built.rowGroups.length; rg++) {
+      var group = built.rowGroups[rg];
+      var sig0 = rowFieldCount > 0 ? group.keys[0].key : '';
+      if (showSubtotals && outerSig !== null && sig0 !== outerSig) {
+        flushSubtotal();
+        outerMembers = [];
+      }
+      if (rowFieldCount > 0) {
+        outerSig = sig0;
+        outerLabel = group.keys[0].type === 'b' ? '(blank)' : '' + group.keys[0].sortValue;
+      }
+      outerMembers = outerMembers.concat(group.members);
+      var labelCells;
+      if (rowFieldCount === 0) {
+        labelCells = [
+          {
+            value: 'Total',
+            type: 't',
+          },
+        ];
+      } else {
+        labelCells = group.keys.map(function (k) {
+          return SC.Pivot.HeaderCellFor(k);
+        });
+      }
+      emitDataRow(labelCells, group.members);
+    }
+    if (showSubtotals && outerSig !== null) flushSubtotal();
+    if (showColTotals) {
+      var allMembers = [];
+      for (rg = 0; rg < built.dataRows.length; rg++) allMembers.push(rg);
+      var grandLabel = blankLabelCells(headerCols);
+      grandLabel[0] = {
+        value: 'Grand Total',
+        type: 't',
+      };
+      emitDataRow(grandLabel, allMembers);
+    }
+    return {
+      grid,
+      rows: grid.length,
+      cols: totalCols,
+    };
+  };
+  SC.Pivot.RefreshPivot = function (sheet, anchor) {
+    var definition = sheet.pivots && sheet.pivots[anchor];
+    if (!definition) return 'No such pivot table: ' + anchor;
+    var fail = function (msg) {
+      SC.Pivot.ClearPivot(sheet, anchor);
+      var ac = sheet.GetAssuredCell(anchor);
+      ac.datavalue = '#PIVOT!';
+      ac.valuetype = 'e';
+      ac.errors = msg;
+      delete ac.displaystring;
+      sheet.renderneeded = true;
+      sheet.changedrendervalues = true;
+      return msg;
+    };
+    var verr = SC.Pivot.ValidateDefinition(definition);
+    if (verr) return fail(verr);
+    var built = SC.Pivot.BuildTable(sheet, definition);
+    if (built.error) return fail(built.error);
+    var rendered = SC.Pivot.RenderGrid(built, definition);
+    var grid = rendered.grid;
+    var rows = rendered.rows,
+      cols = rendered.cols;
+    var cr = SocialCalc.coordToCr(anchor);
+    var status = SC.Pivot.PlanPivotStatus(
+      cr.col,
+      cr.row,
+      rows,
+      cols,
+      SC.Pivot.MAX_COL,
+      SC.Pivot.MAX_ROW,
+      SC.Pivot.MAX_CELLS,
+    );
+    if (status !== 0) return fail('#PIVOT! (output does not fit: ' + rows + 'x' + cols + ')');
+    var anchorCellExisting = sheet.cells[anchor];
+    var oldRows = (anchorCellExisting && anchorCellExisting.pivotrows) || 0;
+    var oldCols = (anchorCellExisting && anchorCellExisting.pivotcols) || 0;
+    var collision = false;
+    var key;
+    for (key in sheet.cells) {
+      var existing = sheet.cells[key];
+      if (!existing || key === anchor || existing.pivotowner === anchor) continue;
+      var a = SocialCalc.coordToCr(key);
+      var inRect =
+        a.col >= cr.col && a.col < cr.col + cols && a.row >= cr.row && a.row < cr.row + rows;
+      var merged = existing.colspan > 1 || existing.rowspan > 1;
+      var intersects =
+        merged &&
+        a.col < cr.col + cols &&
+        a.col + (existing.colspan || 1) > cr.col &&
+        a.row < cr.row + rows &&
+        a.row + (existing.rowspan || 1) > cr.row;
+      if (inRect || intersects) {
+        collision = true;
+        break;
+      }
+    }
+    if (collision) return fail('#PIVOT! (output collides with existing content)');
+    var r, c;
+    for (r = 0; r < oldRows; r++)
+      for (c = 0; c < oldCols; c++) {
+        if (r < rows && c < cols) continue;
+        var stale = sheet.cells[SocialCalc.crToCoord(cr.col + c, cr.row + r)];
+        if (stale && stale.pivotowner === anchor) delete sheet.cells[stale.coord];
+      }
+    var anchorCell = sheet.GetAssuredCell(anchor);
+    delete anchorCell.errors;
+    anchorCell.datavalue = grid[0][0].value;
+    anchorCell.valuetype = grid[0][0].type;
+    anchorCell.pivotrows = rows;
+    anchorCell.pivotcols = cols;
+    delete anchorCell.displaystring;
+    for (r = 0; r < rows; r++)
+      for (c = 0; c < cols; c++) {
+        if (!r && !c) continue;
+        var value = grid[r][c];
+        var childcoord = SocialCalc.crToCoord(cr.col + c, cr.row + r);
+        var child = sheet.cells[childcoord];
+        if (!child || child.pivotowner !== anchor) child = new SocialCalc.Cell(childcoord);
+        child.datavalue = value.value;
+        child.valuetype = value.type;
+        if (value.type === 'e') child.errors = value.value;
+        else delete child.errors;
+        child.pivotowner = anchor;
+        child.pivotrow = r;
+        child.pivotcol = c;
+        delete child.displaystring;
+        sheet.cells[childcoord] = child;
+      }
+    sheet.attribs.lastrow = Math.max(sheet.attribs.lastrow, cr.row + rows - 1);
+    sheet.attribs.lastcol = Math.max(sheet.attribs.lastcol, cr.col + cols - 1);
+    sheet.renderneeded = true;
+    sheet.changedrendervalues = true;
+    return '';
+  };
+  SC.Pivot.RefreshAllPivots = function (sheet) {
+    if (!sheet.pivots) return;
+    var anchor;
+    for (anchor in sheet.pivots) SC.Pivot.RefreshPivot(sheet, anchor);
+  };
+  SC.Pivot.ClearPivot = function (sheet, anchor) {
+    var removed = false;
+    var anchorCell = sheet.cells[anchor];
+    var rows = (anchorCell && anchorCell.pivotrows) || 0;
+    var cols = (anchorCell && anchorCell.pivotcols) || 0;
+    var cr;
+    try {
+      cr = SocialCalc.coordToCr(anchor);
+    } catch {
+      return false;
+    }
+    var r, c;
+    for (r = 0; r < rows; r++)
+      for (c = 0; c < cols; c++) {
+        if (!r && !c) continue;
+        var coord = SocialCalc.crToCoord(cr.col + c, cr.row + r);
+        var cell = sheet.cells[coord];
+        if (cell && cell.pivotowner === anchor) {
+          delete sheet.cells[coord];
+          removed = true;
+        }
+      }
+    if (anchorCell) {
+      delete anchorCell.pivotrows;
+      delete anchorCell.pivotcols;
+    }
+    if (removed) {
+      sheet.renderneeded = true;
+      sheet.changedrendervalues = true;
+    }
+    return removed;
+  };
+  SC.Pivot.ClearAllDerivedPivots = function (sheet) {
+    var changed = false;
+    var key;
+    for (key in sheet.cells) {
+      var cell = sheet.cells[key];
+      if (!cell) continue;
+      if (cell.pivotowner) {
+        delete sheet.cells[key];
+        changed = true;
+      } else if (cell.pivotrows || cell.pivotcols) {
+        delete cell.pivotrows;
+        delete cell.pivotcols;
+        changed = true;
+      }
+    }
+    if (changed) {
+      sheet.renderneeded = true;
+      sheet.changedrendervalues = true;
+    }
+  };
+  SC.Pivot.PivotOwnerForCoord = function (sheet, coord) {
+    var cell = sheet.cells[coord];
+    return cell && cell.pivotowner ? cell.pivotowner : coord;
+  };
+  SC.Pivot.SanitizePivots = function (sheet) {
+    sheet.pivots = sheet.pivots || {};
+    var valid = {};
+    var anchor;
+    for (anchor in sheet.pivots) {
+      var def = sheet.pivots[anchor];
+      var err = SC.Pivot.ValidateDefinition(def);
+      if (!err) {
+        var acr = SocialCalc.coordToCr(anchor);
+        if (!(acr.col >= 1 && acr.row >= 1)) err = 'bad anchor';
+      }
+      if (err) {
+        delete sheet.pivots[anchor];
+        continue;
+      }
+      valid[anchor] = true;
+    }
+    var key;
+    for (key in sheet.cells) {
+      var cell = sheet.cells[key];
+      if (!cell || !cell.pivotowner) continue;
+      var owner = sheet.cells[cell.pivotowner];
+      var good = false;
+      if (owner && valid[cell.pivotowner]) {
+        var a = SocialCalc.coordToCr(cell.pivotowner),
+          c = SocialCalc.coordToCr(key);
+        good =
+          Number.isInteger(cell.pivotrow) &&
+          Number.isInteger(cell.pivotcol) &&
+          cell.pivotrow >= 0 &&
+          cell.pivotcol >= 0 &&
+          !!(cell.pivotrow || cell.pivotcol) &&
+          !!owner.pivotrows &&
+          !!owner.pivotcols &&
+          cell.pivotrow < owner.pivotrows &&
+          cell.pivotcol < owner.pivotcols &&
+          c.col === a.col + cell.pivotcol &&
+          c.row === a.row + cell.pivotrow;
+      }
+      if (!good) {
+        delete cell.pivotowner;
+        delete cell.pivotrow;
+        delete cell.pivotcol;
+      }
+    }
+    sheet.renderneeded = true;
+  };
+
   // In-place TypeScript conversion of socialcalctableeditor.js (SocialCalc global script).
   // Ambient API types live in socialcalctableeditor.d.ts (referenced by dist/SocialCalc.d.ts).
   // Vite+ strips types with Oxc before UMD concat — no runtime tax.
@@ -11658,6 +12595,7 @@ More comments yet to come...
     if (!editor.inputBox) return true;
     if (editor.inputBox.element.disabled) return true;
     if (editor.context.sheetobj.cells[editor.ecell.coord]?.spillowner) return true;
+    if (editor.context.sheetobj.cells[editor.ecell.coord]?.pivotowner) return true;
     editor.inputBox.ShowInputBox(true);
     editor.inputBox.Focus();
     editor.inputBox.SetText('');
@@ -11913,7 +12851,7 @@ More comments yet to come...
       value = TableEditorSC.encodeForSave(value);
     }
     var liveCell = sheetobj.cells[wval.ecoord];
-    if (liveCell?.spillowner) {
+    if (liveCell?.spillowner || liveCell?.pivotowner) {
       editor.inputBox.ShowInputBox(false);
       editor.state = 'start';
       editor.cellhandles.ShowCellHandles(true);
@@ -30902,6 +31840,73 @@ not governed by the terms of the CPAL.
       onclick: SocialCalc.SpreadsheetControlCondFmtOnclick,
       onunclick: SocialCalc.SpreadsheetControlCondFmtOnunclick,
     });
+    this.tabnums.pivot = this.tabs.length;
+    this.tabs.push({
+      name: 'pivot',
+      text: 'Pivot',
+      html:
+        '<div id="%id.pivottools" style="display:none;">' +
+        '  <table cellspacing="0" cellpadding="0"><tr>' +
+        '   <td style="vertical-align:top;padding-right:12px;">' +
+        '    <div style="%tbt.">%loc!Existing Pivot Tables!</div>' +
+        '    <select id="%id.pivotlist" size="1" onchange="%s.SpreadsheetControlPivotChangedSelection();" onfocus="%s.CmdGotFocus(this);"><option selected>[New]</option></select>' +
+        '   </td>' +
+        '   <td style="vertical-align:top;padding-right:12px;width:100px;">' +
+        '    <div style="%tbt.">%loc!Anchor Cell!</div>' +
+        '    <input type="text" id="%id.pivotanchor" style="font-size:x-small;width:60px;" onfocus="%s.CmdGotFocus(this);">' +
+        '    <input type="button" id="%id.pivotanchorproposal" value="A1" onclick="%s.SpreadsheetControlPivotSetAnchor();" style="font-size:x-small;">' +
+        '   </td>' +
+        '   <td style="vertical-align:top;padding-right:12px;width:110px;">' +
+        '    <div style="%tbt.">%loc!Source Range!</div>' +
+        '    <input type="text" id="%id.pivotsource" style="font-size:x-small;width:70px;" onfocus="%s.CmdGotFocus(this);">' +
+        '    <input type="button" id="%id.pivotsourceproposal" value="A1" onclick="%s.SpreadsheetControlPivotSetSource();" style="font-size:x-small;">' +
+        '   </td>' +
+        '   <td style="vertical-align:top;padding-right:12px;">' +
+        '    <div style="%tbt.">%loc!Row Fields (comma-sep)!</div>' +
+        '    <input type="text" id="%id.pivotrowfields" style="font-size:x-small;width:100px;" onfocus="%s.CmdGotFocus(this);">' +
+        '   </td>' +
+        '   <td style="vertical-align:top;padding-right:12px;">' +
+        '    <div style="%tbt.">%loc!Column Fields (comma-sep)!</div>' +
+        '    <input type="text" id="%id.pivotcolfields" style="font-size:x-small;width:100px;" onfocus="%s.CmdGotFocus(this);">' +
+        '   </td>' +
+        '  </tr><tr>' +
+        '   <td style="vertical-align:top;padding-right:12px;padding-top:6px;">' +
+        '    <div style="%tbt.">%loc!Value Field!</div>' +
+        '    <input type="text" id="%id.pivotvaluefield" style="font-size:x-small;width:90px;" onfocus="%s.CmdGotFocus(this);">' +
+        '   </td>' +
+        '   <td style="vertical-align:top;padding-right:12px;padding-top:6px;">' +
+        '    <div style="%tbt.">%loc!Aggregation!</div>' +
+        '    <select id="%id.pivotaggregation" size="1" onfocus="%s.CmdGotFocus(this);">' +
+        '     <option value="sum" selected>%loc!Sum!</option>' +
+        '     <option value="count">%loc!Count!</option>' +
+        '     <option value="counta">%loc!CountA!</option>' +
+        '     <option value="average">%loc!Average!</option>' +
+        '     <option value="min">%loc!Min!</option>' +
+        '     <option value="max">%loc!Max!</option>' +
+        '    </select>' +
+        '   </td>' +
+        '   <td style="vertical-align:top;padding-right:12px;padding-top:6px;">' +
+        '    <div style="%tbt.">%loc!Filter (field=v1,v2)!</div>' +
+        '    <input type="text" id="%id.pivotfilter" style="font-size:x-small;width:130px;" onfocus="%s.CmdGotFocus(this);">' +
+        '   </td>' +
+        '   <td style="vertical-align:top;padding-top:6px;">' +
+        '    <div style="%tbt.">&nbsp;</div>' +
+        '    <label style="font-size:x-small;"><input type="checkbox" id="%id.pivotsubtotals">%loc!Subtotals!</label>&nbsp;' +
+        '    <label style="font-size:x-small;"><input type="checkbox" id="%id.pivotrowtotals">%loc!Row totals!</label>&nbsp;' +
+        '    <label style="font-size:x-small;"><input type="checkbox" id="%id.pivotcoltotals">%loc!Grand total!</label>' +
+        '   </td>' +
+        '  </tr><tr>' +
+        '   <td colspan="6" style="vertical-align:top;padding-top:6px;">' +
+        '    <input type="button" value="%loc!Create/Update!" onclick="%s.SpreadsheetControlPivotSave();" style="font-size:x-small;">' +
+        '    <input type="button" value="%loc!Refresh!" onclick="%s.SpreadsheetControlPivotRefresh();" style="font-size:x-small;">' +
+        '    <input type="button" value="%loc!Delete!" onclick="%s.SpreadsheetControlPivotDelete();" style="font-size:x-small;">' +
+        '   </td>' +
+        '  </tr></table>' +
+        '</div>',
+      view: 'sheet',
+      onclick: SocialCalc.SpreadsheetControlPivotOnclick,
+      onunclick: SocialCalc.SpreadsheetControlPivotOnunclick,
+    });
     this.tabnums.clipboard = this.tabs.length;
     this.tabs.push({
       name: 'clipboard',
@@ -33183,6 +34188,193 @@ not governed by the terms of the CPAL.
     var newlist = document.getElementById(idp + 'condfmtlist');
     SocialCalc.SelectOptionByValue(newlist, id);
     SocialCalc.SpreadsheetControlCondFmtChangedRule();
+  };
+  SpreadsheetControlSC.SpreadsheetControlPivotOnclick = function (s, _t) {
+    s = SocialCalc.GetSpreadsheetControlObject();
+    s.editor.RangeChangeCallback.pivot = SocialCalc.SpreadsheetControlPivotRangeChange;
+    s.editor.MoveECellCallback.pivot = SocialCalc.SpreadsheetControlPivotRangeChange;
+    SocialCalc.SpreadsheetControlPivotRangeChange(s.editor);
+    SocialCalc.SpreadsheetControlPivotFillList();
+    SocialCalc.SpreadsheetControlPivotChangedSelection();
+  };
+  SpreadsheetControlSC.SpreadsheetControlPivotOnunclick = function (s, _t) {
+    delete s.editor.RangeChangeCallback.pivot;
+    delete s.editor.MoveECellCallback.pivot;
+  };
+  SpreadsheetControlSC.SpreadsheetControlPivotRangeChange = function (editor) {
+    var s = SocialCalc.GetSpreadsheetControlObject();
+    var anchorEle = document.getElementById(s.idPrefix + 'pivotanchorproposal');
+    var sourceEle = document.getElementById(s.idPrefix + 'pivotsourceproposal');
+    var coord;
+    var range;
+    if (editor.range.hasrange) {
+      coord = SocialCalc.crToCoord(editor.range.left, editor.range.top);
+      range =
+        SocialCalc.crToCoord(editor.range.left, editor.range.top) +
+        ':' +
+        SocialCalc.crToCoord(editor.range.right, editor.range.bottom);
+    } else {
+      coord = editor.ecell.coord;
+      range = editor.ecell.coord;
+    }
+    anchorEle.value = coord;
+    sourceEle.value = range;
+  };
+  SpreadsheetControlSC.SpreadsheetControlPivotSetAnchor = function () {
+    var s = SocialCalc.GetSpreadsheetControlObject();
+    document.getElementById(s.idPrefix + 'pivotanchor').value = document.getElementById(
+      s.idPrefix + 'pivotanchorproposal',
+    ).value;
+    SocialCalc.KeyboardFocus();
+  };
+  SpreadsheetControlSC.SpreadsheetControlPivotSetSource = function () {
+    var s = SocialCalc.GetSpreadsheetControlObject();
+    document.getElementById(s.idPrefix + 'pivotsource').value = document.getElementById(
+      s.idPrefix + 'pivotsourceproposal',
+    ).value;
+    SocialCalc.KeyboardFocus();
+  };
+  SpreadsheetControlSC.SpreadsheetControlPivotFillList = function () {
+    var SCLoc = SocialCalc.LocalizeString;
+    var anchor, i;
+    var anchorlist = [];
+    var s = SocialCalc.GetSpreadsheetControlObject();
+    var nl = document.getElementById(s.idPrefix + 'pivotlist');
+    var currentanchor = document.getElementById(s.idPrefix + 'pivotanchor').value.toUpperCase();
+    for (anchor in s.sheet.pivots || {}) {
+      anchorlist.push(anchor);
+    }
+    anchorlist.sort();
+    nl.length = 0;
+    nl.options[0] = new Option(anchorlist.length > 0 ? SCLoc('[New]') : SCLoc('[None]'));
+    for (i = 0; i < anchorlist.length; i++) {
+      anchor = anchorlist[i];
+      nl.options[i + 1] = new Option(anchor, anchor);
+      if (anchor == currentanchor) nl.options[i + 1].selected = true;
+    }
+    if (currentanchor == '') nl.options[0].selected = true;
+  };
+  SpreadsheetControlSC.SpreadsheetControlPivotChangedSelection = function () {
+    var s = SocialCalc.GetSpreadsheetControlObject();
+    var nl = document.getElementById(s.idPrefix + 'pivotlist');
+    var anchor = nl.options[nl.selectedIndex] ? nl.options[nl.selectedIndex].value : '';
+    var def = (s.sheet.pivots || {})[anchor];
+    var setval = function (id, value) {
+      document.getElementById(s.idPrefix + id).value = value;
+    };
+    var setchecked = function (id, value) {
+      document.getElementById(s.idPrefix + id).checked = value;
+    };
+    if (def) {
+      setval('pivotanchor', anchor);
+      setval('pivotsource', def.source || '');
+      setval('pivotrowfields', (def.rowFields || []).join(','));
+      setval('pivotcolfields', (def.colFields || []).join(','));
+      var vf = (def.valueFields || [])[0] || {
+        field: '',
+        agg: 'sum',
+      };
+      setval('pivotvaluefield', vf.field || '');
+      document.getElementById(s.idPrefix + 'pivotaggregation').value = vf.agg || 'sum';
+      setval(
+        'pivotfilter',
+        (def.filters || [])
+          .map(function (f) {
+            return f.field + '=' + f.values.join(',');
+          })
+          .join(';'),
+      );
+      setchecked('pivotsubtotals', !!def.showSubtotals);
+      setchecked('pivotrowtotals', !!def.showRowTotals);
+      setchecked('pivotcoltotals', !!def.showColTotals);
+    } else {
+      setval('pivotanchor', '');
+      setval('pivotrowfields', '');
+      setval('pivotcolfields', '');
+      setval('pivotvaluefield', '');
+      setval('pivotfilter', '');
+      setchecked('pivotsubtotals', false);
+      setchecked('pivotrowtotals', false);
+      setchecked('pivotcoltotals', false);
+    }
+  };
+  SpreadsheetControlSC.SpreadsheetControlPivotReadForm = function () {
+    var s = SocialCalc.GetSpreadsheetControlObject();
+    var getval = function (id) {
+      return document.getElementById(s.idPrefix + id).value;
+    };
+    var splitFields = function (str) {
+      return str
+        .split(',')
+        .map(function (v) {
+          return v.trim();
+        })
+        .filter(function (v) {
+          return v.length > 0;
+        });
+    };
+    var filterText = getval('pivotfilter').trim();
+    var filters = filterText
+      ? filterText.split(';').map(function (clause) {
+          var eq = clause.indexOf('=');
+          return {
+            field: clause.substring(0, eq).trim(),
+            values: clause
+              .substring(eq + 1)
+              .split(',')
+              .map(function (v) {
+                return v.trim();
+              }),
+          };
+        })
+      : [];
+    return {
+      anchor: getval('pivotanchor').toUpperCase(),
+      definition: {
+        source: getval('pivotsource'),
+        rowFields: splitFields(getval('pivotrowfields')),
+        colFields: splitFields(getval('pivotcolfields')),
+        valueFields: [
+          {
+            field: getval('pivotvaluefield'),
+            agg: document.getElementById(s.idPrefix + 'pivotaggregation').value,
+          },
+        ],
+        filters,
+        showSubtotals: document.getElementById(s.idPrefix + 'pivotsubtotals').checked,
+        showRowTotals: document.getElementById(s.idPrefix + 'pivotrowtotals').checked,
+        showColTotals: document.getElementById(s.idPrefix + 'pivotcoltotals').checked,
+      },
+    };
+  };
+  SpreadsheetControlSC.SpreadsheetControlPivotSave = function () {
+    var s = SocialCalc.GetSpreadsheetControlObject();
+    var form = SocialCalc.SpreadsheetControlPivotReadForm();
+    SocialCalc.SetTab(s.tabs[0].name);
+    SocialCalc.KeyboardFocus();
+    if (!form.anchor) return;
+    s.ExecuteCommand(
+      'definepivot ' +
+        form.anchor +
+        ' ' +
+        SocialCalc.encodeForSave(JSON.stringify(form.definition)),
+    );
+  };
+  SpreadsheetControlSC.SpreadsheetControlPivotRefresh = function () {
+    var s = SocialCalc.GetSpreadsheetControlObject();
+    var anchor = document.getElementById(s.idPrefix + 'pivotanchor').value.toUpperCase();
+    SocialCalc.SetTab(s.tabs[0].name);
+    SocialCalc.KeyboardFocus();
+    if (!anchor) return;
+    s.ExecuteCommand('refreshpivot ' + anchor);
+  };
+  SpreadsheetControlSC.SpreadsheetControlPivotDelete = function () {
+    var s = SocialCalc.GetSpreadsheetControlObject();
+    var anchor = document.getElementById(s.idPrefix + 'pivotanchor').value.toUpperCase();
+    SocialCalc.SetTab(s.tabs[0].name);
+    SocialCalc.KeyboardFocus();
+    if (!anchor) return;
+    s.ExecuteCommand('deletepivot ' + anchor);
   };
   SpreadsheetControlSC.SpreadsheetControlClipboardOnclick = function (s, _t) {
     s = SocialCalc.GetSpreadsheetControlObject();

@@ -1,6 +1,7 @@
 /// <reference path="../js/socialcalcconstants.d.ts" />
 /// <reference path="../js/socialcalc-3.d.ts" />
 /// <reference path="../js/chart.d.ts" />
+/// <reference path="../js/pivot.d.ts" />
 /// <reference path="../js/socialcalctableeditor.d.ts" />
 /// <reference path="../js/formatnumber2.d.ts" />
 /// <reference path="../js/formula1.d.ts" />

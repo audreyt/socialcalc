@@ -661,6 +661,164 @@ test("SpreadsheetControl Comment + Names helpers operate", async () => {
   SC.SpreadsheetControlNamesOnunclick(control, "names");
 });
 
+test("SpreadsheetControl Pivot tab helpers operate", async () => {
+  const SC = await loadSocialCalc({ browser: true });
+  installUiShim();
+  const { control } = await newControl(SC, "sc-pivot");
+
+  await scheduleCommands(SC, control.sheet, [
+    "set A1 text t Region",
+    "set B1 text t Amount",
+    "set A2 text t East",
+    "set B2 value n 10",
+    "set A3 text t West",
+    "set B3 value n 20",
+  ]);
+  await recalcSheet(SC, control.sheet);
+  // scheduleCommands drives control.sheet directly (bypassing the editor's
+  // own EditorScheduleSheetCommands gate), so editor.busy can still be true
+  // from the async post-recalc position/render chain when recalcSheet
+  // resolves (recalcSheet only awaits "calcfinished", not "doneposcalc").
+  // Wait for the real "doneposcalc" event deterministically instead of
+  // guessing a delay; skip the wait if it already settled.
+  if (control.editor.busy) await waitEditor(control.editor);
+
+  for (const key of [
+    "pivotanchor",
+    "pivotsource",
+    "pivotanchorproposal",
+    "pivotsourceproposal",
+    "pivotrowfields",
+    "pivotcolfields",
+    "pivotvaluefield",
+    "pivotfilter",
+  ]) {
+    const el = document.createElement("input");
+    el.id = control.idPrefix + key;
+    (document as any).body.appendChild(el);
+  }
+  for (const key of ["pivotsubtotals", "pivotrowtotals", "pivotcoltotals"]) {
+    const el = document.createElement("input");
+    el.type = "checkbox";
+    el.id = control.idPrefix + key;
+    (document as any).body.appendChild(el);
+  }
+  const aggSel = document.createElement("select");
+  aggSel.id = control.idPrefix + "pivotaggregation";
+  aggSel.options[0] = new Option("Sum", "sum");
+  aggSel.value = "sum";
+  (document as any).body.appendChild(aggSel);
+  const pivotListSel = document.createElement("select");
+  pivotListSel.id = control.idPrefix + "pivotlist";
+  (document as any).body.appendChild(pivotListSel);
+
+  SC.SpreadsheetControlPivotOnclick(control, "pivot");
+  control.editor.RangeAnchor("A1");
+  control.editor.RangeExtend("B3");
+  SC.SpreadsheetControlPivotRangeChange(control.editor);
+  SC.SpreadsheetControlPivotSetAnchor();
+  SC.SpreadsheetControlPivotSetSource();
+  control.editor.RangeRemove();
+  control.editor.MoveECell("D1");
+  SC.SpreadsheetControlPivotRangeChange(control.editor);
+
+  (document.getElementById(control.idPrefix + "pivotanchor") as HTMLInputElement).value = "D1";
+  (document.getElementById(control.idPrefix + "pivotsource") as HTMLInputElement).value = "A1:B3";
+  (document.getElementById(control.idPrefix + "pivotrowfields") as HTMLInputElement).value =
+    "Region";
+  (document.getElementById(control.idPrefix + "pivotvaluefield") as HTMLInputElement).value =
+    "Amount";
+  (document.getElementById(control.idPrefix + "pivotfilter") as HTMLInputElement).value =
+    "Region=East,West";
+
+  const form = SC.SpreadsheetControlPivotReadForm();
+  expect(form.anchor).toBe("D1");
+  expect(form.definition.rowFields).toEqual(["Region"]);
+  expect(form.definition.filters).toEqual([{ field: "Region", values: ["East", "West"] }]);
+
+  // PivotSave calls SocialCalc.SetTab() before ExecuteCommand; SetTab's own
+  // render/reposition chain sets editor.busy, so the definepivot command
+  // ExecuteCommand schedules is deferred until SetTab's doneposcalc fires.
+  // Wait through both rounds instead of a fixed delay.
+  const pWaitSaveTab = waitEditor(control.editor);
+  SC.SpreadsheetControlPivotSave();
+  await pWaitSaveTab;
+  if (control.editor.busy) await waitEditor(control.editor);
+  expect(control.sheet.pivots.D1).toBeDefined();
+  SC.SpreadsheetControlPivotFillList();
+  expect(pivotListSel.options.length).toBeGreaterThan(0);
+
+  (document.getElementById(control.idPrefix + "pivotanchor") as HTMLInputElement).value = "D1";
+  // SpreadsheetControlPivotFillList inserted a "[New]" placeholder at index
+  // 0 and the sole pivot ("D1") at index 1; select it so ChangedSelection
+  // reads a real stored definition instead of falling through the
+  // no-selection else-branch.
+  pivotListSel.selectedIndex = 1;
+  SC.SpreadsheetControlPivotChangedSelection();
+  expect(
+    (document.getElementById(control.idPrefix + "pivotsource") as HTMLInputElement).value,
+  ).toBe("A1:B3");
+  expect(
+    (document.getElementById(control.idPrefix + "pivotrowfields") as HTMLInputElement).value,
+  ).toBe("Region");
+  expect(
+    (document.getElementById(control.idPrefix + "pivotvaluefield") as HTMLInputElement).value,
+  ).toBe("Amount");
+  expect(
+    (document.getElementById(control.idPrefix + "pivotfilter") as HTMLInputElement).value,
+  ).toBe("Region=East,West");
+
+  const pWaitRefreshTab = waitEditor(control.editor);
+  SC.SpreadsheetControlPivotRefresh();
+  await pWaitRefreshTab;
+  if (control.editor.busy) await waitEditor(control.editor);
+  (document.getElementById(control.idPrefix + "pivotanchor") as HTMLInputElement).value = "D1";
+  const pWaitDeleteTab = waitEditor(control.editor);
+  SC.SpreadsheetControlPivotDelete();
+  await pWaitDeleteTab;
+  if (control.editor.busy) await waitEditor(control.editor);
+  expect(control.sheet.pivots.D1).toBeUndefined();
+
+  // No-anchor early-return branches (empty form guard).
+  (document.getElementById(control.idPrefix + "pivotanchor") as HTMLInputElement).value = "";
+  SC.SpreadsheetControlPivotSave();
+  SC.SpreadsheetControlPivotRefresh();
+  SC.SpreadsheetControlPivotDelete();
+
+  // No-selection [None]/[New] branch in ChangedSelection.
+  pivotListSel.length = 0;
+  SC.SpreadsheetControlPivotChangedSelection();
+
+  SC.SpreadsheetControlPivotOnunclick(control, "pivot");
+
+  // ChangedSelection's `||` fallbacks (def.source, def.rowFields,
+  // def.colFields, def.valueFields, vf.field/agg, def.filters) only fire
+  // for a stored definition missing those optional-looking fields — never
+  // true for anything ValidateDefinition accepted, but real for a
+  // hand-built/partial definition (e.g. from an older save format).
+  control.sheet.pivots = { E1: {} };
+  pivotListSel.length = 0;
+  pivotListSel.options[0] = new Option(SC.LocalizeString("[New]"));
+  pivotListSel.options[1] = new Option("E1", "E1");
+  pivotListSel.selectedIndex = 1;
+  SC.SpreadsheetControlPivotChangedSelection();
+  expect(
+    (document.getElementById(control.idPrefix + "pivotsource") as HTMLInputElement).value,
+  ).toBe("");
+  expect(
+    (document.getElementById(control.idPrefix + "pivotrowfields") as HTMLInputElement).value,
+  ).toBe("");
+  expect(
+    (document.getElementById(control.idPrefix + "pivotvaluefield") as HTMLInputElement).value,
+  ).toBe("");
+  expect(
+    (document.getElementById(control.idPrefix + "pivotaggregation") as HTMLSelectElement).value,
+  ).toBe("sum");
+  expect(
+    (document.getElementById(control.idPrefix + "pivotfilter") as HTMLInputElement).value,
+  ).toBe("");
+});
+
 test("Parse a save built manually and reflect in viewer", async () => {
   const SC = await loadSocialCalc({ browser: true });
   installUiShim();
@@ -950,4 +1108,69 @@ test("SpreadsheetControl: Clipboard + Settings helpers", async () => {
   expect(celltable.style.display).toBe("block");
   expect(sheettoolbar.style.display).toBe("none");
   expect(celltoolbar.style.display).toBe("block");
+});
+
+test("SpreadsheetControl Pivot: fill-list non-match, missing-agg fallback, and empty filter form read", async () => {
+  const SC = await loadSocialCalc({ browser: true });
+  installUiShim();
+  const { control } = await newControl(SC, "sc-pivot2");
+
+  for (const key of [
+    "pivotanchor",
+    "pivotsource",
+    "pivotrowfields",
+    "pivotcolfields",
+    "pivotvaluefield",
+    "pivotfilter",
+  ]) {
+    const el = document.createElement("input");
+    el.id = control.idPrefix + key;
+    (document as any).body.appendChild(el);
+  }
+  for (const key of ["pivotsubtotals", "pivotrowtotals", "pivotcoltotals"]) {
+    const el = document.createElement("input");
+    el.type = "checkbox";
+    el.id = control.idPrefix + key;
+    (document as any).body.appendChild(el);
+  }
+  const aggSel = document.createElement("select");
+  aggSel.id = control.idPrefix + "pivotaggregation";
+  aggSel.options[0] = new Option("Sum", "sum");
+  aggSel.value = "sum";
+  (document as any).body.appendChild(aggSel);
+  const pivotListSel = document.createElement("select");
+  pivotListSel.id = control.idPrefix + "pivotlist";
+  (document as any).body.appendChild(pivotListSel);
+
+  // FillList: currentanchor set to a coordinate that doesn't match any
+  // stored pivot's anchor -- the `anchor == currentanchor` comparison must
+  // run to false for every listed entry instead of short-circuiting.
+  control.sheet.pivots = {
+    E1: {
+      source: "A1:B2",
+      rowFields: [],
+      colFields: [],
+      valueFields: [{ field: "X", agg: "sum" }],
+    },
+  };
+  (document.getElementById(control.idPrefix + "pivotanchor") as HTMLInputElement).value = "Z9";
+  SC.SpreadsheetControlPivotFillList();
+  expect(Array.from(pivotListSel.options).some((o: any) => o.selected)).toBe(false);
+
+  // ChangedSelection: a stored valueFields entry missing `agg` falls back
+  // to "sum" via the `vf.agg || "sum"` branch.
+  control.sheet.pivots = {
+    E1: { source: "A1:B2", rowFields: [], colFields: [], valueFields: [{ field: "X" }] },
+  };
+  pivotListSel.length = 0;
+  pivotListSel.options[0] = new Option("E1", "E1");
+  pivotListSel.selectedIndex = 0;
+  SC.SpreadsheetControlPivotChangedSelection();
+  expect(aggSel.value).toBe("sum");
+
+  // ReadForm: an empty pivotfilter field takes the falsy-ternary branch,
+  // producing an empty filters array instead of parsing clauses.
+  (document.getElementById(control.idPrefix + "pivotfilter") as HTMLInputElement).value = "";
+  const form = SC.SpreadsheetControlPivotReadForm();
+  expect(form.definition.filters).toEqual([]);
 });

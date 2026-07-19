@@ -215,6 +215,20 @@ declare namespace SocialCalc {
   function SpreadsheetControlCondFmtSave(): void;
   function SpreadsheetControlCondFmtDelete(): void;
   function SpreadsheetControlCondFmtMove(direction: string): void;
+  function SpreadsheetControlPivotOnclick(s: SpreadsheetControl, t: string): void;
+  function SpreadsheetControlPivotOnunclick(s: SpreadsheetControl, t: string): void;
+  function SpreadsheetControlPivotRangeChange(editor: any): void;
+  function SpreadsheetControlPivotSetAnchor(): void;
+  function SpreadsheetControlPivotSetSource(): void;
+  function SpreadsheetControlPivotFillList(): void;
+  function SpreadsheetControlPivotChangedSelection(): void;
+  function SpreadsheetControlPivotReadForm(): {
+    anchor: string;
+    definition: SocialCalc.PivotDefinition;
+  };
+  function SpreadsheetControlPivotSave(): void;
+  function SpreadsheetControlPivotRefresh(): void;
+  function SpreadsheetControlPivotDelete(): void;
 
   function SpreadsheetControlClipboardOnclick(s: SpreadsheetControl, t: string): void;
   function SpreadsheetControlClipboardFormat(which: string): void;

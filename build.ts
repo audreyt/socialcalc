@@ -136,6 +136,7 @@ const coreFiles = [
   "socialcalcconstants.js",
   "socialcalc-3.js",
   "chart.ts",
+  "pivot.ts",
   "socialcalctableeditor.js",
   "formatnumber2.js",
   "formula1.js",
