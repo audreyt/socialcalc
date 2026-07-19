@@ -6,6 +6,36 @@ declare namespace SocialCalc {
   }
   type AttribSet = { [name: string]: AttribValue };
 
+  // Palette-index style fields for one conditional-formatting rule; each is
+  // 0 (unset) or an index into the owning Sheet's font/color/borderstyle
+  // arrays, exactly like Cell.font/color/bgcolor/bt/br/bb/bl.
+  interface CondFmtStyle {
+    font: number;
+    color: number;
+    bgcolor: number;
+    bt: number;
+    br: number;
+    bb: number;
+    bl: number;
+  }
+
+  // One conditional-formatting rule. Rules live in Sheet.condfmtRules,
+  // ordered array index 0 = highest priority (stop-if-true precedence).
+  // type: "cellis" | "textcontains" | "textbegins" | "textends" | "blank" |
+  //       "nonblank" | "duplicate" | "unique" | "formula"
+  // op (cellis only): "gt" | "ge" | "lt" | "le" | "eq" | "ne" | "between"
+  interface CondFmtRule {
+    id: number;
+    range: string;
+    type: string;
+    op: string;
+    value1: string;
+    value2: string;
+    formula: string;
+    stopIfTrue: boolean;
+    style: CondFmtStyle;
+  }
+
   // Opt-in policy consulted by rendering code only when
   // SocialCalc.Callbacks.untrustedContent is true. See socialcalc-3.ts
   // SafeUrlForRender / EscapeUntrustedHtml for how each field is used.
@@ -168,6 +198,10 @@ declare namespace SocialCalc {
     names: { [name: string]: { desc: string; definition: string } };
     autofilters: { [id: string]: AutoFilterDef };
     tables: { [name: string]: StructuredTableDef };
+    condfmtRules: CondFmtRule[];
+    condfmtNextId: number;
+    condfmtRulesVersion: number;
+    condfmtValueVersion: number;
     layouts: string[];
     layouthash: { [key: string]: number };
     fonts: string[];
@@ -355,6 +389,17 @@ declare namespace SocialCalc {
   function CreateAuditString(sheet: Sheet): string;
   function GetStyleNum(sheet: Sheet, atype: string, style: string): number;
   function GetStyleString(sheet: Sheet, atype: string, num: number): string | null;
+
+  function CondFmtCoordInRange(range: string, col: number, row: number): boolean;
+  function CondFmtValueCounts(sheet: Sheet, range: string): Map<string, number>;
+  function CondFmtCompare(value: unknown, operand: unknown): number;
+  function CondFmtRuleMatches(
+    sheet: Sheet,
+    rule: CondFmtRule,
+    cell: Cell | undefined,
+    coord: string,
+  ): boolean;
+  function EvaluateCondFmtForCell(sheet: Sheet, coord: string): CondFmtStyle | null;
   function OffsetFormulaCoords(
     formula: string,
     coloffset: number,

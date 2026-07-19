@@ -1587,6 +1587,10 @@ More comments yet to come...
     sheet.names = {};
     sheet.autofilters = {};
     sheet.tables = {};
+    sheet.condfmtRules = [];
+    sheet.condfmtNextId = 1;
+    sheet.condfmtRulesVersion = 0;
+    sheet.condfmtValueVersion = 0;
     sheet.layouts = [];
     sheet.layouthash = {};
     sheet.fonts = [];
@@ -1851,6 +1855,30 @@ More comments yet to come...
             style: SocialCalc.decodeFromSave(parts[4]),
             filterId: SocialCalc.decodeFromSave(parts[5]) || null,
           };
+          break;
+        case 'condfmt':
+          sheetobj.condfmtRules.push({
+            id: parts[1] - 0,
+            range: SocialCalc.decodeFromSave(parts[2]),
+            type: SocialCalc.decodeFromSave(parts[3]),
+            op: SocialCalc.decodeFromSave(parts[4]),
+            value1: SocialCalc.decodeFromSave(parts[5]),
+            value2: SocialCalc.decodeFromSave(parts[6]),
+            formula: SocialCalc.decodeFromSave(parts[7]),
+            stopIfTrue: parts[8] == '1',
+            style: {
+              font: parts[9] - 0,
+              color: parts[10] - 0,
+              bgcolor: parts[11] - 0,
+              bt: parts[12] - 0,
+              br: parts[13] - 0,
+              bb: parts[14] - 0,
+              bl: parts[15] - 0,
+            },
+          });
+          if (parts[1] - 0 >= sheetobj.condfmtNextId) {
+            sheetobj.condfmtNextId = parts[1] - 0 + 1;
+          }
           break;
         case 'layout':
           parts = lines[i].match(/^layout:(\d+):(.+)$/);
@@ -2219,6 +2247,42 @@ More comments yet to come...
           SocialCalc.encodeForSave(tblSaveDef.filterId || ''),
       );
     }
+    for (i = 0; i < sheetobj.condfmtRules.length; i++) {
+      var rule = sheetobj.condfmtRules[i];
+      var rstyle = rule.style;
+      result.push(
+        'condfmt:' +
+          rule.id +
+          ':' +
+          SocialCalc.encodeForSave(rule.range) +
+          ':' +
+          SocialCalc.encodeForSave(rule.type) +
+          ':' +
+          SocialCalc.encodeForSave(rule.op) +
+          ':' +
+          SocialCalc.encodeForSave(rule.value1) +
+          ':' +
+          SocialCalc.encodeForSave(rule.value2) +
+          ':' +
+          SocialCalc.encodeForSave(rule.formula) +
+          ':' +
+          (rule.stopIfTrue ? '1' : '0') +
+          ':' +
+          (rstyle.font ? xlt.fontsxlat[rstyle.font] : 0) +
+          ':' +
+          (rstyle.color ? xlt.colorsxlat[rstyle.color] : 0) +
+          ':' +
+          (rstyle.bgcolor ? xlt.colorsxlat[rstyle.bgcolor] : 0) +
+          ':' +
+          (rstyle.bt ? xlt.borderstylesxlat[rstyle.bt] : 0) +
+          ':' +
+          (rstyle.br ? xlt.borderstylesxlat[rstyle.br] : 0) +
+          ':' +
+          (rstyle.bb ? xlt.borderstylesxlat[rstyle.bb] : 0) +
+          ':' +
+          (rstyle.bl ? xlt.borderstylesxlat[rstyle.bl] : 0),
+      );
+    }
     if (range) {
       result.push(
         'copiedfrom:' +
@@ -2410,6 +2474,16 @@ More comments yet to come...
         if (cr.row > maxrow) maxrow = cr.row;
         if (cr.col > maxcol) maxcol = cr.col;
       }
+    }
+    for (i = 0; i < sheetobj.condfmtRules.length; i++) {
+      var cfstyle = sheetobj.condfmtRules[i].style;
+      if (cfstyle.font) fontsUsed[cfstyle.font] = 1;
+      if (cfstyle.color) colorsUsed[cfstyle.color] = 1;
+      if (cfstyle.bgcolor) colorsUsed[cfstyle.bgcolor] = 1;
+      if (cfstyle.bt) borderstylesUsed[cfstyle.bt] = 1;
+      if (cfstyle.br) borderstylesUsed[cfstyle.br] = 1;
+      if (cfstyle.bb) borderstylesUsed[cfstyle.bb] = 1;
+      if (cfstyle.bl) borderstylesUsed[cfstyle.bl] = 1;
     }
     for (i = 0; i < SocialCalc.sheetfieldsxlat.length; i++) {
       v = sheetobj.attribs[SocialCalc.sheetfieldsxlat[i]];
@@ -2981,6 +3055,7 @@ More comments yet to come...
     if (saveundo) {
       sheet.changes.AddDo(cmdstr);
     }
+    sheet.condfmtValueVersion++;
     cmd1 = cmd.NextToken();
     switch (cmd1) {
       case 'set':
@@ -3969,6 +4044,25 @@ More comments yet to come...
               v2 + SocialCalc.AdjustFormulaCoords(v1, cr1.col, coloffset, cr1.row, rowoffset);
           }
         }
+        for (i = 0; i < sheet.condfmtRules.length; i++) {
+          var icfrule = sheet.condfmtRules[i];
+          icfrule.range = SocialCalc.AdjustFormulaCoords(
+            icfrule.range,
+            cr1.col,
+            coloffset,
+            cr1.row,
+            rowoffset,
+          );
+          if (icfrule.formula) {
+            icfrule.formula = SocialCalc.AdjustFormulaCoords(
+              icfrule.formula,
+              cr1.col,
+              coloffset,
+              cr1.row,
+              rowoffset,
+            );
+          }
+        }
         for (row = attribs.lastrow; row >= rowend && cmd1 == 'insertrow'; row--) {
           rownext = row + rowoffset;
           for (attrib in sheet.rowattribs) {
@@ -4132,6 +4226,50 @@ More comments yet to come...
             if (saveundo && sheet.names[name].definition != olddefinition) {
               changes.AddUndo('name define ' + name + ' ' + olddefinition);
             }
+          }
+        }
+        for (i = 0; i < sheet.condfmtRules.length; i++) {
+          var dcfrule = sheet.condfmtRules[i];
+          var dcfoldrange = dcfrule.range;
+          var dcfoldformula = dcfrule.formula;
+          dcfrule.range = SocialCalc.AdjustFormulaCoords(
+            dcfrule.range,
+            cr1.col,
+            coloffset,
+            cr1.row,
+            rowoffset,
+          );
+          if (dcfrule.formula) {
+            dcfrule.formula = SocialCalc.AdjustFormulaCoords(
+              dcfrule.formula,
+              cr1.col,
+              coloffset,
+              cr1.row,
+              rowoffset,
+            );
+          }
+          if (saveundo && (dcfrule.range != dcfoldrange || dcfrule.formula != dcfoldformula)) {
+            changes.AddUndo(
+              'condfmt update ' +
+                dcfrule.id +
+                ' ' +
+                [
+                  SocialCalc.encodeForSave(dcfoldrange),
+                  SocialCalc.encodeForSave(dcfrule.type),
+                  SocialCalc.encodeForSave(dcfrule.op),
+                  SocialCalc.encodeForSave(dcfrule.value1),
+                  SocialCalc.encodeForSave(dcfrule.value2),
+                  SocialCalc.encodeForSave(dcfoldformula),
+                  dcfrule.stopIfTrue ? '1' : '0',
+                  dcfrule.style.font,
+                  dcfrule.style.color,
+                  dcfrule.style.bgcolor,
+                  dcfrule.style.bt,
+                  dcfrule.style.br,
+                  dcfrule.style.bb,
+                  dcfrule.style.bl,
+                ].join('	'),
+            );
           }
         }
         for (row = rowstart; row <= lastrow - rowoffset && cmd1 == 'deleterow'; row++) {
@@ -4508,6 +4646,38 @@ More comments yet to come...
             }
           }
         }
+        for (i = 0; i < sheet.condfmtRules.length; i++) {
+          var mcfrule = sheet.condfmtRules[i];
+          var mcfoldrange = mcfrule.range;
+          var mcfoldformula = mcfrule.formula;
+          mcfrule.range = SocialCalc.ReplaceFormulaCoords(mcfrule.range, movedto);
+          if (mcfrule.formula) {
+            mcfrule.formula = SocialCalc.ReplaceFormulaCoords(mcfrule.formula, movedto);
+          }
+          if (saveundo && (mcfrule.range != mcfoldrange || mcfrule.formula != mcfoldformula)) {
+            changes.AddUndo(
+              'condfmt update ' +
+                mcfrule.id +
+                ' ' +
+                [
+                  SocialCalc.encodeForSave(mcfoldrange),
+                  SocialCalc.encodeForSave(mcfrule.type),
+                  SocialCalc.encodeForSave(mcfrule.op),
+                  SocialCalc.encodeForSave(mcfrule.value1),
+                  SocialCalc.encodeForSave(mcfrule.value2),
+                  SocialCalc.encodeForSave(mcfoldformula),
+                  mcfrule.stopIfTrue ? '1' : '0',
+                  mcfrule.style.font,
+                  mcfrule.style.color,
+                  mcfrule.style.bgcolor,
+                  mcfrule.style.bt,
+                  mcfrule.style.br,
+                  mcfrule.style.bb,
+                  mcfrule.style.bl,
+                ].join('	'),
+            );
+          }
+        }
         attribs.needsrecalc = 'yes';
         break;
       case 'autofilter':
@@ -4769,6 +4939,170 @@ More comments yet to come...
           changes.AddUndo(attribs.protected == 'yes' ? 'protectsheet' : 'unprotectsheet');
         delete attribs.protected;
         break;
+      case 'condfmt':
+        what = cmd.NextToken();
+        sheet.renderneeded = true;
+        sheet.changedrendervalues = true;
+        if (what == 'add') {
+          var addId = cmd.NextToken() - 0;
+          var addFields = cmd.RestOfString().split('	');
+          sheet.condfmtRules.push({
+            id: addId,
+            range: SocialCalc.decodeFromSave(addFields[0]),
+            type: SocialCalc.decodeFromSave(addFields[1]),
+            op: SocialCalc.decodeFromSave(addFields[2]),
+            value1: SocialCalc.decodeFromSave(addFields[3]),
+            value2: SocialCalc.decodeFromSave(addFields[4]),
+            formula: SocialCalc.decodeFromSave(addFields[5]),
+            stopIfTrue: addFields[6] == '1',
+            style: {
+              font: addFields[7] - 0,
+              color: addFields[8] - 0,
+              bgcolor: addFields[9] - 0,
+              bt: addFields[10] - 0,
+              br: addFields[11] - 0,
+              bb: addFields[12] - 0,
+              bl: addFields[13] - 0,
+            },
+          });
+          if (addId >= sheet.condfmtNextId) sheet.condfmtNextId = addId + 1;
+          if (saveundo) changes.AddUndo('condfmt delete ' + addId);
+        } else if (what == 'update') {
+          var updateId = cmd.NextToken() - 0;
+          var updateFields = cmd.RestOfString().split('	');
+          for (i = 0; i < sheet.condfmtRules.length; i++) {
+            if (sheet.condfmtRules[i].id == updateId) {
+              var oldRule = sheet.condfmtRules[i];
+              if (saveundo) {
+                changes.AddUndo(
+                  'condfmt update ' +
+                    updateId +
+                    ' ' +
+                    [
+                      SocialCalc.encodeForSave(oldRule.range),
+                      SocialCalc.encodeForSave(oldRule.type),
+                      SocialCalc.encodeForSave(oldRule.op),
+                      SocialCalc.encodeForSave(oldRule.value1),
+                      SocialCalc.encodeForSave(oldRule.value2),
+                      SocialCalc.encodeForSave(oldRule.formula),
+                      oldRule.stopIfTrue ? '1' : '0',
+                      oldRule.style.font,
+                      oldRule.style.color,
+                      oldRule.style.bgcolor,
+                      oldRule.style.bt,
+                      oldRule.style.br,
+                      oldRule.style.bb,
+                      oldRule.style.bl,
+                    ].join('	'),
+                );
+              }
+              sheet.condfmtRules[i] = {
+                id: updateId,
+                range: SocialCalc.decodeFromSave(updateFields[0]),
+                type: SocialCalc.decodeFromSave(updateFields[1]),
+                op: SocialCalc.decodeFromSave(updateFields[2]),
+                value1: SocialCalc.decodeFromSave(updateFields[3]),
+                value2: SocialCalc.decodeFromSave(updateFields[4]),
+                formula: SocialCalc.decodeFromSave(updateFields[5]),
+                stopIfTrue: updateFields[6] == '1',
+                style: {
+                  font: updateFields[7] - 0,
+                  color: updateFields[8] - 0,
+                  bgcolor: updateFields[9] - 0,
+                  bt: updateFields[10] - 0,
+                  br: updateFields[11] - 0,
+                  bb: updateFields[12] - 0,
+                  bl: updateFields[13] - 0,
+                },
+              };
+              break;
+            }
+          }
+        } else if (what == 'delete') {
+          var deleteId = cmd.NextToken() - 0;
+          for (i = 0; i < sheet.condfmtRules.length; i++) {
+            if (sheet.condfmtRules[i].id == deleteId) {
+              var deletedRule = sheet.condfmtRules[i];
+              if (saveundo) {
+                changes.AddUndo(
+                  'condfmt insertat ' +
+                    i +
+                    ' ' +
+                    deletedRule.id +
+                    ' ' +
+                    [
+                      SocialCalc.encodeForSave(deletedRule.range),
+                      SocialCalc.encodeForSave(deletedRule.type),
+                      SocialCalc.encodeForSave(deletedRule.op),
+                      SocialCalc.encodeForSave(deletedRule.value1),
+                      SocialCalc.encodeForSave(deletedRule.value2),
+                      SocialCalc.encodeForSave(deletedRule.formula),
+                      deletedRule.stopIfTrue ? '1' : '0',
+                      deletedRule.style.font,
+                      deletedRule.style.color,
+                      deletedRule.style.bgcolor,
+                      deletedRule.style.bt,
+                      deletedRule.style.br,
+                      deletedRule.style.bb,
+                      deletedRule.style.bl,
+                    ].join('	'),
+                );
+              }
+              sheet.condfmtRules.splice(i, 1);
+              break;
+            }
+          }
+        } else if (what == 'insertat') {
+          var atIndex = cmd.NextToken() - 0;
+          var insertId = cmd.NextToken() - 0;
+          var insertFields = cmd.RestOfString().split('	');
+          sheet.condfmtRules.splice(atIndex, 0, {
+            id: insertId,
+            range: SocialCalc.decodeFromSave(insertFields[0]),
+            type: SocialCalc.decodeFromSave(insertFields[1]),
+            op: SocialCalc.decodeFromSave(insertFields[2]),
+            value1: SocialCalc.decodeFromSave(insertFields[3]),
+            value2: SocialCalc.decodeFromSave(insertFields[4]),
+            formula: SocialCalc.decodeFromSave(insertFields[5]),
+            stopIfTrue: insertFields[6] == '1',
+            style: {
+              font: insertFields[7] - 0,
+              color: insertFields[8] - 0,
+              bgcolor: insertFields[9] - 0,
+              bt: insertFields[10] - 0,
+              br: insertFields[11] - 0,
+              bb: insertFields[12] - 0,
+              bl: insertFields[13] - 0,
+            },
+          });
+          if (insertId >= sheet.condfmtNextId) sheet.condfmtNextId = insertId + 1;
+          if (saveundo) changes.AddUndo('condfmt delete ' + insertId);
+        } else if (what == 'move') {
+          var moveId = cmd.NextToken() - 0;
+          var direction = cmd.NextToken();
+          var moveIndex = -1;
+          for (i = 0; i < sheet.condfmtRules.length; i++) {
+            if (sheet.condfmtRules[i].id == moveId) {
+              moveIndex = i;
+              break;
+            }
+          }
+          if (moveIndex >= 0) {
+            var swapWith = direction == 'up' ? moveIndex - 1 : moveIndex + 1;
+            if (swapWith >= 0 && swapWith < sheet.condfmtRules.length) {
+              var tmpRule = sheet.condfmtRules[moveIndex];
+              sheet.condfmtRules[moveIndex] = sheet.condfmtRules[swapWith];
+              sheet.condfmtRules[swapWith] = tmpRule;
+              if (saveundo) {
+                changes.AddUndo(
+                  'condfmt move ' + moveId + ' ' + (direction == 'up' ? 'down' : 'up'),
+                );
+              }
+            }
+          }
+        }
+        attribs.needsrecalc = 'yes';
+        break;
       case 'recalc':
         attribs.needsrecalc = 'yes';
         sheet.recalconce = true;
@@ -4935,6 +5269,171 @@ More comments yet to come...
   SC.GetStyleString = function (sheet, atype, num) {
     if (!num) return null;
     return sheet[atype + 's'][num];
+  };
+  SC.CondFmtCoordInRange = function (range, col, row) {
+    var parsed = SocialCalc.ParseRange(range);
+    return (
+      col >= parsed.cr1.col &&
+      col <= parsed.cr2.col &&
+      row >= parsed.cr1.row &&
+      row <= parsed.cr2.row
+    );
+  };
+  SC.CondFmtValueCounts = function (sheet, range) {
+    sheet.condfmtCountsCache = sheet.condfmtCountsCache || {};
+    if (sheet.condfmtCountsCache.key !== sheet.condfmtValueVersion) {
+      sheet.condfmtCountsCache = {
+        key: sheet.condfmtValueVersion,
+        map: {},
+      };
+    }
+    if (!sheet.condfmtCountsCache.map[range]) {
+      var parsed = SocialCalc.ParseRange(range);
+      var counts = new Map();
+      for (var r = parsed.cr1.row; r <= parsed.cr2.row; r++) {
+        for (var c = parsed.cr1.col; c <= parsed.cr2.col; c++) {
+          var rcoord = SocialCalc.crToCoord(c, r);
+          var rcell = sheet.cells[rcoord];
+          if (!rcell || !rcell.valuetype || rcell.valuetype.charAt(0) == 'b') continue;
+          var key = rcell.valuetype.charAt(0) + ':' + rcell.datavalue;
+          counts.set(key, (counts.get(key) || 0) + 1);
+        }
+      }
+      sheet.condfmtCountsCache.map[range] = counts;
+    }
+    return sheet.condfmtCountsCache.map[range];
+  };
+  SC.CondFmtCompare = function (value, operand) {
+    var nv = SocialCalc.DetermineValueType(value);
+    var no = SocialCalc.DetermineValueType(operand);
+    if (nv.type.charAt(0) == 'n' && no.type.charAt(0) == 'n') {
+      var a = nv.value - 0;
+      var b = no.value - 0;
+      return a < b ? -1 : a > b ? 1 : 0;
+    }
+    var sa = '' + value;
+    var sb = '' + operand;
+    return sa < sb ? -1 : sa > sb ? 1 : 0;
+  };
+  SC.CondFmtRuleMatches = function (sheet, rule, cell, coord) {
+    var vt = (cell && cell.valuetype) || 'b';
+    var isBlank = vt.charAt(0) == 'b';
+    var dv = cell ? cell.datavalue : '';
+    switch (rule.type) {
+      case 'blank':
+        return isBlank;
+      case 'nonblank':
+        return !isBlank;
+      case 'duplicate':
+      case 'unique': {
+        if (isBlank) return false;
+        var counts = SocialCalc.CondFmtValueCounts(sheet, rule.range);
+        var key = vt.charAt(0) + ':' + dv;
+        var count = counts.get(key) || 0;
+        return rule.type == 'duplicate' ? count > 1 : count === 1;
+      }
+      case 'textcontains':
+      case 'textbegins':
+      case 'textends': {
+        if (isBlank) return false;
+        var text = '' + dv;
+        var needle = '' + rule.value1;
+        if (rule.type == 'textcontains') return text.indexOf(needle) != -1;
+        if (rule.type == 'textbegins') return text.indexOf(needle) === 0;
+        return needle.length <= text.length && text.slice(text.length - needle.length) == needle;
+      }
+      case 'cellis': {
+        if (isBlank) return false;
+        if (rule.op == 'between') {
+          var cmpLow = SocialCalc.CondFmtCompare(dv, rule.value1);
+          var cmpHigh = SocialCalc.CondFmtCompare(dv, rule.value2);
+          return cmpLow >= 0 && cmpHigh <= 0;
+        }
+        var cmp = SocialCalc.CondFmtCompare(dv, rule.value1);
+        var opCode =
+          rule.op == 'gt'
+            ? 0
+            : rule.op == 'ge'
+              ? 1
+              : rule.op == 'lt'
+                ? 2
+                : rule.op == 'le'
+                  ? 3
+                  : rule.op == 'eq'
+                    ? 4
+                    : rule.op == 'ne'
+                      ? 5
+                      : -1;
+        if (opCode === 0) return cmp > 0;
+        if (opCode === 1) return cmp >= 0;
+        if (opCode === 2) return cmp < 0;
+        if (opCode === 3) return cmp <= 0;
+        if (opCode === 4) return cmp === 0;
+        if (opCode === 5) return cmp !== 0;
+        return false;
+      }
+      case 'formula': {
+        if (!rule.formula) return false;
+        try {
+          var anchor = SocialCalc.ParseRange(rule.range).cr1;
+          var target = SocialCalc.coordToCr(coord);
+          var relFormula = SocialCalc.OffsetFormulaCoords(
+            rule.formula,
+            target.col - anchor.col,
+            target.row - anchor.row,
+          );
+          var parseinfo = SocialCalc.Formula.ParseFormulaIntoTokens(relFormula);
+          var eresult = SocialCalc.Formula.evaluate_parsed_formula(parseinfo, sheet, false);
+          if (eresult.type && eresult.type.charAt(0) == 'e') return false;
+          return (
+            eresult.value === true ||
+            eresult.value === 1 ||
+            eresult.value === 'TRUE' ||
+            eresult.value === 'true'
+          );
+        } catch {
+          return false;
+        }
+      }
+      default:
+        return false;
+    }
+  };
+  SC.EvaluateCondFmtForCell = function (sheet, coord) {
+    var rules = sheet.condfmtRules;
+    if (!rules || rules.length === 0) return null;
+    var cr = SocialCalc.coordToCr(coord);
+    var cell = sheet.cells[coord];
+    var style = {
+      font: 0,
+      color: 0,
+      bgcolor: 0,
+      bt: 0,
+      br: 0,
+      bb: 0,
+      bl: 0,
+    };
+    var any_applied = false;
+    var stopped = false;
+    for (var i = 0; i < rules.length; i++) {
+      if (stopped) break;
+      var rule = rules[i];
+      if (!SocialCalc.CondFmtCoordInRange(rule.range, cr.col, cr.row)) continue;
+      var matched = SocialCalc.CondFmtRuleMatches(sheet, rule, cell, coord);
+      if (matched) {
+        any_applied = true;
+        var rstyle = rule.style;
+        if (!style.font && rstyle.font) style.font = rstyle.font;
+        if (!style.color && rstyle.color) style.color = rstyle.color;
+        if (!style.bgcolor && rstyle.bgcolor) style.bgcolor = rstyle.bgcolor;
+        if (!style.bt && rstyle.bt) style.bt = rstyle.bt;
+        if (!style.br && rstyle.br) style.br = rstyle.br;
+        if (!style.bb && rstyle.bb) style.bb = rstyle.bb;
+        if (!style.bl && rstyle.bl) style.bl = rstyle.bl;
+        if (rule.stopIfTrue) stopped = true;
+      }
+    }
+    return any_applied ? style : null;
   };
   SC.RecalcInfo = {
     sheet: null,
@@ -5143,6 +5642,7 @@ More comments yet to come...
         cell.valuetype = eresult.type;
         delete cell.displaystring;
         sheet.recalcchangedavalue = true;
+        sheet.condfmtValueVersion++;
       }
       count++;
       coord = sheet.recalcdata.calclist[coord];
@@ -6127,6 +6627,7 @@ More comments yet to come...
     }
     sheetattribs = sheetobj.attribs;
     scc = SocialCalc.Constants;
+    var condfmtStyle = SocialCalc.EvaluateCondFmtForCell(sheetobj, coord);
     if (cell.colspan > 1) {
       span = 1;
       for (num = 1; num < cell.colspan; num++) {
@@ -6263,6 +6764,39 @@ More comments yet to come...
     num = cell.bl;
     if (num && typeof sheetobj.borderstyles[num] !== 'undefined')
       stylestr += 'border-left:' + sheetobj.borderstyles[num] + ';';
+    if (condfmtStyle) {
+      if (condfmtStyle.font && typeof context.fonts[condfmtStyle.font] !== 'undefined') {
+        var cft = context.fonts[condfmtStyle.font];
+        stylestr +=
+          'font-style:' +
+          cft.style +
+          ';font-weight:' +
+          cft.weight +
+          ';font-size:' +
+          cft.size +
+          ';font-family:' +
+          cft.family +
+          ';';
+      }
+      if (condfmtStyle.color && typeof sheetobj.colors[condfmtStyle.color] !== 'undefined') {
+        stylestr += 'color:' + sheetobj.colors[condfmtStyle.color] + ';';
+      }
+      if (condfmtStyle.bgcolor && typeof sheetobj.colors[condfmtStyle.bgcolor] !== 'undefined') {
+        stylestr += 'background-color:' + sheetobj.colors[condfmtStyle.bgcolor] + ';';
+      }
+      if (condfmtStyle.bt && typeof sheetobj.borderstyles[condfmtStyle.bt] !== 'undefined') {
+        stylestr += 'border-top:' + sheetobj.borderstyles[condfmtStyle.bt] + ';';
+      }
+      if (condfmtStyle.br && typeof sheetobj.borderstyles[condfmtStyle.br] !== 'undefined') {
+        stylestr += 'border-right:' + sheetobj.borderstyles[condfmtStyle.br] + ';';
+      }
+      if (condfmtStyle.bb && typeof sheetobj.borderstyles[condfmtStyle.bb] !== 'undefined') {
+        stylestr += 'border-bottom:' + sheetobj.borderstyles[condfmtStyle.bb] + ';';
+      }
+      if (condfmtStyle.bl && typeof sheetobj.borderstyles[condfmtStyle.bl] !== 'undefined') {
+        stylestr += 'border-left:' + sheetobj.borderstyles[condfmtStyle.bl] + ';';
+      }
+    }
     if (cell.comment) {
       result.title = cell.comment;
       if (context.showGrid) {
@@ -26069,6 +26603,75 @@ not governed by the terms of the CPAL.
       onclick: SocialCalc.SpreadsheetControlNamesOnclick,
       onunclick: SocialCalc.SpreadsheetControlNamesOnunclick,
     });
+    this.tabnums.condfmt = this.tabs.length;
+    this.tabs.push({
+      name: 'condfmt',
+      text: 'Conditional Formatting',
+      html:
+        '<div id="%id.condfmttools" style="display:none;">' +
+        '  <table cellspacing="0" cellpadding="0"><tr>' +
+        '   <td style="vertical-align:top;padding-right:16px;">' +
+        '    <div style="%tbt.">%loc!Existing Rules!</div>' +
+        '    <select id="%id.condfmtlist" size="6" style="width:260px;" onchange="%s.SpreadsheetControlCondFmtChangedRule();" onfocus="%s.CmdGotFocus(this);"><option selected value="">[New Rule]</option></select>' +
+        '    <br><input type="button" value="%loc!Move Up!" onclick="%s.SpreadsheetControlCondFmtMove(\'up\');" style="font-size:x-small;">' +
+        '    <input type="button" value="%loc!Move Down!" onclick="%s.SpreadsheetControlCondFmtMove(\'down\');" style="font-size:x-small;">' +
+        '   </td>' +
+        '   <td style="vertical-align:top;padding-right:6px;">' +
+        '    <div style="%tbt.">%loc!Range!</div>' +
+        '    <input type="text" id="%id.condfmtrange" style="font-size:x-small;width:90px;" onfocus="%s.CmdGotFocus(this);">' +
+        '    <div style="%tbt.">%loc!Rule Type!</div>' +
+        '    <select id="%id.condfmttype" style="font-size:x-small;width:150px;" onfocus="%s.CmdGotFocus(this);">' +
+        '     <option value="cellis">%loc!Cell value is!</option>' +
+        '     <option value="textcontains">%loc!Text contains!</option>' +
+        '     <option value="textbegins">%loc!Text begins with!</option>' +
+        '     <option value="textends">%loc!Text ends with!</option>' +
+        '     <option value="blank">%loc!Is blank!</option>' +
+        '     <option value="nonblank">%loc!Is not blank!</option>' +
+        '     <option value="duplicate">%loc!Duplicate values!</option>' +
+        '     <option value="unique">%loc!Unique values!</option>' +
+        '     <option value="formula">%loc!Custom formula!</option>' +
+        '    </select>' +
+        '   </td>' +
+        '   <td style="vertical-align:top;padding-right:6px;">' +
+        '    <div style="%tbt.">%loc!Comparison!</div>' +
+        '    <select id="%id.condfmtop" style="font-size:x-small;width:90px;" onfocus="%s.CmdGotFocus(this);">' +
+        '     <option value="gt">&gt;</option>' +
+        '     <option value="ge">&gt;=</option>' +
+        '     <option value="lt">&lt;</option>' +
+        '     <option value="le">&lt;=</option>' +
+        '     <option value="eq">=</option>' +
+        '     <option value="ne">&lt;&gt;</option>' +
+        '     <option value="between">%loc!between!</option>' +
+        '    </select>' +
+        '    <div style="%tbt.">%loc!Value 1 / Text / Formula!</div>' +
+        '    <input type="text" id="%id.condfmtvalue1" style="font-size:x-small;width:110px;" onfocus="%s.CmdGotFocus(this);">' +
+        '    <div style="%tbt.">%loc!Value 2 (between)!</div>' +
+        '    <input type="text" id="%id.condfmtvalue2" style="font-size:x-small;width:110px;" onfocus="%s.CmdGotFocus(this);">' +
+        '   </td>' +
+        '   <td style="vertical-align:top;padding-right:6px;">' +
+        '    <div style="%tbt.">%loc!Text Color!</div>' +
+        '    <input type="text" id="%id.condfmtcolor" placeholder="rgb(r,g,b)" style="font-size:x-small;width:110px;" onfocus="%s.CmdGotFocus(this);">' +
+        '    <div style="%tbt.">%loc!Background!</div>' +
+        '    <input type="text" id="%id.condfmtbgcolor" placeholder="rgb(r,g,b)" style="font-size:x-small;width:110px;" onfocus="%s.CmdGotFocus(this);">' +
+        '    <div style="%tbt.">%loc!Bold!</div>' +
+        '    <select id="%id.condfmtfont" style="font-size:x-small;width:90px;" onfocus="%s.CmdGotFocus(this);">' +
+        '     <option value="">%loc!Normal!</option>' +
+        '     <option value="normal bold * *">%loc!Bold!</option>' +
+        '    </select>' +
+        '   </td>' +
+        '   <td style="vertical-align:top;padding-right:6px;">' +
+        '    <div style="%tbt.">&nbsp;</div>' +
+        '    <input type="checkbox" id="%id.condfmtstop"> %loc!Stop if true!' +
+        '    <br>' +
+        '    <input type="button" value="%loc!Save!" onclick="%s.SpreadsheetControlCondFmtSave();" style="font-size:x-small;">' +
+        '    <input type="button" value="%loc!Delete!" onclick="%s.SpreadsheetControlCondFmtDelete();" style="font-size:x-small;">' +
+        '   </td>' +
+        '  </tr></table>' +
+        '</div>',
+      view: 'sheet',
+      onclick: SocialCalc.SpreadsheetControlCondFmtOnclick,
+      onunclick: SocialCalc.SpreadsheetControlCondFmtOnunclick,
+    });
     this.tabnums.clipboard = this.tabs.length;
     this.tabs.push({
       name: 'clipboard',
@@ -28183,6 +28786,173 @@ not governed by the terms of the CPAL.
       s.ExecuteCommand('name delete ' + name);
     }
     SocialCalc.KeyboardFocus();
+  };
+  SpreadsheetControlSC.SelectOptionByValue = function (selectEle, value) {
+    for (var i = 0; i < selectEle.options.length; i++) {
+      var match = selectEle.options[i].value == value;
+      selectEle.options[i].selected = match;
+      if (match) selectEle.selectedIndex = i;
+    }
+  };
+  SpreadsheetControlSC.SpreadsheetControlCondFmtOnclick = function (_s, _t) {
+    SocialCalc.SpreadsheetControlCondFmtFillList();
+    SocialCalc.SpreadsheetControlCondFmtChangedRule();
+  };
+  SpreadsheetControlSC.SpreadsheetControlCondFmtOnunclick = function (s, _t) {
+    void s;
+    void _t;
+  };
+  SpreadsheetControlSC.SpreadsheetControlCondFmtFillList = function () {
+    var s = SocialCalc.GetSpreadsheetControlObject();
+    var list = document.getElementById(s.idPrefix + 'condfmtlist');
+    var selectedId = list.options[list.selectedIndex] ? list.options[list.selectedIndex].value : '';
+    var rules = s.sheet.condfmtRules;
+    list.length = 0;
+    list.options[0] = new Option(SocialCalc.LocalizeString('[New Rule]'), '');
+    list.selectedIndex = 0;
+    for (var i = 0; i < rules.length; i++) {
+      list.options[i + 1] = new Option(
+        i + 1 + ': ' + rules[i].range + ' (' + rules[i].type + ')',
+        rules[i].id + '',
+      );
+      if (rules[i].id + '' == selectedId) {
+        list.options[i + 1].selected = true;
+        list.selectedIndex = i + 1;
+      }
+    }
+    if (selectedId == '') {
+      list.options[0].selected = true;
+      list.selectedIndex = 0;
+    }
+  };
+  SpreadsheetControlSC.SpreadsheetControlCondFmtChangedRule = function () {
+    var s = SocialCalc.GetSpreadsheetControlObject();
+    var idp = s.idPrefix;
+    var list = document.getElementById(idp + 'condfmtlist');
+    var id = list.options[list.selectedIndex] ? list.options[list.selectedIndex].value : '';
+    var rule = null;
+    for (var i = 0; i < s.sheet.condfmtRules.length; i++) {
+      if (s.sheet.condfmtRules[i].id + '' == id) {
+        rule = s.sheet.condfmtRules[i];
+        break;
+      }
+    }
+    var set = function (fieldId, value) {
+      document.getElementById(idp + fieldId).value = value;
+    };
+    var setChecked = function (fieldId, checked) {
+      document.getElementById(idp + fieldId).checked = checked;
+    };
+    if (rule) {
+      set('condfmtrange', rule.range);
+      set('condfmttype', rule.type);
+      set('condfmtop', rule.op);
+      set('condfmtvalue1', rule.type == 'formula' ? rule.formula : rule.value1);
+      set('condfmtvalue2', rule.value2);
+      set('condfmtcolor', rule.style.color ? s.sheet.colors[rule.style.color] : '');
+      set('condfmtbgcolor', rule.style.bgcolor ? s.sheet.colors[rule.style.bgcolor] : '');
+      set('condfmtfont', rule.style.font ? s.sheet.fonts[rule.style.font] : '');
+      setChecked('condfmtstop', !!rule.stopIfTrue);
+    } else {
+      set('condfmtrange', s.editor && s.editor.ecell ? s.editor.ecell.coord : 'A1');
+      set('condfmttype', 'cellis');
+      set('condfmtop', 'gt');
+      set('condfmtvalue1', '');
+      set('condfmtvalue2', '');
+      set('condfmtcolor', '');
+      set('condfmtbgcolor', '');
+      set('condfmtfont', '');
+      setChecked('condfmtstop', false);
+    }
+  };
+  SpreadsheetControlSC.SpreadsheetControlCondFmtSave = function () {
+    var s = SocialCalc.GetSpreadsheetControlObject();
+    var idp = s.idPrefix;
+    var get = function (fieldId) {
+      return document.getElementById(idp + fieldId).value;
+    };
+    var getChecked = function (fieldId) {
+      return document.getElementById(idp + fieldId).checked;
+    };
+    var range = get('condfmtrange');
+    var type = get('condfmttype');
+    if (range == '' || type == '') return;
+    var parsedRange = SocialCalc.ParseRange(range);
+    if (
+      !(parsedRange.cr1.col > 0) ||
+      !(parsedRange.cr1.row > 0) ||
+      !(parsedRange.cr2.col > 0) ||
+      !(parsedRange.cr2.row > 0)
+    ) {
+      alert(SocialCalc.LocalizeString('Invalid range: ') + range);
+      return;
+    }
+    var op = get('condfmtop');
+    var value1 = type == 'formula' ? '' : get('condfmtvalue1');
+    var value2 = get('condfmtvalue2');
+    var formula = type == 'formula' ? get('condfmtvalue1') : '';
+    var stopIfTrue = getChecked('condfmtstop') ? '1' : '0';
+    var colorText = get('condfmtcolor');
+    var bgcolorText = get('condfmtbgcolor');
+    var fontText = get('condfmtfont');
+    var color = colorText ? s.sheet.GetStyleNum('color', colorText) : 0;
+    var bgcolor = bgcolorText ? s.sheet.GetStyleNum('color', bgcolorText) : 0;
+    var font = fontText ? s.sheet.GetStyleNum('font', fontText) : 0;
+    var fields = [
+      range,
+      type,
+      op,
+      value1,
+      value2,
+      formula,
+      stopIfTrue,
+      font,
+      color,
+      bgcolor,
+      0,
+      0,
+      0,
+      0,
+    ].join('	');
+    var list = document.getElementById(idp + 'condfmtlist');
+    var id = list.options[list.selectedIndex] ? list.options[list.selectedIndex].value : '';
+    var cmd;
+    if (id) {
+      cmd = 'condfmt update ' + id + ' ' + fields;
+    } else {
+      id = s.sheet.condfmtNextId;
+      cmd = 'condfmt add ' + id + ' ' + fields;
+    }
+    s.ExecuteCommand(cmd);
+    SocialCalc.SpreadsheetControlCondFmtFillList();
+    var newlist = document.getElementById(idp + 'condfmtlist');
+    SocialCalc.SelectOptionByValue(newlist, id + '');
+    SocialCalc.SpreadsheetControlCondFmtChangedRule();
+  };
+  SpreadsheetControlSC.SpreadsheetControlCondFmtDelete = function () {
+    var s = SocialCalc.GetSpreadsheetControlObject();
+    var idp = s.idPrefix;
+    var list = document.getElementById(idp + 'condfmtlist');
+    var id = list.options[list.selectedIndex] ? list.options[list.selectedIndex].value : '';
+    if (id) {
+      s.ExecuteCommand('condfmt delete ' + id);
+    }
+    SocialCalc.SpreadsheetControlCondFmtFillList();
+    var newlist = document.getElementById(idp + 'condfmtlist');
+    SocialCalc.SelectOptionByValue(newlist, '');
+    SocialCalc.SpreadsheetControlCondFmtChangedRule();
+  };
+  SpreadsheetControlSC.SpreadsheetControlCondFmtMove = function (direction) {
+    var s = SocialCalc.GetSpreadsheetControlObject();
+    var idp = s.idPrefix;
+    var list = document.getElementById(idp + 'condfmtlist');
+    var id = list.options[list.selectedIndex] ? list.options[list.selectedIndex].value : '';
+    if (!id) return;
+    s.ExecuteCommand('condfmt move ' + id + ' ' + direction);
+    SocialCalc.SpreadsheetControlCondFmtFillList();
+    var newlist = document.getElementById(idp + 'condfmtlist');
+    SocialCalc.SelectOptionByValue(newlist, id);
+    SocialCalc.SpreadsheetControlCondFmtChangedRule();
   };
   SpreadsheetControlSC.SpreadsheetControlClipboardOnclick = function (s, _t) {
     s = SocialCalc.GetSpreadsheetControlObject();

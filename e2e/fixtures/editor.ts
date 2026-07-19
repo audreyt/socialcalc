@@ -355,6 +355,8 @@ declare global {
           SheetUndo(): void;
           context: { rowpanes: unknown[]; colpanes: unknown[] };
         };
+        idPrefix: string;
+        ExecuteCommand(cmd: string): void;
         CreateSheetSave(): string;
         CreateSpreadsheetSave(): string;
         DecodeSpreadsheetSave(str: string): Record<string, { end: number; start: number }>;
@@ -377,12 +379,25 @@ declare global {
           };
           cells: Record<
             string,
-            { datavalue: unknown; formula: string; errors?: string } | undefined
+            { datavalue: unknown; formula: string; errors?: string; color?: number } | undefined
           >;
           rowattribs: {
             hide: Record<number, string>;
             filterhide: Record<number, string>;
           };
+          colors: string[];
+          condfmtRules: Array<{
+            id: number;
+            range: string;
+            type: string;
+            op: string;
+            value1: string;
+            value2: string;
+            formula: string;
+            stopIfTrue: boolean;
+            style: { font: number; color: number; bgcolor: number };
+          }>;
+          GetStyleNum(atype: string, style: string): number;
         };
       };
     };

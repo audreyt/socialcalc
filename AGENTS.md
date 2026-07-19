@@ -429,8 +429,11 @@ shipping bundle.
   cross-checked by `test/lemma-number-parse-facade.test.ts`.
 - `lemma/protect.ts`: sheet/cell protection editability policy — readonly
   always blocks, protection gates unlocked-only when active — 2 Dafny VCs.
+- `lemma/condfmt.ts`: conditional-format operator validity, rule matching,
+  duplicate/unique predicates, stop-if-true evaluation, and style-field
+  merge policy — 8 Dafny VCs.
 
-Total: **109 VCs (28 + 5 + 3 + 15 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2)**.
+Total: **117 VCs (28 + 5 + 3 + 15 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2 + 8)**.
 
 After a facade edit:
 
@@ -496,6 +499,9 @@ Facade oracle mapping:
   `SocialCalc.IsCellEditable`. `test/lemma-protect-facade.test.ts`
   cross-checks the exhaustive 3-variable truth table against the shipping
   functions.
+- condfmt: shipping conditional-format rule evaluation, duplicate/unique
+  predicates, stop-if-true precedence, and style merge behavior, covered by
+  `test/lemma-condfmt-facade.test.ts` and the conditional-formatting suite.
 
 ## Mutation testing
 

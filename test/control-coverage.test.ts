@@ -3010,3 +3010,205 @@ test("SpreadsheetControl: full pipeline with many ExecuteCommand verbs", async (
   expect(allCmds).toEqual(["moveinsert A1:A1 A2 all"]);
   control.editor.EditorScheduleSheetCommands = origSchedule;
 });
+
+// -------------------------------------------------------------------
+// Test: Conditional Formatting tab - fill list, changed rule, save,
+// delete, move, and the invalid-range guard path.
+// -------------------------------------------------------------------
+test("Conditional Formatting tab: all helpers including Save/Delete/Move", async () => {
+  const SC = await loadSocialCalc();
+  const { control } = await newControl(SC);
+  SC.SetSpreadsheetControlObject(control);
+
+  const g = (id: string) => (document.getElementById(control.idPrefix + id) as any).value;
+  const gc = (id: string) => (document.getElementById(control.idPrefix + id) as any).checked;
+
+  await scheduleCommands(SC, control.sheet, ["set A1 value n 10"]);
+  await recalcSheet(SC, control.sheet);
+
+  const list = document.getElementById(control.idPrefix + "condfmtlist") as any;
+  expect(list).toBeTruthy();
+
+  // Onclick + FillList with no rules yet: only the [New Rule] placeholder.
+  SC.SpreadsheetControlCondFmtOnclick(control, "condfmt");
+  expect(list.options.map((o: any) => o.value)).toEqual([""]);
+  expect(list.options[0].selected).toBe(true);
+  // ChangedRule with no selection (new-rule defaults): range defaults to
+  // the current ecell coord, type/op default to cellis/gt.
+  control.editor.MoveECell("A1");
+  SC.SpreadsheetControlCondFmtChangedRule();
+  expect(g("condfmtrange")).toBe("A1");
+  expect(g("condfmttype")).toBe("cellis");
+  expect(g("condfmtop")).toBe("gt");
+  expect(gc("condfmtstop")).toBe(false);
+
+  const scheduleSpy = spyScheduled(control.sheet as ScheduledCommandSheet);
+
+  // Save with an empty range: no-op (guarded before any command).
+  (document.getElementById(control.idPrefix + "condfmtrange") as any).value = "";
+  SC.SpreadsheetControlCondFmtSave();
+  expect(scheduleSpy.calls).toEqual([]);
+
+  // Save with an unparseable range: alert fires, no command scheduled.
+  const origAlert = (globalThis as any).alert;
+  const alertCalls: string[] = [];
+  (globalThis as any).alert = (msg: string) => alertCalls.push(msg);
+  (document.getElementById(control.idPrefix + "condfmtrange") as any).value = "not a range!!";
+  SC.SpreadsheetControlCondFmtSave();
+  expect(scheduleSpy.calls).toEqual([]);
+  expect(alertCalls.length).toBe(1);
+  (globalThis as any).alert = origAlert;
+
+  // Save a valid cellis rule: first rule gets the sheet's condfmtNextId.
+  const expectedId = control.sheet.condfmtNextId;
+  (document.getElementById(control.idPrefix + "condfmtrange") as any).value = "A1:A1";
+  (document.getElementById(control.idPrefix + "condfmttype") as any).value = "cellis";
+  (document.getElementById(control.idPrefix + "condfmtop") as any).value = "gt";
+  (document.getElementById(control.idPrefix + "condfmtvalue1") as any).value = "5";
+  (document.getElementById(control.idPrefix + "condfmtfont") as any).value = "normal bold * *";
+  (document.getElementById(control.idPrefix + "condfmtcolor") as any).value = "rgb(255,0,0)";
+  (document.getElementById(control.idPrefix + "condfmtbgcolor") as any).value = "rgb(0,255,255)";
+  SC.SpreadsheetControlCondFmtSave();
+  await waitEditor(control.editor, "cmdend", 500);
+  expect(scheduleSpy.calls).toEqual([
+    `condfmt add ${expectedId} A1:A1\tcellis\tgt\t5\t\t\t0\t${control.sheet.GetStyleNum("font", "normal bold * *")}\t${control.sheet.GetStyleNum("color", "rgb(255,0,0)")}\t${control.sheet.GetStyleNum("color", "rgb(0,255,255)")}\t0\t0\t0\t0`,
+  ]);
+  expect(control.sheet.condfmtRules).toHaveLength(1);
+  scheduleSpy.calls.length = 0;
+
+  // FillList now shows the saved rule and re-selects it.
+  SC.SpreadsheetControlCondFmtFillList();
+  expect(list.options.map((o: any) => o.value)).toEqual(["", expectedId + ""]);
+
+  // Select the saved rule and confirm ChangedRule reflects its fields.
+  SC.SelectOptionByValue(list, expectedId + "");
+  SC.SpreadsheetControlCondFmtChangedRule();
+  expect(g("condfmtrange")).toBe("A1:A1");
+  expect(g("condfmtop")).toBe("gt");
+  expect(g("condfmtvalue1")).toBe("5");
+  expect(g("condfmtcolor")).toBe("rgb(255,0,0)");
+
+  // Save again with the same rule selected: updates in place (no new id).
+  (document.getElementById(control.idPrefix + "condfmtvalue1") as any).value = "9";
+  SC.SpreadsheetControlCondFmtSave();
+  await waitEditor(control.editor, "cmdend", 500);
+  expect(scheduleSpy.calls).toEqual([
+    `condfmt update ${expectedId} A1:A1\tcellis\tgt\t9\t\t\t0\t${control.sheet.GetStyleNum("font", "normal bold * *")}\t${control.sheet.GetStyleNum("color", "rgb(255,0,0)")}\t${control.sheet.GetStyleNum("color", "rgb(0,255,255)")}\t0\t0\t0\t0`,
+  ]);
+  expect(control.sheet.condfmtRules[0].value1).toBe("9");
+  scheduleSpy.calls.length = 0;
+
+  // Add a second rule (custom formula type) to exercise Move up/down.
+  const secondId = control.sheet.condfmtNextId;
+  SC.SelectOptionByValue(list, "");
+  SC.SpreadsheetControlCondFmtChangedRule();
+  (document.getElementById(control.idPrefix + "condfmtrange") as any).value = "B1:B1";
+  (document.getElementById(control.idPrefix + "condfmttype") as any).value = "formula";
+  (document.getElementById(control.idPrefix + "condfmtvalue1") as any).value = "B1>0";
+  (document.getElementById(control.idPrefix + "condfmtstop") as any).checked = true;
+  SC.SpreadsheetControlCondFmtSave();
+  await waitEditor(control.editor, "cmdend", 500);
+  expect(control.sheet.condfmtRules).toHaveLength(2);
+  expect(control.sheet.condfmtRules.map((r: any) => r.id)).toEqual([expectedId, secondId]);
+  scheduleSpy.calls.length = 0;
+
+  // Move: no selection -> no-op.
+  SC.SelectOptionByValue(list, "");
+  SC.SpreadsheetControlCondFmtMove("up");
+  expect(scheduleSpy.calls).toEqual([]);
+
+  // Move second rule up: swaps priority order.
+  SC.SpreadsheetControlCondFmtFillList();
+  SC.SelectOptionByValue(list, secondId + "");
+  SC.SpreadsheetControlCondFmtMove("up");
+  await waitEditor(control.editor, "cmdend", 500);
+  expect(scheduleSpy.calls).toEqual([`condfmt move ${secondId} up`]);
+  expect(control.sheet.condfmtRules.map((r: any) => r.id)).toEqual([secondId, expectedId]);
+  scheduleSpy.calls.length = 0;
+
+  // Move it back down.
+  SC.SpreadsheetControlCondFmtFillList();
+  SC.SelectOptionByValue(list, secondId + "");
+  SC.SpreadsheetControlCondFmtMove("down");
+  await waitEditor(control.editor, "cmdend", 500);
+  expect(scheduleSpy.calls).toEqual([`condfmt move ${secondId} down`]);
+  expect(control.sheet.condfmtRules.map((r: any) => r.id)).toEqual([expectedId, secondId]);
+  scheduleSpy.calls.length = 0;
+
+  // Delete: no selection -> no-op.
+  SC.SelectOptionByValue(list, "");
+  SC.SpreadsheetControlCondFmtDelete();
+  expect(scheduleSpy.calls).toEqual([]);
+
+  // Delete the second rule.
+  SC.SpreadsheetControlCondFmtFillList();
+  SC.SelectOptionByValue(list, secondId + "");
+  SC.SpreadsheetControlCondFmtDelete();
+  await waitEditor(control.editor, "cmdend", 500);
+  expect(scheduleSpy.calls).toEqual([`condfmt delete ${secondId}`]);
+  expect(control.sheet.condfmtRules).toHaveLength(1);
+  scheduleSpy.restore();
+
+  // Onunclick is a documented no-op (unlike Names, this tab installs no
+  // range/moveecell callbacks to tear down).
+  expect(() => SC.SpreadsheetControlCondFmtOnunclick(control, "condfmt")).not.toThrow();
+
+  // FillList with zero rules again: only the placeholder remains selected.
+  control.sheet.condfmtRules.length = 0;
+  SC.SpreadsheetControlCondFmtFillList();
+  expect(list.options.map((o: any) => o.value)).toEqual([""]);
+  expect(list.options[0].selected).toBe(true);
+});
+
+// -------------------------------------------------------------------
+// Test: Conditional Formatting Save/Delete/Move work correctly immediately
+// after InitializeSpreadsheetControl, before any explicit FillList/Onclick
+// call — the real tab HTML template always seeds condfmtlist with a
+// selected "[New Rule]" placeholder option, so the [New Rule] selection is
+// never an empty/undefined <select>.
+// -------------------------------------------------------------------
+test("Conditional Formatting: Save/Delete/Move work against the template's initial [New Rule] selection", async () => {
+  const SC = await loadSocialCalc();
+  const { control } = await newControl(SC);
+  SC.SetSpreadsheetControlObject(control);
+
+  const scheduleSpy = spyScheduled(control.sheet as ScheduledCommandSheet);
+
+  // Delete/Move against the template's default "[New Rule]" (id="")
+  // selection: both must no-op without throwing.
+  SC.SpreadsheetControlCondFmtDelete();
+  expect(scheduleSpy.calls).toEqual([]);
+
+  SC.SpreadsheetControlCondFmtMove("up");
+  expect(scheduleSpy.calls).toEqual([]);
+
+  control.editor.MoveECell("A1");
+  (document.getElementById(control.idPrefix + "condfmtrange") as any).value = "A1:A1";
+  (document.getElementById(control.idPrefix + "condfmttype") as any).value = "cellis";
+  (document.getElementById(control.idPrefix + "condfmtop") as any).value = "gt";
+  (document.getElementById(control.idPrefix + "condfmtvalue1") as any).value = "1";
+  SC.SpreadsheetControlCondFmtSave();
+  await waitEditor(control.editor, "cmdend", 500);
+  // Falls through to the "no rule selected" add path.
+  expect(scheduleSpy.calls).toHaveLength(1);
+  expect(scheduleSpy.calls[0]).toMatch(/^condfmt add \d+ /);
+  scheduleSpy.restore();
+});
+
+// -------------------------------------------------------------------
+// Test: Conditional Formatting ChangedRule new-rule default falls back to
+// "A1" when the editor has no active cell selected at all.
+// -------------------------------------------------------------------
+test("Conditional Formatting: ChangedRule new-rule default falls back to A1 without an ecell", async () => {
+  const SC = await loadSocialCalc();
+  const { control } = await newControl(SC);
+  SC.SetSpreadsheetControlObject(control);
+  const originalEcell = control.editor.ecell;
+  control.editor.ecell = null;
+  try {
+    SC.SpreadsheetControlCondFmtChangedRule();
+    expect((document.getElementById(control.idPrefix + "condfmtrange") as any).value).toBe("A1");
+  } finally {
+    control.editor.ecell = originalEcell;
+  }
+});

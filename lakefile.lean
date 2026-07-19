@@ -109,4 +109,8 @@ lean_lib Visibility where
 lean_lib Protect where
   srcDir := "lemma"
   roots := #[`«protect.types», `«protect.def», `«protect.proof»]
+
+lean_lib CondFmt where
+  srcDir := "lemma"
+  roots := #[`«condfmt.types», `«condfmt.def», `«condfmt.proof»]
   extraDepTargets := #[``downloadDependencies]

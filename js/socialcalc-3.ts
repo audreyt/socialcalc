@@ -866,6 +866,10 @@ SC.ResetSheet = function (sheet: any, _reload: any) {
   sheet.names = {}; // Each is: {desc: "optional description", definition: "B5, A1:B7, or =formula"}
   sheet.autofilters = {}; // Each is: {id, range, criteria: {colOffset: {values?, op?, op2?}}}
   sheet.tables = {}; // Each is: {name, range, hasHeader, style, filterId}
+  sheet.condfmtRules = []; // ordered (index 0 = highest priority) CondFmtRule[]; see SC.CondFmtRule
+  sheet.condfmtNextId = 1; // monotonic id counter, stable across reorders/deletes
+  sheet.condfmtRulesVersion = 0; // bumped whenever a rule/range/formula changes (invalidates range index)
+  sheet.condfmtValueVersion = 0; // bumped whenever a cell value could have changed (invalidates duplicate/unique counts)
   sheet.layouts = [];
   sheet.layouthash = {};
   sheet.fonts = [];
@@ -1248,6 +1252,31 @@ SC.ParseSheetSave = function (savedsheet: any, sheetobj: any) {
         };
         break;
 
+      case "condfmt":
+        // condfmt:id:range:type:op:value1:value2:formula:stopIfTrue:font:color:bgcolor:bt:br:bb:bl
+        sheetobj.condfmtRules.push({
+          id: parts[1] - 0,
+          range: SocialCalc.decodeFromSave(parts[2]),
+          type: SocialCalc.decodeFromSave(parts[3]),
+          op: SocialCalc.decodeFromSave(parts[4]),
+          value1: SocialCalc.decodeFromSave(parts[5]),
+          value2: SocialCalc.decodeFromSave(parts[6]),
+          formula: SocialCalc.decodeFromSave(parts[7]),
+          stopIfTrue: parts[8] == "1",
+          style: {
+            font: parts[9] - 0,
+            color: parts[10] - 0,
+            bgcolor: parts[11] - 0,
+            bt: parts[12] - 0,
+            br: parts[13] - 0,
+            bb: parts[14] - 0,
+            bl: parts[15] - 0,
+          },
+        });
+        if (parts[1] - 0 >= sheetobj.condfmtNextId) {
+          sheetobj.condfmtNextId = parts[1] - 0 + 1;
+        }
+        break;
       case "layout":
         parts = lines[i].match(/^layout:(\d+):(.+)$/); // layouts can have ":" in them
         sheetobj.layouts[parts[1] - 0] = parts[2];
@@ -1660,6 +1689,43 @@ SC.CreateSheetSave = function (sheetobj: any, range: any, canonicalize: any) {
     );
   }
 
+  for (i = 0; i < sheetobj.condfmtRules.length; i++) {
+    var rule = sheetobj.condfmtRules[i];
+    var rstyle = rule.style;
+    result.push(
+      "condfmt:" +
+        rule.id +
+        ":" +
+        SocialCalc.encodeForSave(rule.range) +
+        ":" +
+        SocialCalc.encodeForSave(rule.type) +
+        ":" +
+        SocialCalc.encodeForSave(rule.op) +
+        ":" +
+        SocialCalc.encodeForSave(rule.value1) +
+        ":" +
+        SocialCalc.encodeForSave(rule.value2) +
+        ":" +
+        SocialCalc.encodeForSave(rule.formula) +
+        ":" +
+        (rule.stopIfTrue ? "1" : "0") +
+        ":" +
+        (rstyle.font ? xlt.fontsxlat[rstyle.font] : 0) +
+        ":" +
+        (rstyle.color ? xlt.colorsxlat[rstyle.color] : 0) +
+        ":" +
+        (rstyle.bgcolor ? xlt.colorsxlat[rstyle.bgcolor] : 0) +
+        ":" +
+        (rstyle.bt ? xlt.borderstylesxlat[rstyle.bt] : 0) +
+        ":" +
+        (rstyle.br ? xlt.borderstylesxlat[rstyle.br] : 0) +
+        ":" +
+        (rstyle.bb ? xlt.borderstylesxlat[rstyle.bb] : 0) +
+        ":" +
+        (rstyle.bl ? xlt.borderstylesxlat[rstyle.bl] : 0),
+    );
+  }
+
   if (range) {
     result.push(
       "copiedfrom:" +
@@ -1906,6 +1972,17 @@ SC.CanonicalizeSheet = function (sheetobj: any, full: any) {
       if (cr.row > maxrow) maxrow = cr.row;
       if (cr.col > maxcol) maxcol = cr.col;
     }
+  }
+
+  for (i = 0; i < sheetobj.condfmtRules.length; i++) {
+    var cfstyle = sheetobj.condfmtRules[i].style;
+    if (cfstyle.font) fontsUsed[cfstyle.font] = 1;
+    if (cfstyle.color) colorsUsed[cfstyle.color] = 1;
+    if (cfstyle.bgcolor) colorsUsed[cfstyle.bgcolor] = 1;
+    if (cfstyle.bt) borderstylesUsed[cfstyle.bt] = 1;
+    if (cfstyle.br) borderstylesUsed[cfstyle.br] = 1;
+    if (cfstyle.bb) borderstylesUsed[cfstyle.bb] = 1;
+    if (cfstyle.bl) borderstylesUsed[cfstyle.bl] = 1;
   }
 
   for (i = 0; i < SocialCalc.sheetfieldsxlat.length; i++) {
@@ -2788,6 +2865,7 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
     sheet.changes.AddDo(cmdstr);
   }
 
+  sheet.condfmtValueVersion++; // invalidate duplicate/unique count cache (cheap; correctness over micro-perf)
   cmd1 = cmd.NextToken();
   switch (cmd1) {
     case "set":
@@ -3808,6 +3886,31 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
         }
       }
 
+      for (i = 0; i < sheet.condfmtRules.length; i++) {
+        var icfrule = sheet.condfmtRules[i];
+        // No undo emitted here: the top-level insertcol/insertrow command
+        // already schedules a deletecol/deleterow inverse, and that handler's
+        // own condfmt fixup loop restores the pre-insert range/formula. An
+        // explicit undo here would double-adjust (see deletecol/deleterow
+        // case's dcfrule loop, which mirrors this one and does own the undo).
+        icfrule.range = SocialCalc.AdjustFormulaCoords(
+          icfrule.range,
+          cr1.col,
+          coloffset,
+          cr1.row,
+          rowoffset,
+        );
+        if (icfrule.formula) {
+          icfrule.formula = SocialCalc.AdjustFormulaCoords(
+            icfrule.formula,
+            cr1.col,
+            coloffset,
+            cr1.row,
+            rowoffset,
+          );
+        }
+      }
+
       for (row = attribs.lastrow; row >= rowend && cmd1 == "insertrow"; row--) {
         // copy the row attributes forward
         rownext = row + rowoffset;
@@ -4004,6 +4107,51 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
           if (saveundo && sheet.names[name].definition != olddefinition) {
             changes.AddUndo("name define " + name + " " + olddefinition);
           }
+        }
+      }
+
+      for (i = 0; i < sheet.condfmtRules.length; i++) {
+        var dcfrule = sheet.condfmtRules[i];
+        var dcfoldrange = dcfrule.range;
+        var dcfoldformula = dcfrule.formula;
+        dcfrule.range = SocialCalc.AdjustFormulaCoords(
+          dcfrule.range,
+          cr1.col,
+          coloffset,
+          cr1.row,
+          rowoffset,
+        );
+        if (dcfrule.formula) {
+          dcfrule.formula = SocialCalc.AdjustFormulaCoords(
+            dcfrule.formula,
+            cr1.col,
+            coloffset,
+            cr1.row,
+            rowoffset,
+          );
+        }
+        if (saveundo && (dcfrule.range != dcfoldrange || dcfrule.formula != dcfoldformula)) {
+          changes.AddUndo(
+            "condfmt update " +
+              dcfrule.id +
+              " " +
+              [
+                SocialCalc.encodeForSave(dcfoldrange),
+                SocialCalc.encodeForSave(dcfrule.type),
+                SocialCalc.encodeForSave(dcfrule.op),
+                SocialCalc.encodeForSave(dcfrule.value1),
+                SocialCalc.encodeForSave(dcfrule.value2),
+                SocialCalc.encodeForSave(dcfoldformula),
+                dcfrule.stopIfTrue ? "1" : "0",
+                dcfrule.style.font,
+                dcfrule.style.color,
+                dcfrule.style.bgcolor,
+                dcfrule.style.bt,
+                dcfrule.style.br,
+                dcfrule.style.bb,
+                dcfrule.style.bl,
+              ].join("\t"),
+          );
         }
       }
 
@@ -4434,6 +4582,39 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
         }
       }
 
+      for (i = 0; i < sheet.condfmtRules.length; i++) {
+        var mcfrule = sheet.condfmtRules[i];
+        var mcfoldrange = mcfrule.range;
+        var mcfoldformula = mcfrule.formula;
+        mcfrule.range = SocialCalc.ReplaceFormulaCoords(mcfrule.range, movedto);
+        if (mcfrule.formula) {
+          mcfrule.formula = SocialCalc.ReplaceFormulaCoords(mcfrule.formula, movedto);
+        }
+        if (saveundo && (mcfrule.range != mcfoldrange || mcfrule.formula != mcfoldformula)) {
+          changes.AddUndo(
+            "condfmt update " +
+              mcfrule.id +
+              " " +
+              [
+                SocialCalc.encodeForSave(mcfoldrange),
+                SocialCalc.encodeForSave(mcfrule.type),
+                SocialCalc.encodeForSave(mcfrule.op),
+                SocialCalc.encodeForSave(mcfrule.value1),
+                SocialCalc.encodeForSave(mcfrule.value2),
+                SocialCalc.encodeForSave(mcfoldformula),
+                mcfrule.stopIfTrue ? "1" : "0",
+                mcfrule.style.font,
+                mcfrule.style.color,
+                mcfrule.style.bgcolor,
+                mcfrule.style.bt,
+                mcfrule.style.br,
+                mcfrule.style.bb,
+                mcfrule.style.bl,
+              ].join("\t"),
+          );
+        }
+      }
+
       attribs.needsrecalc = "yes";
       break;
 
@@ -4703,6 +4884,170 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
       delete attribs.protected;
       break;
 
+    case "condfmt":
+      what = cmd.NextToken();
+      sheet.renderneeded = true;
+      sheet.changedrendervalues = true;
+
+      if (what == "add") {
+        var addId = cmd.NextToken() - 0;
+        var addFields = cmd.RestOfString().split("\t");
+        sheet.condfmtRules.push({
+          id: addId,
+          range: SocialCalc.decodeFromSave(addFields[0]),
+          type: SocialCalc.decodeFromSave(addFields[1]),
+          op: SocialCalc.decodeFromSave(addFields[2]),
+          value1: SocialCalc.decodeFromSave(addFields[3]),
+          value2: SocialCalc.decodeFromSave(addFields[4]),
+          formula: SocialCalc.decodeFromSave(addFields[5]),
+          stopIfTrue: addFields[6] == "1",
+          style: {
+            font: addFields[7] - 0,
+            color: addFields[8] - 0,
+            bgcolor: addFields[9] - 0,
+            bt: addFields[10] - 0,
+            br: addFields[11] - 0,
+            bb: addFields[12] - 0,
+            bl: addFields[13] - 0,
+          },
+        });
+        if (addId >= sheet.condfmtNextId) sheet.condfmtNextId = addId + 1;
+        if (saveundo) changes.AddUndo("condfmt delete " + addId);
+      } else if (what == "update") {
+        var updateId = cmd.NextToken() - 0;
+        var updateFields = cmd.RestOfString().split("\t");
+        for (i = 0; i < sheet.condfmtRules.length; i++) {
+          if (sheet.condfmtRules[i].id == updateId) {
+            var oldRule = sheet.condfmtRules[i];
+            if (saveundo) {
+              changes.AddUndo(
+                "condfmt update " +
+                  updateId +
+                  " " +
+                  [
+                    SocialCalc.encodeForSave(oldRule.range),
+                    SocialCalc.encodeForSave(oldRule.type),
+                    SocialCalc.encodeForSave(oldRule.op),
+                    SocialCalc.encodeForSave(oldRule.value1),
+                    SocialCalc.encodeForSave(oldRule.value2),
+                    SocialCalc.encodeForSave(oldRule.formula),
+                    oldRule.stopIfTrue ? "1" : "0",
+                    oldRule.style.font,
+                    oldRule.style.color,
+                    oldRule.style.bgcolor,
+                    oldRule.style.bt,
+                    oldRule.style.br,
+                    oldRule.style.bb,
+                    oldRule.style.bl,
+                  ].join("\t"),
+              );
+            }
+            sheet.condfmtRules[i] = {
+              id: updateId,
+              range: SocialCalc.decodeFromSave(updateFields[0]),
+              type: SocialCalc.decodeFromSave(updateFields[1]),
+              op: SocialCalc.decodeFromSave(updateFields[2]),
+              value1: SocialCalc.decodeFromSave(updateFields[3]),
+              value2: SocialCalc.decodeFromSave(updateFields[4]),
+              formula: SocialCalc.decodeFromSave(updateFields[5]),
+              stopIfTrue: updateFields[6] == "1",
+              style: {
+                font: updateFields[7] - 0,
+                color: updateFields[8] - 0,
+                bgcolor: updateFields[9] - 0,
+                bt: updateFields[10] - 0,
+                br: updateFields[11] - 0,
+                bb: updateFields[12] - 0,
+                bl: updateFields[13] - 0,
+              },
+            };
+            break;
+          }
+        }
+      } else if (what == "delete") {
+        var deleteId = cmd.NextToken() - 0;
+        for (i = 0; i < sheet.condfmtRules.length; i++) {
+          if (sheet.condfmtRules[i].id == deleteId) {
+            var deletedRule = sheet.condfmtRules[i];
+            if (saveundo) {
+              changes.AddUndo(
+                "condfmt insertat " +
+                  i +
+                  " " +
+                  deletedRule.id +
+                  " " +
+                  [
+                    SocialCalc.encodeForSave(deletedRule.range),
+                    SocialCalc.encodeForSave(deletedRule.type),
+                    SocialCalc.encodeForSave(deletedRule.op),
+                    SocialCalc.encodeForSave(deletedRule.value1),
+                    SocialCalc.encodeForSave(deletedRule.value2),
+                    SocialCalc.encodeForSave(deletedRule.formula),
+                    deletedRule.stopIfTrue ? "1" : "0",
+                    deletedRule.style.font,
+                    deletedRule.style.color,
+                    deletedRule.style.bgcolor,
+                    deletedRule.style.bt,
+                    deletedRule.style.br,
+                    deletedRule.style.bb,
+                    deletedRule.style.bl,
+                  ].join("\t"),
+              );
+            }
+            sheet.condfmtRules.splice(i, 1);
+            break;
+          }
+        }
+      } else if (what == "insertat") {
+        var atIndex = cmd.NextToken() - 0;
+        var insertId = cmd.NextToken() - 0;
+        var insertFields = cmd.RestOfString().split("\t");
+        sheet.condfmtRules.splice(atIndex, 0, {
+          id: insertId,
+          range: SocialCalc.decodeFromSave(insertFields[0]),
+          type: SocialCalc.decodeFromSave(insertFields[1]),
+          op: SocialCalc.decodeFromSave(insertFields[2]),
+          value1: SocialCalc.decodeFromSave(insertFields[3]),
+          value2: SocialCalc.decodeFromSave(insertFields[4]),
+          formula: SocialCalc.decodeFromSave(insertFields[5]),
+          stopIfTrue: insertFields[6] == "1",
+          style: {
+            font: insertFields[7] - 0,
+            color: insertFields[8] - 0,
+            bgcolor: insertFields[9] - 0,
+            bt: insertFields[10] - 0,
+            br: insertFields[11] - 0,
+            bb: insertFields[12] - 0,
+            bl: insertFields[13] - 0,
+          },
+        });
+        if (insertId >= sheet.condfmtNextId) sheet.condfmtNextId = insertId + 1;
+        if (saveundo) changes.AddUndo("condfmt delete " + insertId);
+      } else if (what == "move") {
+        var moveId = cmd.NextToken() - 0;
+        var direction = cmd.NextToken();
+        var moveIndex = -1;
+        for (i = 0; i < sheet.condfmtRules.length; i++) {
+          if (sheet.condfmtRules[i].id == moveId) {
+            moveIndex = i;
+            break;
+          }
+        }
+        if (moveIndex >= 0) {
+          var swapWith = direction == "up" ? moveIndex - 1 : moveIndex + 1;
+          if (swapWith >= 0 && swapWith < sheet.condfmtRules.length) {
+            var tmpRule = sheet.condfmtRules[moveIndex];
+            sheet.condfmtRules[moveIndex] = sheet.condfmtRules[swapWith];
+            sheet.condfmtRules[swapWith] = tmpRule;
+            if (saveundo) {
+              changes.AddUndo("condfmt move " + moveId + " " + (direction == "up" ? "down" : "up"));
+            }
+          }
+        }
+      }
+      attribs.needsrecalc = "yes";
+      break;
+
     case "recalc":
       attribs.needsrecalc = "yes"; // request recalc
       sheet.recalconce = true; // even if turned off
@@ -4930,6 +5275,213 @@ SC.GetStyleString = function (sheet: any, atype: any, num: any) {
   if (!num) return null; // zero, null, and undefined return null
 
   return sheet[atype + "s"][num];
+};
+
+// ************************
+//
+// Conditional formatting
+//
+// ************************
+//
+// sheet.condfmtRules: ordered array (index 0 = highest priority) of:
+//   {id, range, type, op, value1, value2, formula, stopIfTrue, style}
+// type: "cellis" | "textcontains" | "textbegins" | "textends" | "blank" |
+//       "nonblank" | "duplicate" | "unique" | "formula"
+// op (cellis only): "gt"|"ge"|"lt"|"le"|"eq"|"ne"|"between"
+// style: {font,color,bgcolor,bt,br,bb,bl} - each a palette index (0 = unset)
+//
+// Evaluation order/precedence mirrors lemma/condfmt.ts exactly (rule 0 is
+// highest priority; a matched stopIfTrue rule halts the scan; unset style
+// fields fall through to later, lower-priority matching rules).
+
+/** @param {string} range @param {any} col @param {any} row */
+SC.CondFmtCoordInRange = function (range: any, col: any, row: any) {
+  // ParseRange never throws (it clamps malformed input to degenerate
+  // col=0/negative-row bounds), so a bad range naturally fails the bounds
+  // check below rather than needing a try/catch.
+  var parsed = SocialCalc.ParseRange(range);
+  return (
+    col >= parsed.cr1.col && col <= parsed.cr2.col && row >= parsed.cr1.row && row <= parsed.cr2.row
+  );
+};
+
+// Cache of coord -> occurrence count, keyed by range text, rebuilt lazily
+// whenever sheet.condfmtValueVersion or sheet.condfmtRulesVersion changes.
+// Avoids re-scanning a range's cells for every candidate cell during a
+// full-sheet render (duplicate/unique rule types would otherwise be O(n^2)
+// over the range).
+/** @param {any} sheet @param {string} range */
+SC.CondFmtValueCounts = function (sheet: any, range: any) {
+  sheet.condfmtCountsCache = sheet.condfmtCountsCache || {};
+  if (sheet.condfmtCountsCache.key !== sheet.condfmtValueVersion) {
+    sheet.condfmtCountsCache = { key: sheet.condfmtValueVersion, map: {} };
+  }
+  if (!sheet.condfmtCountsCache.map[range]) {
+    // ParseRange never throws (it clamps malformed input to degenerate
+    // col=0/negative-row bounds); an empty result for those ranges falls
+    // naturally out of the loop below never executing, so no try/catch
+    // is needed here.
+    var parsed = SocialCalc.ParseRange(range);
+    var counts = new Map();
+    for (var r = parsed.cr1.row; r <= parsed.cr2.row; r++) {
+      for (var c = parsed.cr1.col; c <= parsed.cr2.col; c++) {
+        var rcoord = SocialCalc.crToCoord(c, r);
+        var rcell = sheet.cells[rcoord];
+        if (!rcell || !rcell.valuetype || rcell.valuetype.charAt(0) == "b") continue;
+        var key = rcell.valuetype.charAt(0) + ":" + rcell.datavalue;
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+    }
+    sheet.condfmtCountsCache.map[range] = counts;
+  }
+  return sheet.condfmtCountsCache.map[range];
+};
+
+// Three-way compare for cell-is comparisons: numeric compare when both sides
+// parse as numbers, else lexical string compare (mirrors TestCriteria's
+// numeric-vs-text handling in js/formula1.ts).
+/** @param {any} value @param {any} operand */
+SC.CondFmtCompare = function (value: any, operand: any) {
+  var nv = SocialCalc.DetermineValueType(value);
+  var no = SocialCalc.DetermineValueType(operand);
+  if (nv.type.charAt(0) == "n" && no.type.charAt(0) == "n") {
+    var a = (nv.value as any) - 0;
+    var b = (no.value as any) - 0;
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+  var sa = "" + value;
+  var sb = "" + operand;
+  return sa < sb ? -1 : sa > sb ? 1 : 0;
+};
+
+// Evaluates a single rule's match predicate against one cell. Returns
+// boolean. Uses SocialCalc.Formula.TestCriteria's comparator conventions and
+// SocialCalc.condfmt (lemma/condfmt.ts port) for the closed-form op decision.
+/** @param {any} sheet @param {any} rule @param {any} cell @param {string} coord */
+SC.CondFmtRuleMatches = function (sheet: any, rule: any, cell: any, coord: any) {
+  var vt = (cell && cell.valuetype) || "b";
+  var isBlank = vt.charAt(0) == "b";
+  var dv = cell ? cell.datavalue : "";
+
+  switch (rule.type) {
+    case "blank":
+      return isBlank;
+    case "nonblank":
+      return !isBlank;
+    case "duplicate":
+    case "unique": {
+      if (isBlank) return false;
+      var counts = SocialCalc.CondFmtValueCounts(sheet, rule.range);
+      var key = vt.charAt(0) + ":" + dv;
+      var count = counts.get(key) || 0;
+      return rule.type == "duplicate" ? count > 1 : count === 1;
+    }
+    case "textcontains":
+    case "textbegins":
+    case "textends": {
+      if (isBlank) return false;
+      var text = "" + dv;
+      var needle = "" + rule.value1;
+      if (rule.type == "textcontains") return text.indexOf(needle) != -1;
+      if (rule.type == "textbegins") return text.indexOf(needle) === 0;
+      return needle.length <= text.length && text.slice(text.length - needle.length) == needle;
+    }
+    case "cellis": {
+      if (isBlank) return false;
+      if (rule.op == "between") {
+        var cmpLow = SocialCalc.CondFmtCompare(dv, rule.value1);
+        var cmpHigh = SocialCalc.CondFmtCompare(dv, rule.value2);
+        return cmpLow >= 0 && cmpHigh <= 0;
+      }
+      var cmp = SocialCalc.CondFmtCompare(dv, rule.value1);
+      var opCode =
+        rule.op == "gt"
+          ? 0
+          : rule.op == "ge"
+            ? 1
+            : rule.op == "lt"
+              ? 2
+              : rule.op == "le"
+                ? 3
+                : rule.op == "eq"
+                  ? 4
+                  : rule.op == "ne"
+                    ? 5
+                    : -1;
+      if (opCode === 0) return cmp > 0;
+      if (opCode === 1) return cmp >= 0;
+      if (opCode === 2) return cmp < 0;
+      if (opCode === 3) return cmp <= 0;
+      if (opCode === 4) return cmp === 0;
+      if (opCode === 5) return cmp !== 0;
+      return false;
+    }
+    case "formula": {
+      if (!rule.formula) return false;
+      try {
+        var anchor = SocialCalc.ParseRange(rule.range).cr1;
+        var target = SocialCalc.coordToCr(coord);
+        var relFormula = SocialCalc.OffsetFormulaCoords(
+          rule.formula,
+          target.col - anchor.col,
+          target.row - anchor.row,
+        );
+        var parseinfo = SocialCalc.Formula.ParseFormulaIntoTokens(relFormula);
+        var eresult = SocialCalc.Formula.evaluate_parsed_formula(parseinfo, sheet, false);
+        if (eresult.type && eresult.type.charAt(0) == "e") return false;
+        return (
+          eresult.value === true ||
+          eresult.value === 1 ||
+          eresult.value === "TRUE" ||
+          eresult.value === "true"
+        );
+      } catch {
+        return false;
+      }
+    }
+    default:
+      return false;
+  }
+};
+
+// Full evaluation of all applicable condfmt rules for one cell, folding in
+// priority order per lemma/condfmt.ts (foldCondFmtRule): a matched
+// stopIfTrue rule halts the scan; every applicable rule (reached and
+// matched) contributes any style field a higher-priority applicable rule
+// left unset. Returns {font,color,bgcolor,bt,br,bb,bl} with 0 meaning unset,
+// or null when no rule applies at all (fast path for the common case).
+/** @param {any} sheet @param {string} coord */
+SC.EvaluateCondFmtForCell = function (sheet: any, coord: any) {
+  var rules = sheet.condfmtRules;
+  if (!rules || rules.length === 0) return null;
+
+  var cr = SocialCalc.coordToCr(coord);
+  var cell = sheet.cells[coord];
+
+  var style: any = { font: 0, color: 0, bgcolor: 0, bt: 0, br: 0, bb: 0, bl: 0 };
+  var any_applied = false;
+  var stopped = false;
+
+  for (var i = 0; i < rules.length; i++) {
+    if (stopped) break;
+    var rule = rules[i];
+    if (!SocialCalc.CondFmtCoordInRange(rule.range, cr.col, cr.row)) continue;
+    var matched = SocialCalc.CondFmtRuleMatches(sheet, rule, cell, coord);
+    if (matched) {
+      any_applied = true;
+      var rstyle = rule.style;
+      if (!style.font && rstyle.font) style.font = rstyle.font;
+      if (!style.color && rstyle.color) style.color = rstyle.color;
+      if (!style.bgcolor && rstyle.bgcolor) style.bgcolor = rstyle.bgcolor;
+      if (!style.bt && rstyle.bt) style.bt = rstyle.bt;
+      if (!style.br && rstyle.br) style.br = rstyle.br;
+      if (!style.bb && rstyle.bb) style.bb = rstyle.bb;
+      if (!style.bl && rstyle.bl) style.bl = rstyle.bl;
+      if (rule.stopIfTrue) stopped = true;
+    }
+  }
+
+  return any_applied ? style : null;
 };
 
 // Formula-reference rewrite helpers live in js/formula-ref.ts
@@ -5243,6 +5795,7 @@ SC.RecalcTimerRoutine = function () {
       cell.valuetype = eresult.type;
       delete cell.displaystring;
       sheet.recalcchangedavalue = true;
+      sheet.condfmtValueVersion++; // invalidate duplicate/unique count cache
     }
     count++;
     coord = sheet.recalcdata.calclist[coord];
@@ -6599,6 +7152,10 @@ SC.RenderCell = function (
   sheetattribs = sheetobj.attribs;
   scc = SocialCalc.Constants;
 
+  // Conditional formatting: computed once per cell, never mutates `cell`.
+  // Style-field precedence/merge follows lemma/condfmt.ts foldCondFmtRule.
+  var condfmtStyle = SocialCalc.EvaluateCondFmtForCell(sheetobj, coord);
+
   if (cell.colspan > 1) {
     span = 1;
     for (num = 1; num < cell.colspan; num++) {
@@ -6753,6 +7310,42 @@ SC.RenderCell = function (
   num = cell.bl;
   if (num && typeof sheetobj.borderstyles[num] !== "undefined")
     stylestr += "border-left:" + sheetobj.borderstyles[num] + ";";
+
+  if (condfmtStyle) {
+    // Conditional formatting overlay: appended last so it wins the cssText
+    // cascade for any property it sets, without touching `cell` itself.
+    if (condfmtStyle.font && typeof context.fonts[condfmtStyle.font] !== "undefined") {
+      var cft = context.fonts[condfmtStyle.font];
+      stylestr +=
+        "font-style:" +
+        cft.style +
+        ";font-weight:" +
+        cft.weight +
+        ";font-size:" +
+        cft.size +
+        ";font-family:" +
+        cft.family +
+        ";";
+    }
+    if (condfmtStyle.color && typeof sheetobj.colors[condfmtStyle.color] !== "undefined") {
+      stylestr += "color:" + sheetobj.colors[condfmtStyle.color] + ";";
+    }
+    if (condfmtStyle.bgcolor && typeof sheetobj.colors[condfmtStyle.bgcolor] !== "undefined") {
+      stylestr += "background-color:" + sheetobj.colors[condfmtStyle.bgcolor] + ";";
+    }
+    if (condfmtStyle.bt && typeof sheetobj.borderstyles[condfmtStyle.bt] !== "undefined") {
+      stylestr += "border-top:" + sheetobj.borderstyles[condfmtStyle.bt] + ";";
+    }
+    if (condfmtStyle.br && typeof sheetobj.borderstyles[condfmtStyle.br] !== "undefined") {
+      stylestr += "border-right:" + sheetobj.borderstyles[condfmtStyle.br] + ";";
+    }
+    if (condfmtStyle.bb && typeof sheetobj.borderstyles[condfmtStyle.bb] !== "undefined") {
+      stylestr += "border-bottom:" + sheetobj.borderstyles[condfmtStyle.bb] + ";";
+    }
+    if (condfmtStyle.bl && typeof sheetobj.borderstyles[condfmtStyle.bl] !== "undefined") {
+      stylestr += "border-left:" + sheetobj.borderstyles[condfmtStyle.bl] + ";";
+    }
+  }
 
   if (cell.comment) {
     result.title = cell.comment;

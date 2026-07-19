@@ -218,6 +218,17 @@ export const testsByFile = {
   // `new SC.Sheet()`, drive it through scheduleCommands/recalcSheet, and
   // were verified (by temporarily disabling the retry branch) to fail
   // without that exact mechanism.
+  // socialcalc-3.ts also owns SafeUrlForRender/EscapeUntrustedHtml (the
+  // untrusted-content render-security policy, see socialcalc-3.d.ts), the
+  // Sheet class's cache/recalc plumbing, and the conditional-formatting
+  // evaluation engine (CondFmtRuleMatches/CondFmtCompare/CondFmtValueCounts/
+  // EvaluateCondFmtForCell plus the condfmt command/save-load/structural-
+  // rewrite code) — hardening-sheet-core-branches.test.ts, render-security-
+  // policy.test.ts, sheet-cache-load-regressions.test.ts, and
+  // conditional-formatting.test.ts (direct SC.EvaluateCondFmtForCell/
+  // SC.CondFmtRuleMatches/SC.CondFmtCompare call sites plus condfmt
+  // command/save/structural-rewrite scenarios) all drive that surface
+  // directly.
   "socialcalc-3.ts": [
     ...sheetCoreTests,
     ...commandRegressionTests,
@@ -231,6 +242,8 @@ export const testsByFile = {
     "test/formula-dynamic-reference.test.ts",
     "test/sheet-protection.test.ts",
     "test/lemma-protect-facade.test.ts",
+    "test/conditional-formatting.test.ts",
+    "test/lemma-condfmt-facade.test.ts",
   ],
 
   "socialcalctableeditor.ts": editorTests,

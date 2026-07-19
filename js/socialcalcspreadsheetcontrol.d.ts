@@ -206,6 +206,16 @@ declare namespace SocialCalc {
   function SpreadsheetControlNamesSave(): void;
   function SpreadsheetControlNamesDelete(): void;
 
+  function SelectOptionByValue(selectEle: unknown, value: string): void;
+
+  function SpreadsheetControlCondFmtOnclick(s: SpreadsheetControl, t: string): void;
+  function SpreadsheetControlCondFmtOnunclick(s: SpreadsheetControl, t: string): void;
+  function SpreadsheetControlCondFmtFillList(): void;
+  function SpreadsheetControlCondFmtChangedRule(): void;
+  function SpreadsheetControlCondFmtSave(): void;
+  function SpreadsheetControlCondFmtDelete(): void;
+  function SpreadsheetControlCondFmtMove(direction: string): void;
+
   function SpreadsheetControlClipboardOnclick(s: SpreadsheetControl, t: string): void;
   function SpreadsheetControlClipboardFormat(which: string): void;
   function SpreadsheetControlClipboardLoad(): void;

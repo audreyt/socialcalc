@@ -1132,6 +1132,78 @@ SpreadsheetControlSC.SpreadsheetControl = function (idPrefix: any) {
     onunclick: SocialCalc.SpreadsheetControlNamesOnunclick,
   });
 
+  // Conditional Formatting
+
+  this.tabnums.condfmt = this.tabs.length;
+  this.tabs.push({
+    name: "condfmt",
+    text: "Conditional Formatting",
+    html:
+      '<div id="%id.condfmttools" style="display:none;">' +
+      '  <table cellspacing="0" cellpadding="0"><tr>' +
+      '   <td style="vertical-align:top;padding-right:16px;">' +
+      '    <div style="%tbt.">%loc!Existing Rules!</div>' +
+      '    <select id="%id.condfmtlist" size="6" style="width:260px;" onchange="%s.SpreadsheetControlCondFmtChangedRule();" onfocus="%s.CmdGotFocus(this);"><option selected value="">[New Rule]</option></select>' +
+      '    <br><input type="button" value="%loc!Move Up!" onclick="%s.SpreadsheetControlCondFmtMove(\'up\');" style="font-size:x-small;">' +
+      '    <input type="button" value="%loc!Move Down!" onclick="%s.SpreadsheetControlCondFmtMove(\'down\');" style="font-size:x-small;">' +
+      "   </td>" +
+      '   <td style="vertical-align:top;padding-right:6px;">' +
+      '    <div style="%tbt.">%loc!Range!</div>' +
+      '    <input type="text" id="%id.condfmtrange" style="font-size:x-small;width:90px;" onfocus="%s.CmdGotFocus(this);">' +
+      '    <div style="%tbt.">%loc!Rule Type!</div>' +
+      '    <select id="%id.condfmttype" style="font-size:x-small;width:150px;" onfocus="%s.CmdGotFocus(this);">' +
+      '     <option value="cellis">%loc!Cell value is!</option>' +
+      '     <option value="textcontains">%loc!Text contains!</option>' +
+      '     <option value="textbegins">%loc!Text begins with!</option>' +
+      '     <option value="textends">%loc!Text ends with!</option>' +
+      '     <option value="blank">%loc!Is blank!</option>' +
+      '     <option value="nonblank">%loc!Is not blank!</option>' +
+      '     <option value="duplicate">%loc!Duplicate values!</option>' +
+      '     <option value="unique">%loc!Unique values!</option>' +
+      '     <option value="formula">%loc!Custom formula!</option>' +
+      "    </select>" +
+      "   </td>" +
+      '   <td style="vertical-align:top;padding-right:6px;">' +
+      '    <div style="%tbt.">%loc!Comparison!</div>' +
+      '    <select id="%id.condfmtop" style="font-size:x-small;width:90px;" onfocus="%s.CmdGotFocus(this);">' +
+      '     <option value="gt">&gt;</option>' +
+      '     <option value="ge">&gt;=</option>' +
+      '     <option value="lt">&lt;</option>' +
+      '     <option value="le">&lt;=</option>' +
+      '     <option value="eq">=</option>' +
+      '     <option value="ne">&lt;&gt;</option>' +
+      '     <option value="between">%loc!between!</option>' +
+      "    </select>" +
+      '    <div style="%tbt.">%loc!Value 1 / Text / Formula!</div>' +
+      '    <input type="text" id="%id.condfmtvalue1" style="font-size:x-small;width:110px;" onfocus="%s.CmdGotFocus(this);">' +
+      '    <div style="%tbt.">%loc!Value 2 (between)!</div>' +
+      '    <input type="text" id="%id.condfmtvalue2" style="font-size:x-small;width:110px;" onfocus="%s.CmdGotFocus(this);">' +
+      "   </td>" +
+      '   <td style="vertical-align:top;padding-right:6px;">' +
+      '    <div style="%tbt.">%loc!Text Color!</div>' +
+      '    <input type="text" id="%id.condfmtcolor" placeholder="rgb(r,g,b)" style="font-size:x-small;width:110px;" onfocus="%s.CmdGotFocus(this);">' +
+      '    <div style="%tbt.">%loc!Background!</div>' +
+      '    <input type="text" id="%id.condfmtbgcolor" placeholder="rgb(r,g,b)" style="font-size:x-small;width:110px;" onfocus="%s.CmdGotFocus(this);">' +
+      '    <div style="%tbt.">%loc!Bold!</div>' +
+      '    <select id="%id.condfmtfont" style="font-size:x-small;width:90px;" onfocus="%s.CmdGotFocus(this);">' +
+      '     <option value="">%loc!Normal!</option>' +
+      '     <option value="normal bold * *">%loc!Bold!</option>' +
+      "    </select>" +
+      "   </td>" +
+      '   <td style="vertical-align:top;padding-right:6px;">' +
+      '    <div style="%tbt.">&nbsp;</div>' +
+      '    <input type="checkbox" id="%id.condfmtstop"> %loc!Stop if true!' +
+      "    <br>" +
+      '    <input type="button" value="%loc!Save!" onclick="%s.SpreadsheetControlCondFmtSave();" style="font-size:x-small;">' +
+      '    <input type="button" value="%loc!Delete!" onclick="%s.SpreadsheetControlCondFmtDelete();" style="font-size:x-small;">' +
+      "   </td>" +
+      "  </tr></table>" +
+      "</div>",
+    view: "sheet",
+    onclick: SocialCalc.SpreadsheetControlCondFmtOnclick,
+    onunclick: SocialCalc.SpreadsheetControlCondFmtOnunclick,
+  });
+
   // Clipboard
 
   this.tabnums.clipboard = this.tabs.length;
@@ -4042,6 +4114,198 @@ SpreadsheetControlSC.SpreadsheetControlNamesDelete = function () {
     //      SocialCalc.SpreadsheetControlNamesFillNameList();
   }
   SocialCalc.KeyboardFocus();
+};
+
+/** @param {any} selectEle @param {string} value */
+SpreadsheetControlSC.SelectOptionByValue = function (selectEle: any, value: any) {
+  for (var i = 0; i < selectEle.options.length; i++) {
+    var match = selectEle.options[i].value == value;
+    selectEle.options[i].selected = match;
+    if (match) selectEle.selectedIndex = i;
+  }
+};
+
+// Conditional Formatting
+
+/** @param {any} _s @param {any} _t */
+SpreadsheetControlSC.SpreadsheetControlCondFmtOnclick = function (_s: any, _t: any) {
+  SocialCalc.SpreadsheetControlCondFmtFillList();
+  SocialCalc.SpreadsheetControlCondFmtChangedRule();
+};
+
+/** @param {any} s @param {any} _t */
+SpreadsheetControlSC.SpreadsheetControlCondFmtOnunclick = function (s: any, _t: any) {
+  void s;
+  void _t;
+};
+
+SpreadsheetControlSC.SpreadsheetControlCondFmtFillList = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var list = /** @type {any} */ ((document as any).getElementById(s.idPrefix + "condfmtlist"));
+  // Defensive: the real HTML template seeds a "[New Rule]" placeholder
+  // option, but a select's .options array is not guaranteed populated at
+  // every call site (e.g. before the tab's own onclick has ever run).
+  var selectedId = list.options[list.selectedIndex] ? list.options[list.selectedIndex].value : "";
+  var rules = s.sheet.condfmtRules;
+  list.length = 0;
+  list.options[0] = new Option(SocialCalc.LocalizeString("[New Rule]"), "");
+  list.selectedIndex = 0;
+  for (var i = 0; i < rules.length; i++) {
+    list.options[i + 1] = new Option(
+      i + 1 + ": " + rules[i].range + " (" + rules[i].type + ")",
+      rules[i].id + "",
+    );
+    if (rules[i].id + "" == selectedId) {
+      list.options[i + 1].selected = true;
+      list.selectedIndex = i + 1;
+    }
+  }
+  if (selectedId == "") {
+    list.options[0].selected = true;
+    list.selectedIndex = 0;
+  }
+};
+
+SpreadsheetControlSC.SpreadsheetControlCondFmtChangedRule = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var idp = s.idPrefix;
+  var list = /** @type {any} */ ((document as any).getElementById(idp + "condfmtlist"));
+  var id = list.options[list.selectedIndex] ? list.options[list.selectedIndex].value : "";
+  var rule = null;
+  for (var i = 0; i < s.sheet.condfmtRules.length; i++) {
+    if (s.sheet.condfmtRules[i].id + "" == id) {
+      rule = s.sheet.condfmtRules[i];
+      break;
+    }
+  }
+  var set = function (fieldId: string, value: string) {
+    /** @type {any} */ ((document as any).getElementById(idp + fieldId)).value = value;
+  };
+  var setChecked = function (fieldId: string, checked: boolean) {
+    /** @type {any} */ ((document as any).getElementById(idp + fieldId)).checked = checked;
+  };
+  if (rule) {
+    set("condfmtrange", rule.range);
+    set("condfmttype", rule.type);
+    set("condfmtop", rule.op);
+    set("condfmtvalue1", rule.type == "formula" ? rule.formula : rule.value1);
+    set("condfmtvalue2", rule.value2);
+    set("condfmtcolor", rule.style.color ? s.sheet.colors[rule.style.color] : "");
+    set("condfmtbgcolor", rule.style.bgcolor ? s.sheet.colors[rule.style.bgcolor] : "");
+    set("condfmtfont", rule.style.font ? s.sheet.fonts[rule.style.font] : "");
+    setChecked("condfmtstop", !!rule.stopIfTrue);
+  } else {
+    set("condfmtrange", s.editor && s.editor.ecell ? s.editor.ecell.coord : "A1");
+    set("condfmttype", "cellis");
+    set("condfmtop", "gt");
+    set("condfmtvalue1", "");
+    set("condfmtvalue2", "");
+    set("condfmtcolor", "");
+    set("condfmtbgcolor", "");
+    set("condfmtfont", "");
+    setChecked("condfmtstop", false);
+  }
+};
+
+SpreadsheetControlSC.SpreadsheetControlCondFmtSave = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var idp = s.idPrefix;
+  var get = function (fieldId: string) {
+    return /** @type {any} */ ((document as any).getElementById(idp + fieldId)).value;
+  };
+  var getChecked = function (fieldId: string) {
+    return /** @type {any} */ ((document as any).getElementById(idp + fieldId)).checked;
+  };
+  var range = get("condfmtrange");
+  var type = get("condfmttype");
+  if (range == "" || type == "") return;
+  // ParseRange never throws (it clamps garbage input to NaN/0 coords
+  // instead), so a malformed range must be caught by validating the
+  // parsed bounds are real positive coordinates, not by try/catch.
+  var parsedRange = SocialCalc.ParseRange(range);
+  if (
+    !(parsedRange.cr1.col > 0) ||
+    !(parsedRange.cr1.row > 0) ||
+    !(parsedRange.cr2.col > 0) ||
+    !(parsedRange.cr2.row > 0)
+  ) {
+    alert(SocialCalc.LocalizeString("Invalid range: ") + range);
+    return;
+  }
+  var op = get("condfmtop");
+  var value1 = type == "formula" ? "" : get("condfmtvalue1");
+  var value2 = get("condfmtvalue2");
+  var formula = type == "formula" ? get("condfmtvalue1") : "";
+  var stopIfTrue = getChecked("condfmtstop") ? "1" : "0";
+  // Colors/fonts are only ever stored as validated sheet-palette indices
+  // (GetStyleNum), never raw CSS: identical policy to every other cell
+  // style attribute (color/bgcolor/font) set via the Format tab.
+  var colorText = get("condfmtcolor");
+  var bgcolorText = get("condfmtbgcolor");
+  var fontText = get("condfmtfont");
+  var color = colorText ? s.sheet.GetStyleNum("color", colorText) : 0;
+  var bgcolor = bgcolorText ? s.sheet.GetStyleNum("color", bgcolorText) : 0;
+  var font = fontText ? s.sheet.GetStyleNum("font", fontText) : 0;
+
+  var fields = [
+    range,
+    type,
+    op,
+    value1,
+    value2,
+    formula,
+    stopIfTrue,
+    font,
+    color,
+    bgcolor,
+    0,
+    0,
+    0,
+    0,
+  ].join("\t");
+
+  var list = /** @type {any} */ ((document as any).getElementById(idp + "condfmtlist"));
+  var id = list.options[list.selectedIndex] ? list.options[list.selectedIndex].value : "";
+  var cmd;
+  if (id) {
+    cmd = "condfmt update " + id + " " + fields;
+  } else {
+    id = s.sheet.condfmtNextId;
+    cmd = "condfmt add " + id + " " + fields;
+  }
+  s.ExecuteCommand(cmd);
+  SocialCalc.SpreadsheetControlCondFmtFillList();
+  var newlist = /** @type {any} */ ((document as any).getElementById(idp + "condfmtlist"));
+  SocialCalc.SelectOptionByValue(newlist, id + "");
+  SocialCalc.SpreadsheetControlCondFmtChangedRule();
+};
+
+SpreadsheetControlSC.SpreadsheetControlCondFmtDelete = function () {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var idp = s.idPrefix;
+  var list = /** @type {any} */ ((document as any).getElementById(idp + "condfmtlist"));
+  var id = list.options[list.selectedIndex] ? list.options[list.selectedIndex].value : "";
+  if (id) {
+    s.ExecuteCommand("condfmt delete " + id);
+  }
+  SocialCalc.SpreadsheetControlCondFmtFillList();
+  var newlist = /** @type {any} */ ((document as any).getElementById(idp + "condfmtlist"));
+  SocialCalc.SelectOptionByValue(newlist, "");
+  SocialCalc.SpreadsheetControlCondFmtChangedRule();
+};
+
+/** @param {string} direction */
+SpreadsheetControlSC.SpreadsheetControlCondFmtMove = function (direction: any) {
+  var s = SocialCalc.GetSpreadsheetControlObject() as any;
+  var idp = s.idPrefix;
+  var list = /** @type {any} */ ((document as any).getElementById(idp + "condfmtlist"));
+  var id = list.options[list.selectedIndex] ? list.options[list.selectedIndex].value : "";
+  if (!id) return;
+  s.ExecuteCommand("condfmt move " + id + " " + direction);
+  SocialCalc.SpreadsheetControlCondFmtFillList();
+  var newlist = /** @type {any} */ ((document as any).getElementById(idp + "condfmtlist"));
+  SocialCalc.SelectOptionByValue(newlist, id);
+  SocialCalc.SpreadsheetControlCondFmtChangedRule();
 };
 
 // Clipboard

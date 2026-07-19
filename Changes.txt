@@ -226,10 +226,11 @@ Mutation and formal verification
   Missing reports or unmeasured baselines fail the release gate rather than
   receiving placeholder scores. Each baseline also pins the measured
   full-module mutant count so narrowed reports cannot pass as complete evidence.
-- Retained the three LemmaScript facades and their shipping-oracle tests:
+- Retained the LemmaScript facades and their shipping-oracle tests:
   A1/reference algebra (26 Dafny VCs), evaluation operators (4), lookup
-  precedence (3), and dynamic-array spill semantics (15), for 48 checked
-  Dafny verification conditions in total.
+  precedence (3), dynamic-array spill semantics (15), and conditional-
+  formatting rule match/precedence (8), for 56 checked Dafny verification
+  conditions in total.
 - Hardened mutation-report identity/status validation and the critical-mutant
   disposition registry; equivalent-mutant claims remain explicit,
   source-specific proofs rather than exclusions.
@@ -261,6 +262,14 @@ Formula functions
   evaluator typed arrays, live `SORT`/`UNIQUE`, transactional spill
   ownership with collision handling and recalc grow/shrink, persistence,
   commands, and editor integration, with the public facade verified.
+- Added conditional formatting: ordered, stop-if-true rules per range
+  covering cell-is comparisons, text contains/begins/ends, blanks/nonblanks,
+  duplicate/unique, and custom formula with relative A1 adjustment on copy/
+  fill/insert/delete/move. Style payload uses the existing safe font/color/
+  border palette indices, never raw CSS. Re-evaluates on recalc/value
+  changes and renders without mutating the base cell style; new `condfmt`
+  command family (add/update/delete/move), full undo/redo, save/load, and a
+  "Conditional Formatting" toolbar tab with a rule-editor form.
 - Added RANK(number,ref,[order]), MEDIAN(v1,c1:c2,...), and
   QUARTILE(range,quart) (audreyt/ethercalc#712, audreyt/ethercalc#726).
   RANK: descending by default, ascending with a nonzero order argument; tied

@@ -77,6 +77,51 @@ Copying a range copies an anchor and re-spills it, while copying a spill child
 copies its scalar value. For `UNIQUE(..., ..., TRUE)`, no matching result
 follows the existing `#N/A` policy.
 
+### Conditional formatting
+
+`sheet.condfmtRules` is an ordered array of rules (index 0 = highest
+priority) attached to a range, evaluated in priority order for every
+candidate cell. Supported rule types:
+
+- `cellis` — numeric/lexical comparison against `value1` (or `value1`..`value2`
+  for `op: "between"`) using operators `gt`, `ge`, `lt`, `le`, `eq`, `ne`,
+  `between`.
+- `textcontains`, `textbegins`, `textends` — substring match against `value1`.
+- `blank`, `nonblank` — cell value-type test.
+- `duplicate`, `unique` — occurrence count within the rule's own range.
+- `formula` — a custom boolean formula, relative-adjusted per target cell the
+  same way a copied/filled formula would be (via `OffsetFormulaCoords`), using
+  the rule's range top-left as the anchor.
+
+Each rule's `style` is `{font, color, bgcolor, bt, br, bb, bl}` — the same
+palette-index fields as a cell's own `font`/`color`/`bgcolor`/border
+attributes (`0` means unset), resolved only through `sheet.fonts`/
+`sheet.colors`/`sheet.borderstyles`. Style values are never raw CSS text.
+
+A rule with `stopIfTrue: true` halts evaluation for that cell once matched;
+a rule with `stopIfTrue: false` still contributes any style field a
+higher-priority matching rule left unset, and evaluation continues to the
+next rule. Rendering overlays the resolved style onto the cell's computed
+CSS without mutating the underlying cell object, so it never interferes with
+the cell's own persisted formatting and re-evaluates automatically on every
+recalc/value change and re-render.
+
+Rules are managed with the `condfmt` sheet command:
+
+- `condfmt add <id> <range>\t<type>\t<op>\t<value1>\t<value2>\t<formula>\t<stopIfTrue>\t<font>\t<color>\t<bgcolor>\t<bt>\t<br>\t<bb>\t<bl>`
+- `condfmt update <id> <same tab-delimited fields>`
+- `condfmt delete <id>`
+- `condfmt move <id> up|down`
+
+All four are full undo/redo-integrated commands, and a rule's `range` and
+`formula` are rewritten automatically by copy/fill/insert/delete/move
+operations, exactly like a cell's own formula. Rules persist through
+save/load as `condfmt:` lines, with palette references translated through
+the same compaction pass as cell/sheet style attributes. The bundled
+`SpreadsheetControl`'s "Conditional Formatting" toolbar tab provides a rule
+list plus an add/edit/delete/reorder editor form built entirely on this
+command surface.
+
 ## Trust boundary and host security
 
 SocialCalc has two rendering modes. The legacy mode preserves historical output
@@ -233,7 +278,7 @@ Default `vp test` global setup builds `dist/SocialCalc.instrumented.js` from
 the current source tree before workers start. The shared loader executes that
 UMD through `vm.Script`; Istanbul collects its source counters and enforces
 **100 / 100 / 100 / 100** statements, branches, functions, and lines across
-all eleven shipping modules and the three LemmaScript facades.
+all eleven shipping modules and the five LemmaScript facades.
 
 `vp run test:coverage` remains the explicit V8 diagnostic. Its build appends a
 source-map reference to the generated UMD so V8 ranges can be attributed back
@@ -328,6 +373,16 @@ command system.
 
 Total: **50 Dafny verification conditions**. The complete lookup table row scan
 remains runtime-tested.
+| Facade | Verified surface | Dafny VCs |
+| ------------------------ | ------------------------------------------------------------------ | --------: |
+| `lemma/a1.ts` | A1 clamp/coordinate algebra, absolute references, overflow `#REF!` | 26 |
+| `lemma/eval-ops.ts` | `/` and `&` type/error propagation | 4 |
+| `lemma/lookup-result.ts` | exact-before-wildcard-before-miss lookup precedence | 3 |
+| `lemma/spill.ts` | dynamic-array spill rectangle/claim/resize/UNIQUE/SORT policies | 15 |
+| `lemma/condfmt.ts` | conditional-formatting rule match and ordered stop/precedence | 8 |
+
+Total: **56 Dafny verification conditions**. The complete lookup table row
+scan and rule-scanning/formula-evaluation runtime remain runtime-tested.
 
 | Command                     | Purpose                                                             |
 | --------------------------- | ------------------------------------------------------------------- |
