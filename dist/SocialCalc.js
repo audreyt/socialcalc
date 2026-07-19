@@ -25656,6 +25656,774 @@ More comments yet to come...
     }
     return updatedformula;
   };
+  function isBareIdentifierSheetName(name) {
+    return (
+      /^[A-Za-z_][A-Za-z0-9_.]*$/.test(name) &&
+      !/^\$?[A-Za-z]{1,2}\$?[1-9]\d*$/i.test(name) &&
+      !/^[A-Za-z]{1,2}$/.test(name)
+    );
+  }
+  FormulaRefRoot.RewriteSheetNameInFormula = function (
+    formula,
+    oldSheetName,
+    newSheetName,
+    normalize,
+  ) {
+    const scf = SocialCalc.Formula;
+    const tokentype = scf.TokenType;
+    const token_op = tokentype.op;
+    const token_string = tokentype.string;
+    const token_name = tokentype.name;
+    const tokenOpExpansion = scf.TokenOpExpansion;
+    const parseinfo = scf.ParseFormulaIntoTokens(formula);
+    const normalizedOld = normalize(oldSheetName);
+    let updatedformula = '';
+    let matched = false;
+    let i = 0;
+    while (i < parseinfo.length) {
+      const ttype = parseinfo[i].type;
+      const ttext = parseinfo[i].text;
+      const isNameLike = ttype === token_name || ttype === token_string;
+      const next = parseinfo[i + 1];
+      const followedByBang = next != null && next.type === token_op && next.text === '!';
+      if (isNameLike && followedByBang && normalize(ttext) === normalizedOld) {
+        matched = true;
+        if (newSheetName === null) {
+          let j = i + 2;
+          if (parseinfo[j] && parseinfo[j].type === tokentype.coord) {
+            j += 1;
+            if (
+              parseinfo[j] &&
+              parseinfo[j].type === token_op &&
+              parseinfo[j].text === ':' &&
+              parseinfo[j + 1] &&
+              parseinfo[j + 1].type === tokentype.coord
+            ) {
+              j += 2;
+            }
+          }
+          updatedformula += '#REF!';
+          i = j;
+          continue;
+        }
+        updatedformula += isBareIdentifierSheetName(newSheetName)
+          ? newSheetName
+          : quoteFormulaString(newSheetName);
+        i += 1;
+        continue;
+      }
+      if (ttype === token_string) {
+        updatedformula += quoteFormulaString(ttext);
+      } else if (ttype === token_op) {
+        updatedformula += tokenOpExpansion[ttext] || ttext;
+      } else {
+        updatedformula += ttext;
+      }
+      i += 1;
+    }
+    return matched ? updatedformula : formula;
+  };
+
+  // Optional in-core multi-sheet workbook container.
+  // Shipping source (not a parallel oracle). Concatenated after socialcalc-3.js
+  // (needs SocialCalc.Sheet/UndoStack), formula1.js/formula-operand.js (needs
+  // SocialCalc.Formula.NormalizeSheetName/SheetCache), and formula-ref.js
+  // (needs SocialCalc.RewriteSheetNameInFormula). Pure addition: no existing
+  // single-sheet API, save format, or byte output is touched by this file.
+  //
+  // A SocialCalc.Workbook is an ordered collection of uniquely-named
+  // SocialCalc.Sheet instances plus workbook-level metadata (active sheet,
+  // visibility, per-sheet editor-settings blob, workbook-level undo/redo).
+  // Using SocialCalc.Workbook is entirely opt-in: SocialCalc.Sheet,
+  // SocialCalc.SpreadsheetControl's single-sheet constructor, and every
+  // existing save/load byte format are unaffected by this module's presence.
+  //
+  // (c) Copyright 2026 SocialCalc contributors.
+  // Artistic License 2.0: http://socialcalc.org/licenses/al-20/.
+
+  // Runtime root is created by module-wrapper-top.js. Ambient declare namespace is
+  // types-only; progressive assignment of these members uses a named mutable view
+  // so we never redeclare `var SocialCalc` (which collapses the namespace in tsc).
+  // Follows socialcalcviewer.ts's WorkbookConstructor-as-interface pattern:
+  // implementation assigns a classic `function(...) { this... }`.
+
+  const WorkbookRoot = SocialCalc;
+  WorkbookRoot.WorkbookNameValidation = {
+    OK: 0,
+    EMPTY: 1,
+    TOO_LONG: 2,
+    INVALID_CHARS: 3,
+    DUPLICATE: 4,
+  };
+  WorkbookRoot.WorkbookMaxSheetNameLength = 255;
+  WorkbookRoot.WorkbookForbiddenSheetNameChars = [
+    ':',
+    '!',
+    "'",
+    '"',
+    '[',
+    ']',
+    '\\',
+    '/',
+    '?',
+    '*',
+  ];
+  WorkbookRoot.WorkbookNormalizeSheetName = function (name) {
+    return SocialCalc.Formula.NormalizeSheetName(name.trim());
+  };
+  WorkbookRoot.WorkbookValidateSheetName = function (workbook, name, excludeKey) {
+    const wv = WorkbookRoot.WorkbookNameValidation;
+    const trimmed = name.trim();
+    if (trimmed.length === 0) return wv.EMPTY;
+    if (name.length > WorkbookRoot.WorkbookMaxSheetNameLength) return wv.TOO_LONG;
+    const forbidden = WorkbookRoot.WorkbookForbiddenSheetNameChars;
+    for (let i = 0; i < name.length; i++) {
+      if (forbidden.indexOf(name.charAt(i)) !== -1) return wv.INVALID_CHARS;
+    }
+    const key = WorkbookRoot.WorkbookNormalizeSheetName(trimmed);
+    const existing = workbook.sheets[key];
+    if (existing && key !== excludeKey) return wv.DUPLICATE;
+    return wv.OK;
+  };
+  WorkbookRoot.WorkbookCanHideAnotherSheet = function (visibleCount) {
+    return visibleCount > 1;
+  };
+  WorkbookRoot.WorkbookCanDeleteAnotherSheet = function (totalCount) {
+    return totalCount > 1;
+  };
+  WorkbookRoot.Workbook = function () {
+    SocialCalc.ResetWorkbook(this);
+  };
+  WorkbookRoot.ResetWorkbook = function (workbook) {
+    workbook.sheetOrder = [];
+    workbook.sheets = {};
+    workbook.activeSheetName = null;
+    workbook.changes = new SocialCalc.UndoStack();
+    workbook.statuscallback = null;
+    workbook.statuscallbackparams = null;
+  };
+  function wbEntry(workbook, key) {
+    return workbook.sheets[key];
+  }
+  function wbStatus(workbook, status, arg) {
+    if (workbook.statuscallback) {
+      workbook.statuscallback(workbook, status, arg, workbook.statuscallbackparams);
+    }
+  }
+  function wbCacheRegister(key, sheet) {
+    const sfsc = SocialCalc.Formula.SheetCache;
+    sfsc.sheets[key] = {
+      sheet,
+      recalcstate: sfsc.constants.asloaded,
+      name: key,
+    };
+  }
+  function wbCacheUnregister(key) {
+    delete SocialCalc.Formula.SheetCache.sheets[key];
+  }
+  function wbRewriteSheetFormulas(sheet, oldName, newName) {
+    const normalize = WorkbookRoot.WorkbookNormalizeSheetName;
+    for (const coord in sheet.cells) {
+      const cell = sheet.cells[coord];
+      if (!cell || cell.datatype !== 'f') continue;
+      const oldformula = cell.formula;
+      const newformula = SocialCalc.RewriteSheetNameInFormula(
+        oldformula,
+        oldName,
+        newName,
+        normalize,
+      );
+      if (newformula !== oldformula) {
+        cell.formula = newformula;
+        delete cell.parseinfo;
+      }
+    }
+    for (const name in sheet.names) {
+      const def = sheet.names[name].definition;
+      let prefix = '';
+      let body = def;
+      if (body.charAt(0) === '=') {
+        prefix = '=';
+        body = body.substring(1);
+      }
+      const newbody = SocialCalc.RewriteSheetNameInFormula(body, oldName, newName, normalize);
+      if (newbody !== body) {
+        sheet.names[name].definition = prefix + newbody;
+      }
+    }
+  }
+  function wbSnapshotFormulas(sheet) {
+    const before = {};
+    for (const coord in sheet.cells) {
+      const cell = sheet.cells[coord];
+      if (cell && cell.datatype === 'f') before[coord] = cell.formula;
+    }
+    return before;
+  }
+  function wbDiffFormulasIntoUndo(workbook, sheetName, sheet, before) {
+    for (const coord in before) {
+      const cell = sheet.cells[coord];
+      if (cell.formula !== before[coord]) {
+        workbook.changes.AddUndo(
+          'workbook restoreformula ' +
+            SocialCalc.encodeForSave(sheetName) +
+            ' ' +
+            coord +
+            ' ' +
+            SocialCalc.encodeForSave(before[coord]),
+        );
+      }
+    }
+  }
+  WorkbookRoot.Workbook.prototype.AddSheet = function (name, sheet, saveundo = true) {
+    const code = SocialCalc.WorkbookValidateSheetName(this, name);
+    if (code !== SocialCalc.WorkbookNameValidation.OK) return code;
+    const trimmed = name.trim();
+    const key = SocialCalc.WorkbookNormalizeSheetName(trimmed);
+    const newSheet = sheet || new SocialCalc.Sheet();
+    const entry = {
+      name: trimmed,
+      key,
+      sheet: newSheet,
+      visible: true,
+      editorSettings: '',
+    };
+    this.sheets[key] = entry;
+    this.sheetOrder.push(trimmed);
+    wbCacheRegister(key, newSheet);
+    if (this.activeSheetName == null) {
+      this.activeSheetName = trimmed;
+    }
+    if (saveundo) {
+      this.changes.PushChange('addsheet');
+      this.changes.AddDo('workbook addsheet ' + SocialCalc.encodeForSave(trimmed));
+      this.changes.AddUndo('workbook deletesheet ' + SocialCalc.encodeForSave(trimmed));
+    }
+    wbStatus(this, 'addsheet', { name: trimmed });
+    return SocialCalc.WorkbookNameValidation.OK;
+  };
+  WorkbookRoot.Workbook.prototype.DeleteSheet = function (name, saveundo = true) {
+    const key = SocialCalc.WorkbookNormalizeSheetName(name);
+    const entry = wbEntry(this, key);
+    if (!entry) return false;
+    if (!SocialCalc.WorkbookCanDeleteAnotherSheet(this.sheetOrder.length)) return false;
+    if (entry.visible) {
+      let visibleCount = 0;
+      for (const n of this.sheetOrder) {
+        if (this.sheets[SocialCalc.WorkbookNormalizeSheetName(n)].visible) visibleCount++;
+      }
+      if (!SocialCalc.WorkbookCanHideAnotherSheet(visibleCount)) return false;
+    }
+    const deletedIndex = this.sheetOrder.indexOf(entry.name);
+    const wasActive = this.activeSheetName === entry.name;
+    const savedSheetText = entry.sheet.CreateSheetSave();
+    const savedVisible = entry.visible;
+    const savedEditorSettings = entry.editorSettings;
+    if (saveundo) this.changes.PushChange('deletesheet');
+    for (const otherKey in this.sheets) {
+      if (otherKey === key) continue;
+      const other = this.sheets[otherKey];
+      const before = saveundo ? wbSnapshotFormulas(other.sheet) : {};
+      wbRewriteSheetFormulas(other.sheet, entry.name, null);
+      if (saveundo) wbDiffFormulasIntoUndo(this, other.name, other.sheet, before);
+    }
+    delete this.sheets[key];
+    this.sheetOrder.splice(deletedIndex, 1);
+    wbCacheUnregister(key);
+    if (wasActive) {
+      let next = null;
+      for (let i = deletedIndex; i < this.sheetOrder.length; i++) {
+        const n = this.sheetOrder[i];
+        if (this.sheets[SocialCalc.WorkbookNormalizeSheetName(n)].visible) {
+          next = n;
+          break;
+        }
+      }
+      if (next == null) {
+        for (let i = deletedIndex - 1; i >= 0; i--) {
+          const n = this.sheetOrder[i];
+          if (this.sheets[SocialCalc.WorkbookNormalizeSheetName(n)].visible) {
+            next = n;
+            break;
+          }
+        }
+      }
+      this.activeSheetName = next;
+    }
+    if (saveundo) {
+      this.changes.AddDo('workbook deletesheet ' + SocialCalc.encodeForSave(entry.name));
+      if (wasActive) {
+        this.changes.AddUndo('workbook setactivesheet ' + SocialCalc.encodeForSave(entry.name));
+      }
+      this.changes.AddUndo(
+        'workbook restoresheet ' +
+          SocialCalc.encodeForSave(entry.name) +
+          ' ' +
+          deletedIndex +
+          ' ' +
+          (savedVisible ? 'yes' : 'no') +
+          ' ' +
+          SocialCalc.encodeForSave(savedEditorSettings) +
+          ' ' +
+          SocialCalc.encodeForSave(savedSheetText),
+      );
+    }
+    wbStatus(this, 'deletesheet', { name: entry.name });
+    return true;
+  };
+  WorkbookRoot.Workbook.prototype.RenameSheet = function (oldName, newName, saveundo = true) {
+    const oldKey = SocialCalc.WorkbookNormalizeSheetName(oldName);
+    const entry = wbEntry(this, oldKey);
+    if (!entry) return SocialCalc.WorkbookNameValidation.EMPTY;
+    const code = SocialCalc.WorkbookValidateSheetName(this, newName, oldKey);
+    if (code !== SocialCalc.WorkbookNameValidation.OK) return code;
+    const trimmedNew = newName.trim();
+    const newKey = SocialCalc.WorkbookNormalizeSheetName(trimmedNew);
+    const originalName = entry.name;
+    if (saveundo) this.changes.PushChange('renamesheet');
+    for (const anyKey in this.sheets) {
+      const target = this.sheets[anyKey];
+      const before = saveundo ? wbSnapshotFormulas(target.sheet) : {};
+      wbRewriteSheetFormulas(target.sheet, originalName, trimmedNew);
+      if (saveundo) wbDiffFormulasIntoUndo(this, target.name, target.sheet, before);
+    }
+    delete this.sheets[oldKey];
+    wbCacheUnregister(oldKey);
+    entry.name = trimmedNew;
+    entry.key = newKey;
+    this.sheets[newKey] = entry;
+    wbCacheRegister(newKey, entry.sheet);
+    const orderIdx = this.sheetOrder.findIndex(
+      (n) => SocialCalc.WorkbookNormalizeSheetName(n) === oldKey,
+    );
+    this.sheetOrder[orderIdx] = trimmedNew;
+    if (this.activeSheetName === originalName) {
+      this.activeSheetName = trimmedNew;
+    }
+    if (saveundo) {
+      this.changes.AddDo(
+        'workbook renamesheet ' +
+          SocialCalc.encodeForSave(originalName) +
+          ' ' +
+          SocialCalc.encodeForSave(trimmedNew),
+      );
+      this.changes.AddUndo(
+        'workbook renamesheet ' +
+          SocialCalc.encodeForSave(trimmedNew) +
+          ' ' +
+          SocialCalc.encodeForSave(originalName),
+      );
+    }
+    wbStatus(this, 'renamesheet', {
+      oldName: originalName,
+      newName: trimmedNew,
+    });
+    return SocialCalc.WorkbookNameValidation.OK;
+  };
+  WorkbookRoot.Workbook.prototype.ReorderSheet = function (name, newIndex, saveundo = true) {
+    const key = SocialCalc.WorkbookNormalizeSheetName(name);
+    const entry = wbEntry(this, key);
+    if (!entry) return false;
+    const oldIndex = this.sheetOrder.indexOf(entry.name);
+    let clamped = newIndex;
+    if (clamped < 0) clamped = 0;
+    if (clamped > this.sheetOrder.length - 1) clamped = this.sheetOrder.length - 1;
+    if (clamped === oldIndex) return true;
+    this.sheetOrder.splice(oldIndex, 1);
+    this.sheetOrder.splice(clamped, 0, entry.name);
+    if (saveundo) {
+      this.changes.PushChange('reordersheet');
+      this.changes.AddDo(
+        'workbook reordersheet ' + SocialCalc.encodeForSave(entry.name) + ' ' + clamped,
+      );
+      this.changes.AddUndo(
+        'workbook reordersheet ' + SocialCalc.encodeForSave(entry.name) + ' ' + oldIndex,
+      );
+    }
+    wbStatus(this, 'reordersheet', {
+      name: entry.name,
+      index: clamped,
+    });
+    return true;
+  };
+  WorkbookRoot.Workbook.prototype.HideSheet = function (name, saveundo = true) {
+    const key = SocialCalc.WorkbookNormalizeSheetName(name);
+    const entry = wbEntry(this, key);
+    if (!entry || !entry.visible) return false;
+    let visibleCount = 0;
+    for (const n of this.sheetOrder) {
+      if (this.sheets[SocialCalc.WorkbookNormalizeSheetName(n)].visible) visibleCount++;
+    }
+    if (!SocialCalc.WorkbookCanHideAnotherSheet(visibleCount)) return false;
+    entry.visible = false;
+    const wasActive = this.activeSheetName === entry.name;
+    if (wasActive) {
+      const idx = this.sheetOrder.indexOf(entry.name);
+      let next = null;
+      for (let i = idx + 1; i < this.sheetOrder.length; i++) {
+        const n = this.sheetOrder[i];
+        if (this.sheets[SocialCalc.WorkbookNormalizeSheetName(n)].visible) {
+          next = n;
+          break;
+        }
+      }
+      if (next == null) {
+        for (let i = idx - 1; i >= 0; i--) {
+          const n = this.sheetOrder[i];
+          if (this.sheets[SocialCalc.WorkbookNormalizeSheetName(n)].visible) {
+            next = n;
+            break;
+          }
+        }
+      }
+      this.activeSheetName = next;
+    }
+    if (saveundo) {
+      this.changes.PushChange('hidesheet');
+      this.changes.AddDo('workbook hidesheet ' + SocialCalc.encodeForSave(entry.name));
+      if (wasActive) {
+        this.changes.AddUndo('workbook setactivesheet ' + SocialCalc.encodeForSave(entry.name));
+      }
+      this.changes.AddUndo('workbook unhidesheet ' + SocialCalc.encodeForSave(entry.name));
+    }
+    wbStatus(this, 'hidesheet', { name: entry.name });
+    return true;
+  };
+  WorkbookRoot.Workbook.prototype.UnhideSheet = function (name, saveundo = true) {
+    const key = SocialCalc.WorkbookNormalizeSheetName(name);
+    const entry = wbEntry(this, key);
+    if (!entry || entry.visible) return false;
+    entry.visible = true;
+    if (saveundo) {
+      this.changes.PushChange('unhidesheet');
+      this.changes.AddDo('workbook unhidesheet ' + SocialCalc.encodeForSave(entry.name));
+      this.changes.AddUndo('workbook hidesheet ' + SocialCalc.encodeForSave(entry.name));
+    }
+    wbStatus(this, 'unhidesheet', { name: entry.name });
+    return true;
+  };
+  WorkbookRoot.Workbook.prototype.SetActiveSheet = function (name, saveundo = true) {
+    const key = SocialCalc.WorkbookNormalizeSheetName(name);
+    const entry = wbEntry(this, key);
+    if (!entry || !entry.visible) return false;
+    if (this.activeSheetName === entry.name) return true;
+    const previous = this.activeSheetName;
+    this.activeSheetName = entry.name;
+    if (saveundo) {
+      this.changes.PushChange('setactivesheet');
+      this.changes.AddDo('workbook setactivesheet ' + SocialCalc.encodeForSave(entry.name));
+      this.changes.AddUndo('workbook setactivesheet ' + SocialCalc.encodeForSave(previous));
+    }
+    wbStatus(this, 'setactivesheet', { name: entry.name });
+    return true;
+  };
+  WorkbookRoot.Workbook.prototype.GetSheet = function (name) {
+    const entry = wbEntry(this, SocialCalc.WorkbookNormalizeSheetName(name));
+    return entry ? entry.sheet : null;
+  };
+  WorkbookRoot.Workbook.prototype.GetActiveSheet = function () {
+    if (this.activeSheetName == null) return null;
+    return this.GetSheet(this.activeSheetName);
+  };
+  WorkbookRoot.Workbook.prototype.IsSheetVisible = function (name) {
+    const entry = wbEntry(this, SocialCalc.WorkbookNormalizeSheetName(name));
+    return !!entry && entry.visible;
+  };
+  WorkbookRoot.Workbook.prototype.SetSheetEditorSettings = function (name, settings) {
+    const entry = wbEntry(this, SocialCalc.WorkbookNormalizeSheetName(name));
+    if (entry) entry.editorSettings = settings;
+  };
+  WorkbookRoot.Workbook.prototype.GetSheetEditorSettings = function (name) {
+    const entry = wbEntry(this, SocialCalc.WorkbookNormalizeSheetName(name));
+    return entry ? entry.editorSettings : '';
+  };
+  WorkbookRoot.Workbook.prototype.ListSheets = function () {
+    return this.sheetOrder.map((name) => {
+      const entry = wbEntry(this, SocialCalc.WorkbookNormalizeSheetName(name));
+      return {
+        name: entry.name,
+        visible: entry.visible,
+      };
+    });
+  };
+  WorkbookRoot.ExecuteWorkbookCommand = function (workbook, cmd, saveundo) {
+    const parts = cmd.split(' ');
+    const what = parts[1];
+    switch (what) {
+      case 'addsheet':
+        workbook.AddSheet(SocialCalc.decodeFromSave(parts.slice(2).join(' ')), null, saveundo);
+        break;
+      case 'deletesheet':
+        workbook.DeleteSheet(SocialCalc.decodeFromSave(parts.slice(2).join(' ')), saveundo);
+        break;
+      case 'renamesheet': {
+        const oldName = SocialCalc.decodeFromSave(parts[2]);
+        const newName = SocialCalc.decodeFromSave(parts.slice(3).join(' '));
+        workbook.RenameSheet(oldName, newName, saveundo);
+        break;
+      }
+      case 'reordersheet': {
+        const name = SocialCalc.decodeFromSave(parts[2]);
+        const index = Number(parts[3]);
+        workbook.ReorderSheet(name, index, saveundo);
+        break;
+      }
+      case 'hidesheet':
+        workbook.HideSheet(SocialCalc.decodeFromSave(parts.slice(2).join(' ')), saveundo);
+        break;
+      case 'unhidesheet':
+        workbook.UnhideSheet(SocialCalc.decodeFromSave(parts.slice(2).join(' ')), saveundo);
+        break;
+      case 'setactivesheet':
+        workbook.SetActiveSheet(SocialCalc.decodeFromSave(parts.slice(2).join(' ')), saveundo);
+        break;
+      case 'restoreformula': {
+        const sname = SocialCalc.decodeFromSave(parts[2]);
+        const coord = parts[3];
+        const formula = SocialCalc.decodeFromSave(parts.slice(4).join(' '));
+        const sheet = workbook.GetSheet(sname);
+        if (sheet) {
+          const cell = sheet.GetAssuredCell(coord);
+          cell.formula = formula;
+          cell.datatype = 'f';
+          delete cell.parseinfo;
+        }
+        break;
+      }
+      case 'restoresheet': {
+        const name = SocialCalc.decodeFromSave(parts[2]);
+        const index = Number(parts[3]);
+        const visible = parts[4] === 'yes';
+        const editorSettings = SocialCalc.decodeFromSave(parts[5]);
+        const savedText = SocialCalc.decodeFromSave(parts.slice(6).join(' '));
+        const restored = new SocialCalc.Sheet();
+        restored.ParseSheetSave(savedText);
+        workbook.AddSheet(name, restored, false);
+        workbook.ReorderSheet(name, index, false);
+        const entry = wbEntry(workbook, SocialCalc.WorkbookNormalizeSheetName(name));
+        entry.visible = visible;
+        entry.editorSettings = editorSettings;
+        break;
+      }
+      default:
+        break;
+    }
+  };
+  WorkbookRoot.Workbook.prototype.WorkbookUndo = function () {
+    const tos = this.changes.TOS();
+    if (!tos) return;
+    for (let i = tos.undo.length - 1; i >= 0; i--) {
+      SocialCalc.ExecuteWorkbookCommand(this, tos.undo[i], false);
+    }
+    this.changes.Undo();
+  };
+  WorkbookRoot.Workbook.prototype.WorkbookRedo = function () {
+    if (!this.changes.Redo()) return;
+    const tos = this.changes.TOS();
+    for (let i = 0; i < tos.command.length; i++) {
+      SocialCalc.ExecuteWorkbookCommand(this, tos.command[i], false);
+    }
+  };
+  function wbRecalcAll(workbook, callback) {
+    const names = workbook.sheetOrder.slice();
+    if (names.length === 0) {
+      if (callback) callback();
+      return;
+    }
+    const maxRounds = names.length;
+    function runRound(roundsLeft) {
+      let idx = 0;
+      let roundChanged = false;
+      function attachOnce(sheet) {
+        const prevcb = sheet.statuscallback;
+        const prevparams = sheet.statuscallbackparams;
+        sheet.statuscallback = function (data, status, arg, _params) {
+          if (prevcb) prevcb(data, status, arg, prevparams);
+          if (status === 'calcfinished') {
+            sheet.statuscallback = prevcb;
+            sheet.statuscallbackparams = prevparams;
+            if (sheet.recalcchangedavalue) roundChanged = true;
+            onOneDone();
+          }
+        };
+      }
+      function startSheet(i) {
+        const sheet = workbook.GetSheet(names[i]);
+        if (!sheet) {
+          idx = i + 1;
+          onOneDone();
+          return;
+        }
+        sheet.recalcchangedavalue = false;
+        attachOnce(sheet);
+        sheet.RecalcSheet();
+      }
+      function onOneDone() {
+        idx++;
+        if (idx < names.length) {
+          startSheet(idx);
+        } else if (roundChanged && roundsLeft > 1) {
+          runRound(roundsLeft - 1);
+        } else {
+          wbStatus(workbook, 'recalcallfinished', null);
+          if (callback) callback();
+        }
+      }
+      startSheet(0);
+    }
+    runRound(maxRounds);
+  }
+  WorkbookRoot.Workbook.prototype.RecalcAll = function (callback) {
+    wbRecalcAll(this, callback);
+  };
+  const WORKBOOK_SAVE_BOUNDARY = 'SocialCalcWorkbookSave';
+  WorkbookRoot.CreateWorkbookSave = function (workbook) {
+    const enc = SocialCalc.encodeForSave;
+    const lines = ['# SocialCalc Workbook Save', 'version:1.0'];
+    if (workbook.activeSheetName != null) {
+      lines.push('active:' + enc(workbook.activeSheetName));
+    }
+    const names = workbook.sheetOrder;
+    for (const name of names) {
+      const entry = workbook.sheets[SocialCalc.WorkbookNormalizeSheetName(name)];
+      lines.push('sheet:' + enc(entry.name) + ':visible:' + (entry.visible ? 'yes' : 'no'));
+    }
+    for (const name of names) {
+      const entry = workbook.sheets[SocialCalc.WorkbookNormalizeSheetName(name)];
+      if (entry.editorSettings) {
+        lines.push('editorsettings:' + enc(entry.name) + ':' + enc(entry.editorSettings));
+      }
+    }
+    lines.push('');
+    let result =
+      'socialcalc:workbook:version:1.0\n' +
+      'MIME-Version: 1.0\nContent-Type: multipart/mixed; boundary=' +
+      WORKBOOK_SAVE_BOUNDARY +
+      '\n' +
+      '--' +
+      WORKBOOK_SAVE_BOUNDARY +
+      '\nContent-type: text/plain; charset=UTF-8\n\n' +
+      lines.join('\n');
+    for (const name of names) {
+      const entry = workbook.sheets[SocialCalc.WorkbookNormalizeSheetName(name)];
+      result +=
+        '--' +
+        WORKBOOK_SAVE_BOUNDARY +
+        '\nContent-type: text/plain; charset=UTF-8\n\n' +
+        entry.sheet.CreateSheetSave();
+    }
+    result += '--' + WORKBOOK_SAVE_BOUNDARY + '--\n';
+    return result;
+  };
+  WorkbookRoot.DecodeWorkbookSave = function (str) {
+    const dec = SocialCalc.decodeFromSave;
+    const pos1 = str.search(/^MIME-Version:\s1\.0/im);
+    if (pos1 < 0) return null;
+    const mpregex = /^Content-Type:\s*multipart\/mixed;\s*boundary=(\S+)/gim;
+    mpregex.lastIndex = pos1;
+    const mpmatch = mpregex.exec(str);
+    if (!mpmatch || mpregex.lastIndex <= 0) return null;
+    const boundary = mpmatch[1];
+    const boundaryregex = new RegExp('^--' + boundary + '(?:\r\n|\n)', 'mg');
+    boundaryregex.lastIndex = mpregex.lastIndex;
+    if (!boundaryregex.exec(str)) return null;
+    const blanklineregex = /(?:\r\n|\n)(?:\r\n|\n)/gm;
+    blanklineregex.lastIndex = boundaryregex.lastIndex;
+    const blankmatch = blanklineregex.exec(str);
+    if (!blankmatch) return null;
+    let start = blanklineregex.lastIndex;
+    boundaryregex.lastIndex = start;
+    const headerEndMatch = boundaryregex.exec(str);
+    if (!headerEndMatch) return null;
+    let ending = headerEndMatch.index;
+    const headerLines = str.substring(start, ending).split(/\r\n|\n/);
+    let active = null;
+    const sheets = [];
+    const editorSettingsMap = {};
+    for (const line of headerLines) {
+      const parts = line.split(':');
+      switch (parts[0]) {
+        case 'active':
+          active = dec(parts.slice(1).join(':'));
+          break;
+        case 'sheet':
+          sheets.push({
+            name: dec(parts[1]),
+            visible: parts[3] === 'yes',
+            editorSettings: '',
+          });
+          break;
+        case 'editorsettings':
+          editorSettingsMap[dec(parts[1])] = dec(parts.slice(2).join(':'));
+          break;
+        default:
+          break;
+      }
+    }
+    for (const entry of sheets) {
+      if (Object.prototype.hasOwnProperty.call(editorSettingsMap, entry.name)) {
+        entry.editorSettings = editorSettingsMap[entry.name];
+      }
+    }
+    const sheetTexts = [];
+    for (let i = 0; i < sheets.length; i++) {
+      blanklineregex.lastIndex = ending;
+      const partBlank = blanklineregex.exec(str);
+      if (!partBlank) return null;
+      start = blanklineregex.lastIndex;
+      if (i === sheets.length - 1) {
+        const lastregex = new RegExp('^--' + boundary + '--$', 'mg');
+        lastregex.lastIndex = start;
+        const lastmatch = lastregex.exec(str);
+        if (!lastmatch) return null;
+        ending = lastmatch.index;
+      } else {
+        boundaryregex.lastIndex = start;
+        const nextmatch = boundaryregex.exec(str);
+        if (!nextmatch) return null;
+        ending = nextmatch.index;
+      }
+      sheetTexts.push(str.substring(start, ending));
+    }
+    return {
+      active,
+      sheets,
+      sheetTexts,
+    };
+  };
+  WorkbookRoot.LoadWorkbookSave = function (workbook, str) {
+    const decoded = SocialCalc.DecodeWorkbookSave(str);
+    if (!decoded || decoded.sheets.length === 0) return;
+    const staged = new SocialCalc.Workbook();
+    for (let i = 0; i < decoded.sheets.length; i++) {
+      const meta = decoded.sheets[i];
+      const sheet = new SocialCalc.Sheet();
+      sheet.ParseSheetSave(decoded.sheetTexts[i]);
+      const code = staged.AddSheet(meta.name, sheet, false);
+      if (code !== SocialCalc.WorkbookNameValidation.OK) {
+        for (const key in staged.sheets) wbCacheUnregister(key);
+        return;
+      }
+      const entry = wbEntry(staged, SocialCalc.WorkbookNormalizeSheetName(meta.name));
+      entry.visible = meta.visible;
+      entry.editorSettings = meta.editorSettings;
+    }
+    if (
+      decoded.active != null &&
+      wbEntry(staged, SocialCalc.WorkbookNormalizeSheetName(decoded.active))
+    ) {
+      staged.activeSheetName = decoded.active;
+    } else {
+      const firstVisible = staged.sheetOrder.find((n) => staged.IsSheetVisible(n));
+      staged.activeSheetName = firstVisible || staged.sheetOrder[0];
+    }
+    for (const key in workbook.sheets) wbCacheUnregister(key);
+    for (const key in staged.sheets) wbCacheRegister(key, staged.sheets[key].sheet);
+    workbook.sheetOrder = staged.sheetOrder;
+    workbook.sheets = staged.sheets;
+    workbook.activeSheetName = staged.activeSheetName;
+    workbook.changes = new SocialCalc.UndoStack();
+  };
 
   // Opt this module into TypeScript strict checking via the r2scout config.
   // In-place TypeScript conversion of socialcalcpopup.js (SocialCalc global script).
@@ -30865,6 +31633,241 @@ not governed by the terms of the CPAL.
     var editbox = document.getElementById(idprefix);
     SocialCalc.KeyboardFocus();
     editbox.parentNode.removeChild(editbox);
+  };
+
+  // Optional SpreadsheetControl workbook-mode UI: accessible sheet tabs plus
+  // add/rename/delete/reorder context actions, layered on top of the existing
+  // single-sheet SpreadsheetControl. Concatenated after workbook.js (needs
+  // SocialCalc.Workbook) and socialcalcspreadsheetcontrol.js (needs
+  // SocialCalc.SpreadsheetControl/AssignID/GetSpreadsheetControlObject).
+  //
+  // Calling EnableWorkbookMode is the ONLY way any of this code runs: a
+  // SpreadsheetControl that never calls it behaves exactly as before —
+  // constructor, InitializeSpreadsheetControl, and every existing method are
+  // untouched. This module only ADDS spreadsheet.workbookState and four new
+  // methods to the SpreadsheetControl prototype.
+  //
+  // (c) Copyright 2026 SocialCalc contributors.
+  // Artistic License 2.0: http://socialcalc.org/licenses/al-20/.
+
+  const WorkbookUiRoot = SocialCalc;
+  function wbUiPersistCurrentEditorSettings(spreadsheet) {
+    const state = spreadsheet.workbookState;
+    if (!state || state.renderedActiveName == null) return;
+    state.workbook.SetSheetEditorSettings(
+      state.renderedActiveName,
+      spreadsheet.editor.SaveEditorSettings(),
+    );
+  }
+  WorkbookUiRoot.SpreadsheetControlEnableWorkbookMode = function (spreadsheet, workbook) {
+    let wb = workbook;
+    if (!wb) {
+      wb = new SocialCalc.Workbook();
+      wb.AddSheet('Sheet1', spreadsheet.sheet, false);
+    }
+    if (wb.activeSheetName == null) {
+      wb.AddSheet('Sheet1', null, false);
+    }
+    spreadsheet.workbookState = {
+      workbook: wb,
+      tabBarDiv: null,
+      renderedActiveName: null,
+    };
+    const activeSheet = wb.GetActiveSheet();
+    spreadsheet.sheet = activeSheet;
+    spreadsheet.context.sheetobj = activeSheet;
+    activeSheet.statuscallback = spreadsheet.editor.context.sheetobj.statuscallback;
+    activeSheet.statuscallbackparams = spreadsheet.editor;
+    const tabBar = document.createElement('div');
+    tabBar.setAttribute('role', 'tablist');
+    tabBar.setAttribute('aria-label', 'Sheets');
+    SocialCalc.AssignID(spreadsheet, tabBar, 'workbooktabs');
+    wbUiInsertTabBar(spreadsheet, tabBar);
+    spreadsheet.workbookState.tabBarDiv = tabBar;
+    SocialCalc.SpreadsheetControlRenderSheetTabs(spreadsheet);
+    SocialCalc.SpreadsheetControlSwitchToSheet(spreadsheet, wb.activeSheetName);
+  };
+  function wbUiInsertTabBar(spreadsheet, tabBar) {
+    const editorDiv = spreadsheet.editorDiv;
+    if (editorDiv && editorDiv.parentNode) {
+      editorDiv.parentNode.insertBefore(tabBar, editorDiv);
+    } else if (spreadsheet.spreadsheetDiv) {
+      spreadsheet.spreadsheetDiv.insertBefore(tabBar, spreadsheet.spreadsheetDiv.firstChild);
+    }
+  }
+  SocialCalc.SpreadsheetControl.prototype.EnableWorkbookMode = function (workbook) {
+    SocialCalc.SpreadsheetControlEnableWorkbookMode(this, workbook);
+  };
+  SocialCalc.SpreadsheetControl.prototype.IsWorkbookMode = function () {
+    return !!this.workbookState;
+  };
+  WorkbookUiRoot.SpreadsheetControlRenderSheetTabs = function (spreadsheet) {
+    const state = spreadsheet.workbookState;
+    if (!state || !state.tabBarDiv) return;
+    const wb = state.workbook;
+    const tabBar = state.tabBarDiv;
+    while (tabBar.firstChild) {
+      tabBar.removeChild(tabBar.firstChild);
+    }
+    const visible = wb.ListSheets().filter((s) => s.visible);
+    visible.forEach((info, index) => {
+      const tab = document.createElement('button');
+      tab.type = 'button';
+      tab.setAttribute('role', 'tab');
+      tab.textContent = info.name;
+      const isActive = info.name === wb.activeSheetName;
+      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      tab.tabIndex = isActive ? 0 : -1;
+      SocialCalc.AssignID(spreadsheet, tab, 'sheettab-' + info.name);
+      tab.onclick = function () {
+        SocialCalc.SpreadsheetControlSwitchToSheet(spreadsheet, info.name);
+      };
+      tab.ondblclick = function () {
+        wbUiRenamePrompt(spreadsheet, info.name);
+      };
+      tab.oncontextmenu = function (e) {
+        e.preventDefault();
+        wbUiShowContextMenu(spreadsheet, info.name);
+        return false;
+      };
+      tab.onkeydown = function (e) {
+        wbUiHandleTabKeydown(spreadsheet, e, index, visible.length);
+      };
+      tabBar.appendChild(tab);
+    });
+    const addButton = document.createElement('button');
+    addButton.type = 'button';
+    addButton.textContent = '+';
+    addButton.setAttribute('aria-label', 'Add sheet');
+    addButton.tabIndex = 0;
+    SocialCalc.AssignID(spreadsheet, addButton, 'sheettab-add');
+    addButton.onclick = function () {
+      wbUiAddSheetPrompt(spreadsheet);
+    };
+    tabBar.appendChild(addButton);
+  };
+  function wbUiHandleTabKeydown(spreadsheet, e, index, count) {
+    const state = spreadsheet.workbookState;
+    if (!state || !state.tabBarDiv || count === 0) return;
+    let targetIndex = null;
+    switch (e.key) {
+      case 'ArrowLeft':
+        targetIndex = (index - 1 + count) % count;
+        break;
+      case 'ArrowRight':
+        targetIndex = (index + 1) % count;
+        break;
+      case 'Home':
+        targetIndex = 0;
+        break;
+      case 'End':
+        targetIndex = count - 1;
+        break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        SocialCalc.SpreadsheetControlSwitchToSheet(
+          spreadsheet,
+          state.workbook.ListSheets().filter((s) => s.visible)[index].name,
+        );
+        return;
+      default:
+        return;
+    }
+    e.preventDefault();
+    const tabs = state.tabBarDiv.childNodes;
+    const targetTab = tabs[targetIndex];
+    if (targetTab && typeof targetTab.focus === 'function') {
+      targetTab.focus();
+    }
+  }
+  function wbUiAddSheetPrompt(spreadsheet) {
+    const state = spreadsheet.workbookState;
+    if (!state) return;
+    const wb = state.workbook;
+    let n = wb.sheetOrder.length + 1;
+    let candidate = 'Sheet' + n;
+    while (wb.GetSheet(candidate)) {
+      n++;
+      candidate = 'Sheet' + n;
+    }
+    wb.AddSheet(candidate);
+    SocialCalc.SpreadsheetControlRenderSheetTabs(spreadsheet);
+    SocialCalc.SpreadsheetControlSwitchToSheet(spreadsheet, candidate);
+  }
+  function wbUiRenamePrompt(spreadsheet, name) {
+    const state = spreadsheet.workbookState;
+    if (!state || typeof window === 'undefined' || typeof window.prompt !== 'function') return;
+    const proposed = window.prompt('Rename sheet', name);
+    if (proposed == null) return;
+    const code = state.workbook.RenameSheet(name, proposed);
+    if (code === SocialCalc.WorkbookNameValidation.OK) {
+      SocialCalc.SpreadsheetControlRenderSheetTabs(spreadsheet);
+    }
+  }
+  function wbUiShowContextMenu(spreadsheet, name) {
+    const handler = SocialCalc.WorkbookUiContextMenuHandler;
+    if (handler) {
+      handler(spreadsheet, name);
+      return;
+    }
+    const state = spreadsheet.workbookState;
+    if (!state || typeof window === 'undefined' || typeof window.confirm !== 'function') return;
+    if (window.confirm('Delete sheet "' + name + '"?')) {
+      const deleted = state.workbook.DeleteSheet(name);
+      if (deleted) {
+        SocialCalc.SpreadsheetControlRenderSheetTabs(spreadsheet);
+        SocialCalc.SpreadsheetControlSwitchToSheet(spreadsheet, state.workbook.activeSheetName);
+      }
+    }
+  }
+  WorkbookUiRoot.SpreadsheetControlSwitchToSheet = function (spreadsheet, name) {
+    const state = spreadsheet.workbookState;
+    if (!state) return;
+    const wb = state.workbook;
+    if (!wb.IsSheetVisible(name)) return;
+    wbUiPersistCurrentEditorSettings(spreadsheet);
+    wb.SetActiveSheet(name);
+    const newSheet = wb.GetSheet(name);
+    spreadsheet.sheet = newSheet;
+    spreadsheet.context.sheetobj = newSheet;
+    newSheet.statuscallback = SocialCalc.EditorSheetStatusCallback;
+    newSheet.statuscallbackparams = spreadsheet.editor;
+    const savedSettings = wb.GetSheetEditorSettings(name);
+    if (savedSettings) {
+      spreadsheet.editor.LoadEditorSettings(savedSettings);
+    } else {
+      spreadsheet.editor.context.rowpanes = [
+        {
+          first: 1,
+          last: 1,
+        },
+      ];
+      spreadsheet.editor.context.colpanes = [
+        {
+          first: 1,
+          last: 1,
+        },
+      ];
+      spreadsheet.editor.ecell = null;
+      spreadsheet.editor.range = { hasrange: false };
+      spreadsheet.editor.range2 = { hasrange: false };
+      spreadsheet.editor.context.highlights = {};
+      spreadsheet.editor.MoveECell('A1');
+    }
+    state.renderedActiveName = name;
+    spreadsheet.context.needcellskip = true;
+    spreadsheet.context.needprecompute = true;
+    spreadsheet.editor.FitToEditTable();
+    spreadsheet.editor.EditorRenderSheet();
+    spreadsheet.editor.SchedulePositionCalculations();
+    SocialCalc.SpreadsheetControlRenderSheetTabs(spreadsheet);
+  };
+  SocialCalc.SpreadsheetControl.prototype.SwitchToSheet = function (name) {
+    SocialCalc.SpreadsheetControlSwitchToSheet(this, name);
+  };
+  SocialCalc.SpreadsheetControl.prototype.RenderSheetTabs = function () {
+    SocialCalc.SpreadsheetControlRenderSheetTabs(this);
   };
 
   // In-place TypeScript conversion of socialcalcviewer.js (SocialCalc global script).

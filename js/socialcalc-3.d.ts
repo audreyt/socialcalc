@@ -414,6 +414,12 @@ declare namespace SocialCalc {
     rowoffset: number,
   ): string;
   function ReplaceFormulaCoords(formula: string, movedto: { [coord: string]: string }): string;
+  function RewriteSheetNameInFormula(
+    formula: string,
+    oldSheetName: string,
+    newSheetName: string | null,
+    normalize: (name: string) => string,
+  ): string;
 
   const RecalcInfo: {
     sheet: Sheet | null;

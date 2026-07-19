@@ -141,8 +141,10 @@ const coreFiles = [
   "formula-parse.ts",
   "formula-operand.ts",
   "formula-ref.ts",
+  "workbook.ts",
   "socialcalcpopup.js",
   "socialcalcspreadsheetcontrol.js",
+  "workbook-ui.ts",
   "socialcalcviewer.js",
 ];
 

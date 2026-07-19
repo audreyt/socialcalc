@@ -59,6 +59,12 @@ type FormulaRefMutableRoot = {
     rowoffset: number,
   ) => string;
   ReplaceFormulaCoords: (formula: string, movedto: MovedToMap) => string;
+  RewriteSheetNameInFormula: (
+    formula: string,
+    oldSheetName: string,
+    newSheetName: string | null,
+    normalize: (name: string) => string,
+  ) => string;
 };
 
 // One boundary cast: ambient namespace value is progressively filled by concat order.
@@ -487,4 +493,112 @@ FormulaRefRoot.ReplaceFormulaCoords = function (formula: string, movedto: MovedT
   }
 
   return updatedformula;
+};
+
+//@ verify
+//@ ensures \result.length >= 0
+// LemmaScript invariants (workbook rename/delete rewrite):
+// - SHEETNAME_MATCH: only a NAME/STRING token immediately followed by the
+//   `!` operator is treated as a sheet-name reference; bare names/strings
+//   elsewhere in the formula (function args, string literals) are untouched.
+// - RENAME_PRESERVES_REF: matching sheet-name token is replaced by the new
+//   name (quoted only when it is not a valid bare identifier); the `!` and
+//   the coord/range that follows are left completely alone.
+// - DELETE_TO_REF: on delete (newSheetName === null) the whole qualified
+//   reference — sheet-name token, `!`, first coord, and (if the sheet
+//   qualifier is sticky through `:`) the second coord of a range — collapses
+//   to a single `#REF!` token, matching AdjustFormulaCoords' delete-band
+//   #REF! policy.
+// - Comparison uses the caller-supplied `normalize` (matches
+//   SocialCalc.Formula.NormalizeSheetName, which may be host-overridden via
+//   SocialCalc.Callbacks.NormalizeSheetName) so rewrite matching stays in
+//   sync with SheetCache lookups.
+// Sheet names that would be ambiguous as bare NAME tokens must be quoted
+// rather than emitted verbatim:
+// - coord-shaped ($A1, B$2, ...): would re-parse as a cell reference.
+// - bare 1-2 letter alpha-only (B, ab, ...): Formula.LookupName's
+//   `/^[a-zA-Z][a-zA-Z]?$/` fallback (formula1.ts) treats an UNRESOLVED
+//   bare name of that shape as a whole-column reference, not text, so
+//   `OperandAsSheetName` would never see it as a sheet name at all.
+function isBareIdentifierSheetName(name: string): boolean {
+  return (
+    /^[A-Za-z_][A-Za-z0-9_.]*$/.test(name) &&
+    !/^\$?[A-Za-z]{1,2}\$?[1-9]\d*$/i.test(name) &&
+    !/^[A-Za-z]{1,2}$/.test(name)
+  );
+}
+
+FormulaRefRoot.RewriteSheetNameInFormula = function (
+  formula: string,
+  oldSheetName: string,
+  newSheetName: string | null,
+  normalize: (name: string) => string,
+): string {
+  const scf = SocialCalc.Formula;
+  const tokentype = scf.TokenType;
+  const token_op = tokentype.op;
+  const token_string = tokentype.string;
+  const token_name = tokentype.name;
+  const tokenOpExpansion = scf.TokenOpExpansion;
+
+  const parseinfo = scf.ParseFormulaIntoTokens(formula);
+  const normalizedOld = normalize(oldSheetName);
+  let updatedformula = "";
+  let matched = false;
+  let i = 0;
+
+  while (i < parseinfo.length) {
+    const ttype = parseinfo[i]!.type;
+    const ttext = parseinfo[i]!.text;
+    const isNameLike = ttype === token_name || ttype === token_string;
+    const next = parseinfo[i + 1];
+    const followedByBang = next != null && next.type === token_op && next.text === "!";
+
+    if (isNameLike && followedByBang && normalize(ttext) === normalizedOld) {
+      matched = true;
+      if (newSheetName === null) {
+        // Delete: collapse sheet-name!coord(:coord) into a single #REF!.
+        let j = i + 2; // skip name token + "!"
+        if (parseinfo[j] && parseinfo[j]!.type === tokentype.coord) {
+          j += 1;
+          if (
+            parseinfo[j] &&
+            parseinfo[j]!.type === token_op &&
+            parseinfo[j]!.text === ":" &&
+            parseinfo[j + 1] &&
+            parseinfo[j + 1]!.type === tokentype.coord
+          ) {
+            j += 2;
+          }
+        }
+        updatedformula += "#REF!";
+        i = j;
+        continue;
+      }
+      updatedformula += isBareIdentifierSheetName(newSheetName)
+        ? newSheetName
+        : quoteFormulaString(newSheetName);
+      i += 1;
+      continue;
+    }
+
+    if (ttype === token_string) {
+      updatedformula += quoteFormulaString(ttext);
+    } else if (ttype === token_op) {
+      updatedformula += tokenOpExpansion[ttext] || ttext;
+    } else {
+      updatedformula += ttext;
+    }
+    i += 1;
+  }
+
+  // No sheet-qualified reference to oldSheetName was found: return the
+  // ORIGINAL string verbatim rather than a token-reconstructed formula.
+  // Token reconstruction re-serializes every NAME/STRING token (the
+  // tokenizer already uppercases bare identifiers at parse time — see
+  // formula-parse.ts's `str.toUpperCase()` name-token push), so applying
+  // it unconditionally would silently reformat formulas that never
+  // referenced the affected sheet (e.g. "=A1+Beta" -> "=A1+BETA" merely
+  // because a DIFFERENT sheet in the workbook was renamed/deleted).
+  return matched ? updatedformula : formula;
 };

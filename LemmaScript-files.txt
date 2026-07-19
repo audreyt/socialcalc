@@ -11,3 +11,4 @@ lemma/xlookup.ts
 lemma/number-parse.ts
 lemma/protect.ts
 lemma/condfmt.ts
+lemma/workbook.ts

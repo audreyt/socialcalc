@@ -6,6 +6,8 @@
 /// <reference path="../js/socialcalcpopup.d.ts" />
 /// <reference path="../js/socialcalcspreadsheetcontrol.d.ts" />
 /// <reference path="../js/socialcalcviewer.d.ts" />
+/// <reference path="../js/workbook.d.ts" />
+/// <reference path="../js/workbook-ui.d.ts" />
 
 // Bridge the ambient `declare namespace SocialCalc { ... }` blocks (in the
 // referenced files above) into a module-shaped default export. A bare

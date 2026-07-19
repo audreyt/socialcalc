@@ -433,8 +433,13 @@ shipping bundle.
 - `lemma/condfmt.ts`: conditional-format operator validity, rule matching,
   duplicate/unique predicates, stop-if-true evaluation, and style-field
   merge policy — 8 Dafny VCs.
+- `lemma/workbook.ts`: multi-sheet tab-bar policy — sheet-name validation
+  code lattice, name-acceptance predicate, hide/delete last-sheet guards,
+  index clamping, active-tab retargeting after delete/hide, reorder target
+  clamping, and cross-sheet-reference rewrite classification (unchanged/
+  renamed/broken-to-#REF!) on sheet rename/delete — 9 Dafny VCs.
 
-Total: **127 VCs (36 + 5 + 3 + 17 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2 + 8)**.
+Total: **136 VCs (36 + 5 + 3 + 17 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2 + 8 + 9)**.
 
 After a facade edit:
 
