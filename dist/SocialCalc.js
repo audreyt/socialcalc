@@ -8582,6 +8582,337 @@ More comments yet to come...
     }
     return result;
   };
+  SC.HtmlTable = {};
+  (function () {
+    var HT = SC.HtmlTable;
+    HT.TABLE_MAX_COL = 702;
+    HT.TABLE_MAX_ROW = 65536;
+    HT.TABLE_OK = 0;
+    HT.TABLE_INVALID_SPAN = 1;
+    HT.TABLE_BOUNDS_OVERFLOW = 2;
+    HT.IsValidSpan = function (rowSpan, colSpan) {
+      return rowSpan > 0 && colSpan > 0;
+    };
+    HT.EndCol = function (anchorCol, colSpan) {
+      return anchorCol + colSpan - 1;
+    };
+    HT.EndRow = function (anchorRow, rowSpan) {
+      return anchorRow + rowSpan - 1;
+    };
+    HT.CanPlaceRect = function (anyOccupied) {
+      return !anyOccupied;
+    };
+    HT.IsWithinTableBounds = function (anchorCol, anchorRow, rowSpan, colSpan, maxCol, maxRow) {
+      return (
+        anchorCol >= 1 &&
+        anchorRow >= 1 &&
+        HT.EndCol(anchorCol, colSpan) <= maxCol &&
+        HT.EndRow(anchorRow, rowSpan) <= maxRow
+      );
+    };
+    HT.PlanTableStatus = function (anchorCol, anchorRow, rowSpan, colSpan, maxCol, maxRow) {
+      if (!HT.IsValidSpan(rowSpan, colSpan)) return HT.TABLE_INVALID_SPAN;
+      if (!HT.IsWithinTableBounds(anchorCol, anchorRow, rowSpan, colSpan, maxCol, maxRow)) {
+        return HT.TABLE_BOUNDS_OVERFLOW;
+      }
+      return HT.TABLE_OK;
+    };
+    HT.ClampSpanToBounds = function (anchorCol, anchorRow, rowSpan, colSpan, maxCol, maxRow) {
+      var clampedCol = Math.min(colSpan, Math.max(1, maxCol - anchorCol + 1));
+      var clampedRow = Math.min(rowSpan, Math.max(1, maxRow - anchorRow + 1));
+      return {
+        rowSpan: clampedRow,
+        colSpan: clampedCol,
+      };
+    };
+    HT.LooksLikeHtmlTable = function (html) {
+      return typeof html === 'string' && /<table[\s>]/i.test(html);
+    };
+    var SAFE_COLOR_RE =
+      /^(#[0-9a-fA-F]{3}|#[0-9a-fA-F]{6}|rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)|rgba\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*(?:0|1|0?\.\d+)\s*\)|[a-zA-Z]{3,20})$/;
+    HT.ExtractSafeStyle = function (styleAttrText) {
+      var result = {
+        bold: false,
+        italic: false,
+        align: null,
+        color: null,
+        bgcolor: null,
+      };
+      if (typeof styleAttrText !== 'string' || !styleAttrText) return result;
+      var declarations = styleAttrText.split(';');
+      for (var i = 0; i < declarations.length; i++) {
+        var decl = declarations[i];
+        var colon = decl.indexOf(':');
+        if (colon === -1) continue;
+        var prop = decl.slice(0, colon).trim().toLowerCase();
+        var value = decl.slice(colon + 1).trim();
+        if (!prop || !value) continue;
+        if (prop === 'font-weight') {
+          var weightNum = parseInt(value, 10);
+          if (/^bold(er)?$/i.test(value) || (!isNaN(weightNum) && weightNum >= 600)) {
+            result.bold = true;
+          }
+        } else if (prop === 'font-style') {
+          if (/^(italic|oblique)$/i.test(value)) result.italic = true;
+        } else if (prop === 'text-align') {
+          var alignValue = value.toLowerCase();
+          if (alignValue === 'left' || alignValue === 'center' || alignValue === 'right') {
+            result.align = alignValue;
+          }
+        } else if (prop === 'color') {
+          if (SAFE_COLOR_RE.test(value)) result.color = value;
+        } else if (prop === 'background-color' || prop === 'background') {
+          if (SAFE_COLOR_RE.test(value)) result.bgcolor = value;
+        }
+      }
+      return result;
+    };
+    var SKIP_TEXT_TAGS = {
+      SCRIPT: 1,
+      STYLE: 1,
+      NOSCRIPT: 1,
+      TEMPLATE: 1,
+    };
+    var BLOCK_TEXT_TAGS = {
+      P: 1,
+      DIV: 1,
+      TR: 1,
+      TABLE: 1,
+      LI: 1,
+      UL: 1,
+      OL: 1,
+      H1: 1,
+      H2: 1,
+      H3: 1,
+      H4: 1,
+      H5: 1,
+      H6: 1,
+    };
+    HT.ExtractCellText = function (el) {
+      var parts = [];
+      var walk = function (node) {
+        if (!node) return;
+        if (node.nodeType === 3) {
+          parts.push(node.textContent != null ? node.textContent : node.nodeValue || '');
+          return;
+        }
+        if (node.nodeType !== 1) return;
+        var tag = node.tagName;
+        if (SKIP_TEXT_TAGS[tag]) return;
+        if (tag === 'BR') {
+          parts.push('\n');
+          return;
+        }
+        var isBlock = !!BLOCK_TEXT_TAGS[tag];
+        if (isBlock && parts.length && parts[parts.length - 1] !== '\n') parts.push('\n');
+        var kids = node.childNodes || [];
+        for (var i = 0; i < kids.length; i++) walk(kids[i]);
+        if (isBlock && parts.length && parts[parts.length - 1] !== '\n') parts.push('\n');
+      };
+      walk(el);
+      return parts
+        .join('')
+        .replace(/\n{2,}/g, '\n')
+        .replace(/^\n+|\n+$/g, '');
+    };
+    HT.ElementChildren = function (el) {
+      var out = [];
+      var kids = (el && el.childNodes) || [];
+      for (var i = 0; i < kids.length; i++) {
+        if (kids[i].nodeType === 1) out.push(kids[i]);
+      }
+      return out;
+    };
+    HT.FindFirstTable = function (doc) {
+      var found = null;
+      var walk = function (node) {
+        if (found || !node) return;
+        if (node.nodeType === 1 && node.tagName === 'TABLE') {
+          found = node;
+          return;
+        }
+        var kids = node.childNodes || [];
+        for (var i = 0; i < kids.length && !found; i++) walk(kids[i]);
+      };
+      walk(doc.documentElement || doc.body || doc);
+      return found;
+    };
+    HT.CollectRows = function (table) {
+      var rows = [];
+      var walk = function (node) {
+        if (!node || node.nodeType !== 1) return;
+        if (node.tagName === 'TR') {
+          rows.push(node);
+          return;
+        }
+        if (node.tagName === 'TABLE' && node !== table) return;
+        var kids = node.childNodes || [];
+        for (var i = 0; i < kids.length; i++) walk(kids[i]);
+      };
+      walk(table);
+      return rows;
+    };
+    HT.BuildSheetSaveFromHtml = function (htmlString) {
+      if (!HT.LooksLikeHtmlTable(htmlString)) return '';
+      if (typeof DOMParser === 'undefined') return '';
+      var doc;
+      try {
+        doc = new DOMParser().parseFromString(htmlString, 'text/html');
+      } catch {
+        return '';
+      }
+      var table = HT.FindFirstTable(doc);
+      if (!table) return '';
+      var rows = HT.CollectRows(table);
+      if (!rows.length) return '';
+      var occupied = {};
+      var sheet = new SocialCalc.Sheet();
+      var maxColSeen = 0;
+      var maxRowSeen = 0;
+      var anyAnchor = false;
+      for (var r = 0; r < rows.length && r < HT.TABLE_MAX_ROW; r++) {
+        var anchorRow = r + 1;
+        var cells = HT.ElementChildren(rows[r]).filter(function (el) {
+          return el.tagName === 'TD' || el.tagName === 'TH';
+        });
+        var col = 1;
+        for (var c = 0; c < cells.length; c++) {
+          while (col <= HT.TABLE_MAX_COL && occupied[anchorRow + ',' + col]) col++;
+          if (col > HT.TABLE_MAX_COL) break;
+          var cellEl = cells[c];
+          var rowSpanAttr = parseInt(cellEl.getAttribute('rowspan') || '1', 10);
+          var colSpanAttr = parseInt(cellEl.getAttribute('colspan') || '1', 10);
+          var rowSpan = rowSpanAttr > 0 ? rowSpanAttr : 1;
+          var colSpan = colSpanAttr > 0 ? colSpanAttr : 1;
+          var status = HT.PlanTableStatus(
+            col,
+            anchorRow,
+            rowSpan,
+            colSpan,
+            HT.TABLE_MAX_COL,
+            HT.TABLE_MAX_ROW,
+          );
+          if (status === HT.TABLE_BOUNDS_OVERFLOW) {
+            var clamped = HT.ClampSpanToBounds(
+              col,
+              anchorRow,
+              rowSpan,
+              colSpan,
+              HT.TABLE_MAX_COL,
+              HT.TABLE_MAX_ROW,
+            );
+            rowSpan = clamped.rowSpan;
+            colSpan = clamped.colSpan;
+          }
+          var anyOccupied = false;
+          for (var rr = anchorRow; rr <= HT.EndRow(anchorRow, rowSpan) && !anyOccupied; rr++) {
+            for (var cc = col; cc <= HT.EndCol(col, colSpan); cc++) {
+              if (occupied[rr + ',' + cc]) {
+                anyOccupied = true;
+                break;
+              }
+            }
+          }
+          if (!HT.CanPlaceRect(anyOccupied)) {
+            col++;
+            c--;
+            continue;
+          }
+          var cr = SocialCalc.crToCoord(col, anchorRow);
+          var text = HT.ExtractCellText(cellEl);
+          SocialCalc.SetConvertedCell(sheet, cr, text);
+          var assured = sheet.GetAssuredCell(cr);
+          if (colSpan > 1) assured.colspan = colSpan;
+          if (rowSpan > 1) assured.rowspan = rowSpan;
+          var isHeader = cellEl.tagName === 'TH';
+          var safeStyle = HT.ExtractSafeStyle(cellEl.getAttribute('style'));
+          if (isHeader) safeStyle.bold = true;
+          if (safeStyle.bold || safeStyle.italic) {
+            assured.font = sheet.GetStyleNum(
+              'font',
+              (safeStyle.italic ? 'italic' : 'normal') +
+                ' ' +
+                (safeStyle.bold ? 'bold' : 'normal') +
+                ' * *',
+            );
+          }
+          if (safeStyle.align) {
+            assured.cellformat = sheet.GetStyleNum('cellformat', safeStyle.align);
+          } else if (isHeader) {
+            assured.cellformat = sheet.GetStyleNum('cellformat', 'center');
+          }
+          if (safeStyle.color) assured.color = sheet.GetStyleNum('color', safeStyle.color);
+          if (safeStyle.bgcolor) assured.bgcolor = sheet.GetStyleNum('color', safeStyle.bgcolor);
+          for (var rr2 = anchorRow; rr2 <= HT.EndRow(anchorRow, rowSpan); rr2++) {
+            for (var cc2 = col; cc2 <= HT.EndCol(col, colSpan); cc2++) {
+              occupied[rr2 + ',' + cc2] = true;
+            }
+          }
+          if (HT.EndCol(col, colSpan) > maxColSeen) maxColSeen = HT.EndCol(col, colSpan);
+          if (HT.EndRow(anchorRow, rowSpan) > maxRowSeen)
+            maxRowSeen = HT.EndRow(anchorRow, rowSpan);
+          anyAnchor = true;
+          col = col + colSpan;
+        }
+      }
+      if (!anyAnchor) return '';
+      sheet.attribs.lastrow = maxRowSeen;
+      sheet.attribs.lastcol = maxColSeen;
+      return sheet.CreateSheetSave('A1:' + SocialCalc.crToCoord(maxColSeen, maxRowSeen));
+    };
+    HT.PasteTargetRange = function (editor) {
+      if (editor.range && editor.range.hasrange) {
+        return (
+          SocialCalc.crToCoord(editor.range.left, editor.range.top) +
+          ':' +
+          SocialCalc.crToCoord(editor.range.right, editor.range.bottom)
+        );
+      }
+      return editor.ecell.coord;
+    };
+  })();
+  SC.EditorPasteFromClipboardAsync = function (editor) {
+    if (!editor || editor.noEdit || editor.ECellReadonly()) return Promise.resolve();
+    var HT = SocialCalc.HtmlTable;
+    var target = HT.PasteTargetRange(editor);
+    var clipboardApi = typeof navigator !== 'undefined' ? navigator.clipboard : null;
+    var applyTab = function (text) {
+      if (typeof text !== 'string' || text.length === 0) return;
+      var cmd =
+        'loadclipboard ' + SC.encodeForSave(SC.ConvertOtherFormatToSave(text, 'tab')) + '\n';
+      cmd += 'paste ' + target + ' formulas';
+      editor.EditorScheduleSheetCommands(cmd, true, false);
+    };
+    var readPlainFallback = function () {
+      if (!clipboardApi || typeof clipboardApi.readText !== 'function') return Promise.resolve();
+      return clipboardApi.readText().then(applyTab, function () {});
+    };
+    if (!clipboardApi || typeof clipboardApi.read !== 'function') {
+      return readPlainFallback();
+    }
+    return clipboardApi.read().then(function (items) {
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].types && items[i].types.indexOf('text/html') !== -1) {
+          return items[i]
+            .getType('text/html')
+            .then(function (blob) {
+              return blob.text();
+            })
+            .then(function (html) {
+              var scsave = HT.LooksLikeHtmlTable(html)
+                ? SC.ConvertOtherFormatToSave(html, 'html-table')
+                : '';
+              if (!scsave) return readPlainFallback();
+              var cmd = 'loadclipboard ' + SC.encodeForSave(scsave) + '\n';
+              cmd += 'paste ' + target + ' all';
+              editor.EditorScheduleSheetCommands(cmd, true, false);
+              return undefined;
+            }, readPlainFallback);
+        }
+      }
+      return readPlainFallback();
+    }, readPlainFallback);
+  };
   SC.ConvertOtherFormatToSave = function (inputstr, inputformat) {
     var sheet;
     var lines;
@@ -8605,6 +8936,9 @@ More comments yet to come...
     };
     if (inputformat == 'scsave') {
       return inputstr;
+    }
+    if (inputformat == 'html-table') {
+      return SocialCalc.HtmlTable.BuildSheetSaveFromHtml(inputstr);
     }
     var delimiter = inputformat == 'csv-eu' ? ';' : inputformat == 'csv' ? ',' : '	';
     var decimalChar = inputformat == 'csv-eu' ? ',' : '.';
@@ -11002,6 +11336,7 @@ More comments yet to come...
           if (editor.noEdit || editor.ECellReadonly()) return true;
           ta = editor.pasteTextarea;
           ta.value = '';
+          editor.pasteHtmlData = '';
           cell = TableEditorSC.GetEditorCellElement(editor, editor.ecell.row, editor.ecell.col);
           if (cell) {
             position = TableEditorSC.GetElementPosition(cell.element);
@@ -11009,9 +11344,19 @@ More comments yet to come...
             ta.style.top = position.top - 1 + 'px';
           }
           var processPastedText = function (value) {
+            var htmlData = editor.pasteHtmlData;
             var cmd = '';
+            var pasteWhat = 'formulas';
+            var htmlSave = '';
             if (editor.pastescclipboard) {
               editor.pastescclipboard = false;
+            } else if (
+              htmlData &&
+              TableEditorSC.HtmlTable.LooksLikeHtmlTable(htmlData) &&
+              (htmlSave = TableEditorSC.ConvertOtherFormatToSave(htmlData, 'html-table'))
+            ) {
+              cmd = 'loadclipboard ' + TableEditorSC.encodeForSave(htmlSave) + '\n';
+              pasteWhat = 'all';
             } else {
               var clipstr = TableEditorSC.ConvertSaveToOtherFormat(
                 TableEditorSC.Clipboard.clipboard,
@@ -11047,7 +11392,7 @@ More comments yet to come...
             } else {
               cr = editor.ecell.coord;
             }
-            cmd += 'paste ' + cr + ' formulas';
+            cmd += 'paste ' + cr + ' ' + pasteWhat;
             editor.EditorScheduleSheetCommands(cmd, true, false);
             TableEditorSC.KeyboardFocus();
           };
@@ -11393,6 +11738,18 @@ More comments yet to come...
     ta.value = '';
     editor.pasteTextarea = ta;
     AssignID(editor, editor.pasteTextarea, 'pastetextarea');
+    editor.pasteHtmlData = '';
+    ta.addEventListener('paste', function (event) {
+      var htmlData = '';
+      if (event && event.clipboardData && typeof event.clipboardData.getData === 'function') {
+        try {
+          htmlData = event.clipboardData.getData('text/html') || '';
+        } catch {
+          htmlData = '';
+        }
+      }
+      editor.pasteHtmlData = htmlData;
+    });
     if (navigator.userAgent.match(/Safari\//) && !navigator.userAgent.match(/Chrome\//)) {
       window.removeEventListener('beforepaste', TableEditorSC.SafariPasteFunction, false);
       window.addEventListener('beforepaste', TableEditorSC.SafariPasteFunction, false);
@@ -33062,6 +33419,9 @@ not governed by the terms of the CPAL.
         bgcolor = cell.bgcolor ? sheet.colors[cell.bgcolor] : defaultbgcolor;
         if (bgcolor == defaultcolor) bgcolor = '';
         spreadsheet.ExecuteCommand('set %C color ' + bgcolor + '%Nset %C bgcolor ' + color, '');
+        break;
+      case 'pasteclipboard':
+        void SocialCalc.EditorPasteFromClipboardAsync(editor);
         break;
       default:
         combostr = SocialCalc.SpreadsheetCmdLookup[which] || '';

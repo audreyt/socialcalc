@@ -466,8 +466,14 @@ shipping bundle.
   row-eligibility + result-decision policy (first-error-wins, AVERAGE-family
   DIV0-on-empty vs. MAXIFS/MINIFS zero-on-empty, running max/min) — 5 Dafny
   VCs.
+- `lemma/html-table.ts`: rich-HTML-table clipboard paste normalization
+  policy — rowspan/colspan span-shape validity, rectangle placement/
+  collision classification (any occupied target cell blocks the whole
+  candidate rectangle, HTML's downward-growing-cell anchoring rule),
+  bounds-precedence status (invalid span before bounds overflow),
+  mirroring spill.ts's planSpillStatus precedence — 9 Dafny VCs.
 
-Total: **186 VCs (36 + 5 + 3 + 17 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2 + 8 + 9 + 16 + 3 + 6 + 20 + 5)**.
+Total: **195 VCs (36 + 5 + 3 + 17 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2 + 8 + 9 + 16 + 3 + 6 + 20 + 5 + 9)**.
 
 After a facade edit:
 

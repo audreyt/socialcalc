@@ -2464,6 +2464,14 @@ SpreadsheetControlSC.DoCmd = function (obj: any, which: any) {
       spreadsheet.ExecuteCommand("set %C color " + bgcolor + "%Nset %C bgcolor " + color, "");
       break;
 
+    case "pasteclipboard":
+      // Async navigator.clipboard.read() path (see SC.EditorPasteFromClipboardAsync):
+      // prefers a text/html payload containing a <table>, falls back to
+      // plain text via readText(). Distinct from "paste", which stays
+      // synchronous over the SocialCalc-internal in-memory clipboard.
+      void SocialCalc.EditorPasteFromClipboardAsync(editor);
+      break;
+
     default:
       combostr = SocialCalc.SpreadsheetCmdLookup[which] || "";
       sstr = SocialCalc.SpreadsheetCmdSLookup[which] || "";

@@ -198,6 +198,63 @@ be XSS-aware:
 - `MakePageLink(pagename, workspacename, …)` → return value validated via `SafeUrlForRender`
 - `NormalizeSheetName(name)` → **not** a rendering sink (its return value is only used as an internal cache-key string, never written to the DOM), out of scope
 
+## `SC.HtmlTable`: rich HTML clipboard paste (untrusted *input* surface)
+
+Every sink above is about *rendering* already-loaded sheet content safely.
+`SC.HtmlTable.BuildSheetSaveFromHtml` (js/socialcalc-3.ts) is a different
+kind of surface: it is the one place raw, attacker-controlled markup from
+the OS clipboard (a `text/html` paste, or a `navigator.clipboard.read()`
+item) enters SocialCalc at all, via the ctrl-v `pasteTextarea` "paste"
+listener and `SC.EditorPasteFromClipboardAsync`'s toolbar path. It is
+**unconditional** (not gated by `SocialCalc.Callbacks.untrustedContent`)
+because the clipboard payload's origin (any application on the user's
+machine, or another site's copy handler) is never trusted by default,
+unlike a sheet's own save-file content.
+
+Mitigations, all enforced inside `SC.HtmlTable` itself before anything
+reaches a cell:
+
+- **No live-DOM insertion.** `new DOMParser().parseFromString(html,
+  "text/html")` builds a detached `Document` that is never appended to the
+  page and never executes `<script>` (`DOMParser` never runs script
+  content, per spec) — a stronger guarantee than sanitizing a string later
+  passed to `innerHTML=`.
+- **Text-only extraction.** `HT.ExtractCellText` walks child nodes and
+  reads only `nodeValue`/`textContent` off text nodes; it never reads
+  `innerHTML`/`outerHTML` of any element. `SCRIPT`/`STYLE`/`NOSCRIPT`/
+  `TEMPLATE` subtrees are skipped entirely — their content (including any
+  markup-shaped text) never reaches a cell, table.
+- **No attribute pass-through.** `href`, `src`, and every `on*`
+  event-handler attribute are never read anywhere in `SC.HtmlTable` — only
+  `rowspan`, `colspan`, and `style` are consulted via `getAttribute`, so no
+  URL or script reference from the source HTML can reach the sheet.
+- **Allowlisted style subset.** `HT.ExtractSafeStyle` recognizes exactly
+  five CSS properties (`font-weight`, `font-style`, `text-align`, `color`,
+  `background-color`/`background`) and validates `color`/`background-color`
+  against `SAFE_COLOR_RE` (hex/`rgb()`/`rgba()`/named colors only — no
+  `url()`, no multi-token shorthand that could smuggle a
+  `background-image`). Every other property (`position`, `behavior`,
+  `expression(...)`, etc.) is silently dropped.
+- **Fail-closed parsing.** A `DOMParser().parseFromString` exception,
+  malformed/absent `<table>`, or an environment with no `DOMParser` global
+  all return `""` rather than throwing or falling through to a partial
+  result; callers treat `""` as "use the plain-text tab-delimited path
+  instead" (the pre-existing, already-audited import path).
+- **Downstream rendering stays covered by the sinks above.** Extracted
+  cell text/values flow into the sheet through the same `SetConvertedCell`
+  path the existing CSV/tab importer uses, so once a pasted value becomes a
+  cell it is rendered through the already-audited `RenderCell`/
+  `FormatValueForDisplay` pipeline — no new render-time sink is introduced.
+
+Tests: `test/lemma-html-table-facade.test.ts` (pure placement/bounds
+policy vs. the Dafny/Lean-verified `lemma/html-table.ts` facade),
+`test/html-clipboard-paste.test.ts` (`SC.HtmlTable.*` unit behavior,
+including the untrusted-content-safety describe block: script/style
+stripping, no-attribute-pass-through, no live-DOM-sink, fail-closed
+parsing), and `e2e/html-table-paste.spec.ts` (real `ClipboardEvent`/
+`DataTransfer` paste in a live browser, including a script/`onerror`
+payload asserted to never execute and never appear in the rendered cell).
+
 ## Notes on methodology
 
 - Enumeration performed via `grep -n '\.innerHTML\s*=[^=]'` and

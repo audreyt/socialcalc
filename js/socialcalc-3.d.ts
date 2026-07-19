@@ -933,4 +933,63 @@ declare namespace SocialCalc {
   function XmlEscape(text: string): string;
   function TranslateFormulaToOpenFormula(formula: string): { ok: boolean; text: string };
   function CreateFodsFromNormalizedWorkbook(normalizedWorkbook: NormalizedWorkbook): string;
+  function SetConvertedCell(sheet: Sheet, cr: string, rawvalue: string | number): void;
+
+  // Secure, dependency-free rich-HTML-table clipboard paste support. See
+  // socialcalc-3.ts's SC.HtmlTable header comment for the full security
+  // posture; the rectangle-placement/bounds functions mirror
+  // lemma/html-table.ts exactly (Dafny/Lean-verified facade).
+  namespace HtmlTable {
+    const TABLE_MAX_COL: number;
+    const TABLE_MAX_ROW: number;
+    const TABLE_OK: number;
+    const TABLE_INVALID_SPAN: number;
+    const TABLE_BOUNDS_OVERFLOW: number;
+
+    function IsValidSpan(rowSpan: number, colSpan: number): boolean;
+    function EndCol(anchorCol: number, colSpan: number): number;
+    function EndRow(anchorRow: number, rowSpan: number): number;
+    function CanPlaceRect(anyOccupied: boolean): boolean;
+    function IsWithinTableBounds(
+      anchorCol: number,
+      anchorRow: number,
+      rowSpan: number,
+      colSpan: number,
+      maxCol: number,
+      maxRow: number,
+    ): boolean;
+    function PlanTableStatus(
+      anchorCol: number,
+      anchorRow: number,
+      rowSpan: number,
+      colSpan: number,
+      maxCol: number,
+      maxRow: number,
+    ): number;
+    function ClampSpanToBounds(
+      anchorCol: number,
+      anchorRow: number,
+      rowSpan: number,
+      colSpan: number,
+      maxCol: number,
+      maxRow: number,
+    ): { rowSpan: number; colSpan: number };
+
+    function LooksLikeHtmlTable(html: unknown): boolean;
+    function ExtractSafeStyle(styleAttrText: unknown): {
+      bold: boolean;
+      italic: boolean;
+      align: "left" | "center" | "right" | null;
+      color: string | null;
+      bgcolor: string | null;
+    };
+    function ExtractCellText(el: unknown): string;
+    function ElementChildren(el: unknown): unknown[];
+    function FindFirstTable(doc: unknown): unknown;
+    function CollectRows(table: unknown): unknown[];
+    function BuildSheetSaveFromHtml(htmlString: unknown): string;
+    function PasteTargetRange(editor: TableEditor): string;
+  }
+
+  function EditorPasteFromClipboardAsync(editor: TableEditor): Promise<void>;
 }

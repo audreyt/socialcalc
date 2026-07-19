@@ -276,6 +276,7 @@ TableEditorSC.TableEditor = function (context: any) {
         if (editor.noEdit || editor.ECellReadonly()) return true; // not if no edit
         ta = editor.pasteTextarea;
         ta.value = "";
+        editor.pasteHtmlData = ""; // cleared here; the "paste" listener (re)fills it synchronously
         cell = TableEditorSC.GetEditorCellElement(editor, editor.ecell.row, editor.ecell.col);
         if (cell) {
           position = TableEditorSC.GetElementPosition(cell.element);
@@ -287,13 +288,28 @@ TableEditorSC.TableEditor = function (context: any) {
         // used by both the modern navigator.clipboard.readText() path (when
         // it resolves) and the legacy focused-textarea native-paste
         // fallback (when the modern API is unavailable or rejects) — same
-        // "loadclipboard"/"paste" command construction either way.
+        // "loadclipboard"/"paste" command construction either way. Reads
+        // editor.pasteHtmlData itself (rather than taking it as a
+        // parameter): only the focused-textarea native-paste path ever
+        // populates it via the "paste" event listener's clipboardData
+        // read, so the modern readText() path always sees it empty and
+        // falls through to the plain-text branch below, exactly as before.
         var processPastedText = function (value: any) {
+          var htmlData = editor.pasteHtmlData;
           var cmd = "";
+          var pasteWhat = "formulas";
+          var htmlSave = "";
           if (editor.pastescclipboard) {
             // Clipboard loaded from "clipboard tab" - see  SpreadsheetControlClipboardLoad
             // ignore windows clipboard contents
             editor.pastescclipboard = false;
+          } else if (
+            htmlData &&
+            TableEditorSC.HtmlTable.LooksLikeHtmlTable(htmlData) &&
+            (htmlSave = TableEditorSC.ConvertOtherFormatToSave(htmlData, "html-table"))
+          ) {
+            cmd = "loadclipboard " + TableEditorSC.encodeForSave(htmlSave) + "\n";
+            pasteWhat = "all"; // bring in the safe style subset (bold/italic/align/colors) too
           } else {
             // Use windows clipboard contents if value does not match last copy
             var clipstr = TableEditorSC.ConvertSaveToOtherFormat(
@@ -331,7 +347,7 @@ TableEditorSC.TableEditor = function (context: any) {
           } else {
             cr = editor.ecell.coord;
           }
-          cmd += "paste " + cr + " formulas";
+          cmd += "paste " + cr + " " + pasteWhat;
           editor.EditorScheduleSheetCommands(cmd, true, false);
           TableEditorSC.KeyboardFocus();
         };
@@ -824,6 +840,25 @@ TableEditorSC.CreateTableEditor = function (editor: any, width: any, height: any
   ta.value = "";
   editor.pasteTextarea = ta;
   AssignID(editor, editor.pasteTextarea, "pastetextarea");
+
+  // Real browsers deliver the clipboard's "text/html" payload only via the
+  // native "paste" ClipboardEvent's synchronous clipboardData -- by the
+  // time the ctrl-v handler's window.setTimeout(200) callback below reads
+  // ta.value (the plain-text fallback path for engines with no
+  // clipboardData access), that event has already fired for the same
+  // physical paste, so stash its HTML here for that callback to prefer.
+  editor.pasteHtmlData = "";
+  ta.addEventListener("paste", function (event: any) {
+    var htmlData = "";
+    if (event && event.clipboardData && typeof event.clipboardData.getData === "function") {
+      try {
+        htmlData = event.clipboardData.getData("text/html") || "";
+      } catch {
+        htmlData = "";
+      }
+    }
+    editor.pasteHtmlData = htmlData;
+  });
 
   if (navigator.userAgent.match(/Safari\//) && !navigator.userAgent.match(/Chrome\//)) {
     // special code for Safari 5 change

@@ -123,4 +123,7 @@ lean_lib LambdaScope where
 lean_lib Criteria where
   srcDir := "lemma"
   roots := #[`«criteria.types», `«criteria.def», `«criteria.proof»]
+lean_lib HtmlTable where
+  srcDir := "lemma"
+  roots := #[`«html-table.types», `«html-table.def», `«html-table.proof»]
   extraDepTargets := #[``downloadDependencies]

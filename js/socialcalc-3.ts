@@ -9681,6 +9681,481 @@ SC.ConvertSaveToOtherFormat = function (savestr: any, outputformat: any, dorecal
   return result;
 };
 
+// *************************************
+//
+// SocialCalc.HtmlTable: secure, dependency-free rich-HTML-table clipboard
+// paste support.
+//
+// Policy functions (TABLE_MAX_COL/ROW through ClampSpanToBounds) mirror
+// lemma/html-table.ts 1:1 -- see that file's Dafny/Lean proofs for the
+// rectangle-placement/span-collision/bounds invariants they satisfy.
+// test/lemma-html-table-facade.test.ts cross-checks every one of them
+// against the pure facade, exactly as test/lemma-spill-facade.test.ts does
+// for SC.Formula.PlanSpillStatus.
+//
+// The remaining functions (LooksLikeHtmlTable onward) are the impure
+// DOMParser-driven normalizer. Security posture:
+//   - `new DOMParser().parseFromString(...)` builds a detached Document
+//     that is NEVER inserted into the live page DOM and NEVER executes
+//     script content (parseFromString never runs <script>; ExtractCellText
+//     additionally skips SCRIPT/STYLE/NOSCRIPT/TEMPLATE subtrees outright).
+//   - Only cell text (via textContent-equivalent walking) and a fixed
+//     allowlist of style properties (color/background-color/font-weight/
+//     font-style/text-align) are ever read. No href/src/event-handler
+//     attribute is ever consulted, so no URL or script reference from the
+//     source HTML can reach the sheet.
+//   - Malformed rowspan/colspan (non-numeric, zero, negative) degrades to
+//     a plain 1x1 cell rather than throwing; spans that would overflow the
+//     sheet are clamped (never dropping the anchor cell) via
+//     ClampSpanToBounds.
+//   - Output is a normal .scsave string consumed by the existing
+//     "loadclipboard"/"paste" command pair, so readonly/protected-range/
+//     spill guards and undo are inherited for free from that command path
+//     -- no bespoke guard logic here.
+//
+
+SC.HtmlTable = {};
+
+(function () {
+  var HT = SC.HtmlTable;
+
+  // -- 1. Rectangle placement / bounds policy (mirrors lemma/html-table.ts) --
+
+  HT.TABLE_MAX_COL = 702;
+  HT.TABLE_MAX_ROW = 65536;
+
+  HT.TABLE_OK = 0;
+  HT.TABLE_INVALID_SPAN = 1;
+  HT.TABLE_BOUNDS_OVERFLOW = 2;
+
+  /** @param {any} rowSpan @param {any} colSpan */
+  HT.IsValidSpan = function (rowSpan: any, colSpan: any) {
+    return rowSpan > 0 && colSpan > 0;
+  };
+
+  /** @param {any} anchorCol @param {any} colSpan */
+  HT.EndCol = function (anchorCol: any, colSpan: any) {
+    return anchorCol + colSpan - 1;
+  };
+
+  /** @param {any} anchorRow @param {any} rowSpan */
+  HT.EndRow = function (anchorRow: any, rowSpan: any) {
+    return anchorRow + rowSpan - 1;
+  };
+
+  /** @param {any} anyOccupied */
+  HT.CanPlaceRect = function (anyOccupied: any) {
+    return !anyOccupied;
+  };
+
+  /** @param {any} anchorCol @param {any} anchorRow @param {any} rowSpan @param {any} colSpan @param {any} maxCol @param {any} maxRow */
+  HT.IsWithinTableBounds = function (
+    anchorCol: any,
+    anchorRow: any,
+    rowSpan: any,
+    colSpan: any,
+    maxCol: any,
+    maxRow: any,
+  ) {
+    return (
+      anchorCol >= 1 &&
+      anchorRow >= 1 &&
+      HT.EndCol(anchorCol, colSpan) <= maxCol &&
+      HT.EndRow(anchorRow, rowSpan) <= maxRow
+    );
+  };
+
+  /** @param {any} anchorCol @param {any} anchorRow @param {any} rowSpan @param {any} colSpan @param {any} maxCol @param {any} maxRow */
+  HT.PlanTableStatus = function (
+    anchorCol: any,
+    anchorRow: any,
+    rowSpan: any,
+    colSpan: any,
+    maxCol: any,
+    maxRow: any,
+  ) {
+    if (!HT.IsValidSpan(rowSpan, colSpan)) return HT.TABLE_INVALID_SPAN;
+    if (!HT.IsWithinTableBounds(anchorCol, anchorRow, rowSpan, colSpan, maxCol, maxRow)) {
+      return HT.TABLE_BOUNDS_OVERFLOW;
+    }
+    return HT.TABLE_OK;
+  };
+
+  /** @param {any} anchorCol @param {any} anchorRow @param {any} rowSpan @param {any} colSpan @param {any} maxCol @param {any} maxRow */
+  HT.ClampSpanToBounds = function (
+    anchorCol: any,
+    anchorRow: any,
+    rowSpan: any,
+    colSpan: any,
+    maxCol: any,
+    maxRow: any,
+  ) {
+    var clampedCol = Math.min(colSpan, Math.max(1, maxCol - anchorCol + 1));
+    var clampedRow = Math.min(rowSpan, Math.max(1, maxRow - anchorRow + 1));
+    return { rowSpan: clampedRow, colSpan: clampedCol };
+  };
+
+  // -- 2. DOMParser-driven normalizer ---------------------------------------
+
+  /** Quick, cheap check: does the raw clipboard payload plausibly contain a table? @param {any} html */
+  HT.LooksLikeHtmlTable = function (html: any) {
+    return typeof html === "string" && /<table[\s>]/i.test(html);
+  };
+
+  var SAFE_COLOR_RE =
+    /^(#[0-9a-fA-F]{3}|#[0-9a-fA-F]{6}|rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)|rgba\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*(?:0|1|0?\.\d+)\s*\)|[a-zA-Z]{3,20})$/;
+
+  /**
+   * Extracts a fixed allowlist of style properties (bold/italic/alignment/
+   * text color/background color) out of a raw `style="..."` attribute
+   * string. Every other property -- position, url()/gradients, behavior,
+   * unrecognized names -- is silently ignored. Values are validated against
+   * strict per-property patterns (SAFE_COLOR_RE rejects anything with
+   * url()/multiple tokens, so even the "background" shorthand can never
+   * smuggle a background-image).
+   * @param {any} styleAttrText
+   */
+  HT.ExtractSafeStyle = function (styleAttrText: any) {
+    var result: any = { bold: false, italic: false, align: null, color: null, bgcolor: null };
+    if (typeof styleAttrText !== "string" || !styleAttrText) return result;
+    var declarations = styleAttrText.split(";");
+    for (var i = 0; i < declarations.length; i++) {
+      var decl = declarations[i];
+      var colon = decl.indexOf(":");
+      if (colon === -1) continue;
+      var prop = decl.slice(0, colon).trim().toLowerCase();
+      var value = decl.slice(colon + 1).trim();
+      if (!prop || !value) continue;
+      if (prop === "font-weight") {
+        var weightNum = parseInt(value, 10);
+        if (/^bold(er)?$/i.test(value) || (!isNaN(weightNum) && weightNum >= 600)) {
+          result.bold = true;
+        }
+      } else if (prop === "font-style") {
+        if (/^(italic|oblique)$/i.test(value)) result.italic = true;
+      } else if (prop === "text-align") {
+        var alignValue = value.toLowerCase();
+        if (alignValue === "left" || alignValue === "center" || alignValue === "right") {
+          result.align = alignValue;
+        }
+      } else if (prop === "color") {
+        if (SAFE_COLOR_RE.test(value)) result.color = value;
+      } else if (prop === "background-color" || prop === "background") {
+        if (SAFE_COLOR_RE.test(value)) result.bgcolor = value;
+      }
+    }
+    return result;
+  };
+
+  var SKIP_TEXT_TAGS: any = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, TEMPLATE: 1 };
+  var BLOCK_TEXT_TAGS: any = {
+    P: 1,
+    DIV: 1,
+    TR: 1,
+    TABLE: 1,
+    LI: 1,
+    UL: 1,
+    OL: 1,
+    H1: 1,
+    H2: 1,
+    H3: 1,
+    H4: 1,
+    H5: 1,
+    H6: 1,
+  };
+
+  /**
+   * Plain-text extraction from a parsed cell element: walks child nodes
+   * (never reads `.textContent`/`.innerHTML` directly, so it works
+   * identically against a real browser DOMParser Document and against a
+   * minimal test shim), joining block-level children and `<br>` with "\n"
+   * and skipping SCRIPT/STYLE/NOSCRIPT/TEMPLATE subtrees entirely (their
+   * content -- including any markup-shaped text -- never reaches the sheet).
+   * @param {any} el
+   */
+  HT.ExtractCellText = function (el: any) {
+    var parts: string[] = [];
+    var walk = function (node: any) {
+      if (!node) return;
+      if (node.nodeType === 3) {
+        parts.push(node.textContent != null ? node.textContent : node.nodeValue || "");
+        return;
+      }
+      if (node.nodeType !== 1) return;
+      var tag = node.tagName;
+      if (SKIP_TEXT_TAGS[tag]) return;
+      if (tag === "BR") {
+        parts.push("\n");
+        return;
+      }
+      var isBlock = !!BLOCK_TEXT_TAGS[tag];
+      if (isBlock && parts.length && parts[parts.length - 1] !== "\n") parts.push("\n");
+      var kids = node.childNodes || [];
+      for (var i = 0; i < kids.length; i++) walk(kids[i]);
+      if (isBlock && parts.length && parts[parts.length - 1] !== "\n") parts.push("\n");
+    };
+    walk(el);
+    return parts
+      .join("")
+      .replace(/\n{2,}/g, "\n")
+      .replace(/^\n+|\n+$/g, "");
+  };
+
+  /** Element (nodeType 1) children of a node, skipping text nodes. @param {any} el */
+  HT.ElementChildren = function (el: any) {
+    var out: any[] = [];
+    var kids = (el && el.childNodes) || [];
+    for (var i = 0; i < kids.length; i++) {
+      if (kids[i].nodeType === 1) out.push(kids[i]);
+    }
+    return out;
+  };
+
+  /** Depth-first search for the first <table> element in a parsed document. @param {any} doc */
+  HT.FindFirstTable = function (doc: any) {
+    var found: any = null;
+    var walk = function (node: any) {
+      if (found || !node) return;
+      if (node.nodeType === 1 && node.tagName === "TABLE") {
+        found = node;
+        return;
+      }
+      var kids = node.childNodes || [];
+      for (var i = 0; i < kids.length && !found; i++) walk(kids[i]);
+    };
+    walk(doc.documentElement || doc.body || doc);
+    return found;
+  };
+
+  /** Every <tr> belonging directly to `table` (through thead/tbody/tfoot), ignoring nested tables. @param {any} table */
+  HT.CollectRows = function (table: any) {
+    var rows: any[] = [];
+    var walk = function (node: any) {
+      if (!node || node.nodeType !== 1) return;
+      if (node.tagName === "TR") {
+        rows.push(node);
+        return;
+      }
+      if (node.tagName === "TABLE" && node !== table) return; // ignore nested tables
+      var kids = node.childNodes || [];
+      for (var i = 0; i < kids.length; i++) walk(kids[i]);
+    };
+    walk(table);
+    return rows;
+  };
+
+  /**
+   * Parses `htmlString` for its first <table> and builds a normal .scsave
+   * string (same contract as the "csv"/"tab" branches of
+   * ConvertOtherFormatToSave) honoring rowspan/colspan collisions, a safe
+   * style subset, and Excel/Sheets-style number/date/formula value typing
+   * via the existing SetConvertedCell. Returns "" when there is no usable
+   * table (absent, no DOMParser, unparseable, or empty), which callers
+   * treat as "fall back to the plain-text path".
+   * @param {any} htmlString
+   */
+  HT.BuildSheetSaveFromHtml = function (htmlString: any) {
+    if (!HT.LooksLikeHtmlTable(htmlString)) return "";
+    if (typeof DOMParser === "undefined") return "";
+    var doc;
+    try {
+      doc = new DOMParser().parseFromString(htmlString, "text/html");
+    } catch {
+      return "";
+    }
+    var table = HT.FindFirstTable(doc);
+    if (!table) return "";
+    var rows = HT.CollectRows(table);
+    if (!rows.length) return "";
+
+    var occupied: any = {};
+    var sheet = new SocialCalc.Sheet();
+    var maxColSeen = 0;
+    var maxRowSeen = 0;
+    var anyAnchor = false;
+
+    for (var r = 0; r < rows.length && r < HT.TABLE_MAX_ROW; r++) {
+      var anchorRow = r + 1;
+      var cells = HT.ElementChildren(rows[r]).filter(function (el: any) {
+        return el.tagName === "TD" || el.tagName === "TH";
+      });
+      var col = 1;
+      for (var c = 0; c < cells.length; c++) {
+        while (col <= HT.TABLE_MAX_COL && occupied[anchorRow + "," + col]) col++;
+        if (col > HT.TABLE_MAX_COL) break;
+
+        var cellEl = cells[c];
+        var rowSpanAttr = parseInt(cellEl.getAttribute("rowspan") || "1", 10);
+        var colSpanAttr = parseInt(cellEl.getAttribute("colspan") || "1", 10);
+        var rowSpan = rowSpanAttr > 0 ? rowSpanAttr : 1; // malformed/missing -> plain 1x1
+        var colSpan = colSpanAttr > 0 ? colSpanAttr : 1;
+
+        var status = HT.PlanTableStatus(
+          col,
+          anchorRow,
+          rowSpan,
+          colSpan,
+          HT.TABLE_MAX_COL,
+          HT.TABLE_MAX_ROW,
+        );
+        if (status === HT.TABLE_BOUNDS_OVERFLOW) {
+          var clamped = HT.ClampSpanToBounds(
+            col,
+            anchorRow,
+            rowSpan,
+            colSpan,
+            HT.TABLE_MAX_COL,
+            HT.TABLE_MAX_ROW,
+          );
+          rowSpan = clamped.rowSpan;
+          colSpan = clamped.colSpan;
+        }
+
+        // HTML "downward-growing cell" collision rule: an earlier span
+        // always wins; a later cell overlapping it slides forward instead
+        // of overwriting it.
+        var anyOccupied = false;
+        for (var rr = anchorRow; rr <= HT.EndRow(anchorRow, rowSpan) && !anyOccupied; rr++) {
+          for (var cc = col; cc <= HT.EndCol(col, colSpan); cc++) {
+            if (occupied[rr + "," + cc]) {
+              anyOccupied = true;
+              break;
+            }
+          }
+        }
+        if (!HT.CanPlaceRect(anyOccupied)) {
+          col++;
+          c--;
+          continue;
+        }
+
+        var cr = SocialCalc.crToCoord(col, anchorRow);
+        var text = HT.ExtractCellText(cellEl);
+        SocialCalc.SetConvertedCell(sheet, cr, text);
+        var assured = sheet.GetAssuredCell(cr);
+        if (colSpan > 1) assured.colspan = colSpan;
+        if (rowSpan > 1) assured.rowspan = rowSpan;
+
+        var isHeader = cellEl.tagName === "TH";
+        var safeStyle = HT.ExtractSafeStyle(cellEl.getAttribute("style"));
+        if (isHeader) safeStyle.bold = true;
+        if (safeStyle.bold || safeStyle.italic) {
+          assured.font = sheet.GetStyleNum(
+            "font",
+            (safeStyle.italic ? "italic" : "normal") +
+              " " +
+              (safeStyle.bold ? "bold" : "normal") +
+              " * *",
+          );
+        }
+        if (safeStyle.align) {
+          assured.cellformat = sheet.GetStyleNum("cellformat", safeStyle.align);
+        } else if (isHeader) {
+          assured.cellformat = sheet.GetStyleNum("cellformat", "center");
+        }
+        if (safeStyle.color) assured.color = sheet.GetStyleNum("color", safeStyle.color);
+        if (safeStyle.bgcolor) assured.bgcolor = sheet.GetStyleNum("color", safeStyle.bgcolor);
+
+        for (var rr2 = anchorRow; rr2 <= HT.EndRow(anchorRow, rowSpan); rr2++) {
+          for (var cc2 = col; cc2 <= HT.EndCol(col, colSpan); cc2++) {
+            occupied[rr2 + "," + cc2] = true;
+          }
+        }
+
+        if (HT.EndCol(col, colSpan) > maxColSeen) maxColSeen = HT.EndCol(col, colSpan);
+        if (HT.EndRow(anchorRow, rowSpan) > maxRowSeen) maxRowSeen = HT.EndRow(anchorRow, rowSpan);
+        anyAnchor = true;
+
+        col = col + colSpan;
+      }
+    }
+
+    if (!anyAnchor) return "";
+    sheet.attribs.lastrow = maxRowSeen;
+    sheet.attribs.lastcol = maxColSeen;
+    return sheet.CreateSheetSave("A1:" + SocialCalc.crToCoord(maxColSeen, maxRowSeen));
+  };
+
+  /**
+   * Target coordinate/range for a clipboard paste, matching the toolbar's
+   * own "%C" substitution rule (SpreadsheetControlExecuteCommand): the
+   * full selected range when one exists (so the "paste ... all/formulas"
+   * command tiles across it, exactly like the classic clipboard-tab
+   * button), or the single edit cell otherwise.
+   * @param {any} editor
+   */
+  HT.PasteTargetRange = function (editor: any) {
+    if (editor.range && editor.range.hasrange) {
+      return (
+        SocialCalc.crToCoord(editor.range.left, editor.range.top) +
+        ":" +
+        SocialCalc.crToCoord(editor.range.right, editor.range.bottom)
+      );
+    }
+    return editor.ecell.coord;
+  };
+})();
+
+/**
+ * Explicit "paste from the OS clipboard" entry point using the async
+ * Clipboard API (navigator.clipboard), for UI triggers (e.g. a toolbar
+ * button click) that are not themselves a native "paste" ClipboardEvent and
+ * so cannot read event.clipboardData synchronously. Prefers a text/html
+ * payload containing a <table>, parsed the same secure, dependency-free way
+ * as the ctrl-v path (SocialCalc.HtmlTable.BuildSheetSaveFromHtml); falls
+ * back to plain text via readText() when no usable HTML table is present,
+ * permission is denied, or the API is unavailable. Returns a Promise that
+ * resolves once the resulting command has been scheduled (or immediately if
+ * there was nothing to do) -- callers that don't need to wait may ignore it.
+ * @param {any} editor
+ */
+SC.EditorPasteFromClipboardAsync = function (editor: any) {
+  if (!editor || editor.noEdit || editor.ECellReadonly()) return Promise.resolve();
+
+  var HT = SocialCalc.HtmlTable;
+  var target = HT.PasteTargetRange(editor);
+  var clipboardApi = typeof navigator !== "undefined" ? (navigator as any).clipboard : null;
+
+  var applyTab = function (text: any) {
+    if (typeof text !== "string" || text.length === 0) return;
+    var cmd = "loadclipboard " + SC.encodeForSave(SC.ConvertOtherFormatToSave(text, "tab")) + "\n";
+    cmd += "paste " + target + " formulas";
+    editor.EditorScheduleSheetCommands(cmd, true, false);
+  };
+
+  var readPlainFallback = function () {
+    if (!clipboardApi || typeof clipboardApi.readText !== "function") return Promise.resolve();
+    return clipboardApi.readText().then(applyTab, function () {});
+  };
+
+  if (!clipboardApi || typeof clipboardApi.read !== "function") {
+    return readPlainFallback();
+  }
+
+  return clipboardApi.read().then(function (items: any) {
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].types && items[i].types.indexOf("text/html") !== -1) {
+        return items[i]
+          .getType("text/html")
+          .then(function (blob: any) {
+            return blob.text();
+          })
+          .then(function (html: any) {
+            var scsave = HT.LooksLikeHtmlTable(html)
+              ? SC.ConvertOtherFormatToSave(html, "html-table")
+              : "";
+            if (!scsave) return readPlainFallback();
+            var cmd = "loadclipboard " + SC.encodeForSave(scsave) + "\n";
+            cmd += "paste " + target + " all";
+            editor.EditorScheduleSheetCommands(cmd, true, false);
+            return undefined;
+          }, readPlainFallback);
+      }
+    }
+    return readPlainFallback();
+  }, readPlainFallback);
+};
+
 //
 // result = SocialCalc.ConvertOtherFormatToSave(inputstr, inputformat)
 //
@@ -9714,6 +10189,10 @@ SC.ConvertOtherFormatToSave = function (inputstr: any, inputformat: any) {
 
   if (inputformat == "scsave") {
     return inputstr;
+  }
+
+  if (inputformat == "html-table") {
+    return SocialCalc.HtmlTable.BuildSheetSaveFromHtml(inputstr);
   }
 
   // Locale CSV variant: "csv-eu" uses ";" as the field delimiter and ","
