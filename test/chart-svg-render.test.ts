@@ -385,6 +385,13 @@ test("SanitizeLabel handles null/undefined sheet-derived values", async () => {
   expect(SC.Chart.SanitizeLabel(undefined)).toBe("");
 });
 
+test("SanitizeLabel treats a non-primitive value as empty rather than default-stringifying it", async () => {
+  const { SC } = await setup();
+  expect(SC.Chart.SanitizeLabel({ toString: () => "unsafe" })).toBe("");
+  expect(SC.Chart.SanitizeLabel([1, 2, 3])).toBe("");
+  expect(SC.Chart.SanitizeLabel(42)).toBe("42");
+});
+
 test("zero widthpx/heightpx fall back to the minimum size instead of rendering a 0x0 SVG", async () => {
   const { SC, sheet } = await setup();
   await scheduleCommands(SC, sheet, [

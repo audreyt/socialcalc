@@ -9618,7 +9618,7 @@ More comments yet to come...
     return 0;
   };
   Chart.SanitizeLabel = function (value, maxLen) {
-    let s = value == null ? '' : String(value);
+    let s = typeof value === 'string' || typeof value === 'number' ? String(value) : '';
     s = s.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '');
     s = s.replace(/[\r\n\t]+/g, ' ');
     s = s.trim();

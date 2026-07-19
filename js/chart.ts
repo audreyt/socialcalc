@@ -476,7 +476,7 @@ Chart.PlanPlacementStatus = function (
  * surviving sanitize can still never inject markup.
  */
 Chart.SanitizeLabel = function (value: unknown, maxLen?: number): string {
-  let s = value == null ? "" : String(value);
+  let s = typeof value === "string" || typeof value === "number" ? String(value) : "";
   // eslint-disable-next-line no-control-regex -- deliberately strips control chars from sheet content
   s = s.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "");
   s = s.replace(/[\r\n\t]+/g, " ");
