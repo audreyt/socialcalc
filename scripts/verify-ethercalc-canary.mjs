@@ -4,7 +4,8 @@
 // SocialCalc candidate — not the last npm-published release — by packing
 // this repo through `vp pm pack`, regenerating EtherCalc's embedded headless
 // bundle from that exact tarball's dist/SocialCalc.js, and running the
-// package's real current headless test suite against it. This is the
+// package's headless suite plus EtherCalc's focused Worker import contract
+// against it. This is the
 // automated form of the manual candidate-tarball canary that previously
 // gated SocialCalc releases by hand before publish.
 //
@@ -70,6 +71,7 @@ const ETHERCALC_PINNED_DATE = "2026-07-12T01:23:14+08:00";
 const ETHERCALC_PINNED_SUBJECT = "chore: remove obsolete pre-rewrite deployment/legacy files";
 const HEADLESS_WORKSPACE = "@ethercalc/socialcalc-headless";
 const HEADLESS_SUBDIR = "packages/socialcalc-headless";
+const WORKER_SUBDIR = "packages/worker";
 
 // --- Local tandem rehearsal overrides ---------------------------------------
 // Everything above is the deterministic, reproducible release-pin. These
@@ -143,7 +145,7 @@ export function resolveEthercalcSource(env = process.env) {
  * isolated temp checkout, and it is removed (with the whole temp checkout)
  * before this script exits.
  */
-const WORKBOOK_SMOKE_TEST_SOURCE = `import { describe, expect, it } from 'vite-plus/test';
+const WORKBOOK_SMOKE_TEST_SOURCE = `import { describe, expect, it } from 'vitest';
 import { loadSocialCalc } from '../src/index.js';
 
 // Narrow structural view of the SocialCalc.Workbook multi-sheet API (not
@@ -422,6 +424,10 @@ async function main() {
       }
       return headlessDir;
     });
+    const headlessScripts =
+      JSON.parse(readFileSync(path.join(headlessDir, "package.json"), "utf8")).scripts ?? {};
+    const focusedHeadlessTestScript =
+      typeof headlessScripts["test:workers"] === "string" ? "test:workers" : "test";
 
     const lockfileShaBefore = step(
       "bun.lock sha256 before install (baseline for the frozen-lockfile proof)",
@@ -598,11 +604,11 @@ async function main() {
               "run",
               "--cwd",
               HEADLESS_SUBDIR,
-              "test:workers",
+              focusedHeadlessTestScript,
               WORKBOOK_SMOKE_TEST_FILENAME.replace(/\.test\.ts$/, ""),
             ],
             { cwd: ethercalcDir },
-            "bun run --cwd packages/socialcalc-headless test:workers candidate-workbook-smoke",
+            `bun run --cwd packages/socialcalc-headless ${focusedHeadlessTestScript} candidate-workbook-smoke`,
           );
           const summary = summarizeVitestOutput(result.stdout);
           if (summary.failed > 0 || summary.passed === 0) {
@@ -614,6 +620,29 @@ async function main() {
         } finally {
           rmSync(workbookSmokeTestPath, { force: true });
         }
+      },
+    );
+
+    // 9. Focused real Worker import/route suite. On the tandem commit this
+    //    includes TOC routing isolation, child mutation, and cross-sheet
+    //    recalc through RoomDO-to-RoomDO hydration. Older release pins still
+    //    run their own version of the same test file.
+    const workerMultiSummary = step(
+      "Worker multi-import integration passes against the regenerated candidate bundle",
+      () => {
+        const result = must(
+          "bun",
+          ["run", "--cwd", WORKER_SUBDIR, "test:workers", "multi-import"],
+          { cwd: ethercalcDir },
+          "bun run --cwd packages/worker test:workers multi-import",
+        );
+        const summary = summarizeVitestOutput(result.stdout);
+        if (summary.failed > 0 || summary.total === 0 || summary.passed === 0) {
+          throw new Error(
+            `Worker multi-import integration did not pass cleanly: ${JSON.stringify(summary)}`,
+          );
+        }
+        return `${summary.passed}/${summary.total} passed, 0 failed`;
       },
     );
 
@@ -634,9 +663,10 @@ async function main() {
       );
     }
     console.log(`  bun.lock sha256:     ${lockfileShaBefore} (unchanged by install)`);
-    console.log(`Workspace:             ${HEADLESS_WORKSPACE}`);
+    console.log(`Headless workspace:    ${HEADLESS_WORKSPACE}`);
     console.log(`Headless suite:        ${testSummary}`);
     console.log(`Workbook smoke:        ${workbookSmokeSummary}`);
+    console.log(`Worker multi-import:   ${workerMultiSummary}`);
   } finally {
     if (process.env.SC_KEEP_ETHERCALC_CANARY_TMP) {
       console.log(`kept scratch dir: ${workDir}`);
