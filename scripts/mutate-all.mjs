@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// Sequentially run the full all-11-module mutation gate locally: one
+// Sequentially run the full all-13-module mutation gate locally: one
 // Stryker process per module in ALL_MUTATE_FILES, each mutating only that
 // module against the exact test subset stryker-file.mjs's `testsByFile`
 // maps to it (MUTATE_TARGET mode in stryker.config.mjs — the same mode
 // .github/workflows/mutation.yml's `mutate-full` matrix job runs, one
 // module per parallel CI leg). Sequential here so a single machine doesn't
-// need to run 11 processes at once; still far faster than the legacy
+// need to run 13 processes at once; still far faster than the legacy
 // mutate-everything-against-the-full-suite mode, since each module here
 // only pays for its own test subset, not the whole suite.
 //

@@ -265,6 +265,20 @@ export const testsByFile = {
     "test/dynamic-array-spill-family2.test.ts",
   ],
 
+  // Pure pivot-table engine (grouping, aggregation, grid rendering,
+  // materialization/clear/sanitize) plus its command-dispatch surface in
+  // socialcalc-3.ts (definepivot/deletepivot/refreshpivot/refreshpivotall,
+  // PrepareSpillMutation's pivotowner/pivotrows/pivotcols guards). Verified
+  // by grep: pivot-tables.test.ts is the sole behavior suite calling
+  // `SC.Pivot.*` directly and driving definepivot/refreshpivot/deletepivot
+  // through `SC.ExecuteSheetCommand`; lemma-pivot-facade.test.ts
+  // cross-checks every pure helper (TypeRank, CompareGroupKey,
+  // AggregateContributes/NextSum/NextCount/NextMin/NextMax,
+  // AggregateStatus, PlanPivotStatus, MAX_COL/MAX_ROW) against the
+  // lemma/pivot.ts mirror. No other test file references `SC.Pivot` or a
+  // `pivotowner`/`pivotrows`/`pivotcols` cell field.
+  "pivot.ts": ["test/pivot-tables.test.ts", "test/lemma-pivot-facade.test.ts"],
+
   "socialcalctableeditor.ts": editorTests,
 
   // Pure model/save/render/command facade (js/chart.ts) plus its editor

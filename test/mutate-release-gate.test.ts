@@ -3,7 +3,7 @@
 // assert on returned behavior, never script source text. One contract test
 // reads the real baseline registry so a schema change cannot make every release
 // entry invalid; generated reports remain out of scope and are never required.
-// ALL_MUTATE_FILES is imported for real, so "all 11 shipping modules" always
+// ALL_MUTATE_FILES is imported for real, so "every shipping module" always
 // means the current shipping set.
 
 import { describe, expect, test } from "vite-plus/test";
@@ -394,7 +394,7 @@ describe("evaluateAllModules (composed loop, real filesystem, isolated temp cwd)
     return modules;
   }
 
-  test("VALID ALL-11 — every real shipping module passes with a fresh, well-formed, above-floor report", () => {
+  test("VALID ALL-MODULES — every real shipping module passes with a fresh, well-formed, above-floor report", () => {
     withTempCwd((cwd) => {
       for (const file of ALL_MUTATE_FILES) {
         const slug = file.replace(/^js\//, "").replace(/\.ts$/, "");

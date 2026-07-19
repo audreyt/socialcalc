@@ -251,7 +251,7 @@ vp test
 start. `build.ts` instruments each original `js/*.ts` source, assembles
 `dist/SocialCalc.instrumented.js` under the normal UMD wrapper, and writes
 counters to `globalThis.__VITEST_COVERAGE__`. The default gate includes the
-eleven shipping modules plus the five LemmaScript facades and requires
+thirteen shipping modules plus the four LemmaScript facades and requires
 100/100/100/100.
 
 The instrumented bundle is gitignored and never shipped. Ordinary `vp build`
@@ -547,7 +547,7 @@ facade.test.ts` cross-checks every function against its shipping
 
 ## Mutation testing
 
-Stryker covers all eleven shipping modules with no mutator exclusions.
+Stryker covers all thirteen shipping modules with no mutator exclusions.
 `stryker-file.mjs` is the source of truth for target modules and owned test
 subsets. `.github/workflows/mutation.yml` derives its full matrix from
 `ALL_MUTATE_FILES`; do not hand-copy the module list into the workflow.
@@ -587,7 +587,7 @@ or test diffs.
   `formula-ref.ts`; measured break threshold 95.
 - Full scope: one isolated matrix leg for each module, using that module's
   measured integer floor from `stryker-mutation-baseline.json`.
-- Release enforcement: all eleven fresh reports must exist, identify the exact
+- Release enforcement: all thirteen fresh reports must exist, identify the exact
   expected module, contain valid statuses, meet the measured floor, and contain
   at least that baseline's `minimumMutants` complete-module count.
 - Scheduled/full runs upload every report with matrix `fail-fast: false`.
@@ -614,7 +614,7 @@ shipping artifacts.
 
 ## TypeScript and declarations
 
-All eleven core implementation modules are intended to typecheck:
+All thirteen core implementation modules are intended to typecheck:
 
 - `formatnumber2.ts`
 - `formula-parse.ts`
@@ -623,6 +623,8 @@ All eleven core implementation modules are intended to typecheck:
 - `formula1.ts`
 - `socialcalcconstants.ts`
 - `socialcalc-3.ts`
+- `pivot.ts`
+- `chart.ts`
 - `socialcalcspreadsheetcontrol.ts`
 - `socialcalctableeditor.ts`
 - `socialcalcviewer.ts`
@@ -669,7 +671,7 @@ A `v*` tag runs five independent required gates:
 1. core: `vp check` (format, lint, types), strict typecheck, build, Vitest,
    credibility, Dafny, Lean generation, blocking high/critical audit;
 2. merged source coverage;
-3. full eleven-module mutation matrix and release-gate aggregation;
+3. full thirteen-module mutation matrix and release-gate aggregation;
 4. Chromium/Firefox/WebKit Playwright;
 5. pinned EtherCalc candidate-tarball canary.
 

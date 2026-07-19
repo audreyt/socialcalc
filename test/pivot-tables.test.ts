@@ -760,11 +760,11 @@ test("output rectangle exceeding sheet bounds fails cleanly without partial writ
 
 // --- 10. Coverage: cell-level type coercion, invalid ranges, multi-value labels, errors ---
 
-test("numeric aggregation coerces a string-valued numeric datavalue via parseFloat", async () => {
+test("numeric aggregation reads a loaded cell's numeric datavalue directly", async () => {
   const { SC, sheet } = await setup();
-  // Loaded cells (unlike command-set ones) can carry valuetype "n" with a
-  // string datavalue, exercising the `typeof cell.datavalue === "number" ?
-  // ... : parseFloat(...)` fallback in BuildTable's aggregate() closure.
+  // Loaded cells can carry valuetype "n" with a JS-number datavalue (never
+  // a numeric string -- see GroupKeyFor's construction note in pivot.ts);
+  // this exercises that direct read in BuildTable's aggregate() closure.
   sheet.ParseSheetSave(
     [
       "version:1.5",

@@ -7,9 +7,9 @@
 //    test subset stryker-file.mjs's `testsByFile` maps to that module (not
 //    a stripped-down slice — the same set `vp run mutate:file` would use).
 //    This is what .github/workflows/mutation.yml's `mutate-full` matrix job
-//    runs, once per module, in parallel: comprehensive (every one of the 11
+//    runs, once per module, in parallel: comprehensive (every one of the 13
 //    shipping modules gets gated) but far more attributable and far faster
-//    wall-clock than mutating all 11 in a single sandboxed process against
+//    wall-clock than mutating all 13 in a single sandboxed process against
 //    the whole suite. Refuses to run (throws) if the target isn't in
 //    ALL_MUTATE_FILES or has no testsByFile entry — a silently-untested
 //    module is a bug, not an empty-suite no-op.
@@ -34,7 +34,7 @@
 //    formula-reference rewrite algebra) against the deterministic union of
 //    their `testsByFile` subsets. Small, fast, and reproducible enough to gate
 //    a PR. `socialcalcconstants.ts` is intentionally covered only by the full
-//    11-module matrix because its large data-table mutation profile needs a
+//    13-module matrix because its large data-table mutation profile needs a
 //    separate literal-value baseline rather than this algorithmic gate.
 //    The non-null break threshold below is the actual measured floor (see
 //    the measurement note, never a guess). Reports go to
@@ -52,9 +52,9 @@
 // 4. Legacy full-sandbox run (`vp run mutate`, no MUTATE_SCOPE/
 //    MUTATE_TARGET) — mutates every file in ALL_MUTATE_FILES in one
 //    sandboxed process against the whole Vitest suite. Report-only
-//    (`break: null`): an 11-module combined run can't honestly map to any
+//    (`break: null`): a 13-module combined run can't honestly map to any
 //    single module's registered floor. `vp run mutate:all`
-//    (scripts/mutate-all.mjs) remains the supported way to get full-11
+//    (scripts/mutate-all.mjs) remains the supported way to get full-13
 //    coverage locally with per-module reports.
 //
 // Filtered test subsets keep sandboxed per-file runs attributable without
@@ -82,7 +82,7 @@ const mutationBaseline = JSON.parse(readFileSync(`${here}/stryker-mutation-basel
 // gate's target-zero-unexplained-survivors bar would either block PRs on
 // an unrelated, much larger backlog or force a diluted threshold that
 // hides real regressions in the 3 algorithm modules. It stays covered
-// (never globally excluded) by the full 11-module per-file matrix below.
+// (never globally excluded) by the full 13-module per-file matrix below.
 const CRITICAL_FILES = ["js/formula-parse.ts", "js/formula-operand.ts", "js/formula-ref.ts"];
 
 const scope = process.env.MUTATE_SCOPE?.trim();
@@ -153,7 +153,7 @@ const scopeLabel = `${cacheScope}${isPartialRange ? "-partial" : ""}`;
 // formula-operand.ts, formula-ref.ts), against the deterministic 23-file
 // `criticalTests` union, sandboxed, concurrency 4, with NO mutator exclusions.
 // socialcalcconstants.ts is deliberately not in this PR-critical scope: it
-// remains covered without exclusions by the full 11-module per-file matrix.
+// remains covered without exclusions by the full 13-module per-file matrix.
 //
 // Fresh run completed 2026-07-12 18:06:
 //   1440 tested, 1280 killed, 88 timeout, 72 survived => 95.00% score.

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Release gate for the full (all-11-module) mutation scope: refuses to pass
+// Release gate for the full (all-13-module) mutation scope: refuses to pass
 // unless EVERY module in ALL_MUTATE_FILES (stryker-file.mjs) has both (a) a
 // registered, actually-measured baseline in stryker-mutation-baseline.json
 // (`measured:true`, a finite break number in the 0..100 range, and the
@@ -306,7 +306,7 @@ function main() {
     cwd,
   });
 
-  console.log("Mutation release gate — all 12 shipping modules:\n");
+  console.log("Mutation release gate — all 13 shipping modules:\n");
   for (const { file, status, detail } of rows) {
     console.log(`${status}  ${file}  ${detail}`);
   }
@@ -319,7 +319,7 @@ function main() {
   }
 
   console.log(
-    "\nRelease gate PASSED: all 12 modules measured, reported, and at or above their floor.",
+    "\nRelease gate PASSED: all 13 modules measured, reported, and at or above their floor.",
   );
 }
 

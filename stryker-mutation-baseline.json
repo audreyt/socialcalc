@@ -3,7 +3,8 @@
   "$floorPolicy": "break is always the conservative integer floor of the actual measured score (Math.floor), never rounded up and never hand-inflated. Example: 94.21% → break:94, 53.80% → break:53. This ensures a score regression of less than 1% passes the gate while any real regression larger than 1pp triggers a failure, and avoids any ambiguity about rounding direction.",
   "$measurementHistory": {
     "2026-07-13": "All 11 modules were first measured in isolated per-module Stryker sandboxes. UI modules and socialcalc-3.ts carry honest low baselines that reflect current tests, not target quality.",
-    "2026-07-14": "Corrected the hybrid runner to build one all-mutant UMD per sandbox; rebuilding shared output during mutant runs had produced unstable false kills. Fresh exact release reports set every score, floor, and minimumMutants value below. formula1.ts remeasured at 61.44% under the corrected lifecycle, invalidating its prior 95 floor; initializer-heavy survivors remain scored, not excluded. socialcalcconstants.ts reached 100.00% after recursive oracle-backed assertions. Two exact formatnumber2.ts runs were status-identical at 93.78%."
+    "2026-07-14": "Corrected the hybrid runner to build one all-mutant UMD per sandbox; rebuilding shared output during mutant runs had produced unstable false kills. Fresh exact release reports set every score, floor, and minimumMutants value below. formula1.ts remeasured at 61.44% under the corrected lifecycle, invalidating its prior 95 floor; initializer-heavy survivors remain scored, not excluded. socialcalcconstants.ts reached 100.00% after recursive oracle-backed assertions. Two exact formatnumber2.ts runs were status-identical at 93.78%.",
+    "2026-07-19": "Registered js/pivot.ts (new pivot-table engine, coreFiles-ordered between socialcalc-3.ts and socialcalctableeditor.ts) as a 12th shipping module. Fresh exact MUTATE_TARGET=js/pivot.ts run against its owned test set (test/pivot-tables.test.ts, test/lemma-pivot-facade.test.ts) measured 78.9628180039139% (790 killed, 17 timeout, 213 survived, 2 no-coverage of 1022 mutants); floor set to Math.floor(78.9628180039139) = 78, minimumMutants = 1022."
   },
   "modules": {
     "js/formatnumber2.ts": {
@@ -54,6 +55,13 @@
       "break": 57,
       "measuredAt": "2026-07-14",
       "score": "57.39"
+    },
+    "js/pivot.ts": {
+      "measured": true,
+      "minimumMutants": 1022,
+      "break": 78,
+      "measuredAt": "2026-07-19",
+      "score": "78.96"
     },
     "js/socialcalctableeditor.ts": {
       "measured": true,

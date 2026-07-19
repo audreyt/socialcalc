@@ -63,11 +63,11 @@ assert.equal(
 );
 // ALL_MUTATE_FILES is the single source of truth for the matrix. Every entry
 // must be a real source with at least one real test path, and the baseline
-// registry must have exactly the same 11 keys.
+// registry must have exactly the same 13 keys.
 assert.equal(
   ALL_MUTATE_FILES.length,
-  12,
-  "release mutation matrix must contain all 12 shipping modules",
+  13,
+  "release mutation matrix must contain all 13 shipping modules",
 );
 const baseline = JSON.parse(readFileSync("stryker-mutation-baseline.json", "utf8"));
 assert.deepEqual(
@@ -124,5 +124,5 @@ for (const source of [mutation, release]) {
 }
 
 console.log(
-  "mutation/release workflow contracts: 12 targets, fail-closed matrix/artifacts/baselines, caller context, pins, and deadlock-safe concurrency verified",
+  "mutation/release workflow contracts: 13 targets, fail-closed matrix/artifacts/baselines, caller context, pins, and deadlock-safe concurrency verified",
 );

@@ -8,11 +8,11 @@ name: Mutation
 #   formula-operand.ts, formula-ref.ts) against a deterministic 23-file test
 #   subset, in one process. socialcalcconstants.ts is deliberately NOT in
 #   this set (see stryker.config.mjs's CRITICAL_FILES comment) and stays
-#   covered only by the full 11-module per-file matrix below. Small and fast
+#   covered only by the full 13-module per-file matrix below. Small and fast
 #   enough to gate a PR; thresholds.break is a real number measured from an
 #   actual run (see stryker.config.mjs's CRITICAL_BREAK_THRESHOLD comment),
 #   not guessed.
-# - full (MUTATE_TARGET set per leg): all 12 shipping modules, gated
+# - full (MUTATE_TARGET set per leg): all 13 shipping modules, gated
 #   individually as a GitHub Actions matrix — one job per module, each
 #   mutating only that module against the exact test subset
 #   stryker-file.mjs's `testsByFile` maps to it, not the whole suite. This
@@ -42,11 +42,11 @@ name: Mutation
 # `release-gate` runs after the matrix, only when this workflow is CALLED
 # with `enforce_release: true` (i.e. from release.yml's release path, never
 # from a bare PR/schedule/manual-dispatch run of this workflow). It
-# downloads every module's fresh report and hard-fails unless ALL 11
+# downloads every module's fresh report and hard-fails unless ALL 13
 # modules have both a fresh report AND a stryker-mutation-baseline.json
 # entry that's actually `measured: true` with a passing score —
 # scripts/mutate-release-gate.mjs is the same check `vp run
-# mutate:release-gate` runs locally. All 12 modules in the registry are now
+# mutate:release-gate` runs locally. All 13 modules in the registry are now
 # `measured: true`, so release-gate enforces both a fresh per-module report
 # and each module's passing threshold on any enforced release call.
 #
@@ -70,7 +70,7 @@ name: Mutation
 on:
   pull_request:
   schedule:
-    # 09:00 UTC daily — full all-11-module gate.
+    # 09:00 UTC daily — full all-13-module gate.
     - cron: "0 9 * * *"
   workflow_dispatch:
     inputs:
@@ -88,7 +88,7 @@ on:
         type: string
         default: full
       enforce_release:
-        description: "Run release-gate: hard-fail unless all 12 modules have a measured, passing baseline"
+        description: "Run release-gate: hard-fail unless all 13 modules have a measured, passing baseline"
         type: boolean
         default: false
 
@@ -270,11 +270,11 @@ jobs:
   # but ONLY when this workflow was called with `enforce_release: true`
   # (i.e. from release.yml's release path — see the header comment's
   # "Required release.yml wiring"), never on a bare PR/schedule/manual run.
-  # All 11 registry modules are `measured: true`, so this job enforces each
+  # All 13 registry modules are `measured: true`, so this job enforces each
   # module's measured baseline threshold and required fresh report in release
   # runs.
   release-gate:
-    name: mutation (release gate — all 12 modules enforced)
+    name: mutation (release gate — all 13 modules enforced)
     needs: mutate-full
     # `inputs.enforce_release` alone is enough to scope this to a real
     # workflow_call with `enforce_release: true`: that input only exists
@@ -309,7 +309,7 @@ jobs:
           pattern: mutation-report-*
           path: artifacts
           # Keep each artifact in artifacts/mutation-report-<slug>/ so the
-          # release gate can prove all 11 independently downloaded reports.
+          # release gate can prove all 13 independently downloaded reports.
           merge-multiple: false
 
       - name: Verify every shipping module has a measured, passing baseline

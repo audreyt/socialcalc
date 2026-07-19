@@ -14,7 +14,7 @@ name: Release
 #                     threshold fails, so the enforced number stays
 #                     reviewable without a local re-run.
 #   mutation          reusable `mutation.yml` full-scope workflow: discovers
-#                     all 11 shipping modules from `ALL_MUTATE_FILES`, runs
+#                     all 13 shipping modules from `ALL_MUTATE_FILES`, runs
 #                     one fail-fast-disabled matrix leg per module, uploads
 #                     each JSON report, then hard-fails unless every report
 #                     and every measured/passing baseline is present.

@@ -354,7 +354,7 @@ Default `vp test` global setup builds `dist/SocialCalc.instrumented.js` from
 the current source tree before workers start. The shared loader executes that
 UMD through `vm.Script`; Istanbul collects its source counters and enforces
 **100 / 100 / 100 / 100** statements, branches, functions, and lines across
-all eleven shipping modules and the five LemmaScript facades.
+all thirteen shipping modules and the four LemmaScript facades.
 
 `vp run test:coverage` remains the explicit V8 diagnostic. Its build appends a
 source-map reference to the generated UMD so V8 ranges can be attributed back
@@ -476,7 +476,7 @@ over proof-bearing models; use the regeneration command so proof bodies survive.
 
 ## Mutation testing
 
-Stryker mutates all eleven shipping modules with no mutator exclusions.
+Stryker mutates all thirteen shipping modules with no mutator exclusions.
 String, regex, CSS, and format-table mutations remain observable behavior and
 are scored rather than filtered.
 
@@ -493,15 +493,15 @@ Modes:
 - `MUTATE_SCOPE=critical vp run mutate`: PR gate for `formula-parse.ts`,
   `formula-operand.ts`, and `formula-ref.ts` against a deterministic test set.
 - `MUTATE_TARGET=js/<module>.ts vp run mutate`: one module with its owned tests.
-- `vp run mutate:all`: all eleven modules sequentially.
+- `vp run mutate:all`: all thirteen modules sequentially.
 - `vp run mutate:file js/<module>.ts [start-end]`: sandboxed local iteration.
   A line-range run writes to `<module>-partial`, uses an exact-range cache,
   disables the full-module break floor, and cannot be release evidence.
 - `vp run mutate:release-gate`: validate fresh reports and measured baselines
   for every module.
 
-Current registered baselines (exact-module measurements on 2026-07-13 or
-2026-07-14):
+Current registered baselines (exact-module measurements on 2026-07-13,
+2026-07-14, or 2026-07-19):
 
 | Module                            |   Score | Floor | Mutants |
 | --------------------------------- | ------: | ----: | ------: |
@@ -510,6 +510,7 @@ Current registered baselines (exact-module measurements on 2026-07-13 or
 | `formula-ref.ts`                  |  97.22% |    97 |     467 |
 | `formula-operand.ts`              |  94.36% |    94 |     337 |
 | `formatnumber2.ts`                |  93.78% |    93 |   1,399 |
+| `pivot.ts`                        |  78.96% |    78 |   1,022 |
 | `socialcalcviewer.ts`             |  71.88% |    71 |     384 |
 | `socialcalcpopup.ts`              |  61.90% |    61 |     937 |
 | `formula1.ts`                     |  61.44% |    61 |   6,213 |
@@ -534,7 +535,7 @@ A `v*` tag starts five independent gates in `.github/workflows/release.yml`:
 
 1. core typecheck/lint/build/test/credibility/formal/audit checks;
 2. merged coverage;
-3. full eleven-module mutation testing;
+3. full thirteen-module mutation testing;
 4. Chromium/Firefox/WebKit Playwright tests; and
 5. the pinned EtherCalc candidate-tarball canary.
 
