@@ -64,6 +64,7 @@ declare namespace SocialCalc {
     defaultReadonlyNoGridClass: string;
     defaultReadonlyNoGridStyle: string;
     defaultReadonlyComment: string;
+    defaultLockedComment: string;
 
     defaultColWidth: string;
     defaultMinimumColWidth: number;
@@ -244,6 +245,8 @@ declare namespace SocialCalc {
     SCFormatAlignVertical: string;
     SCFormatColwidth: string;
     SCFormatRecalc: string;
+    SCFormatUnlocked: string;
+    SCFormatProtected: string;
     SCFormatUserMaxCol: string;
     SCFormatUserMaxRow: string;
 

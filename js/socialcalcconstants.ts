@@ -163,6 +163,7 @@ ConstantsRoot.Constants = {
   defaultReadonlyNoGridClass: "", // class added to readonly cells when grid not enabled
   defaultReadonlyNoGridStyle: "", // style added to readonly cells when grid not enabled
   defaultReadonlyComment: "Locked cell",
+  defaultLockedComment: "Locked cell (sheet is protected)",
 
   defaultColWidth: "80", // text
   defaultMinimumColWidth: 10, // numeric
@@ -455,6 +456,8 @@ ConstantsRoot.Constants = {
     "20 pixels:20|40:40|60:60|80:80|100:100|120:120|140:140|160:160|" +
     "[newcol]:|180 pixels:180|200:200|220:220|240:240|260:260|280:280|300:300|",
   SCFormatRecalc: "[cancel]:|[break]:|%loc!Auto!:|%loc!Manual!:off|",
+  SCFormatUnlocked: "[cancel]:|[break]:|%loc!Locked!:|%loc!Unlocked!:y|",
+  SCFormatProtected: "[cancel]:|[break]:|%loc!Unprotected!:|%loc!Protected!:yes|",
   SCFormatUserMaxCol:
     "[cancel]:|[break]:|%loc!Default!:|[custom]:|[newcol]:|" +
     "Unlimited:0|10:10|20:20|30:30|40:40|50:50|60:60|80:80|100:100|",

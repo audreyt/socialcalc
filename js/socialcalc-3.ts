@@ -198,6 +198,7 @@ SC.Callbacks = {
 //    cssc: custom css classname for cell, as text (no special chars)
 //    csss: custom css style definition
 //    mod: modification allowed flag "y" if present
+//    unlocked: if present ("y"), cell stays editable when the sheet is protected
 //    comment: cell comment string
 //
 
@@ -211,6 +212,7 @@ SC.Cell = function (coord: any) {
   this.formula = "";
   this.valuetype = "b";
   this.readonly = false;
+  this.unlocked = false;
   // Spill metadata is attached only when a formula actually spills.
 };
 
@@ -242,6 +244,7 @@ SC.CellProperties = {
   rowspan: 2,
   cssc: 2,
   csss: 2,
+  unlocked: 2,
   spillrows: 1,
   spillcols: 1,
   spillowner: 1,
@@ -608,6 +611,38 @@ SC.SubtotalExcludesRow = function (sheet: any, row: number, includeManualHidden:
   if (sheet.rowattribs.filterhide[row] == "yes") return true;
   if (includeManualHidden && sheet.rowattribs.hide[row] == "yes") return true;
   return false;
+};
+//
+// SocialCalc.IsSheetProtected(sheet)
+// SocialCalc.IsCellEditable(sheet, coord)
+//
+// Centralized whole-sheet protection policy. Protection is a UI/data-
+// integrity guard against accidental edits, not access control: there are
+// no passwords and no cryptographic enforcement. Every mutation path (set,
+// erase, fill, paste, merge, sort, move, insert, delete, editor commit, and
+// programmatic sheet commands) MUST route through SC.IsCellEditable rather
+// than testing cell.readonly or sheet.attribs.protected directly, so the
+// policy — mirrored in lemma/protect.ts and proved in lemma/protect.dfy —
+// stays the single source of truth.
+//
+// A cell's pre-existing readonly flag always blocks editing, independent of
+// protection state (preserves legacy cell.readonly behavior byte-for-byte
+// on unprotected sheets). When the sheet is protected, a non-readonly cell
+// is editable only if explicitly marked unlocked (Excel-style default-
+// locked-cell model).
+//
+
+/** @param {any} sheet */
+SC.IsSheetProtected = function (sheet: any) {
+  return sheet.attribs.protected == "yes";
+};
+
+/** @param {any} sheet @param {any} coord */
+SC.IsCellEditable = function (sheet: any, coord: any) {
+  var cell = sheet.cells[coord];
+  if (cell && cell.readonly) return false;
+  if (!SocialCalc.IsSheetProtected(sheet)) return true;
+  return !!(cell && cell.unlocked);
 };
 
 SC.SpillOwnerForCoord = function (sheet: any, coord: any) {
@@ -1148,6 +1183,9 @@ SC.ParseSheetSave = function (savedsheet: any, sheetobj: any) {
             case "needsrecalc":
               attribs.needsrecalc = parts[j++];
               break;
+            case "protected":
+              attribs.protected = parts[j++];
+              break;
             case "usermaxcol":
               attribs.usermaxcol = parts[j++] - 0;
               break;
@@ -1354,6 +1392,9 @@ SC.CellFromStringParts = function (sheet: any, cell: any, parts: any, j: any) {
       case "mod":
         j += 1;
         break;
+      case "unlocked":
+        cell.unlocked = parts[j++].toLowerCase() == "y";
+        break;
       case "comment":
         cell.comment = SocialCalc.decodeFromSave(parts[j++]);
         break;
@@ -1384,6 +1425,7 @@ SC.sheetfields = [
   "circularreferencecell",
   "recalc",
   "needsrecalc",
+  "protected",
   "usermaxcol",
   "usermaxrow",
 ];
@@ -1393,6 +1435,7 @@ SC.sheetfieldsshort = [
   "circularreferencecell",
   "recalc",
   "needsrecalc",
+  "protected",
   "usermaxcol",
   "usermaxrow",
 ];
@@ -1634,6 +1677,9 @@ SC.CellToString = function (sheet: any, cell: any) {
   }
   if (cell.readonly) {
     line += ":ro:yes";
+  }
+  if (cell.unlocked) {
+    line += ":unlocked:y";
   }
   if (cell.errors) {
     line += ":e:" + SocialCalc.encodeForSave(cell.errors);
@@ -2002,12 +2048,13 @@ SC.EncodeCellAttributes = function (sheet: any, coord: any) {
     }
   }
 
-  // misc: cssc, csss, mod
+  // misc: cssc, csss, mod, unlocked
 
-  InitAttribs(["cssc", "csss", "mod"]);
+  InitAttribs(["cssc", "csss", "mod", "unlocked"]);
   SetAttrib("cssc", cell.cssc || "");
   SetAttrib("csss", cell.csss || "");
   SetAttrib("mod", cell.mod || "n");
+  SetAttrib("unlocked", cell.unlocked ? "y" : "n");
 
   return result;
 };
@@ -2126,6 +2173,13 @@ SC.EncodeSheetAttributes = function (sheet: any) {
   InitAttrib("recalc");
   if (attribs.recalc) {
     SetAttrib("recalc", attribs.recalc);
+  }
+
+  // protected: protected
+
+  InitAttrib("protected");
+  if (attribs.protected) {
+    SetAttrib("protected", attribs.protected);
   }
 
   // usermaxcol, usermaxrow
@@ -2254,7 +2308,7 @@ SC.DecodeCellAttributes = function (sheet: any, coord: any, newattribs: any, ran
     CheckChanges(bb, sheet.borderstyles[cell[bb]], bb);
   }
 
-  // misc: cssc, csss, mod
+  // misc: cssc, csss, mod, unlocked
 
   CheckChanges("cssc", cell.cssc, "cssc");
 
@@ -2269,6 +2323,13 @@ SC.DecodeCellAttributes = function (sheet: any, coord: any, newattribs: any, ran
     if (value != (cell.mod || "n")) {
       if (value == "n") value = ""; // restrict to "y" and "" normally
       DoCmd("mod " + value);
+    }
+  }
+
+  if (newattribs.unlocked) {
+    value = newattribs.unlocked.def ? "n" : newattribs.unlocked.val;
+    if (value != (cell.unlocked ? "y" : "n")) {
+      DoCmd("unlocked " + (value == "y" ? "yes" : "no"));
     }
   }
 
@@ -2403,6 +2464,10 @@ SC.DecodeSheetAttributes = function (sheet: any, newattribs: any) {
   // recalc: recalc
 
   CheckChanges("recalc", sheet.attribs.recalc, "recalc");
+
+  // protected: protected
+
+  CheckChanges("protected", sheet.attribs.protected, "protected");
 
   // usermaxcol, usermaxrow
 
@@ -2718,6 +2783,14 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
               delete attribs.recalc;
             }
             break;
+          case "protected":
+            if (saveundo) changes.AddUndo(undostart, attribs.protected || "");
+            if (rest == "yes") {
+              attribs.protected = "yes";
+            } else {
+              delete attribs.protected;
+            }
+            break;
           case "usermaxcol":
           case "usermaxrow":
             if (saveundo) changes.AddUndo(undostart, attribs[attrib] - 0);
@@ -2822,7 +2895,12 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
           for (col = cr1.col; col <= cr2.col; col++) {
             cr = SocialCalc.crToCoord(col, row);
             cell = sheet.GetAssuredCell(cr);
-            if (cell.readonly && attrib != "readonly") continue;
+            if (
+              !SocialCalc.IsCellEditable(sheet, cr) &&
+              attrib != "readonly" &&
+              attrib != "unlocked"
+            )
+              continue;
             if (saveundo) changes.AddUndo("set " + cr + " all", sheet.CellToString(cell));
             if (attrib == "value") {
               // set coord value type numeric-value
@@ -2934,6 +3012,8 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
               cell.comment = SocialCalc.decodeFromSave(rest);
             } else if (attrib == "readonly") {
               cell.readonly = rest.toLowerCase() == "yes";
+            } else if (attrib == "unlocked") {
+              cell.unlocked = rest.toLowerCase() == "yes" || rest.toLowerCase() == "y";
             } else {
               errortext = scc.s_escUnknownSetCoordCmd + cmdstr;
             }
@@ -2950,7 +3030,7 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
       errortext = SocialCalc.PrepareSpillMutation(sheet, [{ cr1: cr1, cr2: cr2 }], true);
       if (errortext) break;
       cell = sheet.GetAssuredCell(cr1.coord);
-      if (cell.readonly) break;
+      if (!SocialCalc.IsCellEditable(sheet, cr1.coord)) break;
 
       // check whether merged cells other than cr1 contain data and clear them
       for (row = cr1.row; row <= cr2.row; row++) {
@@ -2984,7 +3064,7 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
       rest = cmd.RestOfString();
       ParseRange();
       cell = sheet.GetAssuredCell(cr1.coord);
-      if (cell.readonly) break;
+      if (!SocialCalc.IsCellEditable(sheet, cr1.coord)) break;
       if (saveundo)
         changes.AddUndo(
           "merge " +
@@ -3028,7 +3108,7 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
         for (col = cr1.col; col <= cr2.col; col++) {
           cr = SocialCalc.crToCoord(col, row);
           cell = sheet.GetAssuredCell(cr);
-          if (cell.readonly) continue;
+          if (!SocialCalc.IsCellEditable(sheet, cr)) continue;
           if (saveundo) changes.AddUndo("set " + cr + " all", sheet.CellToString(cell));
           if (rest == "all") {
             delete sheet.cells[cr];
@@ -3153,7 +3233,7 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
         for (col = colstart; col <= cr2.col; col++) {
           cr = SocialCalc.crToCoord(col, row);
           cell = sheet.GetAssuredCell(cr);
-          if (cell.readonly) continue;
+          if (!SocialCalc.IsCellEditable(sheet, cr)) continue;
           if (saveundo) changes.AddUndo("set " + cr + " all", sheet.CellToString(cell));
           if (fillright) {
             crbase = SocialCalc.crToCoord(cr1.col, row);
@@ -3254,7 +3334,7 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
         for (col = cr1.col; col < cr1.col + numcols; col++) {
           cr = SocialCalc.crToCoord(col, row);
           cell = sheet.GetAssuredCell(cr);
-          if (cell.readonly) continue;
+          if (!SocialCalc.IsCellEditable(sheet, cr)) continue;
           if (saveundo) changes.AddUndo("set " + cr + " all", sheet.CellToString(cell));
           var currentClipCol =
             cliprange.cr1.col + ((col - cr1.col) % (cliprange.cr2.col - cliprange.cr1.col + 1));
@@ -3351,6 +3431,16 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
       sheet.changedrendervalues = true;
       what = cmd.NextToken();
       ParseRange();
+      if (SocialCalc.IsSheetProtected(sheet)) {
+        for (row = cr1.row; row <= cr2.row; row++) {
+          for (col = cr1.col; col <= cr2.col; col++) {
+            cr = SocialCalc.crToCoord(col, row);
+            if (!SocialCalc.IsCellEditable(sheet, cr)) {
+              return "Unable to sort, because cell " + cr + " is locked.";
+            }
+          }
+        }
+      }
       errortext = SocialCalc.PrepareSpillMutation(sheet, [{ cr1: cr1, cr2: cr2 }], true);
       if (errortext) break;
       for (row = cr1.row; row <= cr2.row; row++) {
@@ -3517,6 +3607,11 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
       what = cmd.NextToken();
       rest = cmd.RestOfString();
       ParseRange();
+      if (SocialCalc.IsSheetProtected(sheet)) {
+        return (
+          "Unable to insert " + (cmd1 == "insertcol" ? "column" : "row") + ": sheet is protected."
+        );
+      }
       lastcol = attribs.lastcol;
       lastrow = attribs.lastrow;
 
@@ -3712,7 +3807,7 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
         for (col = colstart; col <= lastcol - coloffset; col++) {
           cr = SocialCalc.crToCoord(col + coloffset, row + rowoffset);
           cell = sheet.cells[cr];
-          if (cell && cell.readonly) {
+          if (cell && !SocialCalc.IsCellEditable(sheet, cr)) {
             errortext =
               "Unable to remove " +
               (cmd1 == "deletecol" ? "column" : "row") +
@@ -3985,7 +4080,7 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
         for (col = cr1.col; col <= cr2.col; col++) {
           cr = SocialCalc.crToCoord(col, row);
           cell = sheet.GetAssuredCell(cr);
-          if (cell.readonly) continue;
+          if (!SocialCalc.IsCellEditable(sheet, cr)) continue;
           if (saveundo) changes.AddUndo("set " + cr + " all", sheet.CellToString(cell));
 
           // if had nothing
@@ -4152,7 +4247,7 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
         for (col = cr1.col; col < cr1.col + numcols; col++) {
           cr = SocialCalc.crToCoord(col + coloffset, row + rowoffset);
           cell = sheet.GetAssuredCell(cr);
-          if (cell.readonly) continue;
+          if (!SocialCalc.IsCellEditable(sheet, cr)) continue;
           if (saveundo) changes.AddUndo("set " + cr + " all", sheet.CellToString(cell));
 
           crbase = SocialCalc.crToCoord(col, row); // get old cell to move
@@ -4493,6 +4588,17 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
       }
       attribs.needsrecalc = "yes";
 
+      break;
+    case "protectsheet":
+      sheet.renderneeded = true;
+      if (saveundo) changes.AddUndo(attribs.protected == "yes" ? "protectsheet" : "unprotectsheet");
+      attribs.protected = "yes";
+      break;
+
+    case "unprotectsheet":
+      sheet.renderneeded = true;
+      if (saveundo) changes.AddUndo(attribs.protected == "yes" ? "protectsheet" : "unprotectsheet");
+      delete attribs.protected;
       break;
 
     case "recalc":
@@ -5629,6 +5735,7 @@ SC.RenderContext = function (sheetobj: any) {
   this.readonlyNoGridClassName = scc.defaultReadonlyNoGridClass; // for readonly cells when this.showGrid is false
   this.readonlyNoGridCSS = scc.defaultReadonlyNoGridStyle; // any combination of classnames and styles may be used
   this.readonlyComment = scc.defaultReadonlyComment;
+  this.lockedComment = scc.defaultLockedComment;
 
   this.classnames =
     // any combination of classnames and explicitStyles can be used
@@ -6539,9 +6646,9 @@ SC.RenderCell = function (
     }
   }
 
-  if (cell.readonly) {
+  if (!SocialCalc.IsCellEditable(sheetobj, coord)) {
     if (!cell.comment) {
-      result.title = context.readonlyComment;
+      result.title = cell.readonly ? context.readonlyComment : context.lockedComment;
     }
     if (context.showGrid) {
       if (context.readonlyClassName) {

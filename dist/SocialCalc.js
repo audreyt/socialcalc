@@ -107,6 +107,7 @@
     defaultReadonlyNoGridClass: '',
     defaultReadonlyNoGridStyle: '',
     defaultReadonlyComment: 'Locked cell',
+    defaultLockedComment: 'Locked cell (sheet is protected)',
     defaultColWidth: '80',
     defaultMinimumColWidth: 10,
     defaultHighlightTypeCursorClass: '',
@@ -317,6 +318,8 @@
       '20 pixels:20|40:40|60:60|80:80|100:100|120:120|140:140|160:160|' +
       '[newcol]:|180 pixels:180|200:200|220:220|240:240|260:260|280:280|300:300|',
     SCFormatRecalc: '[cancel]:|[break]:|%loc!Auto!:|%loc!Manual!:off|',
+    SCFormatUnlocked: '[cancel]:|[break]:|%loc!Locked!:|%loc!Unlocked!:y|',
+    SCFormatProtected: '[cancel]:|[break]:|%loc!Unprotected!:|%loc!Protected!:yes|',
     SCFormatUserMaxCol:
       '[cancel]:|[break]:|%loc!Default!:|[custom]:|[newcol]:|' +
       'Unlimited:0|10:10|20:20|30:30|40:40|50:50|60:60|80:80|100:100|',
@@ -1076,6 +1079,7 @@ More comments yet to come...
     this.formula = '';
     this.valuetype = 'b';
     this.readonly = false;
+    this.unlocked = false;
   };
   SC.CellProperties = {
     coord: 1,
@@ -1101,6 +1105,7 @@ More comments yet to come...
     rowspan: 2,
     cssc: 2,
     csss: 2,
+    unlocked: 2,
     spillrows: 1,
     spillcols: 1,
     spillowner: 1,
@@ -1400,6 +1405,15 @@ More comments yet to come...
     if (sheet.rowattribs.filterhide[row] == 'yes') return true;
     if (includeManualHidden && sheet.rowattribs.hide[row] == 'yes') return true;
     return false;
+  };
+  SC.IsSheetProtected = function (sheet) {
+    return sheet.attribs.protected == 'yes';
+  };
+  SC.IsCellEditable = function (sheet, coord) {
+    var cell = sheet.cells[coord];
+    if (cell && cell.readonly) return false;
+    if (!SocialCalc.IsSheetProtected(sheet)) return true;
+    return !!(cell && cell.unlocked);
   };
   SC.SpillOwnerForCoord = function (sheet, coord) {
     var cell = sheet.cells[coord];
@@ -1778,6 +1792,9 @@ More comments yet to come...
               case 'needsrecalc':
                 attribs.needsrecalc = parts[j++];
                 break;
+              case 'protected':
+                attribs.protected = parts[j++];
+                break;
               case 'usermaxcol':
                 attribs.usermaxcol = parts[j++] - 0;
                 break;
@@ -1959,6 +1976,9 @@ More comments yet to come...
         case 'mod':
           j += 1;
           break;
+        case 'unlocked':
+          cell.unlocked = parts[j++].toLowerCase() == 'y';
+          break;
         case 'comment':
           cell.comment = SocialCalc.decodeFromSave(parts[j++]);
           break;
@@ -1988,6 +2008,7 @@ More comments yet to come...
     'circularreferencecell',
     'recalc',
     'needsrecalc',
+    'protected',
     'usermaxcol',
     'usermaxrow',
   ];
@@ -1997,6 +2018,7 @@ More comments yet to come...
     'circularreferencecell',
     'recalc',
     'needsrecalc',
+    'protected',
     'usermaxcol',
     'usermaxrow',
   ];
@@ -2202,6 +2224,9 @@ More comments yet to come...
     }
     if (cell.readonly) {
       line += ':ro:yes';
+    }
+    if (cell.unlocked) {
+      line += ':unlocked:y';
     }
     if (cell.errors) {
       line += ':e:' + SocialCalc.encodeForSave(cell.errors);
@@ -2481,10 +2506,11 @@ More comments yet to come...
         SetAttrib(bb + 'color', parts[3]);
       }
     }
-    InitAttribs(['cssc', 'csss', 'mod']);
+    InitAttribs(['cssc', 'csss', 'mod', 'unlocked']);
     SetAttrib('cssc', cell.cssc || '');
     SetAttrib('csss', cell.csss || '');
     SetAttrib('mod', cell.mod || 'n');
+    SetAttrib('unlocked', cell.unlocked ? 'y' : 'n');
     return result;
   };
   SC.EncodeSheetAttributes = function (sheet) {
@@ -2561,6 +2587,10 @@ More comments yet to come...
     InitAttrib('recalc');
     if (attribs.recalc) {
       SetAttrib('recalc', attribs.recalc);
+    }
+    InitAttrib('protected');
+    if (attribs.protected) {
+      SetAttrib('protected', attribs.protected);
     }
     InitAttrib('usermaxcol');
     if (attribs.usermaxcol) {
@@ -2650,6 +2680,12 @@ More comments yet to come...
         DoCmd('mod ' + value);
       }
     }
+    if (newattribs.unlocked) {
+      value = newattribs.unlocked.def ? 'n' : newattribs.unlocked.val;
+      if (value != (cell.unlocked ? 'y' : 'n')) {
+        DoCmd('unlocked ' + (value == 'y' ? 'yes' : 'no'));
+      }
+    }
     if (changed) {
       return cmdstr;
     } else {
@@ -2736,6 +2772,7 @@ More comments yet to come...
       'defaulttextvalueformat',
     );
     CheckChanges('recalc', sheet.attribs.recalc, 'recalc');
+    CheckChanges('protected', sheet.attribs.protected, 'protected');
     CheckChanges('usermaxcol', sheet.attribs.usermaxcol, 'usermaxcol');
     CheckChanges('usermaxrow', sheet.attribs.usermaxrow, 'usermaxrow');
     if (changed) {
@@ -2943,6 +2980,14 @@ More comments yet to come...
                 delete attribs.recalc;
               }
               break;
+            case 'protected':
+              if (saveundo) changes.AddUndo(undostart, attribs.protected || '');
+              if (rest == 'yes') {
+                attribs.protected = 'yes';
+              } else {
+                delete attribs.protected;
+              }
+              break;
             case 'usermaxcol':
             case 'usermaxrow':
               if (saveundo) changes.AddUndo(undostart, attribs[attrib] - 0);
@@ -3051,7 +3096,12 @@ More comments yet to come...
             for (col = cr1.col; col <= cr2.col; col++) {
               cr = SocialCalc.crToCoord(col, row);
               cell = sheet.GetAssuredCell(cr);
-              if (cell.readonly && attrib != 'readonly') continue;
+              if (
+                !SocialCalc.IsCellEditable(sheet, cr) &&
+                attrib != 'readonly' &&
+                attrib != 'unlocked'
+              )
+                continue;
               if (saveundo) changes.AddUndo('set ' + cr + ' all', sheet.CellToString(cell));
               if (attrib == 'value') {
                 pos = rest.indexOf(' ');
@@ -3155,6 +3205,8 @@ More comments yet to come...
                 cell.comment = SocialCalc.decodeFromSave(rest);
               } else if (attrib == 'readonly') {
                 cell.readonly = rest.toLowerCase() == 'yes';
+              } else if (attrib == 'unlocked') {
+                cell.unlocked = rest.toLowerCase() == 'yes' || rest.toLowerCase() == 'y';
               } else {
                 errortext = scc.s_escUnknownSetCoordCmd + cmdstr;
               }
@@ -3179,7 +3231,7 @@ More comments yet to come...
         );
         if (errortext) break;
         cell = sheet.GetAssuredCell(cr1.coord);
-        if (cell.readonly) break;
+        if (!SocialCalc.IsCellEditable(sheet, cr1.coord)) break;
         for (row = cr1.row; row <= cr2.row; row++) {
           for (col = cr1.col; col <= cr2.col; col++) {
             if (!(row == cr1.row && col == cr1.col)) {
@@ -3207,7 +3259,7 @@ More comments yet to come...
         rest = cmd.RestOfString();
         ParseRange();
         cell = sheet.GetAssuredCell(cr1.coord);
-        if (cell.readonly) break;
+        if (!SocialCalc.IsCellEditable(sheet, cr1.coord)) break;
         if (saveundo)
           changes.AddUndo(
             'merge ' +
@@ -3253,7 +3305,7 @@ More comments yet to come...
           for (col = cr1.col; col <= cr2.col; col++) {
             cr = SocialCalc.crToCoord(col, row);
             cell = sheet.GetAssuredCell(cr);
-            if (cell.readonly) continue;
+            if (!SocialCalc.IsCellEditable(sheet, cr)) continue;
             if (saveundo) changes.AddUndo('set ' + cr + ' all', sheet.CellToString(cell));
             if (rest == 'all') {
               delete sheet.cells[cr];
@@ -3377,7 +3429,7 @@ More comments yet to come...
           for (col = colstart; col <= cr2.col; col++) {
             cr = SocialCalc.crToCoord(col, row);
             cell = sheet.GetAssuredCell(cr);
-            if (cell.readonly) continue;
+            if (!SocialCalc.IsCellEditable(sheet, cr)) continue;
             if (saveundo) changes.AddUndo('set ' + cr + ' all', sheet.CellToString(cell));
             if (fillright) {
               crbase = SocialCalc.crToCoord(cr1.col, row);
@@ -3487,7 +3539,7 @@ More comments yet to come...
           for (col = cr1.col; col < cr1.col + numcols; col++) {
             cr = SocialCalc.crToCoord(col, row);
             cell = sheet.GetAssuredCell(cr);
-            if (cell.readonly) continue;
+            if (!SocialCalc.IsCellEditable(sheet, cr)) continue;
             if (saveundo) changes.AddUndo('set ' + cr + ' all', sheet.CellToString(cell));
             var currentClipCol =
               cliprange.cr1.col + ((col - cr1.col) % (cliprange.cr2.col - cliprange.cr1.col + 1));
@@ -3567,6 +3619,16 @@ More comments yet to come...
         sheet.changedrendervalues = true;
         what = cmd.NextToken();
         ParseRange();
+        if (SocialCalc.IsSheetProtected(sheet)) {
+          for (row = cr1.row; row <= cr2.row; row++) {
+            for (col = cr1.col; col <= cr2.col; col++) {
+              cr = SocialCalc.crToCoord(col, row);
+              if (!SocialCalc.IsCellEditable(sheet, cr)) {
+                return 'Unable to sort, because cell ' + cr + ' is locked.';
+              }
+            }
+          }
+        }
         errortext = SocialCalc.PrepareSpillMutation(
           sheet,
           [
@@ -3726,6 +3788,11 @@ More comments yet to come...
         what = cmd.NextToken();
         rest = cmd.RestOfString();
         ParseRange();
+        if (SocialCalc.IsSheetProtected(sheet)) {
+          return (
+            'Unable to insert ' + (cmd1 == 'insertcol' ? 'column' : 'row') + ': sheet is protected.'
+          );
+        }
         lastcol = attribs.lastcol;
         lastrow = attribs.lastrow;
         if (cmd1 == 'insertcol') {
@@ -3888,7 +3955,7 @@ More comments yet to come...
           for (col = colstart; col <= lastcol - coloffset; col++) {
             cr = SocialCalc.crToCoord(col + coloffset, row + rowoffset);
             cell = sheet.cells[cr];
-            if (cell && cell.readonly) {
+            if (cell && !SocialCalc.IsCellEditable(sheet, cr)) {
               errortext =
                 'Unable to remove ' +
                 (cmd1 == 'deletecol' ? 'column' : 'row') +
@@ -4137,7 +4204,7 @@ More comments yet to come...
           for (col = cr1.col; col <= cr2.col; col++) {
             cr = SocialCalc.crToCoord(col, row);
             cell = sheet.GetAssuredCell(cr);
-            if (cell.readonly) continue;
+            if (!SocialCalc.IsCellEditable(sheet, cr)) continue;
             if (saveundo) changes.AddUndo('set ' + cr + ' all', sheet.CellToString(cell));
             movingcells[cr] = new SocialCalc.Cell(cr);
             for (attrib in cellProperties) {
@@ -4277,7 +4344,7 @@ More comments yet to come...
           for (col = cr1.col; col < cr1.col + numcols; col++) {
             cr = SocialCalc.crToCoord(col + coloffset, row + rowoffset);
             cell = sheet.GetAssuredCell(cr);
-            if (cell.readonly) continue;
+            if (!SocialCalc.IsCellEditable(sheet, cr)) continue;
             if (saveundo) changes.AddUndo('set ' + cr + ' all', sheet.CellToString(cell));
             crbase = SocialCalc.crToCoord(col, row);
             movedto[crbase] = cr;
@@ -4593,6 +4660,18 @@ More comments yet to come...
           delete sheet.names[name];
         }
         attribs.needsrecalc = 'yes';
+        break;
+      case 'protectsheet':
+        sheet.renderneeded = true;
+        if (saveundo)
+          changes.AddUndo(attribs.protected == 'yes' ? 'protectsheet' : 'unprotectsheet');
+        attribs.protected = 'yes';
+        break;
+      case 'unprotectsheet':
+        sheet.renderneeded = true;
+        if (saveundo)
+          changes.AddUndo(attribs.protected == 'yes' ? 'protectsheet' : 'unprotectsheet');
+        delete attribs.protected;
         break;
       case 'recalc':
         attribs.needsrecalc = 'yes';
@@ -5364,6 +5443,7 @@ More comments yet to come...
     this.readonlyNoGridClassName = scc.defaultReadonlyNoGridClass;
     this.readonlyNoGridCSS = scc.defaultReadonlyNoGridStyle;
     this.readonlyComment = scc.defaultReadonlyComment;
+    this.lockedComment = scc.defaultLockedComment;
     this.classnames = {
       colname: scc.defaultColnameClass,
       rowname: scc.defaultRownameClass,
@@ -6081,9 +6161,9 @@ More comments yet to come...
         stylestr += context.commentNoGridCSS;
       }
     }
-    if (cell.readonly) {
+    if (!SocialCalc.IsCellEditable(sheetobj, coord)) {
       if (!cell.comment) {
-        result.title = context.readonlyComment;
+        result.title = cell.readonly ? context.readonlyComment : context.lockedComment;
       }
       if (context.showGrid) {
         if (context.readonlyClassName) {
@@ -10264,8 +10344,7 @@ More comments yet to come...
       ecoord = editor.ecell.coord;
     }
     if (!ecoord) return false;
-    var cell = editor.context.sheetobj.cells[ecoord];
-    return cell && cell.readonly;
+    return !SocialCalc.IsCellEditable(editor.context.sheetobj, ecoord);
   };
   TableEditorSC.RangeAnchor = function (editor, ecoord) {
     if (editor.range.hasrange) {
@@ -24938,6 +25017,7 @@ not governed by the terms of the CPAL.
         statuslineid: this.idPrefix + 'statusline',
         recalcid1: this.idPrefix + 'divider_recalc',
         recalcid2: this.idPrefix + 'button_recalc',
+        protectid: this.idPrefix + 'button_protectsheet',
       },
     };
     SpreadsheetControlSC.CurrentSpreadsheetControlObject = this;
@@ -25037,6 +25117,8 @@ not governed by the terms of the CPAL.
         ' <img id="%id.button_hidecol" src="%img.hidecol.png" style="vertical-align:bottom;"> ' +
         ' &nbsp;<img id="%id.divider_recalc" src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; ' +
         '<img id="%id.button_recalc" src="%img.recalc.png" style="vertical-align:bottom;"> ' +
+        ' &nbsp;<img src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; ' +
+        '<img id="%id.button_protectsheet" src="%img.lock.png" style="vertical-align:bottom;"> ' +
         ' </div>',
       oncreate: null,
       onclick: null,
@@ -25193,6 +25275,12 @@ not governed by the terms of the CPAL.
             id: s.idPrefix + 'recalc',
             initialdata: scc.SCFormatRecalc,
           },
+          protected: {
+            setting: 'protected',
+            type: 'PopupList',
+            id: s.idPrefix + 'protected',
+            initialdata: scc.SCFormatProtected,
+          },
           usermaxcol: {
             setting: 'usermaxcol',
             type: 'PopupList',
@@ -25304,6 +25392,12 @@ not governed by the terms of the CPAL.
             type: 'PopupList',
             id: s.idPrefix + 'cpadleft',
             initialdata: scc.SCFormatPadsizes,
+          },
+          cunlocked: {
+            setting: 'unlocked',
+            type: 'PopupList',
+            id: s.idPrefix + 'cunlocked',
+            initialdata: scc.SCFormatUnlocked,
           },
         };
         SocialCalc.SettingsControlInitializePanel(viewobj.values.sheetspanel);
@@ -25446,6 +25540,17 @@ not governed by the terms of the CPAL.
         ' </td>' +
         '</tr>' +
         '<tr>' +
+        ' <td %itemtitle.><br>%loc!Protection!:</td>' +
+        ' <td %itembody.>' +
+        '   <table cellspacing="0" cellpadding="0"><tr>' +
+        '    <td %bodypart.>' +
+        '     <div %parttitle.>&nbsp;</div>' +
+        '     <span id="%id.protected"></span>' +
+        '    </td>' +
+        '   </tr></table>' +
+        ' </td>' +
+        '</tr>' +
+        '<tr>' +
         ' <td %itemtitle.><br>%loc!Dimensions!:</td>' +
         ' <td %itembody.>' +
         '   <table cellspacing="0" cellpadding="0"><tr>' +
@@ -25578,6 +25683,17 @@ not governed by the terms of the CPAL.
         '    <td %bodypart.>' +
         '     <div %parttitle.>%loc!Left!</div>' +
         '     <span id="%id.cpadleft"></span>' +
+        '    </td>' +
+        '   </tr></table>' +
+        ' </td>' +
+        '</tr>' +
+        '<tr>' +
+        ' <td %itemtitle.><br>%loc!Protection!:</td>' +
+        ' <td %itembody.>' +
+        '   <table cellspacing="0" cellpadding="0"><tr>' +
+        '    <td %bodypart.>' +
+        '     <div %parttitle.>&nbsp;</div>' +
+        '     <span id="%id.cunlocked"></span>' +
         '    </td>' +
         '   </tr></table>' +
         ' </td>' +
@@ -26021,6 +26137,10 @@ not governed by the terms of the CPAL.
         tooltip: 'Recalculate',
         command: 'recalc',
       },
+      button_protectsheet: {
+        tooltip: 'Protect/Unprotect Sheet',
+        command: 'toggleprotectsheet',
+      },
     };
     for (button in spreadsheet.Buttons) {
       bele = document.getElementById(spreadsheet.idPrefix + button);
@@ -26381,17 +26501,27 @@ not governed by the terms of the CPAL.
       case 'doneposcalc':
         rele1 = document.getElementById(params.recalcid1);
         rele2 = document.getElementById(params.recalcid2);
-        if (!rele1 || !rele2) break;
-        if (editor.context.sheetobj.attribs.needsrecalc == 'yes') {
-          rele1.style.display = 'inline';
-          rele2.style.display = 'inline';
-        } else {
-          rele1.style.display = 'none';
-          rele2.style.display = 'none';
+        if (rele1 && rele2) {
+          if (editor.context.sheetobj.attribs.needsrecalc == 'yes') {
+            rele1.style.display = 'inline';
+            rele2.style.display = 'inline';
+          } else {
+            rele1.style.display = 'none';
+            rele2.style.display = 'none';
+          }
         }
         break;
       default:
         break;
+    }
+    if (status == 'cmdendnorender' || status == 'cmdend') {
+      var protectele = document.getElementById(params.protectid);
+      if (protectele) {
+        var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
+        var protectedNow = SocialCalc.IsSheetProtected(editor.context.sheetobj);
+        protectele.src = spreadsheet.imagePrefix + (protectedNow ? 'unlock.png' : 'lock.png');
+        protectele.title = protectedNow ? 'Unprotect Sheet' : 'Protect Sheet';
+      }
     }
   };
   SpreadsheetControlSC.UpdateSortRangeProposal = function (editor) {
@@ -26481,6 +26611,13 @@ not governed by the terms of the CPAL.
         break;
       case 'redo':
         spreadsheet.ExecuteCommand('redo', '');
+        break;
+      case 'toggleprotectsheet':
+        sheet = spreadsheet.sheet;
+        spreadsheet.ExecuteCommand(
+          SocialCalc.IsSheetProtected(sheet) ? 'unprotectsheet' : 'protectsheet',
+          '',
+        );
         break;
       case 'fill-rowcolstuff':
       case 'fill-text':
@@ -26699,6 +26836,10 @@ not governed by the terms of the CPAL.
     undo: 'undo',
     redo: 'redo',
     recalc: 'recalc',
+    protectsheet: 'protectsheet',
+    unprotectsheet: 'unprotectsheet',
+    unlockcell: 'set %C unlocked yes',
+    lockcell: 'set %C unlocked no',
   };
   SpreadsheetControlSC.SpreadsheetCmdSLookup = {
     borderon: '1px solid rgb(0,0,0)',

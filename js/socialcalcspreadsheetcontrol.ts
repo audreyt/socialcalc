@@ -215,6 +215,7 @@ SpreadsheetControlSC.SpreadsheetControl = function (idPrefix: any) {
       statuslineid: this.idPrefix + "statusline",
       recalcid1: this.idPrefix + "divider_recalc",
       recalcid2: this.idPrefix + "button_recalc",
+      protectid: this.idPrefix + "button_protectsheet",
     },
   };
 
@@ -326,6 +327,8 @@ SpreadsheetControlSC.SpreadsheetControl = function (idPrefix: any) {
       ' <img id="%id.button_hidecol" src="%img.hidecol.png" style="vertical-align:bottom;"> ' +
       ' &nbsp;<img id="%id.divider_recalc" src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; ' +
       '<img id="%id.button_recalc" src="%img.recalc.png" style="vertical-align:bottom;"> ' +
+      ' &nbsp;<img src="%img.divider1.png" style="vertical-align:bottom;">&nbsp; ' +
+      '<img id="%id.button_protectsheet" src="%img.lock.png" style="vertical-align:bottom;"> ' +
       " </div>",
     oncreate: null, //function(spreadsheet: any, viewobject: any) {SocialCalc.DoCmd(null, "fill-rowcolstuff");},
     onclick: null,
@@ -484,6 +487,12 @@ SpreadsheetControlSC.SpreadsheetControl = function (idPrefix: any) {
           id: s.idPrefix + "recalc",
           initialdata: scc.SCFormatRecalc,
         },
+        protected: {
+          setting: "protected",
+          type: "PopupList",
+          id: s.idPrefix + "protected",
+          initialdata: scc.SCFormatProtected,
+        },
         usermaxcol: {
           setting: "usermaxcol",
           type: "PopupList",
@@ -571,6 +580,12 @@ SpreadsheetControlSC.SpreadsheetControl = function (idPrefix: any) {
           type: "PopupList",
           id: s.idPrefix + "cpadleft",
           initialdata: scc.SCFormatPadsizes,
+        },
+        cunlocked: {
+          setting: "unlocked",
+          type: "PopupList",
+          id: s.idPrefix + "cunlocked",
+          initialdata: scc.SCFormatUnlocked,
         },
       };
 
@@ -714,6 +729,17 @@ SpreadsheetControlSC.SpreadsheetControl = function (idPrefix: any) {
       " </td>" +
       "</tr>" +
       "<tr>" +
+      " <td %itemtitle.><br>%loc!Protection!:</td>" +
+      " <td %itembody.>" +
+      '   <table cellspacing="0" cellpadding="0"><tr>' +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>&nbsp;</div>" +
+      '     <span id="%id.protected"></span>' +
+      "    </td>" +
+      "   </tr></table>" +
+      " </td>" +
+      "</tr>" +
+      "<tr>" +
       " <td %itemtitle.><br>%loc!Dimensions!:</td>" +
       " <td %itembody.>" +
       '   <table cellspacing="0" cellpadding="0"><tr>' +
@@ -846,6 +872,17 @@ SpreadsheetControlSC.SpreadsheetControl = function (idPrefix: any) {
       "    <td %bodypart.>" +
       "     <div %parttitle.>%loc!Left!</div>" +
       '     <span id="%id.cpadleft"></span>' +
+      "    </td>" +
+      "   </tr></table>" +
+      " </td>" +
+      "</tr>" +
+      "<tr>" +
+      " <td %itemtitle.><br>%loc!Protection!:</td>" +
+      " <td %itembody.>" +
+      '   <table cellspacing="0" cellpadding="0"><tr>' +
+      "    <td %bodypart.>" +
+      "     <div %parttitle.>&nbsp;</div>" +
+      '     <span id="%id.cunlocked"></span>' +
       "    </td>" +
       "   </tr></table>" +
       " </td>" +
@@ -1299,6 +1336,7 @@ SpreadsheetControlSC.InitializeSpreadsheetControl = function (
     button_hiderow: { tooltip: "Hide Row", command: "hiderow" },
     button_hidecol: { tooltip: "Hide Column", command: "hidecol" },
     button_recalc: { tooltip: "Recalculate", command: "recalc" },
+    button_protectsheet: { tooltip: "Protect/Unprotect Sheet", command: "toggleprotectsheet" },
   };
 
   for (button in spreadsheet.Buttons) {
@@ -1788,18 +1826,29 @@ SpreadsheetControlSC.SpreadsheetControlStatuslineCallback = function (
     case "doneposcalc":
       rele1 = /** @type {any} */ ((document as any).getElementById(params.recalcid1));
       rele2 = /** @type {any} */ ((document as any).getElementById(params.recalcid2));
-      if (!rele1 || !rele2) break;
-      if (editor.context.sheetobj.attribs.needsrecalc == "yes") {
-        rele1.style.display = "inline";
-        rele2.style.display = "inline";
-      } else {
-        rele1.style.display = "none";
-        rele2.style.display = "none";
+      if (rele1 && rele2) {
+        if (editor.context.sheetobj.attribs.needsrecalc == "yes") {
+          rele1.style.display = "inline";
+          rele2.style.display = "inline";
+        } else {
+          rele1.style.display = "none";
+          rele2.style.display = "none";
+        }
       }
       break;
 
     default:
       break;
+  }
+
+  if (status == "cmdendnorender" || status == "cmdend") {
+    var protectele = /** @type {any} */ ((document as any).getElementById(params.protectid));
+    if (protectele) {
+      var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+      var protectedNow = SocialCalc.IsSheetProtected(editor.context.sheetobj);
+      protectele.src = spreadsheet.imagePrefix + (protectedNow ? "unlock.png" : "lock.png");
+      protectele.title = protectedNow ? "Unprotect Sheet" : "Protect Sheet";
+    }
   }
 };
 
@@ -1924,6 +1973,14 @@ SpreadsheetControlSC.DoCmd = function (obj: any, which: any) {
 
     case "redo":
       spreadsheet.ExecuteCommand("redo", "");
+      break;
+
+    case "toggleprotectsheet":
+      sheet = spreadsheet.sheet;
+      spreadsheet.ExecuteCommand(
+        SocialCalc.IsSheetProtected(sheet) ? "unprotectsheet" : "protectsheet",
+        "",
+      );
       break;
 
     case "fill-rowcolstuff":
@@ -2197,6 +2254,10 @@ SpreadsheetControlSC.SpreadsheetCmdLookup = {
   undo: "undo",
   redo: "redo",
   recalc: "recalc",
+  protectsheet: "protectsheet",
+  unprotectsheet: "unprotectsheet",
+  unlockcell: "set %C unlocked yes",
+  lockcell: "set %C unlocked no",
 };
 
 SpreadsheetControlSC.SpreadsheetCmdSLookup = {

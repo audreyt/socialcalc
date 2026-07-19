@@ -142,6 +142,7 @@ const editorTests = [
   "test/editor-dom-coverage.test.ts",
   "test/page-scroll.test.ts",
   "test/hardening-tableeditor-commands.test.ts",
+  "test/sheet-protection.test.ts",
   "test/hardening-tableeditor-interactions.test.ts",
 ];
 
@@ -228,6 +229,8 @@ export const testsByFile = {
     "test/render-security-policy.test.ts",
     "test/sheet-cache-load-regressions.test.ts",
     "test/formula-dynamic-reference.test.ts",
+    "test/sheet-protection.test.ts",
+    "test/lemma-protect-facade.test.ts",
   ],
 
   "socialcalctableeditor.ts": editorTests,

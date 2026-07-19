@@ -427,8 +427,10 @@ shipping bundle.
   isValidNormalizedCellCoord, replaceUnquotedChar, hasBom/stripBom) are
   runtime-locked (charAt/charCodeAt loops unsupported by the Dafny backend),
   cross-checked by `test/lemma-number-parse-facade.test.ts`.
+- `lemma/protect.ts`: sheet/cell protection editability policy — readonly
+  always blocks, protection gates unlocked-only when active — 2 Dafny VCs.
 
-Total: **107 VCs (28 + 5 + 3 + 15 + 29 + 3 + 3 + 3 + 7 + 7 + 4)**.
+Total: **109 VCs (28 + 5 + 3 + 15 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2)**.
 
 After a facade edit:
 
@@ -490,6 +492,10 @@ Facade oracle mapping:
   wrapped by `Formula.ScanLookupVector`/`XMatchFunction`/`XLookupFunction`.
   `test/lemma-xlookup-facade.test.ts` cross-checks mode acceptance and
   outcome precedence against live `XMATCH()`/`XLOOKUP()` formula evaluation.
+- protect: shipping `SocialCalc.IsSheetProtected` and
+  `SocialCalc.IsCellEditable`. `test/lemma-protect-facade.test.ts`
+  cross-checks the exhaustive 3-variable truth table against the shipping
+  functions.
 
 ## Mutation testing
 

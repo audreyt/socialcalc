@@ -79,21 +79,32 @@ test("remaining Constants string data leaves match the oracle 3.0.8 baseline byt
   const SC = await loadSocialCalc();
   const Oracle = loadOracleSocialCalc();
   const candidate = pickRemainingStringLeaves(SC.Constants);
-  expect(Object.keys(candidate).length).toBe(188);
-  expect(candidate).toEqual(pickRemainingStringLeaves(Oracle.Constants));
+  // 188 oracle-matched leaves + 1 new defaultLockedComment (sheet-protection
+  // lock hint; not present in the oracle, so excluded from the equality
+  // check below via key-set diffing against the oracle candidate).
+  expect(Object.keys(candidate).length).toBe(189);
+  const oracleCandidate = pickRemainingStringLeaves(Oracle.Constants);
+  expect(candidate.defaultLockedComment).toBe("Locked cell (sheet is protected)");
+  delete candidate.defaultLockedComment;
+  expect(candidate).toEqual(oracleCandidate);
 });
 
 test("SCFormat* settings-dropdown data strings match the oracle 3.0.8 baseline byte-for-byte", async () => {
   const SC = await loadSocialCalc();
   const Oracle = loadOracleSocialCalc();
   const candidate = pickByPrefix(SC.Constants, "SCFormat");
-  // 13 keys feeding the live Format-tab dropdowns in socialcalcspreadsheetcontrol.ts
-  // (SCFormatNumberFormats, SCFormatTextFormats, SCFormatPadsizes, SCFormatFontsizes,
-  // SCFormatFontfamilies, SCFormatFontlook, SCFormatTextAlignhoriz,
-  // SCFormatNumberAlignhoriz, SCFormatAlignVertical, SCFormatColwidth,
-  // SCFormatRecalc, SCFormatUserMaxCol, SCFormatUserMaxRow).
-  expect(Object.keys(candidate).length).toBe(13);
-  expect(candidate).toEqual(pickByPrefix(Oracle.Constants, "SCFormat"));
+  // 13 oracle-matched keys feeding the live Format-tab dropdowns, plus 2 new
+  // sheet-protection dropdowns (SCFormatUnlocked, SCFormatProtected) that
+  // have no oracle counterpart.
+  expect(Object.keys(candidate).length).toBe(15);
+  const oracleCandidate = pickByPrefix(Oracle.Constants, "SCFormat");
+  expect(candidate.SCFormatUnlocked).toBe("[cancel]:|[break]:|%loc!Locked!:|%loc!Unlocked!:y|");
+  expect(candidate.SCFormatProtected).toBe(
+    "[cancel]:|[break]:|%loc!Unprotected!:|%loc!Protected!:yes|",
+  );
+  delete candidate.SCFormatUnlocked;
+  delete candidate.SCFormatProtected;
+  expect(candidate).toEqual(oracleCandidate);
 });
 
 test("s_parseerr*/s_calcerr* formula error messages match the oracle 3.0.8 baseline byte-for-byte", async () => {

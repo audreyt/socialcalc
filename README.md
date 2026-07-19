@@ -318,13 +318,15 @@ about those facades, and Vitest compares them with the shipping bundle. This is
 a formal boundary around the named policies, not a proof of the full DOM or
 command system.
 
-| Facade                   | Verified surface                                                   | Dafny VCs |
-| ------------------------ | ------------------------------------------------------------------ | --------: |
-| `lemma/a1.ts`            | A1 clamp/coordinate algebra, absolute references, overflow `#REF!` |        26 |
-| `lemma/eval-ops.ts`      | `/` and `&` type/error propagation                                 |         4 |
-| `lemma/lookup-result.ts` | exact-before-wildcard-before-miss lookup precedence                |         3 |
+| Facade                   | Verified surface                                                         | Dafny VCs |
+| ------------------------ | ------------------------------------------------------------------------ | --------: |
+| `lemma/a1.ts`            | A1 clamp/coordinate algebra, absolute references, overflow `#REF!`       |        26 |
+| `lemma/eval-ops.ts`      | `/` and `&` type/error propagation                                       |         4 |
+| `lemma/lookup-result.ts` | exact-before-wildcard-before-miss lookup precedence                      |         3 |
+| `lemma/spill.ts`         | dynamic-array spill rectangle/claim/resize/UNIQUE/SORT policies          |        15 |
+| `lemma/protect.ts`       | sheet/cell protection editability policy (readonly, protected, unlocked) |         2 |
 
-Total: **33 Dafny verification conditions**. The complete lookup table row scan
+Total: **50 Dafny verification conditions**. The complete lookup table row scan
 remains runtime-tested.
 
 | Command                     | Purpose                                                             |

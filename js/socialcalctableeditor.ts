@@ -3365,7 +3365,11 @@ TableEditorSC.SetECellHeaders = function (editor: any, selected: any) {
 //
 // ECellReadonly(editor, ecoord)
 //
-// Returns true if ecoord is readonly (or ecell if missing).
+// Returns true if ecoord is not editable (or ecell if missing) — either
+// individually read-only, or the sheet is protected and the cell is not
+// explicitly unlocked. Routes through the centralized
+// SocialCalc.IsCellEditable policy so editor gating stays consistent with
+// every command-level mutation guard.
 //
 
 /** @param {any} editor @param {any} ecoord */
@@ -3376,8 +3380,7 @@ TableEditorSC.ECellReadonly = function (editor: any, ecoord: any) {
 
   if (!ecoord) return false;
 
-  var cell = editor.context.sheetobj.cells[ecoord];
-  return cell && cell.readonly;
+  return !SocialCalc.IsCellEditable(editor.context.sheetobj, ecoord);
 };
 
 //

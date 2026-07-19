@@ -96,6 +96,7 @@ declare namespace SocialCalc {
      */
     valuetype: string;
     readonly: boolean;
+    unlocked: boolean;
 
     errors: string;
     comment: string;
@@ -346,6 +347,8 @@ declare namespace SocialCalc {
     saveundo?: boolean,
   ): void;
   function ExecuteSheetCommand(sheet: Sheet, cmd: Parse, saveundo?: boolean): string;
+  function IsSheetProtected(sheet: Sheet): boolean;
+  function IsCellEditable(sheet: Sheet, coord: string): boolean;
 
   function SheetUndo(sheet: Sheet): void;
   function SheetRedo(sheet: Sheet): void;
@@ -527,6 +530,7 @@ declare namespace SocialCalc {
     readonlyNoGridClassName: string;
     readonlyNoGridCSS: string;
     readonlyComment: string;
+    lockedComment: string;
 
     classnames: { [key: string]: string };
     explicitStyles: { [key: string]: string };

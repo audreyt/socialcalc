@@ -1360,6 +1360,70 @@ test("DoCmd: ok-setsort + dosort and named-range", async () => {
   scheduleSpy.restore();
 });
 
+test("DoCmd: toggleprotectsheet flips protection state and back", async () => {
+  const SC = await loadSocialCalc();
+  const { control } = await newControl(SC);
+  SC.SetSpreadsheetControlObject(control);
+
+  expect(SC.IsSheetProtected(control.sheet)).toBe(false);
+  SC.DoCmd(null, "toggleprotectsheet");
+  await waitEditor(control.editor);
+  expect(SC.IsSheetProtected(control.sheet)).toBe(true);
+
+  SC.DoCmd(null, "toggleprotectsheet");
+  await waitEditor(control.editor);
+  expect(SC.IsSheetProtected(control.sheet)).toBe(false);
+});
+
+test("StatuslineCallback swaps protect-button icon/title on cmdend based on protection state", async () => {
+  const SC = await loadSocialCalc();
+  const { control } = await newControl(SC);
+  SC.SetSpreadsheetControlObject(control);
+  const button = document.getElementById(control.idPrefix + "button_protectsheet") as unknown as {
+    src: string;
+    title: string;
+  };
+
+  await scheduleCommands(SC, control.sheet, "protectsheet");
+  expect(button.src).toContain("unlock.png");
+  expect(button.title).toBe("Unprotect Sheet");
+
+  await scheduleCommands(SC, control.sheet, "unprotectsheet");
+  expect(button.src).toContain("lock.png");
+  expect(button.src).not.toContain("unlock.png");
+  expect(button.title).toBe("Protect Sheet");
+});
+
+test("StatuslineCallback: direct invocation covers cmdendnorender, cmdend, and non-matching statuses", async () => {
+  const SC = await loadSocialCalc();
+  const { control } = await newControl(SC);
+  SC.SetSpreadsheetControlObject(control);
+  await scheduleCommands(SC, control.sheet, "protectsheet");
+  const button = document.getElementById(control.idPrefix + "button_protectsheet") as unknown as {
+    src: string;
+    title: string;
+  };
+
+  const params = {
+    statuslineid: control.idPrefix + "statusline",
+    recalcid1: control.idPrefix + "divider_recalc",
+    recalcid2: control.idPrefix + "button_recalc",
+    protectid: control.idPrefix + "button_protectsheet",
+  };
+
+  // Reset to a known non-matching icon state, then drive each disjunct.
+  button.src = "reset.png";
+  SC.SpreadsheetControlStatuslineCallback(control.editor, "moveecell", "", params);
+  expect(button.src).toBe("reset.png"); // non-matching status: no icon update
+
+  SC.SpreadsheetControlStatuslineCallback(control.editor, "cmdendnorender", "", params);
+  expect(button.src).toContain("unlock.png"); // left disjunct alone triggers the swap
+
+  button.src = "reset.png";
+  SC.SpreadsheetControlStatuslineCallback(control.editor, "cmdend", "", params);
+  expect(button.src).toContain("unlock.png"); // right disjunct alone triggers the swap
+});
+
 // -------------------------------------------------------------------
 // Test 17: Comment tab handlers
 // -------------------------------------------------------------------
@@ -1717,6 +1781,7 @@ test("Settings tab: Switch + Save variants + SetCurrentPanel", async () => {
     padright: { def: true, val: 0 },
     padbottom: { def: true, val: 0 },
     padleft: { def: true, val: 0 },
+    unlocked: { def: false, val: "n" },
   });
 
   // SettingControlReset calls OnReset(ctrlname) on every registered
