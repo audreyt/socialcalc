@@ -56,13 +56,22 @@ const sheetCoreTests = [
 // Formula lexer/parser/operand-stack/rewrite tests, verified by name plus
 // grep for ParseFormulaIntoTokens/ConvertInfixToPolish/OperandAs*/
 // OffsetFormulaCoords/AdjustFormulaCoords/ReplaceFormulaCoords call sites.
-// Excludes test/lemma-*-facade.test.ts on purpose: those exercise the
-// non-shipping LemmaScript mirror in lemma/a1.ts (see its header comment),
-// not the shipping js/formula-ref.ts this config mutates. Includes the
-// 2026-07-12 mutation-survivor regression files added while closing the
-// critical-scope Stryker gap (see stryker-mutation-disposition.json), the
-// semantic-audit-hardened branch-coverage file (direct SC.Formula.* calls
-// across EvaluatePolish/ConvertInfixToPolish/DecodeRangeParts/FreshnessInfo/
+// Excludes test/lemma-*-facade.test.ts on purpose EXCEPT
+// lemma-weekday-policy-facade.test.ts: every other facade test exercises
+// only the non-shipping LemmaScript mirror (see each facade's header
+// comment), but weekday-policy's facade test also has a shipping
+// cross-check describe block that calls SC.Formula.DecodeWeekendArgument
+// directly and drives live WORKDAY.INTL formula evaluations, so it kills
+// real js/formula1.ts mutants and belongs in the mutation-owned set.
+// formula-date-arithmetic.test.ts is the direct command-level coverage for
+// EDATE/EOMONTH/DATEDIF/WEEKNUM/ISOWEEKNUM/YEARFRAC/WORKDAY[.INTL]/
+// NETWORKDAYS[.INTL] added with that batch (js/formula1.ts
+// EDateEoMonthFunctions/DateDifFunction/WeekNumFunctions/YearFracFunction/
+// WorkdayNetworkdaysFunctions). Includes the 2026-07-12 mutation-survivor
+// regression files added while closing the critical-scope Stryker gap (see
+// stryker-mutation-disposition.json), the semantic-audit-hardened
+// branch-coverage file (direct SC.Formula.* calls across
+// EvaluatePolish/ConvertInfixToPolish/DecodeRangeParts/FreshnessInfo/
 // FunctionClasses/etc.), and the NaN-vs-overflow numeric-error-message
 // regression (drives EvaluatePolish via a full sheet recalc).
 const formulaOnlyTests = [
@@ -78,6 +87,8 @@ const formulaOnlyTests = [
   "test/formula-ref-mutation-survivors.test.ts",
   "test/hardening-formula-branches.test.ts",
   "test/formula-numeric-error-classification-regressions.test.ts",
+  "test/formula-date-arithmetic.test.ts",
+  "test/lemma-weekday-policy-facade.test.ts",
 ];
 
 // Differential/adversarial corpus (test/differential/**, test/adversarial/**):

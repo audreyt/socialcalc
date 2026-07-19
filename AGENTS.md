@@ -401,9 +401,15 @@ shipping bundle.
   planning (shape/bounds/resource-limit precedence), transactional claim
   classification (reclaimable vs. collision), resize membership
   (retained/grown/stale/outside), stable UNIQUE keep policy, and stable SORT
-  tie-break policy — 15 Dafny VCs.
+  tie-break policy — 15 Dafny VCs;
+- `lemma/weekday-policy.ts`: WORKDAY/WORKDAY.INTL/NETWORKDAYS/
+  NETWORKDAYS.INTL weekend-code/mask policy — numeric weekend-code legality
+  and decode to a Mon..Sun mask, weekend-mask legality (rejects the
+  all-non-working mask), per-day mask lookup, and the working-day/step-
+  direction decision — 29 Dafny VCs. Calendar/holiday-scan loops stay
+  runtime-tested.
 
-Total: **48 VCs (26 + 4 + 3 + 15)**.
+Total: **77 VCs (26 + 4 + 3 + 15 + 29)**.
 
 After a facade edit:
 
@@ -439,7 +445,12 @@ Facade oracle mapping:
   `Formula.StableTieCompare`, and the `Formula.SPILL_MAX_COL`/
   `SPILL_MAX_ROW`/`SPILL_MAX_CELLS` constants. `test/lemma-spill-facade.test.ts`
   cross-checks every function against its shipping counterpart exhaustively
-  and at boundary cases, plus a live `SORT()`/`UNIQUE()` formula smoke test.
+  and at boundary cases, plus a live `SORT()`/`UNIQUE()` formula smoke test;
+- weekday policy: shipping `Formula.DecodeWeekendArgument` (exhaustive over
+  every legal numeric weekend code) plus a live `WORKDAY.INTL()` formula
+  smoke test asserting the shipping evaluator never lands on a day the
+  facade classifies as non-working for the same mask. See
+  `test/lemma-weekday-policy-facade.test.ts`.
 
 ## Mutation testing
 

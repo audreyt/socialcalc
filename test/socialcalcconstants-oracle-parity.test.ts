@@ -190,26 +190,49 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
   // scc["s_fdef_" + fname] / scc["s_farg_" + f[2]] for the formula-entry help popup
   // — the second-largest StringLiteral survivor cluster in the file.
   //
-  // RANK/MEDIAN/QUARTILE (audreyt/ethercalc#712, #726) and SORT/UNIQUE (dynamic-array
-  // spill support) were added after the 3.0.8 baseline was vendored, so the oracle
-  // bundle can never contain their s_fdef_/s_farg_ keys — a byte-for-byte toEqual
-  // against the full candidate object would fail permanently on these nine keys
-  // alone, regardless of correctness. Carve out exactly this named, closed set
-  // (5 s_fdef_ + 4 s_farg_) before the oracle comparison; every other key still
-  // gets whole-object byte-for-byte parity, and the total counts (120/42) stay
-  // pinned so a future undocumented addition or removal still fails loudly instead
-  // of silently passing through this carve-out.
+  // RANK/MEDIAN/QUARTILE (audreyt/ethercalc#712, #726), SORT/UNIQUE (dynamic-array
+  // spill support), and EDATE/EOMONTH/DATEDIF/WEEKNUM/ISOWEEKNUM/YEARFRAC/WORKDAY/
+  // NETWORKDAYS/WORKDAY.INTL/NETWORKDAYS.INTL (date-arithmetic/workday compatibility
+  // batch) were added after the 3.0.8 baseline was vendored, so the oracle bundle can
+  // never contain their s_fdef_/s_farg_ keys — a byte-for-byte toEqual against the
+  // full candidate object would fail permanently on these keys alone, regardless of
+  // correctness. Carve out exactly this named, closed set (15 s_fdef_ + 10 s_farg_)
+  // before the oracle comparison; every other key still gets whole-object
+  // byte-for-byte parity, and the total counts (130/48) stay pinned so a future
+  // undocumented addition or removal still fails loudly instead of silently passing
+  // through this carve-out.
   const postOracleFdefKeys = [
     "s_fdef_RANK",
     "s_fdef_MEDIAN",
     "s_fdef_QUARTILE",
     "s_fdef_SORT",
     "s_fdef_UNIQUE",
+    "s_fdef_EDATE",
+    "s_fdef_EOMONTH",
+    "s_fdef_DATEDIF",
+    "s_fdef_WEEKNUM",
+    "s_fdef_ISOWEEKNUM",
+    "s_fdef_YEARFRAC",
+    "s_fdef_WORKDAY",
+    "s_fdef_NETWORKDAYS",
+    "s_fdef_WORKDAY.INTL",
+    "s_fdef_NETWORKDAYS.INTL",
   ];
-  const postOracleFargKeys = ["s_farg_rank", "s_farg_quartile", "s_farg_sort", "s_farg_unique"];
+  const postOracleFargKeys = [
+    "s_farg_rank",
+    "s_farg_quartile",
+    "s_farg_sort",
+    "s_farg_unique",
+    "s_farg_edate",
+    "s_farg_datedif",
+    "s_farg_weeknum",
+    "s_farg_yearfrac",
+    "s_farg_workday",
+    "s_farg_workdayintl",
+  ];
 
-  expect(Object.keys(candidateFdef).length).toBe(120);
-  expect(Object.keys(candidateFarg).length).toBe(42);
+  expect(Object.keys(candidateFdef).length).toBe(130);
+  expect(Object.keys(candidateFarg).length).toBe(48);
 
   const legacyFdef = { ...candidateFdef };
   const legacyFarg = { ...candidateFarg };
@@ -221,12 +244,14 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
   expect(legacyFdef).toEqual(pickByPrefix(Oracle.Constants, "s_fdef_"));
   expect(legacyFarg).toEqual(pickByPrefix(Oracle.Constants, "s_farg_"));
 
-  // The nine post-3.0.8 keys have no oracle counterpart to diff against. The
-  // focused statistical-formula test (test/formula-rank-median-quartile.test.ts,
+  // The twenty-five post-3.0.8 keys have no oracle counterpart to diff against.
+  // The focused statistical-formula test (test/formula-rank-median-quartile.test.ts,
   // "RANK/MEDIAN/QUARTILE are registered in FunctionList with help text and arg
-  // strings") covers FunctionList/picker plumbing for RANK/MEDIAN/QUARTILE, and
-  // test/formula-dynamic-arrays.test.ts covers SORT/UNIQUE behavior; this test
-  // only asserts every carved-out key has non-empty help text.
+  // strings") covers FunctionList/picker plumbing for RANK/MEDIAN/QUARTILE,
+  // test/formula-dynamic-arrays.test.ts covers SORT/UNIQUE behavior, and
+  // test/formula-date-arithmetic.test.ts covers the date-arithmetic/workday
+  // compatibility batch; this test only asserts every carved-out key has
+  // non-empty help text.
   for (const key of postOracleFdefKeys) {
     expect(candidateFdef[key]).toBeTruthy();
   }

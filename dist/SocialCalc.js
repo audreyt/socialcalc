@@ -714,6 +714,26 @@
     s_fdef_WEEKDAY:
       'Returns the day of week specified by the date value. If type is 1 (the default), Sunday is day and Saturday is day 7. If type is 2, Monday is day 1 and Sunday is day 7. If type is 3, Monday is day 0 and Sunday is day 6. ',
     s_fdef_YEAR: 'Returns the year part of a date value. ',
+    s_fdef_EDATE:
+      'Returns the date that is the specified number of months before or after start_date, clipping the day of month to the last day of the target month when it does not exist there (e.g. Jan 31 + 1 month is Feb 28 or Feb 29). ',
+    s_fdef_EOMONTH:
+      'Returns the serial number of the last day of the month that is the specified number of months before or after start_date. ',
+    s_fdef_DATEDIF:
+      'Returns the difference between start_date and end_date in the units given by unit: "Y" complete years, "M" complete months, "D" days, "MD" days ignoring months and years, "YM" months ignoring years, "YD" days ignoring years. start_date must not be after end_date (#NUM!). ',
+    s_fdef_WEEKNUM:
+      'Returns the week number of a date within the year. return_type selects the week-start day (1 or 17 = Sunday, 2 or 11 = Monday, 12-16 = Tuesday..Saturday, 21 = ISO week numbering, same as ISOWEEKNUM); the default is 1. ',
+    s_fdef_ISOWEEKNUM:
+      "Returns the ISO 8601 week number of a date: weeks start Monday and week 1 is the week containing the year's first Thursday. ",
+    s_fdef_YEARFRAC:
+      'Returns the fraction of a year between start_date and end_date. basis selects the day-count convention: 0 (default) US (NASD) 30/360, 1 actual/actual, 2 actual/360, 3 actual/365, 4 European 30/360. ',
+    s_fdef_WORKDAY:
+      'Returns the date that is days working days before or after start_date, skipping Saturdays, Sundays, and any dates in the optional holidays range. ',
+    s_fdef_NETWORKDAYS:
+      'Returns the number of whole working days between start_date and end_date inclusive, skipping Saturdays, Sundays, and any dates in the optional holidays range. Negative if start_date is after end_date. ',
+    's_fdef_WORKDAY.INTL':
+      'Like WORKDAY, but with a configurable weekend: weekend is either a numeric code (1-7 selects a two-day weekend pair, 11-17 selects one weekend day) or a 7-character "0"/"1" mask (Monday..Sunday, "1" = non-working). ',
+    's_fdef_NETWORKDAYS.INTL':
+      'Like NETWORKDAYS, but with a configurable weekend: weekend is either a numeric code (1-7 selects a two-day weekend pair, 11-17 selects one weekend day) or a 7-character "0"/"1" mask (Monday..Sunday, "1" = non-working). ',
     s_fdef_SUMPRODUCT:
       'Sums the pairwise products of 2 or more ranges. The ranges must be of equal length.',
     s_fdef_CEILING:
@@ -760,6 +780,12 @@
     s_farg_dt: 'date',
     s_farg_rangen: 'range1, range2, ...',
     s_farg_vsig: 'value, [significance]',
+    s_farg_edate: 'start_date, months',
+    s_farg_datedif: 'start_date, end_date, unit',
+    s_farg_weeknum: 'serial_number, [return_type]',
+    s_farg_yearfrac: 'start_date, end_date, [basis]',
+    s_farg_workday: 'start_date, days_or_end_date, [holidays]',
+    s_farg_workdayintl: 'start_date, days_or_end_date, [weekend], [holidays]',
     function_classlist: [
       'all',
       'stat',
@@ -15023,6 +15049,557 @@ More comments yet to come...
     SocialCalc.Formula.DMYFunctions,
     -1,
     'weekday',
+    '',
+    'datetime',
+  ];
+  FormulaMut.EDateEoMonthFunctions = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var result = 0;
+    var PushOperand = function (t, v) {
+      operand.push({
+        type: t,
+        value: v,
+      });
+    };
+    var startdate = scf.OperandAsNumber(sheet, foperand);
+    var months = scf.OperandAsNumber(sheet, foperand);
+    var resulttype = scf.LookupResultType(
+      startdate.type,
+      months.type,
+      scf.TypeLookupTable.twoargnumeric,
+    );
+    if (resulttype.charAt(0) != 'n') {
+      PushOperand(resulttype, result);
+      return;
+    }
+    var ymd = SocialCalc.FormatNumber.convert_date_julian_to_gregorian(
+      Math.floor(startdate.value + SocialCalc.FormatNumber.datevalues.julian_offset),
+    );
+    var totalMonths = ymd.year * 12 + (ymd.month - 1) + Math.trunc(months.value);
+    var targetYear = Math.floor(totalMonths / 12);
+    var targetMonth = totalMonths - targetYear * 12 + 1;
+    if (fname == 'EOMONTH') {
+      var nextMonth1 =
+        SocialCalc.FormatNumber.convert_date_gregorian_to_julian(targetYear, targetMonth + 1, 1) -
+        SocialCalc.FormatNumber.datevalues.julian_offset;
+      result = nextMonth1 - 1;
+    } else {
+      var thisMonth1 =
+        SocialCalc.FormatNumber.convert_date_gregorian_to_julian(targetYear, targetMonth, 1) -
+        SocialCalc.FormatNumber.datevalues.julian_offset;
+      var nextMonth1b =
+        SocialCalc.FormatNumber.convert_date_gregorian_to_julian(targetYear, targetMonth + 1, 1) -
+        SocialCalc.FormatNumber.datevalues.julian_offset;
+      var daysInTargetMonth = nextMonth1b - thisMonth1;
+      var clippedDay = Math.min(ymd.day, daysInTargetMonth);
+      result = thisMonth1 + clippedDay - 1;
+    }
+    PushOperand('nd', result);
+    return;
+  };
+  SocialCalc.Formula.FunctionList['EDATE'] = [
+    SocialCalc.Formula.EDateEoMonthFunctions,
+    2,
+    'edate',
+    '',
+    'datetime',
+  ];
+  SocialCalc.Formula.FunctionList['EOMONTH'] = [
+    SocialCalc.Formula.EDateEoMonthFunctions,
+    2,
+    'edate',
+    '',
+    'datetime',
+  ];
+  FormulaMut.DateDifFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var PushOperand = function (t, v) {
+      operand.push({
+        type: t,
+        value: v,
+      });
+    };
+    var startdate = scf.OperandAsNumber(sheet, foperand);
+    var enddate = scf.OperandAsNumber(sheet, foperand);
+    var unitop = scf.OperandAsText(sheet, foperand);
+    var resulttype = scf.LookupResultType(
+      startdate.type,
+      enddate.type,
+      scf.TypeLookupTable.twoargnumeric,
+    );
+    if (resulttype.charAt(0) != 'n') {
+      PushOperand(resulttype, 0);
+      return;
+    }
+    if (unitop.type.charAt(0) == 'e') {
+      PushOperand(unitop.type, 0);
+      return;
+    }
+    var startS = Math.floor(startdate.value);
+    var endS = Math.floor(enddate.value);
+    var unit = String(unitop.value).toUpperCase();
+    if (startS > endS) {
+      PushOperand('e#NUM!', 0);
+      return;
+    }
+    var s = SocialCalc.FormatNumber.convert_date_julian_to_gregorian(
+      startS + SocialCalc.FormatNumber.datevalues.julian_offset,
+    );
+    var e = SocialCalc.FormatNumber.convert_date_julian_to_gregorian(
+      endS + SocialCalc.FormatNumber.datevalues.julian_offset,
+    );
+    var daysInMonth = function (year, month) {
+      var thisMonth1 =
+        SocialCalc.FormatNumber.convert_date_gregorian_to_julian(year, month, 1) -
+        SocialCalc.FormatNumber.datevalues.julian_offset;
+      var nextMonth1 =
+        SocialCalc.FormatNumber.convert_date_gregorian_to_julian(year, month + 1, 1) -
+        SocialCalc.FormatNumber.datevalues.julian_offset;
+      return nextMonth1 - thisMonth1;
+    };
+    var result;
+    if (unit == 'Y') {
+      result = e.year - s.year;
+      if (e.month < s.month || (e.month == s.month && e.day < s.day)) result--;
+    } else if (unit == 'M') {
+      result = (e.year - s.year) * 12 + (e.month - s.month);
+      if (e.day < s.day) result--;
+    } else if (unit == 'D') {
+      result = endS - startS;
+    } else if (unit == 'MD') {
+      if (e.day >= s.day) {
+        result = e.day - s.day;
+      } else {
+        var pm = e.month - 1;
+        var py = e.year;
+        if (pm < 1) {
+          pm = 12;
+          py--;
+        }
+        result = daysInMonth(py, pm) + e.day - s.day;
+      }
+    } else if (unit == 'YM') {
+      var ym = e.month - s.month;
+      if (e.day < s.day) ym--;
+      result = ((ym % 12) + 12) % 12;
+    } else if (unit == 'YD') {
+      var adjYear = e.year;
+      var adjStart =
+        SocialCalc.FormatNumber.convert_date_gregorian_to_julian(adjYear, s.month, s.day) -
+        SocialCalc.FormatNumber.datevalues.julian_offset;
+      if (adjStart > endS) {
+        adjYear--;
+        adjStart =
+          SocialCalc.FormatNumber.convert_date_gregorian_to_julian(adjYear, s.month, s.day) -
+          SocialCalc.FormatNumber.datevalues.julian_offset;
+      }
+      result = endS - adjStart;
+    } else {
+      PushOperand('e#NUM!', 0);
+      return;
+    }
+    PushOperand('n', result);
+    return;
+  };
+  SocialCalc.Formula.FunctionList['DATEDIF'] = [
+    SocialCalc.Formula.DateDifFunction,
+    3,
+    'datedif',
+    '',
+    'datetime',
+  ];
+  FormulaMut.SundayDowForSerial = function (serial) {
+    return (((Math.floor(serial) + 6) % 7) + 7) % 7;
+  };
+  FormulaMut.IsoWeekNumForSerial = function (serial) {
+    var scf = SocialCalc.Formula;
+    var sundayDow = scf.SundayDowForSerial(serial);
+    var isoDow = sundayDow == 0 ? 7 : sundayDow;
+    var thursday = Math.floor(serial) - isoDow + 4;
+    var thursdayYmd = SocialCalc.FormatNumber.convert_date_julian_to_gregorian(
+      thursday + SocialCalc.FormatNumber.datevalues.julian_offset,
+    );
+    var jan1OfThursdayYear =
+      SocialCalc.FormatNumber.convert_date_gregorian_to_julian(thursdayYmd.year, 1, 1) -
+      SocialCalc.FormatNumber.datevalues.julian_offset;
+    return Math.floor((thursday - jan1OfThursdayYear) / 7) + 1;
+  };
+  FormulaMut.WeekNumFunctions = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var PushOperand = function (t, v) {
+      operand.push({
+        type: t,
+        value: v,
+      });
+    };
+    var serialoperand = scf.OperandAsNumber(sheet, foperand);
+    var returntype = {
+      value: 1,
+      type: 'n',
+    };
+    if (fname == 'WEEKNUM' && foperand.length) {
+      returntype = scf.OperandAsNumber(sheet, foperand);
+      if (returntype.type.charAt(0) != 'n') {
+        PushOperand(returntype.type, 0);
+        return;
+      }
+      if (foperand.length) {
+        scf.FunctionArgsError(fname, operand);
+        return;
+      }
+    }
+    var resulttype = scf.LookupResultType(
+      serialoperand.type,
+      serialoperand.type,
+      scf.TypeLookupTable.oneargnumeric,
+    );
+    if (resulttype.charAt(0) != 'n') {
+      PushOperand(resulttype, 0);
+      return;
+    }
+    var serial = serialoperand.value;
+    if (fname == 'ISOWEEKNUM') {
+      PushOperand('n', scf.IsoWeekNumForSerial(serial));
+      return;
+    }
+    if (returntype.value == 21) {
+      PushOperand('n', scf.IsoWeekNumForSerial(serial));
+      return;
+    }
+    var startDowByType = {
+      1: 0,
+      17: 0,
+      2: 1,
+      11: 1,
+      12: 2,
+      13: 3,
+      14: 4,
+      15: 5,
+      16: 6,
+    };
+    var startDow = startDowByType[returntype.value];
+    if (startDow === undefined) {
+      PushOperand('e#NUM!', 0);
+      return;
+    }
+    var ymd = SocialCalc.FormatNumber.convert_date_julian_to_gregorian(
+      Math.floor(serial) + SocialCalc.FormatNumber.datevalues.julian_offset,
+    );
+    var jan1 =
+      SocialCalc.FormatNumber.convert_date_gregorian_to_julian(ymd.year, 1, 1) -
+      SocialCalc.FormatNumber.datevalues.julian_offset;
+    var jan1Dow = scf.SundayDowForSerial(jan1);
+    var daysFromWeekStart = (jan1Dow - startDow + 7) % 7;
+    var weekStartOfJan1Week = jan1 - daysFromWeekStart;
+    var weekNum = Math.floor((Math.floor(serial) - weekStartOfJan1Week) / 7) + 1;
+    PushOperand('n', weekNum);
+    return;
+  };
+  SocialCalc.Formula.FunctionList['WEEKNUM'] = [
+    SocialCalc.Formula.WeekNumFunctions,
+    -1,
+    'weeknum',
+    '',
+    'datetime',
+  ];
+  SocialCalc.Formula.FunctionList['ISOWEEKNUM'] = [
+    SocialCalc.Formula.WeekNumFunctions,
+    1,
+    'v',
+    '',
+    'datetime',
+  ];
+  FormulaMut.YearFracFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var PushOperand = function (t, v) {
+      operand.push({
+        type: t,
+        value: v,
+      });
+    };
+    var startdate = scf.OperandAsNumber(sheet, foperand);
+    var enddate = scf.OperandAsNumber(sheet, foperand);
+    var basisoperand = {
+      value: 0,
+      type: 'n',
+    };
+    if (foperand.length) {
+      basisoperand = scf.OperandAsNumber(sheet, foperand);
+      if (basisoperand.type.charAt(0) != 'n') {
+        PushOperand(basisoperand.type, 0);
+        return;
+      }
+      if (foperand.length) {
+        scf.FunctionArgsError(fname, operand);
+        return;
+      }
+    }
+    var resulttype = scf.LookupResultType(
+      startdate.type,
+      enddate.type,
+      scf.TypeLookupTable.twoargnumeric,
+    );
+    if (resulttype.charAt(0) != 'n') {
+      PushOperand(resulttype, 0);
+      return;
+    }
+    var basis = Math.trunc(basisoperand.value);
+    if (basis < 0 || basis > 4) {
+      PushOperand('e#NUM!', 0);
+      return;
+    }
+    var startS = Math.floor(startdate.value);
+    var endS = Math.floor(enddate.value);
+    if (startS > endS) {
+      var tmp = startS;
+      startS = endS;
+      endS = tmp;
+    }
+    if (startS == endS) {
+      PushOperand('n', 0);
+      return;
+    }
+    var s = SocialCalc.FormatNumber.convert_date_julian_to_gregorian(
+      startS + SocialCalc.FormatNumber.datevalues.julian_offset,
+    );
+    var e = SocialCalc.FormatNumber.convert_date_julian_to_gregorian(
+      endS + SocialCalc.FormatNumber.datevalues.julian_offset,
+    );
+    var isLeapYear = function (y) {
+      return (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
+    };
+    var result;
+    if (basis == 0 || basis == 4) {
+      var d1 = s.day;
+      var d2 = e.day;
+      if (basis == 0) {
+        var startLastDayOfMonth =
+          SocialCalc.FormatNumber.convert_date_gregorian_to_julian(s.year, s.month + 1, 1) -
+          SocialCalc.FormatNumber.convert_date_gregorian_to_julian(s.year, s.month, 1);
+        var startIsLastFeb = s.month == 2 && s.day == startLastDayOfMonth;
+        if (startIsLastFeb) d1 = 30;
+        if (d1 == 31) d1 = 30;
+        var endLastDayOfMonth =
+          SocialCalc.FormatNumber.convert_date_gregorian_to_julian(e.year, e.month + 1, 1) -
+          SocialCalc.FormatNumber.convert_date_gregorian_to_julian(e.year, e.month, 1);
+        var endIsLastFeb = e.month == 2 && e.day == endLastDayOfMonth;
+        if (endIsLastFeb && startIsLastFeb) d2 = 30;
+        if (d2 == 31 && d1 == 30) d2 = 30;
+      } else {
+        d1 = Math.min(d1, 30);
+        d2 = Math.min(d2, 30);
+      }
+      var days360 = (e.year - s.year) * 360 + (e.month - s.month) * 30 + (d2 - d1);
+      result = days360 / 360;
+    } else if (basis == 2) {
+      result = (endS - startS) / 360;
+    } else if (basis == 3) {
+      result = (endS - startS) / 365;
+    } else {
+      if (s.year == e.year) {
+        result = (endS - startS) / (isLeapYear(s.year) ? 366 : 365);
+      } else {
+        var totalDays = 0;
+        for (var y = s.year; y <= e.year; y++) {
+          totalDays += isLeapYear(y) ? 366 : 365;
+        }
+        var avgYearDays = totalDays / (e.year - s.year + 1);
+        result = (endS - startS) / avgYearDays;
+      }
+    }
+    PushOperand('n', result);
+    return;
+  };
+  SocialCalc.Formula.FunctionList['YEARFRAC'] = [
+    SocialCalc.Formula.YearFracFunction,
+    -2,
+    'yearfrac',
+    '',
+    'datetime',
+  ];
+  FormulaMut.DEFAULT_WEEKEND_MASK = 96;
+  FormulaMut.DecodeWeekendArgument = function (value, valuetype) {
+    if (valuetype.charAt(0) == 'e') {
+      return {
+        mask: 0,
+        errortype: valuetype,
+      };
+    }
+    if (valuetype.charAt(0) == 'n') {
+      var code = Math.trunc(value);
+      var mask;
+      if (code >= 1 && code <= 7) {
+        var first = (code + 4) % 7;
+        var second = (first + 1) % 7;
+        mask = Math.pow(2, first) + Math.pow(2, second);
+      } else if (code >= 11 && code <= 17) {
+        mask = Math.pow(2, (code + 2) % 7);
+      } else {
+        return {
+          mask: 0,
+          errortype: 'e#NUM!',
+        };
+      }
+      return {
+        mask,
+        errortype: '',
+      };
+    }
+    if (valuetype.charAt(0) == 't') {
+      var str = String(value);
+      if (str.length != 7) {
+        return {
+          mask: 0,
+          errortype: 'e#VALUE!',
+        };
+      }
+      var strmask = 0;
+      for (var i = 0; i < 7; i++) {
+        var ch = str.charAt(i);
+        if (ch != '0' && ch != '1') {
+          return {
+            mask: 0,
+            errortype: 'e#VALUE!',
+          };
+        }
+        if (ch == '1') strmask += Math.pow(2, i);
+      }
+      if (strmask == 127) {
+        return {
+          mask: 0,
+          errortype: 'e#VALUE!',
+        };
+      }
+      return {
+        mask: strmask,
+        errortype: '',
+      };
+    }
+    return {
+      mask: 0,
+      errortype: 'e#VALUE!',
+    };
+  };
+  FormulaMut.CollectHolidaySerials = function (sheet, holidayoperand) {
+    var scf = SocialCalc.Formula;
+    var holidays = new Set();
+    if (holidayoperand.type == 'range' || holidayoperand.type == 'coord') {
+      var holidaylist = [holidayoperand];
+      while (holidaylist.length > 0) {
+        var value = scf.OperandValueAndType(sheet, holidaylist);
+        if (value.type.charAt(0) == 'n') {
+          holidays.add(Math.floor(value.value));
+        }
+      }
+      return holidays;
+    }
+    if (holidayoperand.type.charAt(0) == 'n') {
+      holidays.add(Math.floor(holidayoperand.value));
+      return holidays;
+    }
+    return null;
+  };
+  FormulaMut.WorkdayNetworkdaysFunctions = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var isIntl = fname == 'WORKDAY.INTL' || fname == 'NETWORKDAYS.INTL';
+    var isWorkday = fname == 'WORKDAY' || fname == 'WORKDAY.INTL';
+    var PushOperand = function (t, v) {
+      operand.push({
+        type: t,
+        value: v,
+      });
+    };
+    var startdate = scf.OperandAsNumber(sheet, foperand);
+    var secondarg = scf.OperandAsNumber(sheet, foperand);
+    var resulttype = scf.LookupResultType(
+      startdate.type,
+      secondarg.type,
+      scf.TypeLookupTable.twoargnumeric,
+    );
+    if (resulttype.charAt(0) != 'n') {
+      PushOperand(resulttype, 0);
+      return;
+    }
+    var mask = scf.DEFAULT_WEEKEND_MASK;
+    if (isIntl && foperand.length) {
+      var weekendoperand = scf.OperandValueAndType(sheet, foperand);
+      var decoded = scf.DecodeWeekendArgument(weekendoperand.value, weekendoperand.type);
+      if (decoded.errortype) {
+        PushOperand(decoded.errortype, 0);
+        return;
+      }
+      mask = decoded.mask;
+    }
+    var holidays = null;
+    if (foperand.length) {
+      var holidayoperand = scf.TopOfStackValueAndType(sheet, foperand);
+      holidays = scf.CollectHolidaySerials(sheet, holidayoperand);
+      if (holidays === null) {
+        PushOperand('e#VALUE!', 0);
+        return;
+      }
+      if (foperand.length) {
+        scf.FunctionArgsError(fname, operand);
+        return;
+      }
+    }
+    var dayIsWorking = function (serial) {
+      var sundayDow = (((Math.floor(serial) + 6) % 7) + 7) % 7;
+      var isoDow = (sundayDow + 6) % 7;
+      var dayOff = Math.floor(mask / Math.pow(2, isoDow)) % 2 == 1;
+      if (dayOff) return false;
+      if (holidays && holidays.has(Math.floor(serial))) return false;
+      return true;
+    };
+    if (isWorkday) {
+      var days = Math.trunc(secondarg.value);
+      var direction = days > 0 ? 1 : days < 0 ? -1 : 0;
+      var remaining = Math.abs(days);
+      var cur = Math.floor(startdate.value);
+      while (remaining > 0) {
+        cur += direction;
+        if (dayIsWorking(cur)) remaining--;
+      }
+      PushOperand('nd', cur);
+      return;
+    }
+    var startS = Math.floor(startdate.value);
+    var endS = Math.floor(secondarg.value);
+    var direction2 = startS <= endS ? 1 : -1;
+    var lo = Math.min(startS, endS);
+    var hi = Math.max(startS, endS);
+    var count = 0;
+    for (var d = lo; d <= hi; d++) {
+      if (dayIsWorking(d)) count++;
+    }
+    PushOperand('n', direction2 * count);
+    return;
+  };
+  SocialCalc.Formula.FunctionList['WORKDAY'] = [
+    SocialCalc.Formula.WorkdayNetworkdaysFunctions,
+    -2,
+    'workday',
+    '',
+    'datetime',
+  ];
+  SocialCalc.Formula.FunctionList['NETWORKDAYS'] = [
+    SocialCalc.Formula.WorkdayNetworkdaysFunctions,
+    -2,
+    'workday',
+    '',
+    'datetime',
+  ];
+  SocialCalc.Formula.FunctionList['WORKDAY.INTL'] = [
+    SocialCalc.Formula.WorkdayNetworkdaysFunctions,
+    -2,
+    'workdayintl',
+    '',
+    'datetime',
+  ];
+  SocialCalc.Formula.FunctionList['NETWORKDAYS.INTL'] = [
+    SocialCalc.Formula.WorkdayNetworkdaysFunctions,
+    -2,
+    'workdayintl',
     '',
     'datetime',
   ];

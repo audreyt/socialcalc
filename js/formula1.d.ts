@@ -417,6 +417,22 @@ declare namespace SocialCalc {
     const DateFunction: FormulaFunctionImpl;
     const TimeFunction: FormulaFunctionImpl;
     const DMYFunctions: FormulaFunctionImpl;
+    const EDateEoMonthFunctions: FormulaFunctionImpl;
+    const DateDifFunction: FormulaFunctionImpl;
+    function SundayDowForSerial(serial: number): number;
+    function IsoWeekNumForSerial(serial: number): number;
+    const WeekNumFunctions: FormulaFunctionImpl;
+    const YearFracFunction: FormulaFunctionImpl;
+    const DEFAULT_WEEKEND_MASK: number;
+    function DecodeWeekendArgument(
+      value: unknown,
+      valuetype: FormulaOperandType,
+    ): { mask: number; errortype: string };
+    function CollectHolidaySerials(
+      sheet: Sheet,
+      holidayoperand: FormulaOperand,
+    ): Set<number> | null;
+    const WorkdayNetworkdaysFunctions: FormulaFunctionImpl;
     const HMSFunctions: FormulaFunctionImpl;
     const ExactFunction: FormulaFunctionImpl;
     const StringFunctions: FormulaFunctionImpl;

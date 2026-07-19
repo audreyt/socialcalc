@@ -889,6 +889,26 @@ ConstantsRoot.Constants = {
   s_fdef_WEEKDAY:
     "Returns the day of week specified by the date value. If type is 1 (the default), Sunday is day and Saturday is day 7. If type is 2, Monday is day 1 and Sunday is day 7. If type is 3, Monday is day 0 and Sunday is day 6. ",
   s_fdef_YEAR: "Returns the year part of a date value. ",
+  s_fdef_EDATE:
+    "Returns the date that is the specified number of months before or after start_date, clipping the day of month to the last day of the target month when it does not exist there (e.g. Jan 31 + 1 month is Feb 28 or Feb 29). ",
+  s_fdef_EOMONTH:
+    "Returns the serial number of the last day of the month that is the specified number of months before or after start_date. ",
+  s_fdef_DATEDIF:
+    'Returns the difference between start_date and end_date in the units given by unit: "Y" complete years, "M" complete months, "D" days, "MD" days ignoring months and years, "YM" months ignoring years, "YD" days ignoring years. start_date must not be after end_date (#NUM!). ',
+  s_fdef_WEEKNUM:
+    "Returns the week number of a date within the year. return_type selects the week-start day (1 or 17 = Sunday, 2 or 11 = Monday, 12-16 = Tuesday..Saturday, 21 = ISO week numbering, same as ISOWEEKNUM); the default is 1. ",
+  s_fdef_ISOWEEKNUM:
+    "Returns the ISO 8601 week number of a date: weeks start Monday and week 1 is the week containing the year's first Thursday. ",
+  s_fdef_YEARFRAC:
+    "Returns the fraction of a year between start_date and end_date. basis selects the day-count convention: 0 (default) US (NASD) 30/360, 1 actual/actual, 2 actual/360, 3 actual/365, 4 European 30/360. ",
+  s_fdef_WORKDAY:
+    "Returns the date that is days working days before or after start_date, skipping Saturdays, Sundays, and any dates in the optional holidays range. ",
+  s_fdef_NETWORKDAYS:
+    "Returns the number of whole working days between start_date and end_date inclusive, skipping Saturdays, Sundays, and any dates in the optional holidays range. Negative if start_date is after end_date. ",
+  "s_fdef_WORKDAY.INTL":
+    'Like WORKDAY, but with a configurable weekend: weekend is either a numeric code (1-7 selects a two-day weekend pair, 11-17 selects one weekend day) or a 7-character "0"/"1" mask (Monday..Sunday, "1" = non-working). ',
+  "s_fdef_NETWORKDAYS.INTL":
+    'Like NETWORKDAYS, but with a configurable weekend: weekend is either a numeric code (1-7 selects a two-day weekend pair, 11-17 selects one weekend day) or a 7-character "0"/"1" mask (Monday..Sunday, "1" = non-working). ',
   s_fdef_SUMPRODUCT:
     "Sums the pairwise products of 2 or more ranges. The ranges must be of equal length.",
   s_fdef_CEILING:
@@ -936,6 +956,12 @@ ConstantsRoot.Constants = {
   s_farg_dt: "date",
   s_farg_rangen: "range1, range2, ...",
   s_farg_vsig: "value, [significance]",
+  s_farg_edate: "start_date, months",
+  s_farg_datedif: "start_date, end_date, unit",
+  s_farg_weeknum: "serial_number, [return_type]",
+  s_farg_yearfrac: "start_date, end_date, [basis]",
+  s_farg_workday: "start_date, days_or_end_date, [holidays]",
+  s_farg_workdayintl: "start_date, days_or_end_date, [weekend], [holidays]",
 
   function_classlist: [
     "all",
