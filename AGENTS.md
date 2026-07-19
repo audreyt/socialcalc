@@ -408,8 +408,13 @@ shipping bundle.
   all-non-working mask), per-day mask lookup, and the working-day/step-
   direction decision — 29 Dafny VCs. Calendar/holiday-scan loops stay
   runtime-tested.
+- `lemma/statistics.ts`: RANK.AVG tie-averaging and QUARTILE.EXC
+  interpolation-domain policies, restated as exact-integer arithmetic (the
+  real-valued average/position are unverified one-line bridges around the
+  proved integer core, same split as `spill.ts`'s `planSpillRectangle`) —
+  3 Dafny VCs.
 
-Total: **77 VCs (26 + 4 + 3 + 15 + 29)**.
+Total: **87 VCs (26 + 5 + 3 + 15 + 29 + 3 + 3 + 3)**.
 
 After a facade edit:
 
@@ -451,6 +456,15 @@ Facade oracle mapping:
   smoke test asserting the shipping evaluator never lands on a day the
   facade classifies as non-working for the same mask. See
   `test/lemma-weekday-policy-facade.test.ts`.
+- statistics: shipping `Formula.DoubledAverageRank`,
+  `Formula.QuartileExcScaledPosition`, `Formula.IsValidQuartileExcPosition`.
+  `test/lemma-statistics-facade.test.ts` cross-checks every function against
+  its shipping counterpart exhaustively over small inputs, plus live
+  `RANK.AVG()`/`QUARTILE.EXC()` formula smoke tests. Not every new pure
+  helper in the math/stat compatibility batch gets a facade — see
+  `lemma/statistics.ts`'s header for the deliberate scope boundary (only
+  genuinely integer-exact boundary/tie classification is proved; plain
+  arithmetic folds and floating-point iterative solvers are not).
 
 ## Mutation testing
 

@@ -210,6 +210,8 @@ test("math1 functions cover their branches and error paths", async () => {
     "set E2 formula SQRT(A2)",
     "set E3 formula TAN(0)",
     "set E5 formula SIGN(-10)",
+    "set E6 formula SIGN(7)",
+    "set E7 formula SIGN(0)",
   ]);
 
   expect(getDV("B1")).toBe(2);
@@ -242,8 +244,13 @@ test("math1 functions cover their branches and error paths", async () => {
   expect(getDV("E1")).toBe(2);
   expect(getVT("E2")).toBe("e#NUM!");
   expect(getDV("E3")).toBe(0);
-  // SIGN isn't in the source; unknown function path
-  expect(getVT("E5").charAt(0)).toBe("e");
+  // SIGN implemented (math/stat compatibility batch): full sign lattice.
+  expect(getDV("E5")).toBe(-1);
+  expect(getVT("E5")).toBe("n");
+  expect(getDV("E6")).toBe(1);
+  expect(getVT("E6")).toBe("n");
+  expect(getDV("E7")).toBe(0);
+  expect(getVT("E7")).toBe("n");
 });
 
 test("math2, rounding, ceiling, floor, log functions", async () => {

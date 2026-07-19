@@ -614,6 +614,11 @@ declare namespace SocialCalc {
     s_farg_rate: string;
     s_farg_rank: string;
     s_farg_quartile: string;
+    s_farg_percentile: string;
+    s_farg_percentrank: string;
+    s_farg_pairedrange: string;
+    s_farg_forecast: string;
+    s_farg_trendgrowth: string;
     s_farg_replace: string;
     s_farg_vp: string;
     s_farg_valpre: string;

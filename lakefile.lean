@@ -96,3 +96,9 @@ lean_lib Spill where
   srcDir := "lemma"
   roots := #[`«spill.types», `«spill.def», `«spill.proof»]
   extraDepTargets := #[``downloadDependencies]
+
+@[default_target]
+lean_lib Statistics where
+  srcDir := "lemma"
+  roots := #[`«statistics.types», `«statistics.def», `«statistics.proof»]
+  extraDepTargets := #[``downloadDependencies]

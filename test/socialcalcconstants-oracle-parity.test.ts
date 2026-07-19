@@ -186,15 +186,16 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
   const Oracle = loadOracleSocialCalc();
   const candidateFdef = pickByPrefix(SC.Constants, "s_fdef_");
   const candidateFarg = pickByPrefix(SC.Constants, "s_farg_");
-  // 115 s_fdef_* + 38 s_farg_* = 153 keys read dynamically by formula1.ts via
+  // 115 s_fdef_* + 40 s_farg_* = 155 keys read dynamically by formula1.ts via
   // scc["s_fdef_" + fname] / scc["s_farg_" + f[2]] for the formula-entry help popup
   // — the second-largest StringLiteral survivor cluster in the file.
   //
-  // RANK/MEDIAN/QUARTILE (audreyt/ethercalc#712, #726), SORT/UNIQUE (dynamic-array
-  // The post-3.0.8 date, financial, logical/error, text, and regex keys have no
-  // oracle counterpart to diff against. Focused compatibility suites cover their
-  // registration, help text, and behavior; this test asserts every carved-out
-  // key has non-empty help text. SEARCH reuses FIND's s_farg_find definition.
+  // RANK/MEDIAN/QUARTILE, SORT/UNIQUE, date arithmetic, financial, logical/error,
+  // text, regex, and math/statistics functions were added after the 3.0.8
+  // baseline was vendored, so the oracle has no corresponding help keys. Focused
+  // compatibility suites cover registration, help text, and behavior; this test
+  // asserts every carved-out key has non-empty help text. SEARCH reuses FIND's
+  // s_farg_find definition.
   const postOracleFdefKeys = [
     "s_fdef_RANK",
     "s_fdef_MEDIAN",
@@ -258,10 +259,15 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
     "s_farg_regexmatch",
     "s_farg_regexextract",
     "s_farg_regexreplace",
+    "s_farg_percentile",
+    "s_farg_percentrank",
+    "s_farg_pairedrange",
+    "s_farg_forecast",
+    "s_farg_trendgrowth",
   ];
 
   expect(Object.keys(candidateFdef).length).toBe(149);
-  expect(Object.keys(candidateFarg).length).toBe(64);
+  expect(Object.keys(candidateFarg).length).toBe(69);
 
   const legacyFdef = { ...candidateFdef };
   const legacyFarg = { ...candidateFarg };

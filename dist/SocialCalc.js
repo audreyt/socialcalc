@@ -807,6 +807,11 @@
     s_farg_xirr: 'values, dates, [guess]',
     s_farg_rank: 'number, ref, [order]',
     s_farg_quartile: 'range, quart',
+    s_farg_percentile: 'range, k',
+    s_farg_percentrank: 'range, x, [significance]',
+    s_farg_pairedrange: 'known_ys, known_xs',
+    s_farg_forecast: 'x, known_ys, known_xs',
+    s_farg_trendgrowth: 'known_ys, [known_xs], [new_xs], [const]',
     s_farg_replace: 'text1, start, length, text2',
     s_farg_vp: 'value, [precision]',
     s_farg_valpre: 'value, precision',
@@ -12887,6 +12892,16 @@ More comments yet to come...
   FormulaMut.StableTieCompare = function (result, indexA, indexB) {
     return result !== 0 ? result : indexA < indexB ? -1 : indexA > indexB ? 1 : 0;
   };
+  FormulaMut.DoubledAverageRank = function (bestRank, tieCount) {
+    return 2 * bestRank + tieCount - 1;
+  };
+  FormulaMut.QuartileExcScaledPosition = function (n, quart) {
+    return quart * (n + 1);
+  };
+  FormulaMut.IsValidQuartileExcPosition = function (n, quart) {
+    var scaled = quart * (n + 1);
+    return scaled >= 4 && scaled <= 4 * n;
+  };
   FormulaMut.TokenPrecedence = {
     '!': 1,
     ':': 2,
@@ -13745,6 +13760,7 @@ More comments yet to come...
       sk = 0,
       mk1 = 0,
       sk1 = 0;
+    var sumsq = 0;
     while (foperand.length > 0) {
       value1 = operand_value_and_type(sheet, foperand);
       t = value1.type.charAt(0);
@@ -13755,6 +13771,7 @@ More comments yet to come...
       if (t == 'n') {
         v1 = value1.value - 0;
         sum += v1;
+        sumsq += v1 * v1;
         product *= v1;
         maxval = maxval != undefined ? (v1 > maxval ? v1 : maxval) : v1;
         minval = minval != undefined ? (v1 < minval ? v1 : minval) : v1;
@@ -13811,6 +13828,7 @@ More comments yet to come...
         }
         break;
       case 'STDEV':
+      case 'STDEV.S':
         if (count > 1) {
           PushOperand(resulttypesum, Math.sqrt(sk / (count - 1)));
         } else {
@@ -13824,7 +13842,17 @@ More comments yet to come...
           PushOperand('e#DIV/0!', 0);
         }
         break;
+      case 'STDEV.P':
+        if (count > 1) {
+          PushOperand(resulttypesum, Math.sqrt(sk / count));
+        } else if (count == 1) {
+          PushOperand(resulttypesum, 0);
+        } else {
+          PushOperand('e#DIV/0!', 0);
+        }
+        break;
       case 'VAR':
+      case 'VAR.S':
         if (count > 1) {
           PushOperand(resulttypesum, sk / (count - 1));
         } else {
@@ -13837,6 +13865,18 @@ More comments yet to come...
         } else {
           PushOperand('e#DIV/0!', 0);
         }
+        break;
+      case 'VAR.P':
+        if (count > 1) {
+          PushOperand(resulttypesum, sk / count);
+        } else if (count == 1) {
+          PushOperand(resulttypesum, 0);
+        } else {
+          PushOperand('e#DIV/0!', 0);
+        }
+        break;
+      case 'SUMSQ':
+        PushOperand(resulttypesum, sumsq);
         break;
     }
     return null;
@@ -13939,6 +13979,41 @@ More comments yet to come...
     null,
     'stat',
   ];
+  SocialCalc.Formula.FunctionList['STDEV.S'] = [
+    SocialCalc.Formula.SeriesFunctions,
+    -1,
+    'vn',
+    null,
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['STDEV.P'] = [
+    SocialCalc.Formula.SeriesFunctions,
+    -1,
+    'vn',
+    null,
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['VAR.S'] = [
+    SocialCalc.Formula.SeriesFunctions,
+    -1,
+    'vn',
+    null,
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['VAR.P'] = [
+    SocialCalc.Formula.SeriesFunctions,
+    -1,
+    'vn',
+    null,
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['SUMSQ'] = [
+    SocialCalc.Formula.SeriesFunctions,
+    -1,
+    'vn',
+    null,
+    'stat',
+  ];
   FormulaMut.CollectNumericValues = function (sheet, foperand) {
     var scf = SocialCalc.Formula;
     var operand_value_and_type = scf.OperandValueAndType;
@@ -13959,6 +14034,52 @@ More comments yet to come...
       errortype,
     };
   };
+  FormulaMut.CollectPairedNumericValues = function (sheet, yOperand, xOperand) {
+    var scf = SocialCalc.Formula;
+    var yArray = scf.MaterializeArray(sheet, yOperand);
+    var xArray = scf.MaterializeArray(sheet, xOperand);
+    if (!yArray || !xArray) {
+      return {
+        ys: [],
+        xs: [],
+        errortype: 'e#VALUE!',
+        mismatched: false,
+      };
+    }
+    var yFlat = yArray.cells.reduce(function (acc, row) {
+      return acc.concat(row);
+    }, []);
+    var xFlat = xArray.cells.reduce(function (acc, row) {
+      return acc.concat(row);
+    }, []);
+    if (yFlat.length != xFlat.length) {
+      return {
+        ys: [],
+        xs: [],
+        errortype: '',
+        mismatched: true,
+      };
+    }
+    var ys = [];
+    var xs = [];
+    var errortype = '';
+    for (var i = 0; i < yFlat.length; i++) {
+      var yt = yFlat[i].type.charAt(0);
+      var xt = xFlat[i].type.charAt(0);
+      if (yt == 'e' && !errortype) errortype = yFlat[i].type;
+      if (xt == 'e' && !errortype) errortype = xFlat[i].type;
+      if (yt == 'n' && xt == 'n') {
+        ys.push(yFlat[i].value - 0);
+        xs.push(xFlat[i].value - 0);
+      }
+    }
+    return {
+      ys,
+      xs,
+      errortype,
+      mismatched: false,
+    };
+  };
   FormulaMut.RankMedianQuartileFunctions = function (fname, operand, foperand, sheet) {
     var scf = SocialCalc.Formula;
     var PushOperand = function (t, v) {
@@ -13967,7 +14088,7 @@ More comments yet to come...
         value: v,
       });
     };
-    if (fname == 'RANK') {
+    if (fname == 'RANK' || fname == 'RANK.EQ' || fname == 'RANK.AVG') {
       var numberoperand = scf.OperandAsNumber(sheet, foperand);
       if (numberoperand.type.charAt(0) != 'n') {
         PushOperand(numberoperand.type, 0);
@@ -13999,11 +14120,14 @@ More comments yet to come...
         }
       }
       var rank = 0;
+      var tieCount = 0;
       var found = false;
       var values = collected.values;
       for (var i = 0; i < values.length; i++) {
-        if (values[i] === number) found = true;
-        if (order == 0) {
+        if (values[i] === number) {
+          found = true;
+          tieCount++;
+        } else if (order == 0) {
           if (values[i] > number) rank++;
         } else {
           if (values[i] < number) rank++;
@@ -14013,10 +14137,15 @@ More comments yet to come...
         PushOperand('e#N/A', 0);
         return;
       }
-      PushOperand('n', rank + 1);
+      var bestRank = rank + 1;
+      if (fname == 'RANK.AVG') {
+        PushOperand('n', scf.DoubledAverageRank(bestRank, tieCount) / 2);
+      } else {
+        PushOperand('n', bestRank);
+      }
       return;
     }
-    if (fname == 'QUARTILE') {
+    if (fname == 'QUARTILE' || fname == 'QUARTILE.INC') {
       var rangeoperand = scf.TopOfStackValueAndType(sheet, foperand);
       if (rangeoperand.type != 'range' && rangeoperand.type != 'coord') {
         PushOperand('e#VALUE!', 0);
@@ -14060,6 +14189,265 @@ More comments yet to come...
       PushOperand('n', result);
       return;
     }
+    if (fname == 'QUARTILE.EXC') {
+      var excrangeoperand = scf.TopOfStackValueAndType(sheet, foperand);
+      if (excrangeoperand.type != 'range' && excrangeoperand.type != 'coord') {
+        PushOperand('e#VALUE!', 0);
+        return;
+      }
+      var excquartoperand = scf.OperandAsNumber(sheet, foperand);
+      if (excquartoperand.type.charAt(0) != 'n') {
+        PushOperand(excquartoperand.type, 0);
+        return;
+      }
+      var excquartvalue = excquartoperand.value;
+      var excquart = excquartvalue < 0 ? Math.ceil(excquartvalue) : Math.floor(excquartvalue);
+      if (excquart <= 0 || excquart >= 4) {
+        PushOperand('e#NUM!', 0);
+        return;
+      }
+      var excrangelist = [excrangeoperand];
+      var exccollected = scf.CollectNumericValues(sheet, excrangelist);
+      if (exccollected.errortype) {
+        PushOperand(exccollected.errortype, 0);
+        return;
+      }
+      if (!exccollected.values.length) {
+        PushOperand('e#NUM!', 0);
+        return;
+      }
+      var excsorted = exccollected.values.sort(function (a, b) {
+        return a - b;
+      });
+      var excn = excsorted.length;
+      if (!scf.IsValidQuartileExcPosition(excn, excquart)) {
+        PushOperand('e#NUM!', 0);
+        return;
+      }
+      var excscaled = scf.QuartileExcScaledPosition(excn, excquart);
+      var excpos = excscaled / 4;
+      var exclo = Math.floor(excpos);
+      var exchi = Math.ceil(excpos);
+      var excfrac = excpos - exclo;
+      var excresult =
+        excsorted[exclo - 1] + excfrac * (excsorted[exchi - 1] - excsorted[exclo - 1]);
+      PushOperand('n', excresult);
+      return;
+    }
+    if (fname == 'PERCENTILE' || fname == 'PERCENTILE.INC') {
+      var pirangeoperand = scf.TopOfStackValueAndType(sheet, foperand);
+      if (pirangeoperand.type != 'range' && pirangeoperand.type != 'coord') {
+        PushOperand('e#VALUE!', 0);
+        return;
+      }
+      var pikoperand = scf.OperandAsNumber(sheet, foperand);
+      if (pikoperand.type.charAt(0) != 'n') {
+        PushOperand(pikoperand.type, 0);
+        return;
+      }
+      var pik = pikoperand.value;
+      if (pik < 0 || pik > 1) {
+        PushOperand('e#NUM!', 0);
+        return;
+      }
+      var pirangelist = [pirangeoperand];
+      var picollected = scf.CollectNumericValues(sheet, pirangelist);
+      if (picollected.errortype) {
+        PushOperand(picollected.errortype, 0);
+        return;
+      }
+      if (!picollected.values.length) {
+        PushOperand('e#NUM!', 0);
+        return;
+      }
+      var pisorted = picollected.values.sort(function (a, b) {
+        return a - b;
+      });
+      var pin = pisorted.length;
+      if (pin == 1) {
+        PushOperand('n', pisorted[0]);
+        return;
+      }
+      var pipos = pik * (pin - 1);
+      var pilo = Math.floor(pipos);
+      var pihi = Math.ceil(pipos);
+      var pifrac = pipos - pilo;
+      var piresult = pisorted[pilo] + pifrac * (pisorted[pihi] - pisorted[pilo]);
+      PushOperand('n', piresult);
+      return;
+    }
+    if (fname == 'PERCENTILE.EXC') {
+      var perangeoperand = scf.TopOfStackValueAndType(sheet, foperand);
+      if (perangeoperand.type != 'range' && perangeoperand.type != 'coord') {
+        PushOperand('e#VALUE!', 0);
+        return;
+      }
+      var pekoperand = scf.OperandAsNumber(sheet, foperand);
+      if (pekoperand.type.charAt(0) != 'n') {
+        PushOperand(pekoperand.type, 0);
+        return;
+      }
+      var pek = pekoperand.value;
+      if (pek <= 0 || pek >= 1) {
+        PushOperand('e#NUM!', 0);
+        return;
+      }
+      var perangelist = [perangeoperand];
+      var pecollected = scf.CollectNumericValues(sheet, perangelist);
+      if (pecollected.errortype) {
+        PushOperand(pecollected.errortype, 0);
+        return;
+      }
+      if (!pecollected.values.length) {
+        PushOperand('e#NUM!', 0);
+        return;
+      }
+      var pesorted = pecollected.values.sort(function (a, b) {
+        return a - b;
+      });
+      var pen = pesorted.length;
+      var pepos = pek * (pen + 1);
+      if (pepos < 1 - 1e-9 || pepos > pen + 1e-9) {
+        PushOperand('e#NUM!', 0);
+        return;
+      }
+      pepos = Math.min(Math.max(pepos, 1), pen);
+      var pelo = Math.floor(pepos);
+      var pehi = Math.ceil(pepos);
+      var pefrac = pepos - pelo;
+      var peresult = pesorted[pelo - 1] + pefrac * (pesorted[pehi - 1] - pesorted[pelo - 1]);
+      PushOperand('n', peresult);
+      return;
+    }
+    if (fname == 'PERCENTRANK' || fname == 'PERCENTRANK.INC') {
+      var prrangeoperand = scf.TopOfStackValueAndType(sheet, foperand);
+      if (prrangeoperand.type != 'range' && prrangeoperand.type != 'coord') {
+        PushOperand('e#VALUE!', 0);
+        return;
+      }
+      var prxoperand = scf.OperandAsNumber(sheet, foperand);
+      if (prxoperand.type.charAt(0) != 'n') {
+        PushOperand(prxoperand.type, 0);
+        return;
+      }
+      var prx = prxoperand.value;
+      var prsignificance = 3;
+      if (foperand.length) {
+        var prsigoperand = scf.OperandAsNumber(sheet, foperand);
+        if (prsigoperand.type.charAt(0) != 'n') {
+          PushOperand(prsigoperand.type, 0);
+          return;
+        }
+        prsignificance = Math.floor(prsigoperand.value);
+        if (prsignificance < 1) {
+          PushOperand('e#NUM!', 0);
+          return;
+        }
+        if (foperand.length) {
+          scf.FunctionArgsError(fname, operand);
+          return;
+        }
+      }
+      var prrangelist = [prrangeoperand];
+      var prcollected = scf.CollectNumericValues(sheet, prrangelist);
+      if (prcollected.errortype) {
+        PushOperand(prcollected.errortype, 0);
+        return;
+      }
+      if (!prcollected.values.length) {
+        PushOperand('e#NUM!', 0);
+        return;
+      }
+      var prsorted = prcollected.values.sort(function (a, b) {
+        return a - b;
+      });
+      var prn = prsorted.length;
+      if (prn == 1) {
+        PushOperand(prx == prsorted[0] ? 'n' : 'e#N/A', prx == prsorted[0] ? 0 : 0);
+        return;
+      }
+      if (prx < prsorted[0] || prx > prsorted[prn - 1]) {
+        PushOperand('e#N/A', 0);
+        return;
+      }
+      var prrank;
+      var prexactidx = prsorted.indexOf(prx);
+      if (prexactidx >= 0) {
+        prrank = prexactidx / (prn - 1);
+      } else {
+        var prlo = 0;
+        while (prlo < prn - 1 && prsorted[prlo + 1] < prx) prlo++;
+        var prfrac = (prx - prsorted[prlo]) / (prsorted[prlo + 1] - prsorted[prlo]);
+        prrank = (prlo + prfrac) / (prn - 1);
+      }
+      var prscale = Math.pow(10, prsignificance);
+      prrank = Math.floor(prrank * prscale + 1e-9) / prscale;
+      PushOperand('n', prrank);
+      return;
+    }
+    if (fname == 'PERCENTRANK.EXC') {
+      var pxrangeoperand = scf.TopOfStackValueAndType(sheet, foperand);
+      if (pxrangeoperand.type != 'range' && pxrangeoperand.type != 'coord') {
+        PushOperand('e#VALUE!', 0);
+        return;
+      }
+      var pxxoperand = scf.OperandAsNumber(sheet, foperand);
+      if (pxxoperand.type.charAt(0) != 'n') {
+        PushOperand(pxxoperand.type, 0);
+        return;
+      }
+      var pxx = pxxoperand.value;
+      var pxsignificance = 3;
+      if (foperand.length) {
+        var pxsigoperand = scf.OperandAsNumber(sheet, foperand);
+        if (pxsigoperand.type.charAt(0) != 'n') {
+          PushOperand(pxsigoperand.type, 0);
+          return;
+        }
+        pxsignificance = Math.floor(pxsigoperand.value);
+        if (pxsignificance < 1) {
+          PushOperand('e#NUM!', 0);
+          return;
+        }
+        if (foperand.length) {
+          scf.FunctionArgsError(fname, operand);
+          return;
+        }
+      }
+      var pxrangelist = [pxrangeoperand];
+      var pxcollected = scf.CollectNumericValues(sheet, pxrangelist);
+      if (pxcollected.errortype) {
+        PushOperand(pxcollected.errortype, 0);
+        return;
+      }
+      if (!pxcollected.values.length) {
+        PushOperand('e#NUM!', 0);
+        return;
+      }
+      var pxsorted = pxcollected.values.sort(function (a, b) {
+        return a - b;
+      });
+      var pxn = pxsorted.length;
+      if (pxx < pxsorted[0] || pxx > pxsorted[pxn - 1]) {
+        PushOperand('e#N/A', 0);
+        return;
+      }
+      var pxrankpos;
+      var pxexactidx = pxsorted.indexOf(pxx);
+      if (pxexactidx >= 0) {
+        pxrankpos = pxexactidx + 1;
+      } else {
+        var pxlo = 0;
+        while (pxlo < pxn - 1 && pxsorted[pxlo + 1] < pxx) pxlo++;
+        var pxfrac = (pxx - pxsorted[pxlo]) / (pxsorted[pxlo + 1] - pxsorted[pxlo]);
+        pxrankpos = pxlo + 1 + pxfrac;
+      }
+      var pxrank = pxrankpos / (pxn + 1);
+      var pxscale = Math.pow(10, pxsignificance);
+      pxrank = Math.floor(pxrank * pxscale + 1e-9) / pxscale;
+      PushOperand('n', pxrank);
+      return;
+    }
     var mcollected = scf.CollectNumericValues(sheet, foperand);
     if (mcollected.errortype) {
       PushOperand(mcollected.errortype, 0);
@@ -14096,6 +14484,76 @@ More comments yet to come...
     SocialCalc.Formula.RankMedianQuartileFunctions,
     2,
     'quartile',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['RANK.EQ'] = [
+    SocialCalc.Formula.RankMedianQuartileFunctions,
+    -2,
+    'rank',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['RANK.AVG'] = [
+    SocialCalc.Formula.RankMedianQuartileFunctions,
+    -2,
+    'rank',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['QUARTILE.INC'] = [
+    SocialCalc.Formula.RankMedianQuartileFunctions,
+    2,
+    'quartile',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['QUARTILE.EXC'] = [
+    SocialCalc.Formula.RankMedianQuartileFunctions,
+    2,
+    'quartile',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['PERCENTILE'] = [
+    SocialCalc.Formula.RankMedianQuartileFunctions,
+    2,
+    'percentile',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['PERCENTILE.INC'] = [
+    SocialCalc.Formula.RankMedianQuartileFunctions,
+    2,
+    'percentile',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['PERCENTILE.EXC'] = [
+    SocialCalc.Formula.RankMedianQuartileFunctions,
+    2,
+    'percentile',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['PERCENTRANK'] = [
+    SocialCalc.Formula.RankMedianQuartileFunctions,
+    -2,
+    'percentrank',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['PERCENTRANK.INC'] = [
+    SocialCalc.Formula.RankMedianQuartileFunctions,
+    -2,
+    'percentrank',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['PERCENTRANK.EXC'] = [
+    SocialCalc.Formula.RankMedianQuartileFunctions,
+    -2,
+    'percentrank',
     '',
     'stat',
   ];
@@ -14154,6 +14612,363 @@ More comments yet to come...
     SocialCalc.Formula.SumProductFunction,
     -1,
     'rangen',
+    '',
+    'stat',
+  ];
+  FormulaMut.PairedSums = function (ys, xs) {
+    var n = ys.length;
+    var sx = 0,
+      sy = 0,
+      sxx = 0,
+      syy = 0,
+      sxy = 0;
+    for (var i = 0; i < n; i++) {
+      sx += xs[i];
+      sy += ys[i];
+      sxx += xs[i] * xs[i];
+      syy += ys[i] * ys[i];
+      sxy += xs[i] * ys[i];
+    }
+    return {
+      n,
+      sx,
+      sy,
+      sxx,
+      syy,
+      sxy,
+    };
+  };
+  FormulaMut.PairedRangeStatFunctions = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var PushOperand = function (t, v) {
+      operand.push({
+        type: t,
+        value: v,
+      });
+    };
+    if (
+      fname == 'CORREL' ||
+      fname == 'COVARIANCE.P' ||
+      fname == 'COVARIANCE.S' ||
+      fname == 'SLOPE' ||
+      fname == 'INTERCEPT' ||
+      fname == 'RSQ' ||
+      fname == 'FORECAST' ||
+      fname == 'FORECAST.LINEAR'
+    ) {
+      var xarg = null;
+      if (fname == 'FORECAST' || fname == 'FORECAST.LINEAR') {
+        xarg = scf.OperandAsNumber(sheet, foperand);
+        if (xarg.type.charAt(0) != 'n') {
+          PushOperand(xarg.type, 0);
+          return;
+        }
+      }
+      var yoperand = scf.TopOfStackValueAndType(sheet, foperand);
+      if (yoperand.type != 'range' && yoperand.type != 'coord') {
+        PushOperand('e#VALUE!', 0);
+        return;
+      }
+      var xoperand = scf.TopOfStackValueAndType(sheet, foperand);
+      if (xoperand.type != 'range' && xoperand.type != 'coord') {
+        PushOperand('e#VALUE!', 0);
+        return;
+      }
+      var paired = scf.CollectPairedNumericValues(sheet, yoperand, xoperand);
+      if (paired.mismatched) {
+        PushOperand('e#N/A', 0);
+        return;
+      }
+      if (paired.errortype) {
+        PushOperand(paired.errortype, 0);
+        return;
+      }
+      var sums = scf.PairedSums(paired.ys, paired.xs);
+      var n = sums.n;
+      if (fname == 'COVARIANCE.P') {
+        if (n == 0) {
+          PushOperand('e#DIV/0!', 0);
+          return;
+        }
+        var meanX = sums.sx / n,
+          meanY = sums.sy / n;
+        var covp = sums.sxy / n - meanX * meanY;
+        PushOperand('n', covp);
+        return;
+      }
+      if (fname == 'COVARIANCE.S') {
+        if (n < 2) {
+          PushOperand('e#DIV/0!', 0);
+          return;
+        }
+        var smeanX = sums.sx / n,
+          smeanY = sums.sy / n;
+        var covs = (sums.sxy - n * smeanX * smeanY) / (n - 1);
+        PushOperand('n', covs);
+        return;
+      }
+      var denom = n * sums.sxx - sums.sx * sums.sx;
+      if (n == 0 || denom == 0) {
+        PushOperand('e#DIV/0!', 0);
+        return;
+      }
+      var slope = (n * sums.sxy - sums.sx * sums.sy) / denom;
+      var intercept = (sums.sy - slope * sums.sx) / n;
+      if (fname == 'SLOPE') {
+        PushOperand('n', slope);
+        return;
+      }
+      if (fname == 'INTERCEPT') {
+        PushOperand('n', intercept);
+        return;
+      }
+      if (fname == 'FORECAST' || fname == 'FORECAST.LINEAR') {
+        PushOperand('n', intercept + slope * xarg.value);
+        return;
+      }
+      var denomY = n * sums.syy - sums.sy * sums.sy;
+      if (denomY == 0) {
+        PushOperand('e#DIV/0!', 0);
+        return;
+      }
+      var r = (n * sums.sxy - sums.sx * sums.sy) / Math.sqrt(denom * denomY);
+      PushOperand('n', fname == 'RSQ' ? r * r : r);
+      return;
+    }
+    var materializeFlat = function (opnd) {
+      if (opnd.type == 'array' || opnd.type == 'coord' || opnd.type == 'range') {
+        return scf.MaterializeArray(sheet, opnd);
+      }
+      return {
+        rows: 1,
+        cols: 1,
+        cells: [
+          [
+            {
+              type: opnd.type,
+              value: opnd.value,
+            },
+          ],
+        ],
+      };
+    };
+    var tyoperand = scf.TopOfStackValueAndType(sheet, foperand);
+    if (tyoperand.type != 'range' && tyoperand.type != 'coord') {
+      PushOperand('e#VALUE!', 0);
+      return;
+    }
+    var tyArray = scf.MaterializeArray(sheet, tyoperand);
+    if (!tyArray) {
+      PushOperand('e#VALUE!', 0);
+      return;
+    }
+    var tyFlat = tyArray.cells.reduce(function (acc, row) {
+      return acc.concat(row);
+    }, []);
+    var txFlat;
+    var txRows, txCols;
+    if (foperand.length) {
+      var txoperand = scf.TopOfStackValueAndType(sheet, foperand);
+      var txArray = materializeFlat(txoperand);
+      if (!txArray) {
+        PushOperand('e#VALUE!', 0);
+        return;
+      }
+      txFlat = txArray.cells.reduce(function (acc, row) {
+        return acc.concat(row);
+      }, []);
+      txRows = txArray.rows;
+      txCols = txArray.cols;
+    } else {
+      txFlat = tyFlat.map(function (_cell, idx) {
+        return {
+          type: 'n',
+          value: idx + 1,
+        };
+      });
+      txRows = tyArray.rows;
+      txCols = tyArray.cols;
+    }
+    if (txFlat.length != tyFlat.length) {
+      PushOperand('e#N/A', 0);
+      return;
+    }
+    var newXFlat;
+    var newRows, newCols;
+    if (foperand.length) {
+      var newXoperand = scf.TopOfStackValueAndType(sheet, foperand);
+      var newXArray = materializeFlat(newXoperand);
+      if (!newXArray) {
+        PushOperand('e#VALUE!', 0);
+        return;
+      }
+      newXFlat = newXArray.cells.reduce(function (acc, row) {
+        return acc.concat(row);
+      }, []);
+      newRows = newXArray.rows;
+      newCols = newXArray.cols;
+    } else {
+      newXFlat = txFlat;
+      newRows = txRows;
+      newCols = txCols;
+    }
+    var forceConst = true;
+    if (foperand.length) {
+      var constoperand = scf.OperandAsNumber(sheet, foperand);
+      if (constoperand.type.charAt(0) != 'n') {
+        PushOperand(constoperand.type, 0);
+        return;
+      }
+      forceConst = constoperand.value != 0;
+      if (foperand.length) {
+        scf.FunctionArgsError(fname, operand);
+        return;
+      }
+    }
+    var fitYs = [];
+    var fitXs = [];
+    var fitError = '';
+    for (var ti = 0; ti < tyFlat.length; ti++) {
+      var tyt = tyFlat[ti].type.charAt(0);
+      var txt = txFlat[ti].type.charAt(0);
+      if (tyt == 'e' && !fitError) fitError = tyFlat[ti].type;
+      if (txt == 'e' && !fitError) fitError = txFlat[ti].type;
+      if (tyt == 'n' && txt == 'n') {
+        var yv = tyFlat[ti].value;
+        if (fname == 'GROWTH') {
+          if (yv <= 0) {
+            PushOperand('e#NUM!', 0);
+            return;
+          }
+          fitYs.push(Math.log(yv));
+        } else {
+          fitYs.push(yv);
+        }
+        fitXs.push(txFlat[ti].value);
+      }
+    }
+    if (fitError) {
+      PushOperand(fitError, 0);
+      return;
+    }
+    var fitSums = scf.PairedSums(fitYs, fitXs);
+    var fn2 = fitSums.n;
+    var fitSlope, fitIntercept;
+    if (!forceConst) {
+      if (fitSums.sxx == 0) {
+        PushOperand('e#DIV/0!', 0);
+        return;
+      }
+      fitSlope = fitSums.sxy / fitSums.sxx;
+      fitIntercept = 0;
+    } else {
+      var fitDenom = fn2 * fitSums.sxx - fitSums.sx * fitSums.sx;
+      if (fn2 == 0 || fitDenom == 0) {
+        PushOperand('e#DIV/0!', 0);
+        return;
+      }
+      fitSlope = (fn2 * fitSums.sxy - fitSums.sx * fitSums.sy) / fitDenom;
+      fitIntercept = (fitSums.sy - fitSlope * fitSums.sx) / fn2;
+    }
+    var outCells = [];
+    for (var r = 0; r < newRows; r++) {
+      var rowCells = [];
+      for (var c = 0; c < newCols; c++) {
+        var idx = r * newCols + c;
+        var cell = newXFlat[idx];
+        if (!cell || cell.type.charAt(0) != 'n') {
+          rowCells.push({
+            type: 'e#VALUE!',
+            value: 0,
+          });
+          continue;
+        }
+        var xv = cell.value;
+        var predicted = fitIntercept + fitSlope * xv;
+        rowCells.push({
+          type: 'n',
+          value: fname == 'GROWTH' ? Math.exp(predicted) : predicted,
+        });
+      }
+      outCells.push(rowCells);
+    }
+    operand.push({
+      type: 'array',
+      value: {
+        rows: newRows,
+        cols: newCols,
+        cells: outCells,
+      },
+    });
+    return;
+  };
+  SocialCalc.Formula.FunctionList['CORREL'] = [
+    SocialCalc.Formula.PairedRangeStatFunctions,
+    2,
+    'pairedrange',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['COVARIANCE.P'] = [
+    SocialCalc.Formula.PairedRangeStatFunctions,
+    2,
+    'pairedrange',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['COVARIANCE.S'] = [
+    SocialCalc.Formula.PairedRangeStatFunctions,
+    2,
+    'pairedrange',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['SLOPE'] = [
+    SocialCalc.Formula.PairedRangeStatFunctions,
+    2,
+    'pairedrange',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['INTERCEPT'] = [
+    SocialCalc.Formula.PairedRangeStatFunctions,
+    2,
+    'pairedrange',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['RSQ'] = [
+    SocialCalc.Formula.PairedRangeStatFunctions,
+    2,
+    'pairedrange',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['FORECAST'] = [
+    SocialCalc.Formula.PairedRangeStatFunctions,
+    3,
+    'forecast',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['FORECAST.LINEAR'] = [
+    SocialCalc.Formula.PairedRangeStatFunctions,
+    3,
+    'forecast',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['TREND'] = [
+    SocialCalc.Formula.PairedRangeStatFunctions,
+    -1,
+    'trendgrowth',
+    '',
+    'stat',
+  ];
+  SocialCalc.Formula.FunctionList['GROWTH'] = [
+    SocialCalc.Formula.PairedRangeStatFunctions,
+    -1,
+    'trendgrowth',
     '',
     'stat',
   ];
@@ -16249,6 +17064,9 @@ More comments yet to come...
         case 'SIN':
           value = Math.sin(value);
           break;
+        case 'SIGN':
+          value = value > 0 ? 1 : value < 0 ? -1 : 0;
+          break;
         case 'SQRT':
           if (value >= 0) {
             value = Math.sqrt(value);
@@ -16304,6 +17122,7 @@ More comments yet to come...
   SocialCalc.Formula.FunctionList['SIN'] = [SocialCalc.Formula.Math1Functions, 1, 'v', '', 'math'];
   SocialCalc.Formula.FunctionList['SQRT'] = [SocialCalc.Formula.Math1Functions, 1, 'v', '', 'math'];
   SocialCalc.Formula.FunctionList['TAN'] = [SocialCalc.Formula.Math1Functions, 1, 'v', '', 'math'];
+  SocialCalc.Formula.FunctionList['SIGN'] = [SocialCalc.Formula.Math1Functions, 1, 'v', '', 'math'];
   FormulaMut.Math2Functions = function (fname, operand, foperand, sheet) {
     var xval, yval, quotient, decimalscale, i;
     var result = {};
@@ -16334,6 +17153,23 @@ More comments yet to come...
             quotient = xval.value / yval.value;
             quotient = Math.floor(quotient);
             result.value = xval.value - quotient * yval.value;
+          }
+          break;
+        case 'QUOTIENT':
+          if (yval.value == 0) {
+            result.type = 'e#DIV/0!';
+          } else {
+            result.value = Math.trunc(xval.value / yval.value);
+          }
+          break;
+        case 'MROUND':
+          if (yval.value == 0) {
+            result.value = 0;
+          } else if ((xval.value < 0 && yval.value > 0) || (xval.value > 0 && yval.value < 0)) {
+            result.type = 'e#NUM!';
+          } else {
+            quotient = Math.floor(xval.value / yval.value + 0.5 + 1e-9);
+            result.value = quotient * yval.value;
           }
           break;
         case 'TRUNC':
@@ -16372,6 +17208,92 @@ More comments yet to come...
     SocialCalc.Formula.Math2Functions,
     2,
     'valpre',
+    '',
+    'math',
+  ];
+  SocialCalc.Formula.FunctionList['QUOTIENT'] = [
+    SocialCalc.Formula.Math2Functions,
+    2,
+    '',
+    '',
+    'math',
+  ];
+  SocialCalc.Formula.FunctionList['MROUND'] = [
+    SocialCalc.Formula.Math2Functions,
+    2,
+    '',
+    '',
+    'math',
+  ];
+  FormulaMut.GcdLcmFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var PushOperand = function (t, v) {
+      operand.push({
+        type: t,
+        value: v,
+      });
+    };
+    var MAX_SAFE = 9007199254740992;
+    var gcdOf = function (a, b) {
+      while (b !== 0) {
+        var t = b;
+        b = a % b;
+        a = t;
+      }
+      return a;
+    };
+    var values = [];
+    while (foperand.length > 0) {
+      var v = scf.OperandAsNumber(sheet, foperand);
+      if (v.type.charAt(0) != 'n') {
+        PushOperand(v.type, 0);
+        return;
+      }
+      var n = Math.trunc(v.value);
+      if (n < 0 || Math.abs(n) >= MAX_SAFE) {
+        PushOperand('e#NUM!', 0);
+        return;
+      }
+      values.push(n);
+    }
+    if (!values.length) {
+      scf.FunctionArgsError(fname, operand);
+      return;
+    }
+    if (fname == 'GCD') {
+      var g = values[0];
+      for (var i = 1; i < values.length; i++) g = gcdOf(g, values[i]);
+      PushOperand('n', g);
+      return;
+    }
+    var l = values[0];
+    for (var j = 1; j < values.length; j++) {
+      var b2 = values[j];
+      if (l == 0 || b2 == 0) {
+        l = 0;
+        continue;
+      }
+      var g2 = gcdOf(l, b2);
+      l = (l / g2) * b2;
+      if (l >= MAX_SAFE) {
+        PushOperand('e#NUM!', 0);
+        return;
+      }
+    }
+    PushOperand('n', l);
+    return;
+  };
+  SocialCalc.Formula.FunctionList['GCD'] = [
+    SocialCalc.Formula.GcdLcmFunction,
+    -1,
+    'vn',
+    '',
+    'math',
+  ];
+  SocialCalc.Formula.FunctionList['LCM'] = [
+    SocialCalc.Formula.GcdLcmFunction,
+    -1,
+    'vn',
     '',
     'math',
   ];
@@ -16447,30 +17369,63 @@ More comments yet to come...
     }
     if (resulttype == 'n') {
       value2.value = value2.value - 0;
-      if (value2.value == 0) {
-        result = Math.round(value.value);
-      } else if (value2.value > 0) {
-        decimalscale = 1;
-        value2.value = Math.floor(value2.value);
-        for (i = 0; i < value2.value; i++) {
-          decimalscale *= 10;
+      if (fname == 'ROUND') {
+        if (value2.value == 0) {
+          result = Math.round(value.value);
+        } else if (value2.value > 0) {
+          decimalscale = 1;
+          value2.value = Math.floor(value2.value);
+          for (i = 0; i < value2.value; i++) {
+            decimalscale *= 10;
+          }
+          scaledvalue = Math.round(value.value * decimalscale);
+          result = scaledvalue / decimalscale;
+        } else if (value2.value < 0) {
+          decimalscale = 1;
+          value2.value = Math.floor(-value2.value);
+          for (i = 0; i < value2.value; i++) {
+            decimalscale *= 10;
+          }
+          scaledvalue = Math.round(value.value / decimalscale);
+          result = scaledvalue * decimalscale;
         }
-        scaledvalue = Math.round(value.value * decimalscale);
+      } else {
+        decimalscale = 1;
+        if (value2.value > 0) {
+          value2.value = Math.floor(value2.value);
+          for (i = 0; i < value2.value; i++) decimalscale *= 10;
+        } else if (value2.value < 0) {
+          value2.value = Math.floor(-value2.value);
+          for (i = 0; i < value2.value; i++) decimalscale *= 10;
+          decimalscale = 1 / decimalscale;
+        }
+        var scaled = value.value * decimalscale;
+        if (fname == 'ROUNDUP') {
+          scaledvalue = scaled >= 0 ? Math.ceil(scaled - 1e-9) : Math.floor(scaled + 1e-9);
+        } else {
+          scaledvalue = scaled >= 0 ? Math.floor(scaled + 1e-9) : Math.ceil(scaled - 1e-9);
+        }
         result = scaledvalue / decimalscale;
-      } else if (value2.value < 0) {
-        decimalscale = 1;
-        value2.value = Math.floor(-value2.value);
-        for (i = 0; i < value2.value; i++) {
-          decimalscale *= 10;
-        }
-        scaledvalue = Math.round(value.value / decimalscale);
-        result = scaledvalue * decimalscale;
       }
     }
     scf.PushOperand(operand, resulttype, result);
     return;
   };
   SocialCalc.Formula.FunctionList['ROUND'] = [
+    SocialCalc.Formula.RoundFunction,
+    -1,
+    'vp',
+    '',
+    'math',
+  ];
+  SocialCalc.Formula.FunctionList['ROUNDUP'] = [
+    SocialCalc.Formula.RoundFunction,
+    -1,
+    'vp',
+    '',
+    'math',
+  ];
+  SocialCalc.Formula.FunctionList['ROUNDDOWN'] = [
     SocialCalc.Formula.RoundFunction,
     -1,
     'vp',

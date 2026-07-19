@@ -266,6 +266,22 @@ FormulaMut.StableTieCompare = function (result, indexA, indexB) {
   return result !== 0 ? result : indexA < indexB ? -1 : indexA > indexB ? 1 : 0;
 };
 
+// Statistics pure policies mirroring lemma/statistics.ts (Dafny/Lean-verified
+// exact-integer core; see that file for why RANK.AVG's real-valued average
+// and QUARTILE.EXC's real-valued interpolation position are deliberately
+// NOT modeled directly — only their integer-exact boundary/tie predicates
+// are proved, same split as the spill policies above).
+FormulaMut.DoubledAverageRank = function (bestRank, tieCount) {
+  return 2 * bestRank + tieCount - 1;
+};
+FormulaMut.QuartileExcScaledPosition = function (n, quart) {
+  return quart * (n + 1);
+};
+FormulaMut.IsValidQuartileExcPosition = function (n, quart) {
+  var scaled = quart * (n + 1);
+  return scaled >= 4 && scaled <= 4 * n;
+};
+
 // Operator Precedence table
 //
 // 1- !, 2- : ,, 3- M P, 4- %, 5- ^, 6- * /, 7- + -, 8- &, 9- < > = G(>=) L(<=) N(<>),
@@ -1746,6 +1762,7 @@ FormulaMut.SeriesFunctions = function (fname, operand, foperand, sheet) {
     mk1 = 0,
     sk1 = 0; // For variance, etc.: M sub k, k-1, and S sub k-1
   // as per Knuth "The Art of Computer Programming" Vol. 2 3rd edition, page 232
+  var sumsq = 0; // SUMSQ(v1,c1:c2,...) — sum of squares of numeric operands.
 
   while (foperand.length > 0) {
     value1 = operand_value_and_type(sheet, foperand);
@@ -1758,6 +1775,7 @@ FormulaMut.SeriesFunctions = function (fname, operand, foperand, sheet) {
     if (t == "n") {
       v1 = value1.value - 0; // get it as a number
       sum += v1;
+      sumsq += v1 * v1;
       product *= v1;
       maxval = maxval != undefined ? (v1 > maxval ? v1 : maxval) : v1;
       minval = minval != undefined ? (v1 < minval ? v1 : minval) : v1;
@@ -1823,6 +1841,7 @@ FormulaMut.SeriesFunctions = function (fname, operand, foperand, sheet) {
       break;
 
     case "STDEV":
+    case "STDEV.S":
       if (count > 1) {
         PushOperand(resulttypesum, Math.sqrt(sk / (count - 1))); // sk is never negative according to Knuth
       } else {
@@ -1838,7 +1857,22 @@ FormulaMut.SeriesFunctions = function (fname, operand, foperand, sheet) {
       }
       break;
 
+    case "STDEV.P":
+      // Population variance is well-defined for a single point (0), unlike
+      // sample variance/STDEV — Excel/Sheets STDEV.P(x) == 0, not #DIV/0!.
+      // Legacy STDEVP intentionally keeps its original count>1 requirement
+      // above; this is exclusive to the modern name.
+      if (count > 1) {
+        PushOperand(resulttypesum, Math.sqrt(sk / count));
+      } else if (count == 1) {
+        PushOperand(resulttypesum, 0);
+      } else {
+        PushOperand("e#DIV/0!", 0);
+      }
+      break;
+
     case "VAR":
+    case "VAR.S":
       if (count > 1) {
         PushOperand(resulttypesum, sk / (count - 1));
       } else {
@@ -1852,6 +1886,21 @@ FormulaMut.SeriesFunctions = function (fname, operand, foperand, sheet) {
       } else {
         PushOperand("e#DIV/0!", 0);
       }
+      break;
+
+    case "VAR.P":
+      // Same population-variance-at-n=1 rationale as STDEV.P above.
+      if (count > 1) {
+        PushOperand(resulttypesum, sk / count);
+      } else if (count == 1) {
+        PushOperand(resulttypesum, 0);
+      } else {
+        PushOperand("e#DIV/0!", 0);
+      }
+      break;
+
+    case "SUMSQ":
+      PushOperand(resulttypesum, sumsq);
       break;
   }
 
@@ -1963,6 +2012,41 @@ SocialCalc.Formula.FunctionList["VARP"] = [
   null,
   "stat",
 ];
+SocialCalc.Formula.FunctionList["STDEV.S"] = [
+  SocialCalc.Formula.SeriesFunctions,
+  -1,
+  "vn",
+  null,
+  "stat",
+];
+SocialCalc.Formula.FunctionList["STDEV.P"] = [
+  SocialCalc.Formula.SeriesFunctions,
+  -1,
+  "vn",
+  null,
+  "stat",
+];
+SocialCalc.Formula.FunctionList["VAR.S"] = [
+  SocialCalc.Formula.SeriesFunctions,
+  -1,
+  "vn",
+  null,
+  "stat",
+];
+SocialCalc.Formula.FunctionList["VAR.P"] = [
+  SocialCalc.Formula.SeriesFunctions,
+  -1,
+  "vn",
+  null,
+  "stat",
+];
+SocialCalc.Formula.FunctionList["SUMSQ"] = [
+  SocialCalc.Formula.SeriesFunctions,
+  -1,
+  "vn",
+  null,
+  "stat",
+];
 
 /*
 #
@@ -2010,6 +2094,73 @@ FormulaMut.CollectNumericValues = function (
 };
 
 /**
+ * Parallel-walk two equal-shaped range/coord operands (e.g. known_y's and
+ * known_x's), collecting only the numeric pairs where BOTH sides resolve
+ * to a number -- the paired-range analogue of CollectNumericValues, shared
+ * by CORREL/COVARIANCE.P/COVARIANCE.S/SLOPE/INTERCEPT/RSQ/FORECAST.LINEAR.
+ * Blank/text on EITHER side skips that pair entirely (a pairwise skip,
+ * unlike CollectNumericValues' single-range skip, since the two series
+ * must stay index-aligned). Logicals (type "nl") are numeric here
+ * (charAt(0)=="n"), the existing SocialCalc-wide convention this facade
+ * intentionally does not special-case away from — see the inline comment
+ * below for the resulting, pre-existing divergence from Excel/Sheets'
+ * documented "text, logical values ... ignored" rule
+ * (support.microsoft.com/en-us/excel/functions/covariance-p-function).
+ *
+ * Shape mismatch (a genuinely different element count between the two
+ * operands after both are materialized) is reported via `mismatched`, not
+ * silently truncated to the shorter length -- callers push #N/A per the
+ * documented "different number of data points ... #N/A" convention.
+ */
+FormulaMut.CollectPairedNumericValues = function (
+  sheet: SocialCalc.Sheet,
+  yOperand: SocialCalc.FormulaOperand,
+  xOperand: SocialCalc.FormulaOperand,
+): {
+  ys: number[];
+  xs: number[];
+  errortype: SocialCalc.FormulaOperandType | "";
+  mismatched: boolean;
+} {
+  var scf = SocialCalc.Formula;
+  var yArray = scf.MaterializeArray(sheet, yOperand);
+  var xArray = scf.MaterializeArray(sheet, xOperand);
+  if (!yArray || !xArray) {
+    return { ys: [], xs: [], errortype: "e#VALUE!", mismatched: false };
+  }
+  var yFlat = yArray.cells.reduce(function (acc, row) {
+    return acc.concat(row);
+  }, [] as SocialCalc.FormulaArrayCell[]);
+  var xFlat = xArray.cells.reduce(function (acc, row) {
+    return acc.concat(row);
+  }, [] as SocialCalc.FormulaArrayCell[]);
+  if (yFlat.length != xFlat.length) {
+    return { ys: [], xs: [], errortype: "", mismatched: true };
+  }
+  var ys: number[] = [];
+  var xs: number[] = [];
+  var errortype: SocialCalc.FormulaOperandType | "" = "";
+  for (var i = 0; i < yFlat.length; i++) {
+    var yt = yFlat[i]!.type.charAt(0);
+    var xt = xFlat[i]!.type.charAt(0);
+    if (yt == "e" && !errortype) errortype = yFlat[i]!.type;
+    if (xt == "e" && !errortype) errortype = xFlat[i]!.type;
+    if (yt == "n" && xt == "n") {
+      ys.push((yFlat[i]!.value as number) - 0);
+      xs.push((xFlat[i]!.value as number) - 0);
+    }
+    // blank/text on either side: skip the pair (not an error). Logicals
+    // (type "nl") have charAt(0)=="n" and are therefore treated as numeric
+    // 1/0 here, matching CollectNumericValues/SeriesFunctions' existing
+    // SocialCalc-wide convention -- Excel/Sheets instead ignore logicals
+    // in these paired-range args, a known, pre-existing platform
+    // divergence (same category as this codebase's other n*/logical
+    // coercion choices), not something newly introduced by this function.
+  }
+  return { ys: ys, xs: xs, errortype: errortype, mismatched: false };
+};
+
+/**
  * RANK(number,ref,[order]), MEDIAN(v1,c1:c2,...), QUARTILE(range,quart).
  *
  * Order statistics: unlike SeriesFunctions, these need the full sorted list
@@ -2029,8 +2180,9 @@ FormulaMut.RankMedianQuartileFunctions = function (
     operand.push({ type: t, value: v });
   };
 
-  if (fname == "RANK") {
+  if (fname == "RANK" || fname == "RANK.EQ" || fname == "RANK.AVG") {
     // RANK(number, ref, [order]) -- args arrive in foperand in call order.
+    // RANK.EQ is an exact alias; RANK.AVG averages ranks across ties.
     var numberoperand = scf.OperandAsNumber(sheet, foperand);
     if (numberoperand.type.charAt(0) != "n") {
       // Excel: RANK requires number to resolve to a number; no established
@@ -2068,11 +2220,14 @@ FormulaMut.RankMedianQuartileFunctions = function (
     }
 
     var rank = 0;
+    var tieCount = 0;
     var found = false;
     var values = collected.values;
     for (var i = 0; i < values.length; i++) {
-      if (values[i] === number) found = true;
-      if (order == 0) {
+      if (values[i] === number) {
+        found = true;
+        tieCount++;
+      } else if (order == 0) {
         if (values[i]! > number) rank++;
       } else {
         if (values[i]! < number) rank++;
@@ -2082,11 +2237,19 @@ FormulaMut.RankMedianQuartileFunctions = function (
       PushOperand("e#N/A", 0); // Excel RANK behavior: number absent from ref
       return;
     }
-    PushOperand("n", rank + 1); // ties share the best (lowest) rank
+    var bestRank = rank + 1; // ties share the best (lowest) rank
+    if (fname == "RANK.AVG") {
+      // doubledAverageRank is the exact-integer Dafny-verified core
+      // (lemma/statistics.ts); halving here is the unverified real-space
+      // bridge — mirrors lemma/spill.ts's planSpillRectangle split.
+      PushOperand("n", scf.DoubledAverageRank(bestRank, tieCount) / 2);
+    } else {
+      PushOperand("n", bestRank);
+    }
     return;
   }
 
-  if (fname == "QUARTILE") {
+  if (fname == "QUARTILE" || fname == "QUARTILE.INC") {
     var rangeoperand = scf.TopOfStackValueAndType(sheet, foperand);
     if (rangeoperand.type != "range" && rangeoperand.type != "coord") {
       PushOperand("e#VALUE!", 0);
@@ -2134,6 +2297,297 @@ FormulaMut.RankMedianQuartileFunctions = function (
     return;
   }
 
+  if (fname == "QUARTILE.EXC") {
+    var excrangeoperand = scf.TopOfStackValueAndType(sheet, foperand);
+    if (excrangeoperand.type != "range" && excrangeoperand.type != "coord") {
+      PushOperand("e#VALUE!", 0);
+      return;
+    }
+    var excquartoperand = scf.OperandAsNumber(sheet, foperand);
+    if (excquartoperand.type.charAt(0) != "n") {
+      PushOperand(excquartoperand.type, 0);
+      return;
+    }
+    // "If quart is not an integer, it is truncated" (docs.microsoft.com/
+    // quartile-exc-function), same toward-zero truncation as QUARTILE.INC.
+    var excquartvalue = excquartoperand.value as number;
+    var excquart = excquartvalue < 0 ? Math.ceil(excquartvalue) : Math.floor(excquartvalue);
+    if (excquart <= 0 || excquart >= 4) {
+      // "If quart <= 0 or if quart >= 4 ... #NUM!" -- unlike QUARTILE.INC,
+      // the exclusive method never accepts the 0/4 (min/max) endpoints.
+      PushOperand("e#NUM!", 0);
+      return;
+    }
+    var excrangelist: SocialCalc.FormulaOperand[] = [excrangeoperand];
+    var exccollected = scf.CollectNumericValues(sheet, excrangelist);
+    if (exccollected.errortype) {
+      PushOperand(exccollected.errortype, 0);
+      return;
+    }
+    if (!exccollected.values.length) {
+      PushOperand("e#NUM!", 0); // "If array is empty ... #NUM!"
+      return;
+    }
+    var excsorted = exccollected.values.sort(function (a: number, b: number) {
+      return a - b;
+    });
+    var excn = excsorted.length;
+    if (!scf.IsValidQuartileExcPosition(excn, excquart)) {
+      // Position quart*(n+1)/4 falls outside [1,n] -- cannot interpolate.
+      // Dafny-verified integer boundary check (lemma/statistics.ts); no
+      // floating point involved since quart/n are both integers here.
+      PushOperand("e#NUM!", 0);
+      return;
+    }
+    var excscaled = scf.QuartileExcScaledPosition(excn, excquart); // = quart*(n+1)
+    var excpos = excscaled / 4; // real 1-indexed position, unverified bridge
+    var exclo = Math.floor(excpos);
+    var exchi = Math.ceil(excpos);
+    var excfrac = excpos - exclo;
+    var excresult =
+      excsorted[exclo - 1]! + excfrac * (excsorted[exchi - 1]! - excsorted[exclo - 1]!);
+    PushOperand("n", excresult);
+    return;
+  }
+
+  if (fname == "PERCENTILE" || fname == "PERCENTILE.INC") {
+    var pirangeoperand = scf.TopOfStackValueAndType(sheet, foperand);
+    if (pirangeoperand.type != "range" && pirangeoperand.type != "coord") {
+      PushOperand("e#VALUE!", 0);
+      return;
+    }
+    var pikoperand = scf.OperandAsNumber(sheet, foperand);
+    if (pikoperand.type.charAt(0) != "n") {
+      PushOperand(pikoperand.type, 0);
+      return;
+    }
+    var pik = pikoperand.value as number;
+    if (pik < 0 || pik > 1) {
+      PushOperand("e#NUM!", 0);
+      return;
+    }
+    var pirangelist: SocialCalc.FormulaOperand[] = [pirangeoperand];
+    var picollected = scf.CollectNumericValues(sheet, pirangelist);
+    if (picollected.errortype) {
+      PushOperand(picollected.errortype, 0);
+      return;
+    }
+    if (!picollected.values.length) {
+      PushOperand("e#NUM!", 0);
+      return;
+    }
+    var pisorted = picollected.values.sort(function (a: number, b: number) {
+      return a - b;
+    });
+    var pin = pisorted.length;
+    if (pin == 1) {
+      PushOperand("n", pisorted[0]);
+      return;
+    }
+    var pipos = pik * (pin - 1);
+    var pilo = Math.floor(pipos);
+    var pihi = Math.ceil(pipos);
+    var pifrac = pipos - pilo;
+    var piresult = pisorted[pilo]! + pifrac * (pisorted[pihi]! - pisorted[pilo]!);
+    PushOperand("n", piresult);
+    return;
+  }
+
+  if (fname == "PERCENTILE.EXC") {
+    var perangeoperand = scf.TopOfStackValueAndType(sheet, foperand);
+    if (perangeoperand.type != "range" && perangeoperand.type != "coord") {
+      PushOperand("e#VALUE!", 0);
+      return;
+    }
+    var pekoperand = scf.OperandAsNumber(sheet, foperand);
+    if (pekoperand.type.charAt(0) != "n") {
+      PushOperand(pekoperand.type, 0);
+      return;
+    }
+    var pek = pekoperand.value as number;
+    if (pek <= 0 || pek >= 1) {
+      // "If k is <= 0 or if k >= 1, PERCENTILE.EXC returns #NUM!"
+      PushOperand("e#NUM!", 0);
+      return;
+    }
+    var perangelist: SocialCalc.FormulaOperand[] = [perangeoperand];
+    var pecollected = scf.CollectNumericValues(sheet, perangelist);
+    if (pecollected.errortype) {
+      PushOperand(pecollected.errortype, 0);
+      return;
+    }
+    if (!pecollected.values.length) {
+      PushOperand("e#NUM!", 0);
+      return;
+    }
+    var pesorted = pecollected.values.sort(function (a: number, b: number) {
+      return a - b;
+    });
+    var pen = pesorted.length;
+    // k is an arbitrary real (unlike QUARTILE.EXC's exact-rational quart/4),
+    // so this domain check is plain floating point, not the Dafny-verified
+    // integer facade -- deliberately not formalized (see lemma/statistics.ts
+    // header). A small epsilon absorbs binary floating-point boundary error
+    // at exact positions (e.g. k=1/(n+1) landing at pos=1 - 1e-16).
+    var pepos = pek * (pen + 1);
+    if (pepos < 1 - 1e-9 || pepos > pen + 1e-9) {
+      PushOperand("e#NUM!", 0);
+      return;
+    }
+    pepos = Math.min(Math.max(pepos, 1), pen);
+    var pelo = Math.floor(pepos);
+    var pehi = Math.ceil(pepos);
+    var pefrac = pepos - pelo;
+    var peresult = pesorted[pelo - 1]! + pefrac * (pesorted[pehi - 1]! - pesorted[pelo - 1]!);
+    PushOperand("n", peresult);
+    return;
+  }
+
+  if (fname == "PERCENTRANK" || fname == "PERCENTRANK.INC") {
+    var prrangeoperand = scf.TopOfStackValueAndType(sheet, foperand);
+    if (prrangeoperand.type != "range" && prrangeoperand.type != "coord") {
+      PushOperand("e#VALUE!", 0);
+      return;
+    }
+    var prxoperand = scf.OperandAsNumber(sheet, foperand);
+    if (prxoperand.type.charAt(0) != "n") {
+      PushOperand(prxoperand.type, 0);
+      return;
+    }
+    var prx = prxoperand.value as number;
+    var prsignificance = 3;
+    if (foperand.length) {
+      var prsigoperand = scf.OperandAsNumber(sheet, foperand);
+      if (prsigoperand.type.charAt(0) != "n") {
+        PushOperand(prsigoperand.type, 0);
+        return;
+      }
+      prsignificance = Math.floor(prsigoperand.value as number);
+      if (prsignificance < 1) {
+        // "If significance < 1, PERCENTRANK.INC returns the #NUM! error"
+        PushOperand("e#NUM!", 0);
+        return;
+      }
+      if (foperand.length) {
+        scf.FunctionArgsError(fname, operand);
+        return;
+      }
+    }
+    var prrangelist: SocialCalc.FormulaOperand[] = [prrangeoperand];
+    var prcollected = scf.CollectNumericValues(sheet, prrangelist);
+    if (prcollected.errortype) {
+      PushOperand(prcollected.errortype, 0);
+      return;
+    }
+    if (!prcollected.values.length) {
+      // "If array is empty, PERCENTRANK.INC returns the #NUM! error"
+      PushOperand("e#NUM!", 0);
+      return;
+    }
+    var prsorted = prcollected.values.sort(function (a: number, b: number) {
+      return a - b;
+    });
+    var prn = prsorted.length;
+    if (prn == 1) {
+      // Degenerate single-point data set: rank is only defined for the
+      // point itself (0, its own relative standing); any other x has no
+      // established convention here, so it is treated the same way this
+      // family treats "value absent from the reference" elsewhere (RANK).
+      PushOperand(prx == prsorted[0] ? "n" : "e#N/A", prx == prsorted[0] ? 0 : 0);
+      return;
+    }
+    if (prx < prsorted[0]! || prx > prsorted[prn - 1]!) {
+      // Outside the data range: not a valid parameter (#NUM!) vs. a valid
+      // parameter with no rank in this reference -- matches this codebase's
+      // own established convention for RANK (number absent from ref).
+      PushOperand("e#N/A", 0);
+      return;
+    }
+    var prrank: number;
+    var prexactidx = prsorted.indexOf(prx);
+    if (prexactidx >= 0) {
+      prrank = prexactidx / (prn - 1);
+    } else {
+      var prlo = 0;
+      while (prlo < prn - 1 && prsorted[prlo + 1]! < prx) prlo++;
+      var prfrac = (prx - prsorted[prlo]!) / (prsorted[prlo + 1]! - prsorted[prlo]!);
+      prrank = (prlo + prfrac) / (prn - 1);
+    }
+    var prscale = Math.pow(10, prsignificance);
+    // Truncate (not round) to `significance` digits, per documented
+    // behavior; small epsilon avoids shorting an exact boundary due to
+    // binary floating-point representation error.
+    prrank = Math.floor(prrank * prscale + 1e-9) / prscale;
+    PushOperand("n", prrank);
+    return;
+  }
+
+  if (fname == "PERCENTRANK.EXC") {
+    // Exclusive-method inverse of PERCENTILE.EXC: rank = position/(n+1)
+    // where position is the (possibly interpolated) 1-indexed rank of x.
+    var pxrangeoperand = scf.TopOfStackValueAndType(sheet, foperand);
+    if (pxrangeoperand.type != "range" && pxrangeoperand.type != "coord") {
+      PushOperand("e#VALUE!", 0);
+      return;
+    }
+    var pxxoperand = scf.OperandAsNumber(sheet, foperand);
+    if (pxxoperand.type.charAt(0) != "n") {
+      PushOperand(pxxoperand.type, 0);
+      return;
+    }
+    var pxx = pxxoperand.value as number;
+    var pxsignificance = 3;
+    if (foperand.length) {
+      var pxsigoperand = scf.OperandAsNumber(sheet, foperand);
+      if (pxsigoperand.type.charAt(0) != "n") {
+        PushOperand(pxsigoperand.type, 0);
+        return;
+      }
+      pxsignificance = Math.floor(pxsigoperand.value as number);
+      if (pxsignificance < 1) {
+        PushOperand("e#NUM!", 0);
+        return;
+      }
+      if (foperand.length) {
+        scf.FunctionArgsError(fname, operand);
+        return;
+      }
+    }
+    var pxrangelist: SocialCalc.FormulaOperand[] = [pxrangeoperand];
+    var pxcollected = scf.CollectNumericValues(sheet, pxrangelist);
+    if (pxcollected.errortype) {
+      PushOperand(pxcollected.errortype, 0);
+      return;
+    }
+    if (!pxcollected.values.length) {
+      PushOperand("e#NUM!", 0);
+      return;
+    }
+    var pxsorted = pxcollected.values.sort(function (a: number, b: number) {
+      return a - b;
+    });
+    var pxn = pxsorted.length;
+    if (pxx < pxsorted[0]! || pxx > pxsorted[pxn - 1]!) {
+      PushOperand("e#N/A", 0);
+      return;
+    }
+    var pxrankpos: number; // 1-indexed exclusive-method position
+    var pxexactidx = pxsorted.indexOf(pxx);
+    if (pxexactidx >= 0) {
+      pxrankpos = pxexactidx + 1;
+    } else {
+      var pxlo = 0;
+      while (pxlo < pxn - 1 && pxsorted[pxlo + 1]! < pxx) pxlo++;
+      var pxfrac = (pxx - pxsorted[pxlo]!) / (pxsorted[pxlo + 1]! - pxsorted[pxlo]!);
+      pxrankpos = pxlo + 1 + pxfrac;
+    }
+    var pxrank = pxrankpos / (pxn + 1);
+    var pxscale = Math.pow(10, pxsignificance);
+    pxrank = Math.floor(pxrank * pxscale + 1e-9) / pxscale;
+    PushOperand("n", pxrank);
+    return;
+  }
+
   // MEDIAN(v1, c1:c2, ...)
   var mcollected = scf.CollectNumericValues(sheet, foperand);
   if (mcollected.errortype) {
@@ -2174,6 +2628,76 @@ SocialCalc.Formula.FunctionList["QUARTILE"] = [
   SocialCalc.Formula.RankMedianQuartileFunctions,
   2,
   "quartile",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["RANK.EQ"] = [
+  SocialCalc.Formula.RankMedianQuartileFunctions,
+  -2,
+  "rank",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["RANK.AVG"] = [
+  SocialCalc.Formula.RankMedianQuartileFunctions,
+  -2,
+  "rank",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["QUARTILE.INC"] = [
+  SocialCalc.Formula.RankMedianQuartileFunctions,
+  2,
+  "quartile",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["QUARTILE.EXC"] = [
+  SocialCalc.Formula.RankMedianQuartileFunctions,
+  2,
+  "quartile",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["PERCENTILE"] = [
+  SocialCalc.Formula.RankMedianQuartileFunctions,
+  2,
+  "percentile",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["PERCENTILE.INC"] = [
+  SocialCalc.Formula.RankMedianQuartileFunctions,
+  2,
+  "percentile",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["PERCENTILE.EXC"] = [
+  SocialCalc.Formula.RankMedianQuartileFunctions,
+  2,
+  "percentile",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["PERCENTRANK"] = [
+  SocialCalc.Formula.RankMedianQuartileFunctions,
+  -2,
+  "percentrank",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["PERCENTRANK.INC"] = [
+  SocialCalc.Formula.RankMedianQuartileFunctions,
+  -2,
+  "percentrank",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["PERCENTRANK.EXC"] = [
+  SocialCalc.Formula.RankMedianQuartileFunctions,
+  -2,
+  "percentrank",
   "",
   "stat",
 ];
@@ -2246,6 +2770,417 @@ SocialCalc.Formula.FunctionList["SUMPRODUCT"] = [
   SocialCalc.Formula.SumProductFunction,
   -1,
   "rangen",
+  "",
+  "stat",
+];
+
+/*
+#
+# CORREL(known_y's, known_x's)
+# COVARIANCE.P(array1, array2)
+# COVARIANCE.S(array1, array2)
+# SLOPE(known_y's, known_x's)
+# INTERCEPT(known_y's, known_x's)
+# RSQ(known_y's, known_x's)
+# FORECAST(x, known_y's, known_x's)
+# FORECAST.LINEAR(x, known_y's, known_x's)
+# TREND(known_y's, [known_x's], [new_x's], [const])
+# GROWTH(known_y's, [known_x's], [new_x's], [const])
+#
+# Least-squares single-variable linear (TREND/FORECAST) and exponential
+# (GROWTH, via a log-space linear fit y'=ln(y)=ln(b)+x*ln(m)) regression.
+# CORREL/COVARIANCE.P/COVARIANCE.S/SLOPE/INTERCEPT/RSQ share the same
+# paired-range sums (Sx, Sy, Sxx, Syy, Sxy) and error-domain checks:
+# both vendors document array1/array2 (or known_y's/known_x's) as pairwise
+# non-numeric-skipped, mismatched-length -> #N/A. See
+# CollectPairedNumericValues above for the exact pairing policy.
+#
+*/
+
+/** Sx/Sy/Sxx/Syy/Sxy sums over paired numeric series -- shared by every
+ * function in this dispatcher (CORREL/COVARIANCE/SLOPE/INTERCEPT/RSQ all
+ * reduce to a closed-form expression over these five sums). */
+FormulaMut.PairedSums = function (
+  ys: number[],
+  xs: number[],
+): { n: number; sx: number; sy: number; sxx: number; syy: number; sxy: number } {
+  var n = ys.length;
+  var sx = 0,
+    sy = 0,
+    sxx = 0,
+    syy = 0,
+    sxy = 0;
+  for (var i = 0; i < n; i++) {
+    sx += xs[i]!;
+    sy += ys[i]!;
+    sxx += xs[i]! * xs[i]!;
+    syy += ys[i]! * ys[i]!;
+    sxy += xs[i]! * ys[i]!;
+  }
+  return { n: n, sx: sx, sy: sy, sxx: sxx, syy: syy, sxy: sxy };
+};
+
+/**
+ * @param {string} fname
+ * @param {SocialCalc.FormulaOperand[]} operand
+ * @param {SocialCalc.FormulaOperand[]} foperand
+ * @param {SocialCalc.Sheet} sheet
+ */
+FormulaMut.PairedRangeStatFunctions = function (
+  fname: string,
+  operand: SocialCalc.FormulaOperand[],
+  foperand: SocialCalc.FormulaOperand[],
+  sheet: SocialCalc.Sheet,
+) {
+  var scf = SocialCalc.Formula;
+  var PushOperand = function (t: SocialCalc.FormulaOperandType, v: unknown) {
+    operand.push({ type: t, value: v });
+  };
+
+  if (
+    fname == "CORREL" ||
+    fname == "COVARIANCE.P" ||
+    fname == "COVARIANCE.S" ||
+    fname == "SLOPE" ||
+    fname == "INTERCEPT" ||
+    fname == "RSQ" ||
+    fname == "FORECAST" ||
+    fname == "FORECAST.LINEAR"
+  ) {
+    // FORECAST/FORECAST.LINEAR take (x, known_y's, known_x's); the other
+    // five take (known_y's/array1, known_x's/array2) -- pop x first only
+    // for the FORECAST family.
+    var xarg: SocialCalc.FormulaValueResult | null = null;
+    if (fname == "FORECAST" || fname == "FORECAST.LINEAR") {
+      xarg = scf.OperandAsNumber(sheet, foperand);
+      if (xarg.type.charAt(0) != "n") {
+        PushOperand(xarg.type, 0);
+        return;
+      }
+    }
+    var yoperand = scf.TopOfStackValueAndType(sheet, foperand);
+    if (yoperand.type != "range" && yoperand.type != "coord") {
+      PushOperand("e#VALUE!", 0);
+      return;
+    }
+    var xoperand = scf.TopOfStackValueAndType(sheet, foperand);
+    if (xoperand.type != "range" && xoperand.type != "coord") {
+      PushOperand("e#VALUE!", 0);
+      return;
+    }
+    var paired = scf.CollectPairedNumericValues(sheet, yoperand, xoperand);
+    if (paired.mismatched) {
+      // "If ... have a different number of data points ... #N/A" -- the
+      // documented convention shared by every function in this family.
+      PushOperand("e#N/A", 0);
+      return;
+    }
+    if (paired.errortype) {
+      PushOperand(paired.errortype, 0);
+      return;
+    }
+    var sums = scf.PairedSums(paired.ys, paired.xs);
+    var n = sums.n;
+
+    if (fname == "COVARIANCE.P") {
+      if (n == 0) {
+        PushOperand("e#DIV/0!", 0); // "If either array is empty ... #DIV/0!"
+        return;
+      }
+      // Population covariance: mean of products of deviations.
+      var meanX = sums.sx / n,
+        meanY = sums.sy / n;
+      var covp = sums.sxy / n - meanX * meanY;
+      PushOperand("n", covp);
+      return;
+    }
+    if (fname == "COVARIANCE.S") {
+      if (n < 2) {
+        PushOperand("e#DIV/0!", 0); // "empty or ... only 1 data point ... #DIV/0!"
+        return;
+      }
+      var smeanX = sums.sx / n,
+        smeanY = sums.sy / n;
+      var covs = (sums.sxy - n * smeanX * smeanY) / (n - 1);
+      PushOperand("n", covs);
+      return;
+    }
+
+    // CORREL/SLOPE/INTERCEPT/RSQ/FORECAST(.LINEAR) all share the same
+    // "variance of x is zero -> #DIV/0!" domain check (documented for
+    // FORECAST/FORECAST.LINEAR; CORREL/SLOPE/INTERCEPT/RSQ inherit the
+    // identical denominator, n*Sxx - Sx^2, being zero).
+    var denom = n * sums.sxx - sums.sx * sums.sx;
+    if (n == 0 || denom == 0) {
+      PushOperand("e#DIV/0!", 0);
+      return;
+    }
+    var slope = (n * sums.sxy - sums.sx * sums.sy) / denom;
+    var intercept = (sums.sy - slope * sums.sx) / n;
+
+    if (fname == "SLOPE") {
+      PushOperand("n", slope);
+      return;
+    }
+    if (fname == "INTERCEPT") {
+      PushOperand("n", intercept);
+      return;
+    }
+    if (fname == "FORECAST" || fname == "FORECAST.LINEAR") {
+      PushOperand("n", intercept + slope * (xarg!.value as number));
+      return;
+    }
+
+    // CORREL / RSQ: r = (n*Sxy - Sx*Sy) / sqrt((n*Sxx - Sx^2)*(n*Syy - Sy^2))
+    var denomY = n * sums.syy - sums.sy * sums.sy;
+    if (denomY == 0) {
+      PushOperand("e#DIV/0!", 0);
+      return;
+    }
+    var r = (n * sums.sxy - sums.sx * sums.sy) / Math.sqrt(denom * denomY);
+    PushOperand("n", fname == "RSQ" ? r * r : r);
+    return;
+  }
+
+  // TREND(known_y's, [known_x's], [new_x's], [const])
+  // GROWTH(known_y's, [known_x's], [new_x's], [const]) -- exponential fit
+  // via a log-space linear regression on ln(known_y's). Arguments are
+  // consumed strictly positionally (Excel's real arg model): unlike
+  // CORREL/SLOPE/etc. above, known_x's and new_x's may themselves be
+  // scalars (a single-point series/prediction), not just ranges -- so
+  // this cannot type-sniff "is the next arg a range" to decide whether
+  // it was omitted; a bare scalar in the known_x's position is a valid,
+  // real single-point known_x's, not new_x's smuggled forward.
+  var materializeFlat = function (
+    opnd: SocialCalc.FormulaValueResult,
+  ): SocialCalc.FormulaArrayValue | null {
+    if (opnd.type == "array" || opnd.type == "coord" || opnd.type == "range") {
+      return scf.MaterializeArray(sheet, opnd);
+    }
+    // Scalar (n/t/b/e...): wrap as a 1x1 array so a bare literal or
+    // computed scalar is a valid single-point known_x's/new_x's, matching
+    // Excel accepting e.g. TREND(known_ys, known_xs, 4) with a literal 4.
+    return { rows: 1, cols: 1, cells: [[{ type: opnd.type, value: opnd.value }]] };
+  };
+
+  var tyoperand = scf.TopOfStackValueAndType(sheet, foperand);
+  if (tyoperand.type != "range" && tyoperand.type != "coord") {
+    PushOperand("e#VALUE!", 0);
+    return;
+  }
+  var tyArray = scf.MaterializeArray(sheet, tyoperand);
+  if (!tyArray) {
+    PushOperand("e#VALUE!", 0);
+    return;
+  }
+  var tyFlat = tyArray.cells.reduce(function (acc, row) {
+    return acc.concat(row);
+  }, [] as SocialCalc.FormulaArrayCell[]);
+
+  // known_x's, defaulting to {1,2,...,count} (known_y's shape) when the
+  // argument list has nothing left after known_y's.
+  var txFlat: SocialCalc.FormulaArrayCell[];
+  var txRows: number, txCols: number;
+  if (foperand.length) {
+    var txoperand = scf.TopOfStackValueAndType(sheet, foperand);
+    var txArray = materializeFlat(txoperand);
+    if (!txArray) {
+      PushOperand("e#VALUE!", 0);
+      return;
+    }
+    txFlat = txArray.cells.reduce(function (acc, row) {
+      return acc.concat(row);
+    }, [] as SocialCalc.FormulaArrayCell[]);
+    txRows = txArray.rows;
+    txCols = txArray.cols;
+  } else {
+    txFlat = tyFlat.map(function (_cell, idx) {
+      return { type: "n", value: idx + 1 } as SocialCalc.FormulaArrayCell;
+    });
+    txRows = tyArray.rows;
+    txCols = tyArray.cols;
+  }
+  if (txFlat.length != tyFlat.length) {
+    PushOperand("e#N/A", 0);
+    return;
+  }
+
+  // new_x's, defaulting to known_x's (same shape) when the argument list
+  // has nothing left after known_x's.
+  var newXFlat: SocialCalc.FormulaArrayCell[];
+  var newRows: number, newCols: number;
+  if (foperand.length) {
+    var newXoperand = scf.TopOfStackValueAndType(sheet, foperand);
+    var newXArray = materializeFlat(newXoperand);
+    if (!newXArray) {
+      PushOperand("e#VALUE!", 0);
+      return;
+    }
+    newXFlat = newXArray.cells.reduce(function (acc, row) {
+      return acc.concat(row);
+    }, [] as SocialCalc.FormulaArrayCell[]);
+    newRows = newXArray.rows;
+    newCols = newXArray.cols;
+  } else {
+    newXFlat = txFlat;
+    newRows = txRows;
+    newCols = txCols;
+  }
+
+  // const: force intercept b to 0 (TREND) / 1 (GROWTH) when explicitly
+  // FALSE; defaults to normal fit (true) when omitted.
+  var forceConst = true;
+  if (foperand.length) {
+    var constoperand = scf.OperandAsNumber(sheet, foperand);
+    if (constoperand.type.charAt(0) != "n") {
+      PushOperand(constoperand.type, 0);
+      return;
+    }
+    forceConst = constoperand.value != 0;
+    if (foperand.length) {
+      scf.FunctionArgsError(fname, operand);
+      return;
+    }
+  }
+
+  var fitYs: number[] = [];
+  var fitXs: number[] = [];
+  var fitError: SocialCalc.FormulaOperandType | "" = "";
+  for (var ti = 0; ti < tyFlat.length; ti++) {
+    var tyt = tyFlat[ti]!.type.charAt(0);
+    var txt = txFlat[ti]!.type.charAt(0);
+    if (tyt == "e" && !fitError) fitError = tyFlat[ti]!.type;
+    if (txt == "e" && !fitError) fitError = txFlat[ti]!.type;
+    if (tyt == "n" && txt == "n") {
+      var yv = tyFlat[ti]!.value as number;
+      if (fname == "GROWTH") {
+        if (yv <= 0) {
+          PushOperand("e#NUM!", 0); // "any ... known_y's is 0 or negative -> #NUM!"
+          return;
+        }
+        fitYs.push(Math.log(yv));
+      } else {
+        fitYs.push(yv);
+      }
+      fitXs.push(txFlat[ti]!.value as number);
+    }
+  }
+  if (fitError) {
+    PushOperand(fitError, 0);
+    return;
+  }
+  var fitSums = scf.PairedSums(fitYs, fitXs);
+  var fn2 = fitSums.n;
+  var fitSlope: number, fitIntercept: number;
+  if (!forceConst) {
+    // b forced to 0 (TREND) / 1 (GROWTH, i.e. ln(b)=0): fit y=mx through
+    // the origin, m = Sxy / Sxx.
+    if (fitSums.sxx == 0) {
+      PushOperand("e#DIV/0!", 0);
+      return;
+    }
+    fitSlope = fitSums.sxy / fitSums.sxx;
+    fitIntercept = 0;
+  } else {
+    var fitDenom = fn2 * fitSums.sxx - fitSums.sx * fitSums.sx;
+    if (fn2 == 0 || fitDenom == 0) {
+      PushOperand("e#DIV/0!", 0);
+      return;
+    }
+    fitSlope = (fn2 * fitSums.sxy - fitSums.sx * fitSums.sy) / fitDenom;
+    fitIntercept = (fitSums.sy - fitSlope * fitSums.sx) / fn2;
+  }
+
+  var outCells: SocialCalc.FormulaArrayCell[][] = [];
+  for (var r = 0; r < newRows; r++) {
+    var rowCells: SocialCalc.FormulaArrayCell[] = [];
+    for (var c = 0; c < newCols; c++) {
+      var idx = r * newCols + c;
+      var cell = newXFlat[idx];
+      if (!cell || cell.type.charAt(0) != "n") {
+        rowCells.push({ type: "e#VALUE!", value: 0 });
+        continue;
+      }
+      var xv = cell.value as number;
+      var predicted = fitIntercept + fitSlope * xv;
+      rowCells.push({ type: "n", value: fname == "GROWTH" ? Math.exp(predicted) : predicted });
+    }
+    outCells.push(rowCells);
+  }
+  operand.push({
+    type: "array",
+    value: { rows: newRows, cols: newCols, cells: outCells },
+  });
+  return;
+};
+
+SocialCalc.Formula.FunctionList["CORREL"] = [
+  SocialCalc.Formula.PairedRangeStatFunctions,
+  2,
+  "pairedrange",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["COVARIANCE.P"] = [
+  SocialCalc.Formula.PairedRangeStatFunctions,
+  2,
+  "pairedrange",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["COVARIANCE.S"] = [
+  SocialCalc.Formula.PairedRangeStatFunctions,
+  2,
+  "pairedrange",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["SLOPE"] = [
+  SocialCalc.Formula.PairedRangeStatFunctions,
+  2,
+  "pairedrange",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["INTERCEPT"] = [
+  SocialCalc.Formula.PairedRangeStatFunctions,
+  2,
+  "pairedrange",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["RSQ"] = [
+  SocialCalc.Formula.PairedRangeStatFunctions,
+  2,
+  "pairedrange",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["FORECAST"] = [
+  SocialCalc.Formula.PairedRangeStatFunctions,
+  3,
+  "forecast",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["FORECAST.LINEAR"] = [
+  SocialCalc.Formula.PairedRangeStatFunctions,
+  3,
+  "forecast",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["TREND"] = [
+  SocialCalc.Formula.PairedRangeStatFunctions,
+  -1,
+  "trendgrowth",
+  "",
+  "stat",
+];
+SocialCalc.Formula.FunctionList["GROWTH"] = [
+  SocialCalc.Formula.PairedRangeStatFunctions,
+  -1,
+  "trendgrowth",
   "",
   "stat",
 ];
@@ -4902,6 +5837,10 @@ FormulaMut.Math1Functions = function (fname, operand, foperand, sheet) {
         value = Math.sin(value);
         break;
 
+      case "SIGN":
+        value = value > 0 ? 1 : value < 0 ? -1 : 0;
+        break;
+
       case "SQRT":
         if (value >= 0) {
           value = Math.sqrt(value);
@@ -4956,6 +5895,7 @@ SocialCalc.Formula.FunctionList["RADIANS"] = [
 SocialCalc.Formula.FunctionList["SIN"] = [SocialCalc.Formula.Math1Functions, 1, "v", "", "math"];
 SocialCalc.Formula.FunctionList["SQRT"] = [SocialCalc.Formula.Math1Functions, 1, "v", "", "math"];
 SocialCalc.Formula.FunctionList["TAN"] = [SocialCalc.Formula.Math1Functions, 1, "v", "", "math"];
+SocialCalc.Formula.FunctionList["SIGN"] = [SocialCalc.Formula.Math1Functions, 1, "v", "", "math"];
 
 /*
 #
@@ -5010,6 +5950,36 @@ FormulaMut.Math2Functions = function (fname, operand, foperand, sheet) {
         }
         break;
 
+      case "QUOTIENT":
+        if (yval.value == 0) {
+          result.type = "e#DIV/0!";
+        } else {
+          result.value = Math.trunc(xval.value / yval.value);
+        }
+        break;
+
+      case "MROUND":
+        if (yval.value == 0) {
+          result.value = 0;
+        } else if ((xval.value < 0 && yval.value > 0) || (xval.value > 0 && yval.value < 0)) {
+          // Number and Multiple must share sign (docs.microsoft.com/mround-function).
+          result.type = "e#NUM!";
+        } else {
+          // Round-half-away-from-zero with a small tolerance so a quotient
+          // that is mathematically exactly .5 (e.g. 1.3/0.2) but lands just
+          // under it in binary floating point (6.499999999999999) still
+          // rounds up, matching MROUND(1.3,0.2)=1.4 from Microsoft's docs.
+          // quotient = xval.value/yval.value is provably >= 0 here: the
+          // sign-mismatch guard above already rejected every combination
+          // where xval and yval have strictly opposite nonzero signs, so
+          // same-sign (or zero-numerator) division can never yield a
+          // negative quotient -- no separate negative-quotient branch
+          // exists to keep, since it can never be taken.
+          quotient = Math.floor(xval.value / yval.value + 0.5 + 1e-9);
+          result.value = quotient * yval.value;
+        }
+        break;
+
       case "TRUNC":
         decimalscale = 1; // cut down to required number of decimal digits
         if (yval.value >= 0) {
@@ -5047,6 +6017,104 @@ SocialCalc.Formula.FunctionList["TRUNC"] = [
   "",
   "math",
 ];
+SocialCalc.Formula.FunctionList["QUOTIENT"] = [
+  SocialCalc.Formula.Math2Functions,
+  2,
+  "",
+  "",
+  "math",
+];
+SocialCalc.Formula.FunctionList["MROUND"] = [SocialCalc.Formula.Math2Functions, 2, "", "", "math"];
+
+/*
+#
+# GCD(number1,[number2],...)
+# LCM(number1,[number2],...)
+#
+# Both vendors: greatest common divisor / least common multiple of one or
+# more non-negative integers (truncated if fractional). #VALUE! for
+# non-numeric args, #NUM! for negative args or a magnitude >= 2^53
+# (docs.microsoft.com/gcd-function, /lcm-function).
+*/
+
+/**
+ * @param {string} fname
+ * @param {SocialCalc.FormulaOperand[]} operand
+ * @param {SocialCalc.FormulaOperand[]} foperand
+ * @param {SocialCalc.Sheet} sheet
+ */
+FormulaMut.GcdLcmFunction = function (
+  fname: string,
+  operand: SocialCalc.FormulaOperand[],
+  foperand: SocialCalc.FormulaOperand[],
+  sheet: SocialCalc.Sheet,
+) {
+  var scf = SocialCalc.Formula;
+  var PushOperand = function (t: SocialCalc.FormulaOperandType, v: unknown) {
+    operand.push({ type: t, value: v });
+  };
+
+  var MAX_SAFE = 9007199254740992; // 2^53, per Microsoft docs' documented ceiling
+
+  var gcdOf = function (a: number, b: number): number {
+    while (b !== 0) {
+      var t = b;
+      b = a % b;
+      a = t;
+    }
+    return a;
+  };
+
+  var values: number[] = [];
+  while (foperand.length > 0) {
+    var v = scf.OperandAsNumber(sheet, foperand);
+    if (v.type.charAt(0) != "n") {
+      // Non-numeric coerces to e#VALUE! per OperandAsNumber; propagate that
+      // exact error type rather than a generic one (matches CollectNumericValues
+      // convention of preserving the first encountered error).
+      PushOperand(v.type, 0);
+      return;
+    }
+    var n = Math.trunc(v.value as number);
+    if (n < 0 || Math.abs(n) >= MAX_SAFE) {
+      PushOperand("e#NUM!", 0);
+      return;
+    }
+    values.push(n);
+  }
+  if (!values.length) {
+    scf.FunctionArgsError(fname, operand);
+    return;
+  }
+
+  if (fname == "GCD") {
+    var g = values[0]!;
+    for (var i = 1; i < values.length; i++) g = gcdOf(g, values[i]!);
+    PushOperand("n", g);
+    return;
+  }
+
+  // LCM(a,b) = |a*b| / gcd(a,b); LCM with any 0 argument is 0 by convention.
+  var l = values[0]!;
+  for (var j = 1; j < values.length; j++) {
+    var b2 = values[j]!;
+    if (l == 0 || b2 == 0) {
+      l = 0;
+      continue;
+    }
+    var g2 = gcdOf(l, b2);
+    l = (l / g2) * b2;
+    if (l >= MAX_SAFE) {
+      PushOperand("e#NUM!", 0);
+      return;
+    }
+  }
+  PushOperand("n", l);
+  return;
+};
+
+SocialCalc.Formula.FunctionList["GCD"] = [SocialCalc.Formula.GcdLcmFunction, -1, "vn", "", "math"];
+SocialCalc.Formula.FunctionList["LCM"] = [SocialCalc.Formula.GcdLcmFunction, -1, "vn", "", "math"];
 
 /*
 #
@@ -5150,24 +6218,59 @@ FormulaMut.RoundFunction = function (fname, operand, foperand, sheet) {
 
   if (resulttype == "n") {
     value2.value = value2.value - 0;
-    if (value2.value == 0) {
-      result = Math.round(value.value);
-    } else if (value2.value > 0) {
-      decimalscale = 1; // cut down to required number of decimal digits
-      value2.value = Math.floor(value2.value);
-      for (i = 0; i < value2.value; i++) {
-        decimalscale *= 10;
+    if (fname == "ROUND") {
+      // Unchanged from the original implementation, byte-for-byte: plain
+      // Math.round (JS ties toward +Infinity, e.g. round(-0.5) === -0) and
+      // the original divide-not-multiply-by-reciprocal arithmetic for the
+      // negative-precision branch (avoids a differing float result from a
+      // 1/decimalscale reciprocal multiply).
+      if (value2.value == 0) {
+        result = Math.round(value.value);
+      } else if (value2.value > 0) {
+        decimalscale = 1; // cut down to required number of decimal digits
+        value2.value = Math.floor(value2.value);
+        for (i = 0; i < value2.value; i++) {
+          decimalscale *= 10;
+        }
+        scaledvalue = Math.round(value.value * decimalscale);
+        result = scaledvalue / decimalscale;
+      } else if (value2.value < 0) {
+        decimalscale = 1; // cut down to required number of decimal digits
+        value2.value = Math.floor(-value2.value);
+        for (i = 0; i < value2.value; i++) {
+          decimalscale *= 10;
+        }
+        scaledvalue = Math.round(value.value / decimalscale);
+        result = scaledvalue * decimalscale;
       }
-      scaledvalue = Math.round(value.value * decimalscale);
+    } else {
+      // ROUNDUP / ROUNDDOWN: same digit-count derivation as ROUND, always
+      // multiplying the value up into the target scale (mirrors ROUND's
+      // positive-precision branch arithmetic for both signs of precision,
+      // since away-from-zero/toward-zero truncation is symmetric under a
+      // sign flip of the scale exponent) then explicit sign-aware
+      // ceil/floor with a small epsilon to survive binary floating-point
+      // representation error at exact decimal boundaries (e.g.
+      // ROUNDUP(2.5,0) must not fall short of 3 because 2.5*1 has no
+      // error, but ROUNDUP(1.005,2) must not fall short of 1.01 because
+      // 1.005*100 === 100.49999999999999 in IEEE 754 binary64).
+      decimalscale = 1;
+      if (value2.value > 0) {
+        value2.value = Math.floor(value2.value);
+        for (i = 0; i < value2.value; i++) decimalscale *= 10;
+      } else if (value2.value < 0) {
+        value2.value = Math.floor(-value2.value);
+        for (i = 0; i < value2.value; i++) decimalscale *= 10;
+        decimalscale = 1 / decimalscale;
+      }
+      var scaled = value.value * decimalscale;
+      if (fname == "ROUNDUP") {
+        scaledvalue = scaled >= 0 ? Math.ceil(scaled - 1e-9) : Math.floor(scaled + 1e-9);
+      } else {
+        // ROUNDDOWN: toward zero (truncate).
+        scaledvalue = scaled >= 0 ? Math.floor(scaled + 1e-9) : Math.ceil(scaled - 1e-9);
+      }
       result = scaledvalue / decimalscale;
-    } else if (value2.value < 0) {
-      decimalscale = 1; // cut down to required number of decimal digits
-      value2.value = Math.floor(-value2.value);
-      for (i = 0; i < value2.value; i++) {
-        decimalscale *= 10;
-      }
-      scaledvalue = Math.round(value.value / decimalscale);
-      result = scaledvalue * decimalscale;
     }
   }
 
@@ -5177,6 +6280,20 @@ FormulaMut.RoundFunction = function (fname, operand, foperand, sheet) {
 };
 
 SocialCalc.Formula.FunctionList["ROUND"] = [SocialCalc.Formula.RoundFunction, -1, "vp", "", "math"];
+SocialCalc.Formula.FunctionList["ROUNDUP"] = [
+  SocialCalc.Formula.RoundFunction,
+  -1,
+  "vp",
+  "",
+  "math",
+];
+SocialCalc.Formula.FunctionList["ROUNDDOWN"] = [
+  SocialCalc.Formula.RoundFunction,
+  -1,
+  "vp",
+  "",
+  "math",
+];
 
 /*
 #

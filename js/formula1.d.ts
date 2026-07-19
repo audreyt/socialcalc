@@ -258,6 +258,9 @@ declare namespace SocialCalc {
       exactlyOnce: boolean,
     ): boolean;
     function StableTieCompare(comparatorResult: number, indexA: number, indexB: number): number;
+    function DoubledAverageRank(bestRank: number, tieCount: number): number;
+    function QuartileExcScaledPosition(n: number, quart: number): number;
+    function IsValidQuartileExcPosition(n: number, quart: number): boolean;
     function MaterializeArray(sheet: Sheet, value: FormulaValueResult): FormulaArrayValue | null;
     function DynamicArrayFunctions(
       fname: string,
@@ -397,10 +400,26 @@ declare namespace SocialCalc {
     const SumProductFunction: FormulaFunctionImpl;
     const DSeriesFunctions: FormulaFunctionImpl;
     const RankMedianQuartileFunctions: FormulaFunctionImpl;
+    const GcdLcmFunction: FormulaFunctionImpl;
+    const PairedRangeStatFunctions: FormulaFunctionImpl;
+    function PairedSums(
+      ys: number[],
+      xs: number[],
+    ): { n: number; sx: number; sy: number; sxx: number; syy: number; sxy: number };
     function CollectNumericValues(
       sheet: Sheet,
       foperand: FormulaOperand[],
     ): { values: number[]; errortype: FormulaOperandType | "" };
+    function CollectPairedNumericValues(
+      sheet: Sheet,
+      yOperand: FormulaOperand,
+      xOperand: FormulaOperand,
+    ): {
+      ys: number[];
+      xs: number[];
+      errortype: FormulaOperandType | "";
+      mismatched: boolean;
+    };
     function FieldToColnum(
       sheet: Sheet,
       col1num: number,
