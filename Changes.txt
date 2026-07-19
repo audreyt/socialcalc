@@ -164,6 +164,30 @@ Formal verification
   Dafny VC count: 52 (was 48).
 
 
+Highlights
+- Added print/page-setup sheet metadata: `printarea`, `printrepeatrows`,
+  `printrepeatcols`, `printorientation`, `printscale`, and `printmargins` are
+  new sheet attributes, set via `set sheet print...` commands (undo-able,
+  save/load round-trippable, backward-compatible — sheets without print
+  settings never emit the new save tokens). A minimal "Print" toolbar tab
+  lets a host configure these fields and trigger `window.print()` from a
+  real button click; `SocialCalc.PreparePrintArea` marks the rendered grid
+  and injects a real `@page` CSS rule (orientation/margins/scale) so
+  `@media print` hides editor chrome, prints only the configured area, and
+  repeats header rows across pages as CSS `table-header-group` permits.
+- Added real ARIA accessibility to the rendered grid: `role="grid"` with
+  `aria-rowcount`/`aria-colcount`, `role="row"`/`"rowheader"`/
+  `"columnheader"`/`"gridcell"` with row/column indices and plain-text
+  accessible names, `aria-selected`/`aria-readonly`/`aria-invalid` kept in
+  sync on every keyboard/mouse cursor move (not just full re-render), a
+  keyboard-focusable grid (`tabindex="0"`, `aria-activedescendant`), and
+  visually-hidden `aria-live` regions announcing cell navigation and
+  command errors. All ARIA attributes are set via `setAttribute`/
+  `textContent` from plain cell data, never by concatenating sheet content
+  into markup.
+
+
+
 Changes
 =======
 
