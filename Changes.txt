@@ -50,6 +50,94 @@ FODS (OpenDocument Flat XML Spreadsheet) export
   before emission; malformed defs are skipped rather than producing broken
   cell-range-address values.
 
+Formula functions and dynamic arrays
+- Added 107 registered formula names plus the `LET` and `LAMBDA` special
+  forms. Every new formula name is enumerated below by family.
+- Completed the dynamic-array implementation for
+  [audreyt/ethercalc#650](https://github.com/audreyt/ethercalc/issues/650).
+  `SORT`, `UNIQUE`, `FILTER`, `SEQUENCE`, `TRANSPOSE`, `SORTBY`,
+  `CHOOSECOLS`, `CHOOSEROWS`, `TAKE`, `DROP`, `HSTACK`, `VSTACK`, `TOCOL`,
+  `TOROW`, `WRAPROWS`, `WRAPCOLS`, and `EXPAND` return typed arrays through
+  one transactional spill pipeline. Spill ownership, collision handling,
+  recalc grow/shrink, persistence, command guards, and editor integration
+  prevent partial or stale arrays.
+- Added lexical `LET` and `LAMBDA` expressions, named closures, nested scope
+  and recursion limits, plus the higher-order array functions `MAP`, `REDUCE`,
+  `SCAN`, `BYROW`, `BYCOL`, and `MAKEARRAY`.
+- Added `RANK(number,ref,[order])`, `MEDIAN(v1,c1:c2,...)`, and
+  `QUARTILE(range,quart)` for audreyt/ethercalc#712 and #726, together with
+  `RANK.EQ`, `RANK.AVG`, `QUARTILE.INC`, `QUARTILE.EXC`, `PERCENTILE`,
+  `PERCENTILE.INC`, `PERCENTILE.EXC`, `PERCENTRANK`, `PERCENTRANK.INC`, and
+  `PERCENTRANK.EXC`. `RANK` is descending by default, tied values share the
+  best rank, and a missing value is `#N/A`; `MEDIAN` averages the middle pair;
+  inclusive quartiles truncate the quart argument toward zero before
+  validating 0..4.
+- Added math and modern statistical compatibility functions `SIGN`, `GCD`,
+  `LCM`, `MROUND`, `QUOTIENT`, `ROUNDUP`, `ROUNDDOWN`, `SUMSQ`, `STDEV.P`,
+  `STDEV.S`, `VAR.P`, and `VAR.S`.
+- Added paired-range statistics `CORREL`, `COVARIANCE.P`, `COVARIANCE.S`,
+  `SLOPE`, `INTERCEPT`, `RSQ`, `FORECAST`, `FORECAST.LINEAR`, `TREND`, and
+  `GROWTH`, with equal-shape validation and shared numeric/error handling.
+- Added `SUBTOTAL`, including function-code validation and filtered/manual
+  hidden-row semantics shared with AutoFilter.
+- Added date and workday functions `EDATE`, `EOMONTH`, `DATEDIF`, `WEEKNUM`,
+  `ISOWEEKNUM`, `YEARFRAC`, `WORKDAY`, `WORKDAY.INTL`, `NETWORKDAYS`, and
+  `NETWORKDAYS.INTL`, including holiday ranges and Excel-compatible weekend
+  codes/masks.
+- Added financial functions `PPMT`, `IPMT`, `MIRR`, `XNPV`, and `XIRR`,
+  including irregular dated cash flows and bounded root solving.
+- Added reference, information, and rendering functions `ROW`, `COLUMN`,
+  `ADDRESS`, `INDIRECT`, `OFFSET`, `ISFORMULA`, `ISREF`, `ERROR.TYPE`, `TYPE`,
+  `HYPERLINK`, `IMAGE`, `TEXT`, and `SEARCH`. Dynamic references participate
+  in recalculation dependencies; rendered URLs remain subject to the
+  untrusted-content URL policy.
+- Added logical/error functions `IFERROR`, `IFNA`, `IFS`, and `SWITCH`.
+- Added text/array functions `TEXTJOIN`, `JOIN`, `TEXTBEFORE`, `TEXTAFTER`,
+  `SPLIT`, and `TEXTSPLIT`, plus `REGEXMATCH`, `REGEXEXTRACT`, and
+  `REGEXREPLACE`.
+- Added `XMATCH(lookup_value,lookup_array,[match_mode],[search_mode])` and
+  `XLOOKUP(lookup_value,lookup_array,return_array,[if_not_found],[match_mode],
+  [search_mode])`. Exact, approximate, wildcard, reverse, and binary modes
+  are supported; shape mismatches are `#VALUE!`, misses are `#N/A` unless
+  `if_not_found` is supplied, and matching rows/columns spill through the
+  dynamic-array pipeline.
+- Added `COUNTIFS`, `AVERAGEIF`, `AVERAGEIFS`, `MAXIFS`, and `MINIFS`.
+  Criteria and aggregate ranges must have identical shapes; matched errors
+  propagate, average functions return `#DIV/0!` for no numeric matches, and
+  `MAXIFS`/`MINIFS` return zero for no matches.
+
+Spreadsheet capabilities
+- Added optional workbook/multi-sheet mode with add, delete, rename, reorder,
+  hide, and unhide operations; accessible sheet tabs; cross-sheet
+  recalculation; undo/redo; and a versioned workbook save/load envelope.
+- Added AutoFilter and structured tables with per-column criteria, composed
+  manual/filter row visibility, dropdown value collection, structural range
+  adjustment, persistence, and undo/redo. `SUBTOTAL` consumes the same
+  visibility policy.
+- Added pivot tables with row/column groups, filters, `SUM`/`COUNT`/`COUNTA`/
+  `AVERAGE`/`MIN`/`MAX` aggregation, subtotals and grand totals, transactional
+  output ownership, refresh/recalc, structural adjustment, persistence, UI,
+  and undo/redo.
+- Added anchored column, bar, line, area, and pie charts with safe SVG
+  rendering, range-backed series, titles/labels/legends, editor dialogs,
+  drag/resize/delete controls, structural reference adjustment, persistence,
+  and undo/redo.
+- Added cell data validation for lists, numbers, dates, text length, and
+  custom formulas, with reject/warn/allow-blank policies, safe dropdowns,
+  edit/paste enforcement, coordinate-aware rewrites, persistence, and
+  undo/redo.
+- Added sheet protection with per-cell unlocked exceptions. Protected cells
+  reject edit, erase, fill, paste, merge, and sort operations while unlocked
+  cells remain editable; the state round-trips through save/load and
+  undo/redo.
+- Added conditional formatting with ordered, stop-if-true rules for
+  comparisons, text, blank/nonblank, duplicate/unique, and custom formulas.
+  Relative formulas adjust across copy/fill/structural edits; safe palette
+  styles render without mutating base cell styles and persist with undo/redo.
+- Added rich HTML-table clipboard paste with sanitized text, rowspan/colspan
+  expansion, and an allowlisted formatting subset (bold, italic, alignment,
+  foreground/background colors), applied as one undoable paste transaction.
+
 Formal verification
 - Added `lemma/number-parse.ts` facade (5th LemmaScript module):
   `groupingCharFor` (explicit-locale decimal/grouping classifier, NOT an
@@ -256,79 +344,6 @@ Release engineering and dependencies
   findings. Their dependency paths, reachability, mitigations, ownership, and
   re-audit conditions are recorded in `docs/security-disposition.json`; no
   advisory package is shipped in the npm tarball.
-Formula functions
-- Completed dynamic-array implementation for
-  [audreyt/ethercalc#650](https://github.com/audreyt/ethercalc/issues/650):
-  evaluator typed arrays, live `SORT`/`UNIQUE`, transactional spill
-  ownership with collision handling and recalc grow/shrink, persistence,
-  commands, and editor integration, with the public facade verified.
-- Added conditional formatting: ordered, stop-if-true rules per range
-  covering cell-is comparisons, text contains/begins/ends, blanks/nonblanks,
-  duplicate/unique, and custom formula with relative A1 adjustment on copy/
-  fill/insert/delete/move. Style payload uses the existing safe font/color/
-  border palette indices, never raw CSS. Re-evaluates on recalc/value
-  changes and renders without mutating the base cell style; new `condfmt`
-  command family (add/update/delete/move), full undo/redo, save/load, and a
-  "Conditional Formatting" toolbar tab with a rule-editor form.
-- Added RANK(number,ref,[order]), MEDIAN(v1,c1:c2,...), and
-  QUARTILE(range,quart) (audreyt/ethercalc#712, audreyt/ethercalc#726).
-  RANK: descending by default, ascending with a nonzero order argument; tied
-  values share the best (lowest) rank; #N/A if number is not present in ref.
-  MEDIAN: sorts the collected numeric values and averages the middle pair on
-  an even count; empty numeric input follows the existing AVERAGE #DIV/0!
-  convention. QUARTILE: Excel legacy QUARTILE/QUARTILE.INC inclusive linear
-  interpolation; a noninteger quart is truncated toward zero before the
-  0..4 domain is validated (quart outside 0..4 after truncation, or an empty
-  numeric range, is #NUM!). All three reuse the existing numeric-only
-  extraction/blank-and-text-skip/error-propagation conventions from
-  SeriesFunctions (see `SocialCalc.Formula.RankMedianQuartileFunctions` and
-  `CollectNumericValues` in js/formula1.ts) and register picker/help text
-  in js/socialcalcconstants.ts.
-- Added XMATCH(lookup_value,lookup_array,[match_mode],[search_mode]) and
-  XLOOKUP(lookup_value,lookup_array,return_array,[if_not_found],[match_mode],
-  [search_mode]), Excel/Google Sheets cross-compatible. match_mode: 0 exact
-  (default), -1 exact-or-next-smaller, 1 exact-or-next-larger, 2 wildcard
-  (*, ?, ~ escaping, shared with COUNTIF/SUMIF's criteria matcher via the
-  new `Formula.WildcardPatternToRegex` helper). search_mode: 1 first-to-last
-  (default), -1 last-to-first, 2/-2 binary ascending/descending (assumes
-  sorted; incompatible with wildcard match_mode, rejected as #VALUE!).
-  Approximate linear modes scan the whole array for the true closest
-  qualifying value (no sortedness assumed, unlike legacy MATCH's bracket
-  scan). lookup_array/return_array must each be a single row or column;
-  a genuine 2-D shape or a lookup/return axis-length mismatch is #VALUE!.
-  XLOOKUP's if_not_found is returned verbatim (including error values) on a
-  miss and is otherwise never consulted; omitted, a miss is #N/A. A
-  same-shaped 2-D return_array spills the matched row/column through the
-  existing dynamic-array pipeline (`Formula.MaterializeArray`); a scalar
-  return_array stays an ordinary single-cell result. Both reuse
-  `DecodeRangeParts`/`MaterializeArray` for range/name/cross-sheet
-  resolution (see `Formula.DecodeXLookupModes`, `DecodeLookupVector`,
-  `CompareLookupCell`, `ScanLookupVector`, `XMatchFunction`,
-  `XLookupFunction` in js/formula1.ts). Proven with a new
-  `lemma/xlookup.ts` LemmaScript facade (7 Dafny/Lean VCs: match_mode/
-  search_mode legality, binary/wildcard incompatibility, exact-before-
-  approximate-before-miss precedence, if_not_found fallback).
-- Added COUNTIFS(criteria_range1,criteria1,...), AVERAGEIF(range,criteria,
-  [average_range]), AVERAGEIFS(average_range,criteria_range1,criteria1,...),
-  MAXIFS(max_range,criteria_range1,criteria1,...), and
-  MINIFS(min_range,criteria_range1,criteria1,...), sharing a new
-  `SocialCalc.Formula.CriteriaAggregateFunctions` core (js/formula1.ts).
-  Unlike the pre-existing COUNTIF/SUMIF/SUMIFS (left untouched, including
-  their lockstep operand-stack range walk with no shape validation, so the
-  pinned oracle-3.0.8 differential stays byte-for-byte), every criteria_range
-  and the aggregate range in this family must decode to the identical
-  ncols/nrows rectangle or the call is #VALUE!, matching documented
-  Excel/Sheets *IFS semantics. AVERAGEIF/AVERAGEIFS average only numeric
-  matched cells (blank/text ignored) and return #DIV/0! when none match;
-  MAXIFS/MINIFS return 0 (not #DIV/0!) when no cells match, per Microsoft's
-  documented example. An error among matched aggregate cells always wins
-  over any numeric result, first-error-first. Cross-sheet ranges and named
-  ranges are supported via the same `DecodeRangeParts`/`LookupName` machinery
-  as the rest of the formula engine. A new `lemma/criteria.ts` LemmaScript
-  facade (5 Dafny VCs) verifies the shared row-eligibility/result-decision
-  policy (COUNTIFS always counts; AVERAGE-family empty-match is DIV0;
-  MAXIFS/MINIFS empty-match is zero; captured error outranks any numeric
-  branch), and registers picker/help text in js/socialcalcconstants.ts.
 
 ==============================================================================
 v3.0.8 — 2026-07-09
