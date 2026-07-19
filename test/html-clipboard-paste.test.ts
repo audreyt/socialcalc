@@ -114,6 +114,12 @@ describe("SC.HtmlTable.ExtractSafeStyle: allowlisted style subset", () => {
     expect(SC.HtmlTable.ExtractSafeStyle("font-weight:normal").bold).toBe(false);
   });
 
+  test("font-style values other than italic/oblique are ignored", async () => {
+    const SC = await loadSocialCalc();
+    expect(SC.HtmlTable.ExtractSafeStyle("font-style:normal").italic).toBe(false);
+    expect(SC.HtmlTable.ExtractSafeStyle("font-style:garbage").italic).toBe(false);
+  });
+
   test("text-align only accepts left/center/right, not justify or garbage", async () => {
     const SC = await loadSocialCalc();
     expect(SC.HtmlTable.ExtractSafeStyle("text-align:left").align).toBe("left");
@@ -223,6 +229,18 @@ describe("SC.HtmlTable.BuildSheetSaveFromHtml: normalized table parsing", () => 
     expect(sheet.cellformats[cell?.cellformat as number]).toBe("right");
   });
 
+  test("an italic-only style (no bold) composes 'italic normal * *' in the font entry", async () => {
+    withDOMParser();
+    const SC = await loadSocialCalc();
+    const html = '<table><tr><td style="font-style:italic">tilted</td></tr></table>';
+    const save = SC.HtmlTable.BuildSheetSaveFromHtml(html);
+    const sheet = new SC.Sheet();
+    sheet.ParseSheetSave(save);
+    const font = sheet.fonts[sheet.cells.A1?.font as number];
+    expect(font).toContain("italic");
+    expect(font).not.toContain("bold");
+  });
+
   test("empty cells produce a blank cell (matching SetConvertedCell's existing CSV/tab-import precedent)", async () => {
     withDOMParser();
     const SC = await loadSocialCalc();
@@ -233,6 +251,13 @@ describe("SC.HtmlTable.BuildSheetSaveFromHtml: normalized table parsing", () => 
     expect(sheet.cells.A1?.datavalue).toBe(1);
     expect(sheet.cells.B1?.datavalue).toBe("");
     expect(sheet.cells.C1?.datavalue).toBe(3);
+  });
+
+  test("a table whose rows contain no TD/TH cells at all returns '' (no anchor cell ever placed)", async () => {
+    withDOMParser();
+    const SC = await loadSocialCalc();
+    const save = SC.HtmlTable.BuildSheetSaveFromHtml("<table><tr></tr></table>");
+    expect(save).toBe("");
   });
 
   test("nested inline text and <br> line breaks join with newlines", async () => {
@@ -292,6 +317,132 @@ describe("SC.HtmlTable.BuildSheetSaveFromHtml: normalized table parsing", () => 
     expect(sheet.cells.B1?.datavalue).toBe("next");
     expect(sheet.cells.C1).toBeUndefined();
     expect(sheet.cells.A2).toBeUndefined();
+  });
+});
+
+describe("SC.HtmlTable direct-API edge cases (ExtractCellText/ElementChildren/FindFirstTable/CollectRows)", () => {
+  test("ExtractCellText returns '' for a null/undefined root node without throwing", async () => {
+    const SC = await loadSocialCalc();
+    expect(SC.HtmlTable.ExtractCellText(null)).toBe("");
+    expect(SC.HtmlTable.ExtractCellText(undefined)).toBe("");
+  });
+
+  test("ExtractCellText falls back to nodeValue when textContent is null, and to '' when both are absent", async () => {
+    const SC = await loadSocialCalc();
+    expect(SC.HtmlTable.ExtractCellText({ nodeType: 3, textContent: null, nodeValue: "raw" })).toBe(
+      "raw",
+    );
+    expect(SC.HtmlTable.ExtractCellText({ nodeType: 3, textContent: null, nodeValue: null })).toBe(
+      "",
+    );
+  });
+
+  test("ExtractCellText on an element with no childNodes property at all falls back to an empty child list", async () => {
+    const SC = await loadSocialCalc();
+    expect(SC.HtmlTable.ExtractCellText({ nodeType: 1, tagName: "SPAN" })).toBe("");
+  });
+  test("ExtractCellText skips a node that is neither an element nor a text node (e.g. a comment)", async () => {
+    const SC = await loadSocialCalc();
+    expect(SC.HtmlTable.ExtractCellText({ nodeType: 8, childNodes: [] })).toBe("");
+  });
+
+  test("ElementChildren returns [] for a null root or a root with no childNodes", async () => {
+    const SC = await loadSocialCalc();
+    expect(SC.HtmlTable.ElementChildren(null)).toEqual([]);
+    expect(SC.HtmlTable.ElementChildren({})).toEqual([]);
+  });
+
+  test("ElementChildren skips text-node siblings, keeping only element children", async () => {
+    const SC = await loadSocialCalc();
+    const kids = SC.HtmlTable.ElementChildren({
+      childNodes: [
+        { nodeType: 3, textContent: "text" },
+        { nodeType: 1, tagName: "TD" },
+      ],
+    });
+    expect(kids.length).toBe(1);
+  });
+
+  test("FindFirstTable returns null when neither documentElement nor body nor a table is present", async () => {
+    const SC = await loadSocialCalc();
+    expect(SC.HtmlTable.FindFirstTable({ documentElement: null, body: null })).toBeNull();
+  });
+
+  test("FindFirstTable falls back to doc.body when documentElement is absent", async () => {
+    const SC = await loadSocialCalc();
+    const table = { nodeType: 1, tagName: "TABLE", childNodes: [] };
+    const found = SC.HtmlTable.FindFirstTable({
+      documentElement: null,
+      body: { nodeType: 1, tagName: "BODY", childNodes: [table] },
+    });
+    expect(found).toBe(table);
+  });
+
+  test("FindFirstTable returns null when no <table> exists anywhere in the tree", async () => {
+    const SC = await loadSocialCalc();
+    const found = SC.HtmlTable.FindFirstTable({
+      documentElement: { nodeType: 1, tagName: "HTML", childNodes: [] },
+    });
+    expect(found).toBeNull();
+  });
+
+  test("CollectRows returns [] for a null/undefined table root", async () => {
+    const SC = await loadSocialCalc();
+    expect(SC.HtmlTable.CollectRows(null)).toEqual([]);
+    expect(SC.HtmlTable.CollectRows(undefined)).toEqual([]);
+  });
+
+  test("CollectRows on a table root with no childNodes property returns []", async () => {
+    const SC = await loadSocialCalc();
+    expect(SC.HtmlTable.CollectRows({ nodeType: 1, tagName: "TABLE" })).toEqual([]);
+  });
+
+  test("FindFirstTable skips a null/undefined entry inside childNodes without throwing", async () => {
+    const SC = await loadSocialCalc();
+    const table = { nodeType: 1, tagName: "TABLE", childNodes: [] };
+    const found = SC.HtmlTable.FindFirstTable({
+      documentElement: { nodeType: 1, tagName: "HTML", childNodes: [null, table] },
+    });
+    expect(found).toBe(table);
+    // Also confirm a childNodes list with ONLY null/undefined entries and
+    // no table anywhere resolves to null rather than throwing.
+    expect(
+      SC.HtmlTable.FindFirstTable({
+        documentElement: { nodeType: 1, tagName: "HTML", childNodes: [null, undefined] },
+      }),
+    ).toBeNull();
+  });
+
+  test("CollectRows skips a null/undefined entry inside childNodes without throwing", async () => {
+    const SC = await loadSocialCalc();
+    const rows = SC.HtmlTable.CollectRows({
+      nodeType: 1,
+      tagName: "TABLE",
+      childNodes: [null, { nodeType: 1, tagName: "TR", childNodes: [] }],
+    });
+    expect(rows.length).toBe(1);
+  });
+
+  test("CollectRows skips a table nested directly inside another table (no TR in between)", async () => {
+    const SC = await loadSocialCalc();
+    // The outer table's direct child is another TABLE (not a TR/TBODY),
+    // so `walk` reaches it as a raw TABLE node before ever finding a TR
+    // that would otherwise return early -- this is the only path that
+    // exercises the "ignore nested tables" guard directly, distinct from
+    // an HTML-parsed cell-nested table (where the outer TR is reached and
+    // returns before ever descending into the nested table's own TR).
+    const rows = SC.HtmlTable.CollectRows({
+      nodeType: 1,
+      tagName: "TABLE",
+      childNodes: [
+        {
+          nodeType: 1,
+          tagName: "TABLE",
+          childNodes: [{ nodeType: 1, tagName: "TR", childNodes: [] }],
+        },
+      ],
+    });
+    expect(rows.length).toBe(0);
   });
 });
 
@@ -414,6 +565,26 @@ describe("SC.HtmlTable.BuildSheetSaveFromHtml: rowspan/colspan handling", () => 
     // 701; the invariant under test is the clamp itself, asserted above.)
     expect(sheet.cells[anchorCoord]?.colspan).toBe(2);
   });
+
+  test("a row with more than TABLE_MAX_COL plain cells stops placing further cells at the boundary (overflow break)", async () => {
+    withDOMParser();
+    const SC = await loadSocialCalc();
+    // 703 plain 1x1 cells (TABLE_MAX_COL is 702): the (703rd)'s starting
+    // `col` position after 702 placements exceeds TABLE_MAX_COL, hitting
+    // the "col > TABLE_MAX_COL" break directly -- distinct from the
+    // colspan-clamp case above, which never exceeds the bound because the
+    // span itself gets clamped before placement.
+    const cellCount = SC.HtmlTable.TABLE_MAX_COL + 1;
+    const cells = Array.from({ length: cellCount }, (_unused, i) => `<td>c${i}</td>`).join("");
+    const html = `<table><tr>${cells}</tr></table>`;
+    const save = SC.HtmlTable.BuildSheetSaveFromHtml(html);
+    const sheet = new SC.Sheet();
+    sheet.ParseSheetSave(save);
+    // The last (703rd) cell was never placed -- lastcol stays at 702.
+    expect(sheet.attribs.lastcol).toBe(SC.HtmlTable.TABLE_MAX_COL);
+    const lastPlaceable = SC.crToCoord(SC.HtmlTable.TABLE_MAX_COL, 1);
+    expect(sheet.cells[lastPlaceable]?.datavalue).toBe(`c${cellCount - 2}`);
+  });
 });
 
 describe("SC.HtmlTable.BuildSheetSaveFromHtml: untrusted-content safety", () => {
@@ -488,6 +659,34 @@ describe("SC.HtmlTable.BuildSheetSaveFromHtml: untrusted-content safety", () => 
     expect(() => SC.HtmlTable.BuildSheetSaveFromHtml("<table")).not.toThrow();
   });
 
+  test("a DOMParser that successfully parses but yields no <table> node (despite input matching LooksLikeHtmlTable) fails closed to ''", async () => {
+    const SC = await loadSocialCalc();
+    const originalGlobal = globalThis as { DOMParser?: unknown };
+    const original = originalGlobal.DOMParser;
+    class NoTableDOMParser {
+      parseFromString(): {
+        documentElement: { nodeType: number; tagName: string; childNodes: never[] };
+      } {
+        // A well-formed parse result with no <table> anywhere -- distinct
+        // from the "parser throws" and "malformed input never reaches the
+        // parser" cases above, this exercises FindFirstTable genuinely
+        // returning null from a successful parse.
+        return { documentElement: { nodeType: 1, tagName: "HTML", childNodes: [] } };
+      }
+    }
+    originalGlobal.DOMParser = NoTableDOMParser;
+    try {
+      expect(SC.HtmlTable.BuildSheetSaveFromHtml("<table>content that never actually parses")).toBe(
+        "",
+      );
+    } finally {
+      if (original === undefined) {
+        delete originalGlobal.DOMParser;
+      } else {
+        originalGlobal.DOMParser = original;
+      }
+    }
+  });
   test("a DOMParser that throws during parseFromString fails closed to '' rather than propagating", async () => {
     const SC = await loadSocialCalc();
     const originalGlobal = globalThis as { DOMParser?: unknown };
@@ -826,6 +1025,25 @@ describe("SC.EditorPasteFromClipboardAsync: navigator.clipboard UI path", () => 
     const scheduled: string[] = [];
     const editor = makeEditor(scheduled);
     setNavigatorClipboard(undefined);
+    await SC.EditorPasteFromClipboardAsync(editor);
+    expect(scheduled).toHaveLength(0);
+  });
+
+  test("is a no-op when navigator itself is entirely absent (typeof navigator === 'undefined')", async () => {
+    const SC = await loadSocialCalc();
+    const scheduled: string[] = [];
+    const editor = makeEditor(scheduled);
+    // Distinct from setNavigatorClipboard(undefined) above: this deletes
+    // the global `navigator` property itself, so `typeof navigator` is
+    // "undefined" rather than navigator existing with an undefined
+    // .clipboard -- exercises the outer guard's own falsy side.
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      enumerable: true,
+      value: undefined,
+    });
+    delete (globalThis as { navigator?: unknown }).navigator;
+    expect(typeof (globalThis as { navigator?: unknown }).navigator).toBe("undefined");
     await SC.EditorPasteFromClipboardAsync(editor);
     expect(scheduled).toHaveLength(0);
   });

@@ -404,27 +404,38 @@ SC.Pivot.BuildTable = function (sheet: any, definition: any): any {
       }
       seen[sig].members.push(di);
     }
-    // Per-level compare is pure rank+same-type (CompareGroupKey's index
-    // args pinned equal so its tiebreak never fires mid-loop). Distinct
-    // groups always differ in `sig` (their joined per-level keys), and
-    // SameTypeCompare/CompareGroupKey never return 0 when two levels'
-    // sortValues differ (unequal strings/numbers always compare nonzero,
-    // including NaN, which the `<` fallback resolves to a nonzero verdict
-    // even though it isn't a strict order) — so the loop always returns at
-    // the first differing level. The trailing firstIndex tiebreak exists
-    // only for defense if that invariant is ever violated.
-    groups.sort(function (ga: any, gb: any) {
-      var lvl: number;
-      for (lvl = 0; lvl < fields.length; lvl++) {
-        var a = ga.keys[lvl],
-          b = gb.keys[lvl];
-        var same = SC.Pivot.SameTypeCompare(a, b);
-        var c = SC.Pivot.CompareGroupKey(a.rank, b.rank, same, 0, 0);
-        if (c !== 0) return c;
-      }
-      /* istanbul ignore next -- unreachable, see comment above */
-      return SC.Pivot.CompareGroupKey(0, 0, 0, ga.firstIndex, gb.firstIndex);
-    });
+    // Per-level compare is pure rank+same-type. Every level up to (but not
+    // including) the last is checked with an early return on any
+    // difference; the LAST level's comparison is returned unconditionally
+    // rather than gated behind another "if differs" check, since there is
+    // no further level left to fall through to -- this is exactly
+    // equivalent to the traditional "loop then trailing tiebreak" shape
+    // but without a final statement that can never execute. fields.length
+    // === 0 means groups.length <= 1 (every row maps to the same empty-key
+    // signature "", per the sig computation above), so Array.sort() never
+    // invokes this comparator in that case; when fields.length > 0 the
+    // loop below always terminates by returning some field's comparison.
+    if (fields.length > 0) {
+      groups.sort(function (ga: any, gb: any) {
+        var lvl: number;
+        for (lvl = 0; lvl < fields.length - 1; lvl++) {
+          var a = ga.keys[lvl],
+            b = gb.keys[lvl];
+          var same = SC.Pivot.SameTypeCompare(a, b);
+          var c = SC.Pivot.CompareGroupKey(a.rank, b.rank, same, 0, 0);
+          if (c !== 0) return c;
+        }
+        var lastA = ga.keys[fields.length - 1],
+          lastB = gb.keys[fields.length - 1];
+        return SC.Pivot.CompareGroupKey(
+          lastA.rank,
+          lastB.rank,
+          SC.Pivot.SameTypeCompare(lastA, lastB),
+          0,
+          0,
+        );
+      });
+    }
     return groups;
   };
 
@@ -765,16 +776,10 @@ SC.Pivot.ClearPivot = function (sheet: any, anchor: string): boolean {
   var anchorCell = sheet.cells[anchor];
   var rows = (anchorCell && anchorCell.pivotrows) || 0;
   var cols = (anchorCell && anchorCell.pivotcols) || 0;
-  var cr: any;
   // SocialCalc.coordToCr never throws for shipping inputs (any string
-  // parses to some {row,col}, however degenerate); defensive against a
-  // future coordToCr revision, not reachable today.
-  try {
-    cr = SocialCalc.coordToCr(anchor);
-  } catch {
-    /* istanbul ignore next -- unreachable, see comment above */
-    return false;
-  }
+  // parses to some {row,col}, however degenerate) -- see SanitizePivots'
+  // identical direct (non-try/catch) calls just below in this file.
+  var cr: any = SocialCalc.coordToCr(anchor);
   var r: number, c: number;
   for (r = 0; r < rows; r++)
     for (c = 0; c < cols; c++) {

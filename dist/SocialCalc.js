@@ -8726,7 +8726,7 @@ More comments yet to come...
     HT.FindFirstTable = function (doc) {
       var found = null;
       var walk = function (node) {
-        if (found || !node) return;
+        if (!node) return;
         if (node.nodeType === 1 && node.tagName === 'TABLE') {
           found = node;
           return;
@@ -9431,7 +9431,6 @@ More comments yet to come...
         if (!defPartsValid) continue;
         function dollarize(a1) {
           var firstDigit = 0;
-          while (firstDigit < a1.length && a1.charCodeAt(firstDigit) < 48) firstDigit++;
           while (firstDigit < a1.length && a1.charCodeAt(firstDigit) > 57) firstDigit++;
           return '$' + a1.slice(0, firstDigit) + '$' + a1.slice(firstDigit);
         }
@@ -10795,17 +10794,27 @@ More comments yet to come...
         }
         seen[sig].members.push(di);
       }
-      groups.sort(function (ga, gb) {
-        var lvl;
-        for (lvl = 0; lvl < fields.length; lvl++) {
-          var a = ga.keys[lvl],
-            b = gb.keys[lvl];
-          var same = SC.Pivot.SameTypeCompare(a, b);
-          var c = SC.Pivot.CompareGroupKey(a.rank, b.rank, same, 0, 0);
-          if (c !== 0) return c;
-        }
-        return SC.Pivot.CompareGroupKey(0, 0, 0, ga.firstIndex, gb.firstIndex);
-      });
+      if (fields.length > 0) {
+        groups.sort(function (ga, gb) {
+          var lvl;
+          for (lvl = 0; lvl < fields.length - 1; lvl++) {
+            var a = ga.keys[lvl],
+              b = gb.keys[lvl];
+            var same = SC.Pivot.SameTypeCompare(a, b);
+            var c = SC.Pivot.CompareGroupKey(a.rank, b.rank, same, 0, 0);
+            if (c !== 0) return c;
+          }
+          var lastA = ga.keys[fields.length - 1],
+            lastB = gb.keys[fields.length - 1];
+          return SC.Pivot.CompareGroupKey(
+            lastA.rank,
+            lastB.rank,
+            SC.Pivot.SameTypeCompare(lastA, lastB),
+            0,
+            0,
+          );
+        });
+      }
       return groups;
     };
     var rowGroups = distinctGroups(definition.rowFields);
@@ -11120,12 +11129,7 @@ More comments yet to come...
     var anchorCell = sheet.cells[anchor];
     var rows = (anchorCell && anchorCell.pivotrows) || 0;
     var cols = (anchorCell && anchorCell.pivotcols) || 0;
-    var cr;
-    try {
-      cr = SocialCalc.coordToCr(anchor);
-    } catch {
-      return false;
-    }
+    var cr = SocialCalc.coordToCr(anchor);
     var r, c;
     for (r = 0; r < rows; r++)
       for (c = 0; c < cols; c++) {
@@ -17729,11 +17733,9 @@ More comments yet to come...
     result = scf.EvaluatePolish(resolved, revpolish, sheet, allowrangereturn);
     return result;
   };
-  var lambdaParamCoordRegex = /^\$?[A-Z]{1,2}\$?[1-9]\d*$/;
   function isValidLambdaParamName(text, ttype) {
     var scf = SocialCalc.Formula;
     if (ttype !== scf.TokenType.name) return false;
-    if (lambdaParamCoordRegex.test(text)) return false;
     if (scf.SpecialConstants && scf.SpecialConstants[text]) return false;
     return true;
   }
@@ -18659,7 +18661,7 @@ More comments yet to come...
           scf.PushOperand(operand, boundResult.type, boundResult.value);
           return boundResult.error || '';
         }
-        if (operand.length && operand[operand.length - 1].type === 'start') {
+        if (operand[operand.length - 1].type === 'start') {
           operand.pop();
         }
         scf.PushOperand(operand, 'name', fname);

@@ -441,6 +441,22 @@ test("insert row above a rule's range shifts the rule range and formula anchor",
   expect(SC.EvaluateCondFmtForCell(sheet, "A2")).toBeNull();
 });
 
+test("insert row above a range-only rule (no formula) shifts only the range, not a nonexistent formula field", async () => {
+  const { SC, sheet } = await setup(["set A2 value n 10"]);
+  const red = await definePaletteColor(SC, sheet, "rgb(255,0,0)");
+  await scheduleCommands(SC, sheet, [
+    addRuleCommand(1, "A2:A2", "cellis", { op: "gt", value1: "5", color: red }),
+  ]);
+  expect(SC.EvaluateCondFmtForCell(sheet, "A2")).not.toBeNull();
+  await scheduleCommands(SC, sheet, ["insertrow A1"]);
+  // A cellis rule has no .formula field at all -- the insertrow fixup's
+  // formula-rewrite guard must skip cleanly rather than assuming every
+  // rule carries one.
+  expect(sheet.condfmtRules[0].range).toBe("A3:A3");
+  expect(sheet.condfmtRules[0].formula).toBeFalsy();
+  expect(SC.EvaluateCondFmtForCell(sheet, "A3")).not.toBeNull();
+});
+
 test("delete row above a rule's range shifts the rule range up", async () => {
   const { SC, sheet } = await setup(["set A3 value n 10", "set B3 value n 1"]);
   const red = await definePaletteColor(SC, sheet, "rgb(255,0,0)");
@@ -453,6 +469,83 @@ test("delete row above a rule's range shifts the rule range up", async () => {
   await sheetUndo(SC, sheet);
   expect(sheet.condfmtRules[0].range).toBe("A3:A3");
   expect(sheet.condfmtRules[0].formula).toBe("A3>B3");
+});
+
+test("delete row above a range-only rule (no formula) shifts only the range, not a nonexistent formula field", async () => {
+  const { SC, sheet } = await setup(["set A3 value n 10"]);
+  const red = await definePaletteColor(SC, sheet, "rgb(255,0,0)");
+  await scheduleCommands(SC, sheet, [
+    addRuleCommand(1, "A3:A3", "cellis", { op: "gt", value1: "5", color: red }),
+  ]);
+  await scheduleCommands(SC, sheet, ["deleterow A1"]);
+  expect(sheet.condfmtRules[0].range).toBe("A2:A2");
+  expect(sheet.condfmtRules[0].formula).toBeFalsy();
+  expect(SC.EvaluateCondFmtForCell(sheet, "A2")).not.toBeNull();
+});
+
+test("deletecol whose deleted column only touches a formula rule's formula (not its own range) still records undo", async () => {
+  const { SC, sheet } = await setup(["set A5 value n 1", "set C5 value n 10"]);
+  const red = await definePaletteColor(SC, sheet, "rgb(255,0,0)");
+  await scheduleCommands(SC, sheet, [
+    addRuleCommand(1, "A5:A5", "formula", { formula: "C5>1", color: red, stopIfTrue: true }),
+  ]);
+  // Deleting column B leaves the rule's own A5:A5 range untouched (range
+  // is entirely left of B), but its formula's C5 reference shifts to B5 --
+  // exercises the "range unchanged but formula changed" side of the
+  // undo-worthiness OR, distinct from a range-shift-only case.
+  await scheduleCommands(SC, sheet, ["deletecol B"]);
+  expect(sheet.condfmtRules[0].range).toBe("A5:A5");
+  expect(sheet.condfmtRules[0].formula).toBe("B5>1");
+  await sheetUndo(SC, sheet);
+  expect(sheet.condfmtRules[0].range).toBe("A5:A5");
+  expect(sheet.condfmtRules[0].formula).toBe("C5>1");
+});
+
+test("deleterow with saveundo=false rewrites a formula rule without recording undo", async () => {
+  const { SC, sheet } = await setup(["set A3 value n 10", "set B3 value n 1"]);
+  const red = await definePaletteColor(SC, sheet, "rgb(255,0,0)");
+  await scheduleCommands(SC, sheet, [
+    addRuleCommand(1, "A3:A3", "formula", { formula: "A3>B3", color: red, stopIfTrue: true }),
+  ]);
+  const undoDepthBefore = sheet.changes.tos;
+  await scheduleCommands(SC, sheet, ["deleterow A1"], false);
+  expect(sheet.condfmtRules[0].range).toBe("A2:A2");
+  expect(sheet.condfmtRules[0].formula).toBe("A2>B2");
+  expect(sheet.changes.tos).toBe(undoDepthBefore);
+});
+
+test("deleterow rewrites a corrupt (undecodable) cell validation payload's coordinates by leaving it unchanged", async () => {
+  const { SC, sheet } = await setup(["set A2 text t ok"]);
+  sheet.cells.A2.validation = "not-decodable-json";
+  await scheduleCommands(SC, sheet, ["deleterow A1"]);
+  // A2's content shifted up to A1; DecodeRule failing on the corrupt
+  // payload must leave it as-is rather than dropping it or crashing.
+  expect(sheet.cells.A1.validation).toBe("not-decodable-json");
+});
+
+test("movepaste leaves a corrupt (undecodable) validation payload on a moved cell unchanged", async () => {
+  const { SC, sheet } = await setup(["set A1 text t ok"]);
+  sheet.cells.A1.validation = "not-decodable-json";
+  await scheduleCommands(SC, sheet, ["movepaste A1:A1 C1 all"]);
+  expect(sheet.cells.C1.validation).toBe("not-decodable-json");
+});
+
+test("movepaste whose destination overlaps the moved formula rule's own referenced cell (range unchanged, formula changed) still records undo", async () => {
+  const { SC, sheet } = await setup(["set A5 value n 1", "set B5 value n 10"]);
+  const red = await definePaletteColor(SC, sheet, "rgb(255,0,0)");
+  await scheduleCommands(SC, sheet, [
+    addRuleCommand(1, "A5:A5", "formula", { formula: "B5>1", color: red, stopIfTrue: true }),
+  ]);
+  // Move B5 (referenced by the rule's formula) to C5, leaving the rule's
+  // own A5:A5 range untouched -- exercises the "range unchanged but
+  // formula changed" side of the undo-worthiness OR, distinct from a
+  // range-shift case.
+  await scheduleCommands(SC, sheet, ["movepaste B5:B5 C5 all"]);
+  expect(sheet.condfmtRules[0].range).toBe("A5:A5");
+  expect(sheet.condfmtRules[0].formula).toBe("C5>1");
+  await sheetUndo(SC, sheet);
+  expect(sheet.condfmtRules[0].range).toBe("A5:A5");
+  expect(sheet.condfmtRules[0].formula).toBe("B5>1");
 });
 
 test("update with a nonexistent rule id is a no-op", async () => {
@@ -518,6 +611,22 @@ test("condfmt update with saveundo=true can be undone back to the prior field va
   expect(sheet.condfmtRules[0].value1).toBe("9");
   await sheetUndo(SC, sheet);
   expect(sheet.condfmtRules[0].value1).toBe("5");
+});
+
+test("condfmt update undo of a stopIfTrue=true rule restores stopIfTrue in the undo string", async () => {
+  const { SC, sheet } = await setup([]);
+  const red = await definePaletteColor(SC, sheet, "rgb(255,0,0)");
+  await scheduleCommands(SC, sheet, [
+    addRuleCommand(1, "A1:A1", "cellis", { op: "gt", value1: "5", color: red, stopIfTrue: true }),
+  ]);
+  await scheduleCommands(SC, sheet, [
+    "condfmt update 1 A1:A1\tcellis\tgt\t9\t\t\t0\t0\t" + red + "\t0\t0\t0\t0\t0",
+  ]);
+  expect(sheet.condfmtRules[0].value1).toBe("9");
+  expect(sheet.condfmtRules[0].stopIfTrue).toBe(false);
+  await sheetUndo(SC, sheet);
+  expect(sheet.condfmtRules[0].value1).toBe("5");
+  expect(sheet.condfmtRules[0].stopIfTrue).toBe(true);
 });
 
 test("move range: rule range follows moved cells via movepaste", async () => {

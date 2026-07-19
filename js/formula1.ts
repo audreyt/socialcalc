@@ -464,18 +464,23 @@ FormulaMut.evaluate_parsed_formula = function (parseinfo, sheet, allowrangeretur
 // pure `ResolveScopeIndex` facade in formula-parse.ts.
 // ------------------------------------------------------------------------
 
-/** Matches formula-parse.ts's coordregex: LET/LAMBDA params shaped like a
- * cell reference (A1, $B$2, ...) are rejected up front (Excel behavior),
- * which keeps every existing coord-only rewrite path (formula-ref.ts's
+/** LET/LAMBDA params shaped like a cell reference (A1, $B$2, ...) can
+ * never reach here as tokentype.name: formula-parse.ts's tokenizer uses
+ * this exact `coordregex` to decide coord vs. name typing for any
+ * digit-suffixed identifier (state machine's `coord` branch), and a
+ * purely-alphabetic identifier (no trailing digits) can never match a
+ * regex requiring `[1-9]\d*` -- so ttype===name and coordregex.test(text)
+ * are mutually exclusive by construction, not by a redundant runtime
+ * check here. Confirmed empirically: every string matching this pattern
+ * tokenizes as tokentype.coord, never tokentype.name (checked A1, $B2,
+ * B$2, $B$2, AB2, ZZ99999, $A$1, lower-case variants). This keeps every
+ * existing coord-only rewrite path (formula-ref.ts's
  * OffsetFormulaCoords/AdjustFormulaCoords/ReplaceFormulaCoords, and
- * EvaluatePolish's tokentype.coord branch) unaware LET/LAMBDA exist: a
- * bound parameter can never tokenize as tokentype.coord. */
-var lambdaParamCoordRegex = /^\$?[A-Z]{1,2}\$?[1-9]\d*$/;
-
+ * EvaluatePolish's tokentype.coord branch) correctly unaware LET/LAMBDA
+ * exist: a bound parameter can never tokenize as tokentype.coord. */
 function isValidLambdaParamName(text: string, ttype: number): boolean {
   var scf = SocialCalc.Formula;
   if (ttype !== scf.TokenType.name) return false;
-  if (lambdaParamCoordRegex.test(text)) return false;
   if (scf.SpecialConstants && scf.SpecialConstants[text]) return false;
   return true;
 }
@@ -1989,7 +1994,14 @@ FormulaMut.CalculateFunction = function (fname, operand, sheet, coord) {
       // Bare reference to a bound (non-lambda, or lambda-with-no-call-args)
       // name: pop the RPN "start" sentinel if present and push it as a
       // resolvable "name" operand -- LookupName's scope check picks it up.
-      if (operand.length && operand[operand.length - 1]!.type === "start") {
+      // ConvertInfixToPolish always pushes a "start" marker for every
+      // tokentype.name token before this dispatch runs (formula-parse.ts's
+      // `revpolish.push(function_start)`), so `operand` is never empty
+      // here -- the top entry may or may not still be that "start" marker
+      // (an outer LET's already-resolved name can sit on top instead, as
+      // in `LET(a,1,LET(b,2,a+b))`'s inner reference to `b`), but there is
+      // always at least one entry to check.
+      if (operand[operand.length - 1]!.type === "start") {
         operand.pop();
       }
       scf.PushOperand(operand, "name", fname);

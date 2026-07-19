@@ -9914,8 +9914,12 @@ SC.HtmlTable = {};
   /** Depth-first search for the first <table> element in a parsed document. @param {any} doc */
   HT.FindFirstTable = function (doc: any) {
     var found: any = null;
+    // `walk` is only ever invoked (both the initial call below and every
+    // recursive call in the loop) while `found` is still null: the loop
+    // guards each further call with `&& !found`, so a `found` truthy check
+    // at entry can never see anything but its own initial null.
     var walk = function (node: any) {
-      if (found || !node) return;
+      if (!node) return;
       if (node.nodeType === 1 && node.tagName === "TABLE") {
         found = node;
         return;
@@ -10981,17 +10985,18 @@ SC.CreateFodsFromNormalizedWorkbook = function (normalizedWorkbook: any): string
       // (e.g. containing a space) must be single-quoted per ODF's
       // QuotedSheetName production, with an embedded "'" doubled.
       // dollarize splits a coord that already passed
-      // IsValidNormalizedCellCoord above on the letter/digit boundary
-      // (the first digit index is always present for such a coord) and
+      // IsValidNormalizedCellCoord above on the letter/digit boundary and
       // inserts "$" before the column-letter run and again before the
-      // digit run. No regex-match null check is needed: every input here
-      // is 1-2 uppercase A-Z letters followed by a no-leading-zero digit
-      // run, so the boundary scan always finds a digit, and there is no
-      // fallback branch.
+      // digit run. Every input here is 1-2 uppercase A-Z letters (charCode
+      // 65-90, always >= 48) followed by a no-leading-zero digit run, so
+      // the scan only ever needs to skip forward while the current char's
+      // code is > "9" (57) to find the first digit -- there is no
+      // fallback branch, and no separate "skip below '0'" pass is needed
+      // since a normalized coord's first character is never below "0"
+      // (48) in the first place.
       /** @param {string} a1 */
       function dollarize(a1: string): string {
         var firstDigit = 0;
-        while (firstDigit < a1.length && a1.charCodeAt(firstDigit) < 48) firstDigit++;
         while (firstDigit < a1.length && a1.charCodeAt(firstDigit) > 57) firstDigit++;
         return "$" + a1.slice(0, firstDigit) + "$" + a1.slice(firstDigit);
       }

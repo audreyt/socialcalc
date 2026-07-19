@@ -69,6 +69,13 @@ describe("data validation: set/clear commands", () => {
     expect(sheet.GetCellValidation("B2")).toBeNull();
   });
 
+  test("GetCellValidation returns null for a coordinate whose cell was never created", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    expect(sheet.cells.Z99).toBeUndefined();
+    expect(sheet.GetCellValidation("Z99")).toBeNull();
+  });
+
   test("set validation on a range applies the rule to every cell", async () => {
     const SC = await loadSocialCalc();
     const sheet = new SC.Sheet();
@@ -414,6 +421,19 @@ describe("data validation: copy/paste and fill propagation", () => {
     expect(sheet.cells.B1.validation).toBeUndefined();
   });
 
+  test("paste copies a corrupt (undecodable) validation payload verbatim instead of dropping it", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, ["set A1 text t ok"]);
+    // Directly corrupt the source cell's stored validation payload -- not
+    // reachable via the normal "set ... validation" command -- to exercise
+    // the paste logic's DecodeRule-fails fallback: it must copy the raw
+    // string through unchanged rather than dropping/crashing.
+    sheet.cells.A1.validation = "not-decodable-json";
+    await scheduleCommands(SC, sheet, ["copy A1 all", "paste B1 all"]);
+    expect(sheet.cells.B1.validation).toBe("not-decodable-json");
+  });
+
   test("filldown propagates a validation rule with an offset source-range reference", async () => {
     const SC = await loadSocialCalc();
     const sheet = new SC.Sheet();
@@ -428,6 +448,20 @@ describe("data validation: copy/paste and fill propagation", () => {
     expect(a2rule.sourceRange).toBe("=D2"); // offset by +1 row like a formula would be
     const a3rule = SC.DataValidation.DecodeRule(sheet.cells.A3.validation);
     expect(a3rule.sourceRange).toBe("=D3");
+  });
+
+  test("fill copies a corrupt (undecodable) validation payload verbatim instead of dropping it", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, ["set A1 text t ok"]);
+    // Directly corrupt the source cell's stored validation payload (not
+    // reachable via the normal "set ... validation" command, which always
+    // writes a decodable JSON payload) to exercise the fill logic's
+    // DecodeRule-fails fallback: it must copy the raw string through
+    // unchanged rather than dropping/crashing.
+    sheet.cells.A1.validation = "not-decodable-json";
+    await scheduleCommands(SC, sheet, ["filldown A1:A2 all"]);
+    expect(sheet.cells.A2.validation).toBe("not-decodable-json");
   });
 });
 
@@ -490,6 +524,18 @@ describe("data validation: structural rewrites (insert/delete/move)", () => {
     ]);
     const after = SC.DataValidation.DecodeRule(sheet.cells.C1.validation);
     expect(after).toEqual(rule);
+  });
+
+  test("insertrow leaves a corrupt (undecodable) validation payload on an existing cell unchanged", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, ["set A2 text t ok"]);
+    sheet.cells.A2.validation = "not-decodable-json";
+    await scheduleCommands(SC, sheet, ["insertrow 1"]);
+    // A2's content (and its now-undecodable validation string) shifted
+    // down to A3; DecodeRule failing on the corrupt payload must leave it
+    // as-is rather than dropping it or crashing the structural rewrite.
+    expect(sheet.cells.A3.validation).toBe("not-decodable-json");
   });
 
   test("movepaste all clears a target cell's validation rule when the moved source cell has none", async () => {
