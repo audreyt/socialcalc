@@ -17874,13 +17874,6 @@ More comments yet to come...
       }
       params.push(names[0]);
     }
-    if (!bodyTokens.length) {
-      return {
-        value: 0,
-        type: 'e#VALUE!',
-        error: SocialCalc.Constants.s_calcerrincorrectargstofunction + ' LAMBDA. ',
-      };
-    }
     return {
       params,
       bodyTokens,
@@ -29991,7 +29984,7 @@ More comments yet to come...
   // attribute (see "comment").
 
   const DVRoot = SocialCalc;
-  if (!DVRoot.DataValidation) DVRoot.DataValidation = {};
+  DVRoot.DataValidation = {};
   const DV = DVRoot.DataValidation;
   DV.RULE_LIST = 'list';
   DV.RULE_NUMBER = 'number';
@@ -30093,22 +30086,18 @@ More comments yet to come...
       rangeText =
         name.definition.charAt(0) === '=' ? name.definition.substring(1) : name.definition;
     }
-    try {
-      const prange = SocialCalc.ParseRange(rangeText);
-      const values = [];
-      for (let row = prange.cr1.row; row <= prange.cr2.row; row++) {
-        for (let col = prange.cr1.col; col <= prange.cr2.col; col++) {
-          const coord = SocialCalc.crToCoord(col, row);
-          const cell = sheet.cells[coord];
-          if (cell && cell.datavalue !== '' && cell.datavalue != null) {
-            values.push(cell.datavalue + '');
-          }
+    const prange = SocialCalc.ParseRange(rangeText);
+    const values = [];
+    for (let row = prange.cr1.row; row <= prange.cr2.row; row++) {
+      for (let col = prange.cr1.col; col <= prange.cr2.col; col++) {
+        const coord = SocialCalc.crToCoord(col, row);
+        const cell = sheet.cells[coord];
+        if (cell && cell.datavalue !== '' && cell.datavalue != null) {
+          values.push(cell.datavalue + '');
         }
       }
-      return values;
-    } catch {
-      return [];
     }
+    return values;
   };
   DV.ComputeCustomPass = function (sheet, rule) {
     if (!rule.formula) return true;

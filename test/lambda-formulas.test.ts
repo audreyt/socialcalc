@@ -204,6 +204,13 @@ describe("LAMBDA", () => {
     expect(result.type).toBe("e#VALUE!");
   });
 
+  test("rejects LAMBDA(x,) -- a trailing comma is a tokenize-level error, not a resolveLambdaSpan case", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    const result = await evalFormula(SC, sheet, "LAMBDA(x,)");
+    expect(result.type).toBe("e#VALUE!");
+  });
+
   test("rejects a scoped IF with the wrong argument count (recursive-body context)", async () => {
     const SC = await loadSocialCalc();
     const sheet = new SC.Sheet();
@@ -334,6 +341,15 @@ describe("MAP/REDUCE/SCAN/BYROW/BYCOL/MAKEARRAY", () => {
     const result = await evalFormula(SC, sheet, "REDUCE(0,A1:A4,LAMBDA(acc,x,acc+x))");
     expect(result.type).toBe("n");
     expect(result.value).toBe(10);
+  });
+
+  test("REDUCE rejects a lambda whose parameter count is not exactly 2", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, ["set A1 value n 1", "set A2 value n 2"]);
+    await recalcSheet(SC, sheet);
+    const result = await evalFormula(SC, sheet, "REDUCE(0,A1:A2,LAMBDA(x,x))");
+    expect(result.type).toBe("e#VALUE!");
   });
 
   test("SCAN returns the running-accumulator array, same shape as the source", async () => {

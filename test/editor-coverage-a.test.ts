@@ -1427,6 +1427,24 @@ test("ShowCellHandles: show + moveshow variants", async () => {
   // Empty ecell / no editor path.
   SC.ShowCellHandles({ editor: null } as any);
   SC.ShowCellHandles({ editor: { ecell: null } } as any);
+  // ecell present but no dvDropdown at all (e.g. a noEdit viewer's
+  // cellhandles, which is still constructed even when dvDropdown is not).
+  // show=false so the code short-circuits before reaching the geometry
+  // calculations that need real draghandle/dragpalette/dragtooltip
+  // elements -- only draghandle/dragpalette are touched by the
+  // doshow/moveshow cleanup at the end.
+  expect(() =>
+    SC.ShowCellHandles(
+      {
+        editor: { ecell: { row: 1, col: 1 }, dvDropdown: null },
+        draghandle: document.createElement("div"),
+        dragpalette: document.createElement("div"),
+        dragtooltip: document.createElement("div"),
+      } as any,
+      false,
+      false,
+    ),
+  ).not.toThrow();
 });
 
 test("InputBox + InputEcho + InputBoxOnMouseDown + SetInputEchoText", async () => {

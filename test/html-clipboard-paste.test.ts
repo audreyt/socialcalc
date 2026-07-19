@@ -674,6 +674,18 @@ describe("pasteTextarea 'paste' ClipboardEvent listener (CreateTableEditor wirin
     expect((editor as unknown as { pasteHtmlData: string }).pasteHtmlData).toBe("<table></table>");
   });
 
+  test("a getData('text/html') call that returns a falsy value (mime not present) falls back to empty string", async () => {
+    const SC = await loadSocialCalc({ browser: true });
+    const { editor } = newControl(SC);
+    firePaste(editor, {
+      // No text/html on the clipboard at all -- a real browser's getData()
+      // returns "" (not undefined/null) for an absent format, exercising
+      // the `|| ""` fallback distinctly from the no-clipboardData case below.
+      clipboardData: { getData: () => "" },
+    });
+    expect((editor as unknown as { pasteHtmlData: string }).pasteHtmlData).toBe("");
+  });
+
   test("a getData() call that throws is caught and leaves pasteHtmlData empty", async () => {
     const SC = await loadSocialCalc({ browser: true });
     const { editor } = newControl(SC);

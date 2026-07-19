@@ -3098,6 +3098,29 @@ test("Conditional Formatting tab: all helpers including Save/Delete/Move", async
   expect(control.sheet.condfmtRules[0].value1).toBe("9");
   scheduleSpy.calls.length = 0;
 
+  // Save with selectedIndex === -1 (nothing selected at all): the id
+  // ternary's falsy branch (list.options[-1] is undefined) falls through
+  // to the same "add a new rule" path as an empty-value [New Rule]
+  // selection.
+  list.selectedIndex = -1;
+  (document.getElementById(control.idPrefix + "condfmtrange") as any).value = "C1:C1";
+  (document.getElementById(control.idPrefix + "condfmtvalue1") as any).value = "1";
+  const idxSelectNextId = control.sheet.condfmtNextId;
+  SC.SpreadsheetControlCondFmtSave();
+  await waitEditor(control.editor, "cmdend", 500);
+  expect(scheduleSpy.calls[0]).toMatch(new RegExp(`^condfmt add ${idxSelectNextId} `));
+  expect(control.sheet.condfmtRules).toHaveLength(2);
+  scheduleSpy.calls.length = 0;
+  // Remove it again so the rest of this test's rule-count assertions
+  // (which assume exactly one rule survives from the earlier Save block)
+  // stay valid.
+  SC.SpreadsheetControlCondFmtFillList();
+  SC.SelectOptionByValue(list, idxSelectNextId + "");
+  SC.SpreadsheetControlCondFmtDelete();
+  await waitEditor(control.editor, "cmdend", 500);
+  expect(control.sheet.condfmtRules).toHaveLength(1);
+  scheduleSpy.calls.length = 0;
+
   // Add a second rule (custom formula type) to exercise Move up/down.
   const secondId = control.sheet.condfmtNextId;
   SC.SelectOptionByValue(list, "");
@@ -3114,6 +3137,13 @@ test("Conditional Formatting tab: all helpers including Save/Delete/Move", async
 
   // Move: no selection -> no-op.
   SC.SelectOptionByValue(list, "");
+  SC.SpreadsheetControlCondFmtMove("up");
+  expect(scheduleSpy.calls).toEqual([]);
+
+  // Move: selectedIndex === -1 (nothing selected at all, not even
+  // [New Rule]) -> list.options[list.selectedIndex] is undefined, same
+  // no-op as an empty-value selection.
+  list.selectedIndex = -1;
   SC.SpreadsheetControlCondFmtMove("up");
   expect(scheduleSpy.calls).toEqual([]);
 

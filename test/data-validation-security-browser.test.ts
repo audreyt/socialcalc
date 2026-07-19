@@ -168,6 +168,98 @@ describe("data validation security: hostile list labels are escaped before reach
     expect(scriptOption!.o).toBe("&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(scriptOption!.o).not.toContain("<script>");
   });
+
+  test("ValidationDropdownMouseDown guards: no focused editor, no dvDropdown, no coord open", async () => {
+    const SC = await loadBrowserSocialCalc();
+    const { control } = await newControl(SC, "gd-root");
+    const editor = control.editor;
+
+    // No editor currently has keyboard focus. Also pass a falsy `e` (as a
+    // caller might when re-dispatching synthetically) to exercise the
+    // `e || window.event` fallback before the focusTable guard fires.
+    SC.Keyboard.focusTable = null;
+    expect(SC.ValidationDropdownMouseDown(null)).toBe(true);
+    expect(SC.ValidationDropdownMouseDown({ target: null })).toBe(true);
+
+    // Focused editor exists but has no dvDropdown (e.g. a noEdit viewer).
+    SC.Keyboard.focusTable = { dvDropdown: null };
+    expect(SC.ValidationDropdownMouseDown({ target: null })).toBe(true);
+
+    // Focused editor's dropdown exists but is not currently open (no coord).
+    SC.Keyboard.focusTable = editor;
+    editor.dvDropdown.coord = null;
+    expect(SC.ValidationDropdownMouseDown({ target: null })).toBe(true);
+  });
+
+  test("ValidationDropdownMouseDown no-ops when the target cell was cleared or its rule changed kind after the dropdown opened", async () => {
+    const SC = await loadBrowserSocialCalc();
+    const { control } = await newControl(SC, "gd2-root");
+    const sheet = control.sheet;
+    const editor = control.editor;
+
+    const rule = { kind: "list", values: ["red", "green"], allowBlank: false, mode: "reject" };
+    await scheduleCommands(
+      SC,
+      sheet,
+      `set A1 validation ${SC.encodeForSave(SC.DataValidation.EncodeRule(rule))}`,
+    );
+    editor.MoveECell("A1");
+    primeGridLayout(editor);
+    SC.KeyboardSetFocus(editor);
+    editor.dvDropdown.Update();
+    expect(editor.dvDropdown.coord).toBe("A1");
+
+    // The cell itself was removed from the sheet after the dropdown was
+    // shown (e.g. by a concurrent command) -- sheetobj.cells[coord] is
+    // undefined, so `cell` is falsy and the ternary's null branch fires.
+    const savedCell = sheet.cells.A1;
+    delete sheet.cells.A1;
+    try {
+      expect(SC.ValidationDropdownMouseDown({ target: editor.dvDropdown.main })).toBe(true);
+    } finally {
+      sheet.cells.A1 = savedCell;
+    }
+
+    // The cell still exists but its validation rule is no longer a list
+    // (e.g. changed to a number rule after the dropdown opened).
+    const numberRule = {
+      kind: "number",
+      op: "between",
+      bound1: 1,
+      bound2: 10,
+      allowBlank: false,
+      mode: "reject",
+    };
+    await scheduleCommands(
+      SC,
+      sheet,
+      `set A1 validation ${SC.encodeForSave(SC.DataValidation.EncodeRule(numberRule))}`,
+    );
+    expect(SC.ValidationDropdownMouseDown({ target: editor.dvDropdown.main })).toBe(true);
+  });
+
+  test("ValidationDropdownMouseDown tolerates a synthetic event with no preventDefault/stopPropagation methods", async () => {
+    const SC = await loadBrowserSocialCalc();
+    const { control } = await newControl(SC, "gd3-root");
+    const sheet = control.sheet;
+    const editor = control.editor;
+
+    const rule = { kind: "list", values: ["red", "green"], allowBlank: false, mode: "reject" };
+    await scheduleCommands(
+      SC,
+      sheet,
+      `set A1 validation ${SC.encodeForSave(SC.DataValidation.EncodeRule(rule))}`,
+    );
+    editor.MoveECell("A1");
+    primeGridLayout(editor);
+    SC.KeyboardSetFocus(editor);
+    editor.dvDropdown.Update();
+
+    // A plain event object (no preventDefault/stopPropagation, as a native
+    // browser MouseEvent always provides but a minimal synthetic one might
+    // not) must not throw -- both calls are feature-detected.
+    expect(() => SC.ValidationDropdownMouseDown({ target: editor.dvDropdown.main })).not.toThrow();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -207,6 +299,19 @@ describe("data validation browser: dropdown open / type-invalid / select-valid f
     editor.dvDropdown.Update();
     expect(editor.dvDropdown.main.style.display).toBe("none");
     expect(editor.dvDropdown.coord).toBeNull();
+  });
+
+  test("dropdown Update hides itself when the editor has no current ecell yet", async () => {
+    const SC = await loadBrowserSocialCalc();
+    const { control } = await newControl(SC);
+    const { editor } = control;
+    primeGridLayout(editor);
+    // editor.ecell defaults to A1 on construction; force it unset to
+    // exercise the "!editor.ecell" guard branch directly.
+    editor.ecell = null;
+    editor.dvDropdown.main.style.display = "block"; // force a visible state to prove Update resets it
+    editor.dvDropdown.Update();
+    expect(editor.dvDropdown.main.style.display).toBe("none");
   });
 
   test("selecting a dropdown item commits the value through the normal EditorSaveEdit/ExecuteSheetCommand path", async () => {
@@ -351,5 +456,102 @@ describe("data validation browser: dropdown open / type-invalid / select-valid f
       (globalThis as any).confirm = originalConfirm;
     }
     expect(sheet.cells.A1.datavalue).toBe("purple");
+  });
+
+  test("reject mode with no global alert() function still blocks the edit silently", async () => {
+    const SC = await loadBrowserSocialCalc();
+    const { control } = await newControl(SC);
+    const sheet = control.sheet;
+    const editor = control.editor;
+
+    const rule = { kind: "list", values: ["red", "green"], allowBlank: false, mode: "reject" };
+    await scheduleCommands(
+      SC,
+      sheet,
+      `set A1 validation ${SC.encodeForSave(SC.DataValidation.EncodeRule(rule))}`,
+    );
+
+    editor.MoveECell("A1");
+    editor.workingvalues.ecoord = "A1";
+
+    const originalAlert = (globalThis as any).alert;
+    delete (globalThis as any).alert;
+    try {
+      expect(() => editor.EditorSaveEdit("purple")).not.toThrow();
+    } finally {
+      (globalThis as any).alert = originalAlert;
+    }
+    expect(sheet.cells.A1.datavalue).toBe("");
+  });
+
+  test("warn mode with no global confirm() function proceeds as if confirmed", async () => {
+    const SC = await loadBrowserSocialCalc();
+    const { control } = await newControl(SC);
+    const sheet = control.sheet;
+    const editor = control.editor;
+
+    const rule = { kind: "list", values: ["red", "green"], allowBlank: false, mode: "warn" };
+    await scheduleCommands(
+      SC,
+      sheet,
+      `set A1 validation ${SC.encodeForSave(SC.DataValidation.EncodeRule(rule))}`,
+    );
+
+    editor.MoveECell("A1");
+    editor.workingvalues.ecoord = "A1";
+
+    const originalConfirm = (globalThis as any).confirm;
+    delete (globalThis as any).confirm;
+    try {
+      await new Promise<void>((resolve) => {
+        sheet.statuscallback = (_s: any, status: string) => {
+          if (status === "cmdend") resolve();
+        };
+        editor.EditorSaveEdit("purple");
+      });
+    } finally {
+      (globalThis as any).confirm = originalConfirm;
+    }
+    // No confirm() available -> dvProceed defaults true -> edit commits.
+    expect(sheet.cells.A1.datavalue).toBe("purple");
+  });
+
+  test("a cell carrying an undecodable validation payload skips enforcement entirely (edit commits)", async () => {
+    const SC = await loadBrowserSocialCalc();
+    const { control } = await newControl(SC);
+    const sheet = control.sheet;
+    const editor = control.editor;
+
+    // Set a cell directly with a validation string that DecodeRule cannot
+    // parse (e.g. corrupted/truncated save data), bypassing the normal
+    // EncodeRule path so DecodeRule genuinely returns null.
+    await scheduleCommands(SC, sheet, "set A1 validation not-a-valid-rule-payload");
+
+    editor.MoveECell("A1");
+    editor.workingvalues.ecoord = "A1";
+
+    await new Promise<void>((resolve) => {
+      sheet.statuscallback = (_s: any, status: string) => {
+        if (status === "cmdend") resolve();
+      };
+      editor.EditorSaveEdit("anything");
+    });
+    expect(sheet.cells.A1.datavalue).toBe("anything");
+  });
+});
+
+describe("ValidationDropdown constructor", () => {
+  test("returns immediately without building any DOM when the owning editor is noEdit", async () => {
+    const SC = await loadBrowserSocialCalc();
+    const sheet = new SC.Sheet();
+    const ctx = new SC.RenderContext(sheet);
+    const editor = new SC.TableEditor(ctx);
+    editor.noEdit = true;
+    const dropdown = new SC.ValidationDropdown(editor);
+    // The noEdit guard returns before `this.editor`/`this.main` are set --
+    // mirrors the production construction site in CreateTableEditor, which
+    // only news this up inside an `if (!editor.noEdit)` block.
+    expect(dropdown.editor).toBeUndefined();
+    expect(dropdown.main).toBeUndefined();
   });
 });

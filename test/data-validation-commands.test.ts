@@ -479,6 +479,30 @@ describe("data validation: structural rewrites (insert/delete/move)", () => {
     const after = SC.DataValidation.DecodeRule(sheet.cells.A1.validation);
     expect(after.sourceRange).toBe("=C1");
   });
+
+  test("movepaste all copies the moved source cell's validation rule onto the target cell", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    const rule = { kind: "number", op: "gt", bound1: 0, allowBlank: false, mode: "reject" };
+    await scheduleCommands(SC, sheet, [
+      `set B1 validation ${encodeRule(SC, rule)}`,
+      "movepaste B1:B1 C1 all",
+    ]);
+    const after = SC.DataValidation.DecodeRule(sheet.cells.C1.validation);
+    expect(after).toEqual(rule);
+  });
+
+  test("movepaste all clears a target cell's validation rule when the moved source cell has none", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    const rule = { kind: "number", op: "gt", bound1: 0, allowBlank: false, mode: "reject" };
+    await scheduleCommands(SC, sheet, [
+      `set C1 validation ${encodeRule(SC, rule)}`,
+      "set B1 value n 5",
+      "movepaste B1:B1 C1 all",
+    ]);
+    expect(sheet.cells.C1.validation).toBeUndefined();
+  });
 });
 
 describe("data validation: undo/redo", () => {
@@ -589,5 +613,384 @@ describe("data validation: recalc integration", () => {
     await recalcSheet(SC, sheet);
     await scheduleCommands(SC, sheet, "set A1 value n 6");
     expect(sheet.cells.A1.datavalue).toBe(5); // rejected: B1 no longer 1, prior 5 unchanged
+  });
+});
+
+describe("data validation: DV.ComputeCustomPass / DV.EvaluateForCell direct API", () => {
+  test("ComputeCustomPass fails closed (returns false) when the formula evaluator itself throws", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    const rule = { kind: "custom", formula: "1=1", allowBlank: false, mode: "reject" };
+    const original = SC.Formula.evaluate_parsed_formula;
+    SC.Formula.evaluate_parsed_formula = () => {
+      throw new Error("simulated evaluator failure");
+    };
+    try {
+      expect(SC.DataValidation.ComputeCustomPass(sheet, rule)).toBe(false);
+    } finally {
+      SC.Formula.evaluate_parsed_formula = original;
+    }
+  });
+
+  test("EvaluateForCell returns a pass outcome with no rule for an unvalidated cell", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, "set A1 value n 5");
+    const info = SC.DataValidation.EvaluateForCell(sheet, "A1", "5");
+    expect(info).toEqual({ outcome: "pass", rule: null });
+  });
+
+  test("EvaluateForCell evaluates a cell's own validation rule against a candidate raw value", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    const rule = { kind: "number", op: "gt", bound1: 10, allowBlank: false, mode: "reject" };
+    await scheduleCommands(SC, sheet, `set A1 validation ${encodeRule(SC, rule)}`);
+    const passing = SC.DataValidation.EvaluateForCell(sheet, "A1", "20");
+    expect(passing.outcome).toBe("pass");
+    expect(passing.rule).toEqual(rule);
+    const failing = SC.DataValidation.EvaluateForCell(sheet, "A1", "5");
+    expect(failing.outcome).toBe("reject");
+  });
+});
+
+describe("data validation: DV.DecodeRule payload-shape guards", () => {
+  test("valid JSON that isn't an object (e.g. a bare number or string) decodes to null", async () => {
+    const SC = await loadSocialCalc();
+    expect(SC.DataValidation.DecodeRule("42")).toBeNull();
+    expect(SC.DataValidation.DecodeRule('"just a string"')).toBeNull();
+    expect(SC.DataValidation.DecodeRule("null")).toBeNull();
+  });
+
+  test("a JSON object with no 'kind' field, or a non-string 'kind', decodes to null", async () => {
+    const SC = await loadSocialCalc();
+    expect(SC.DataValidation.DecodeRule(JSON.stringify({ allowBlank: true }))).toBeNull();
+    expect(SC.DataValidation.DecodeRule(JSON.stringify({ kind: 5 }))).toBeNull();
+  });
+});
+
+describe("data validation: DV.ResolveBound formula-evaluation guard", () => {
+  test("a formula bound whose evaluator throws resolves to invalid (fails closed)", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    const original = SC.Formula.ParseFormulaIntoTokens;
+    SC.Formula.ParseFormulaIntoTokens = () => {
+      throw new Error("simulated parse failure");
+    };
+    try {
+      const resolved = SC.DataValidation.ResolveBound(sheet, "=A1");
+      expect(resolved).toEqual({ value: 0, valid: false });
+    } finally {
+      SC.Formula.ParseFormulaIntoTokens = original;
+    }
+  });
+});
+
+describe("data validation: DV.ResolveListValues source-range parse guard", () => {
+  test("an unparseable sourceRange resolves to an empty list instead of throwing", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    const rule = {
+      kind: "list",
+      sourceRange: "not a valid range!!",
+      allowBlank: false,
+      mode: "reject",
+    };
+    expect(SC.DataValidation.ResolveListValues(sheet, rule)).toEqual([]);
+  });
+});
+
+describe("data validation: DV.CompareOk exhaustive operator coverage", () => {
+  test("every comparison operator's true and false side", async () => {
+    const SC = await loadSocialCalc();
+    const CompareOk = SC.DataValidation.CompareOk;
+    // between
+    expect(CompareOk("between", 5, 1, 10)).toBe(true);
+    expect(CompareOk("between", 0, 1, 10)).toBe(false);
+    // notBetween
+    expect(CompareOk("notBetween", 0, 1, 10)).toBe(true);
+    expect(CompareOk("notBetween", 11, 1, 10)).toBe(true);
+    expect(CompareOk("notBetween", 5, 1, 10)).toBe(false);
+    // eq / ne
+    expect(CompareOk("eq", 5, 5, 0)).toBe(true);
+    expect(CompareOk("eq", 5, 6, 0)).toBe(false);
+    expect(CompareOk("ne", 5, 6, 0)).toBe(true);
+    expect(CompareOk("ne", 5, 5, 0)).toBe(false);
+    // gt / lt
+    expect(CompareOk("gt", 5, 1, 0)).toBe(true);
+    expect(CompareOk("gt", 1, 5, 0)).toBe(false);
+    expect(CompareOk("lt", 1, 5, 0)).toBe(true);
+    expect(CompareOk("lt", 5, 1, 0)).toBe(false);
+    // ge / le
+    expect(CompareOk("ge", 5, 5, 0)).toBe(true);
+    expect(CompareOk("ge", 4, 5, 0)).toBe(false);
+    expect(CompareOk("le", 5, 5, 0)).toBe(true);
+    expect(CompareOk("le", 6, 5, 0)).toBe(false);
+    // Unknown op falls through to the default false.
+    expect(CompareOk("bogus-op", 5, 5, 5)).toBe(false);
+  });
+});
+
+describe("data validation: DV.ComputeOutcome truth table", () => {
+  test("all allowBlank/isBlank/checkPassed/mode combinations", async () => {
+    const SC = await loadSocialCalc();
+    const ComputeOutcome = SC.DataValidation.ComputeOutcome;
+    // allowBlank + blank short-circuits to pass regardless of checkPassed/mode.
+    expect(ComputeOutcome(true, true, false, "reject")).toBe("pass");
+    expect(ComputeOutcome(true, true, false, "warn")).toBe("pass");
+    // Not blank (or blank without allowBlank): checkPassed wins next.
+    expect(ComputeOutcome(true, false, true, "reject")).toBe("pass");
+    expect(ComputeOutcome(false, true, true, "reject")).toBe("pass");
+    // Neither blank-pass nor checkPassed: mode decides.
+    expect(ComputeOutcome(false, false, false, "warn")).toBe("warn");
+    expect(ComputeOutcome(false, false, false, "reject")).toBe("reject");
+    expect(ComputeOutcome(true, false, false, "reject")).toBe("reject");
+  });
+});
+
+describe("data validation: DV.ResolveBound plain-string parsing", () => {
+  test("a plain numeric string resolves via DetermineValueType's numeric path", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    expect(SC.DataValidation.ResolveBound(sheet, "42")).toEqual({ value: 42, valid: true });
+  });
+
+  test("a non-numeric plain string resolves to an invalid NaN result", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    const resolved = SC.DataValidation.ResolveBound(sheet, "not a number");
+    expect(resolved.valid).toBe(false);
+    expect(Number.isNaN(resolved.value)).toBe(true);
+  });
+
+  test("a formula bound whose result is itself an error type resolves to invalid", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    // "=1/0" evaluates to an error type ("e#DIV/0!").
+    const resolved = SC.DataValidation.ResolveBound(sheet, "=1/0");
+    expect(resolved.valid).toBe(false);
+  });
+});
+
+describe("data validation: DV.ResolveListValues named-range source", () => {
+  test("a sourceRange naming a defined range resolves through sheet.names", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, [
+      "set A1 text t alpha",
+      "set A2 text t beta",
+      "name define MYLIST A1:A2",
+    ]);
+    const rule = { kind: "list", sourceRange: "MYLIST", allowBlank: false, mode: "reject" };
+    expect(SC.DataValidation.ResolveListValues(sheet, rule)).toEqual(["alpha", "beta"]);
+  });
+
+  test("a formula-prefixed sourceRange ('=A1:A2') strips the leading '=' before parsing", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, ["set A1 text t one", "set A2 text t two"]);
+    const rule = { kind: "list", sourceRange: "=A1:A2", allowBlank: false, mode: "reject" };
+    expect(SC.DataValidation.ResolveListValues(sheet, rule)).toEqual(["one", "two"]);
+  });
+});
+
+describe("data validation: DV.RuleCheckPassed textLength/number/date branches", () => {
+  test("textLength rule with an invalid (unresolvable) bound1 fails closed", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    const rule = {
+      kind: "textLength",
+      op: "le",
+      bound1: "not a number",
+      allowBlank: false,
+      mode: "reject",
+    };
+    expect(SC.DataValidation.RuleCheckPassed(sheet, rule, "hello")).toBe(false);
+  });
+
+  test("textLength rule defaults op to 'eq' when omitted", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    const rule = { kind: "textLength", bound1: 5, allowBlank: false, mode: "reject" };
+    expect(SC.DataValidation.RuleCheckPassed(sheet, rule, "hello")).toBe(true);
+    expect(SC.DataValidation.RuleCheckPassed(sheet, rule, "hi")).toBe(false);
+  });
+
+  test("number rule rejects non-numeric raw input before touching bounds", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    const rule = { kind: "number", op: "gt", bound1: 0, allowBlank: false, mode: "reject" };
+    expect(SC.DataValidation.RuleCheckPassed(sheet, rule, "not a number")).toBe(false);
+  });
+
+  test("number rule with an invalid bound1 fails closed even for numeric raw input", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    const rule = {
+      kind: "number",
+      op: "gt",
+      bound1: "not a number",
+      allowBlank: false,
+      mode: "reject",
+    };
+    expect(SC.DataValidation.RuleCheckPassed(sheet, rule, "5")).toBe(false);
+  });
+
+  test("number rule defaults op to 'eq' when omitted", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    const rule = { kind: "number", bound1: 10, allowBlank: false, mode: "reject" };
+    expect(SC.DataValidation.RuleCheckPassed(sheet, rule, "10")).toBe(true);
+    expect(SC.DataValidation.RuleCheckPassed(sheet, rule, "11")).toBe(false);
+  });
+});
+
+describe("data validation: DV.DefaultErrorMessage", () => {
+  test("uses the rule's own errorMessage when present", async () => {
+    const SC = await loadSocialCalc();
+    const rule = {
+      kind: "number",
+      bound1: 0,
+      allowBlank: false,
+      mode: "reject",
+      errorMessage: "Custom!",
+    };
+    expect(SC.DataValidation.DefaultErrorMessage(rule)).toBe("Custom!");
+  });
+
+  test("falls back to the shipping default message when no errorMessage is set", async () => {
+    const SC = await loadSocialCalc();
+    const rule = { kind: "number", bound1: 0, allowBlank: false, mode: "reject" };
+    expect(SC.DataValidation.DefaultErrorMessage(rule)).toBe(
+      SC.Constants.s_dvDefaultError || "The value entered does not meet validation rules.",
+    );
+  });
+});
+
+describe("data validation: dvRewriteAllFields bound2 formula rewrite", () => {
+  test("AdjustRuleCoords rewrites a formula-prefixed bound2 alongside bound1", async () => {
+    const SC = await loadSocialCalc();
+    const rule = {
+      kind: "number",
+      op: "between",
+      bound1: "=B1",
+      bound2: "=B2",
+      allowBlank: false,
+      mode: "reject",
+    };
+    const adjusted = SC.DataValidation.AdjustRuleCoords(rule, 1, 0, 1, 1);
+    expect(adjusted.bound1).toBe("=B2");
+    expect(adjusted.bound2).toBe("=B3");
+  });
+});
+
+describe("data validation: DV.ResolveListValues with neither values nor sourceRange", () => {
+  test("a list rule with no literal values and no sourceRange resolves to an empty list", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    const rule = { kind: "list", allowBlank: false, mode: "reject" };
+    expect(SC.DataValidation.ResolveListValues(sheet, rule)).toEqual([]);
+  });
+});
+
+describe("data validation: DV.ResolveListValues named range whose own definition is formula-prefixed", () => {
+  test("a defined name with a '=' -prefixed definition is stripped before ParseRange", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    await scheduleCommands(SC, sheet, ["set A1 text t x", "set A2 text t y"]);
+    // Defined names in SocialCalc store their definition with a leading "="
+    // (formula-style), unlike a raw sourceRange string -- exercise that path
+    // directly since `name define` always writes it that way.
+    sheet.names["MYRANGE"] = { name: "MYRANGE", definition: "=A1:A2", desc: "" };
+    const rule = { kind: "list", sourceRange: "MYRANGE", allowBlank: false, mode: "reject" };
+    expect(SC.DataValidation.ResolveListValues(sheet, rule)).toEqual(["x", "y"]);
+  });
+});
+
+describe("data validation: DV.ComputeCustomPass direct API", () => {
+  test("a custom rule with no formula passes trivially (nothing to fail)", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    const rule = { kind: "custom", allowBlank: false, mode: "reject" };
+    expect(SC.DataValidation.ComputeCustomPass(sheet, rule)).toBe(true);
+  });
+
+  test("a custom formula that itself evaluates to an error type fails", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    const rule = { kind: "custom", formula: "1/0", allowBlank: false, mode: "reject" };
+    expect(SC.DataValidation.ComputeCustomPass(sheet, rule)).toBe(false);
+  });
+});
+
+describe("data validation: DV.RuleCheckPassed NaN-after-DetermineValueType guard", () => {
+  test("a raw value DetermineValueType calls numeric but Number() can't parse falls closed", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    const rule = { kind: "number", op: "gt", bound1: 0, allowBlank: false, mode: "reject" };
+    const original = SC.DetermineValueType;
+    SC.DetermineValueType = () => ({ type: "n", value: "not-actually-a-number" });
+    try {
+      expect(SC.DataValidation.RuleCheckPassed(sheet, rule, "whatever")).toBe(false);
+    } finally {
+      SC.DetermineValueType = original;
+    }
+  });
+});
+
+describe("data validation: DV.EvaluateForCell on a coordinate with no cell at all", () => {
+  test("passes with no rule when the coordinate has never been touched", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    // Z99 was never set, so sheet.cells["Z99"] is undefined (distinct from
+    // a cell that exists but carries no .validation).
+    expect(sheet.cells.Z99).toBeUndefined();
+    const info = SC.DataValidation.EvaluateForCell(sheet, "Z99", "anything");
+    expect(info).toEqual({ outcome: "pass", rule: null });
+  });
+});
+
+describe("data validation: DV.DefaultErrorMessage constant fallback", () => {
+  test("falls back to the literal default string when s_dvDefaultError itself is unset", async () => {
+    const SC = await loadSocialCalc();
+    const rule = { kind: "number", bound1: 0, allowBlank: false, mode: "reject" };
+    const original = SC.Constants.s_dvDefaultError;
+    delete SC.Constants.s_dvDefaultError;
+    try {
+      expect(SC.DataValidation.DefaultErrorMessage(rule)).toBe(
+        "The value entered does not meet validation rules.",
+      );
+    } finally {
+      SC.Constants.s_dvDefaultError = original;
+    }
+  });
+});
+
+describe("data validation: dvRewriteAllFields sourceRange/formula rewrite branches", () => {
+  test("AdjustRuleCoords rewrites a formula-prefixed sourceRange and a plain formula field together", async () => {
+    const SC = await loadSocialCalc();
+    const rule = {
+      kind: "list",
+      sourceRange: "=B1:B2",
+      allowBlank: false,
+      mode: "reject",
+    };
+    const adjusted = SC.DataValidation.AdjustRuleCoords(rule, 1, 0, 1, 1);
+    expect(adjusted.sourceRange).toBe("=B2:B3");
+  });
+
+  test("AdjustRuleCoords rewrites a custom rule's formula field", async () => {
+    const SC = await loadSocialCalc();
+    const rule = { kind: "custom", formula: "B1=1", allowBlank: false, mode: "reject" };
+    const adjusted = SC.DataValidation.AdjustRuleCoords(rule, 1, 0, 1, 1);
+    expect(adjusted.formula).toBe("B2=1");
+  });
+});
+
+describe("data validation: dvRewriteAllFields bare (non-formula-prefixed) sourceRange", () => {
+  test("AdjustRuleCoords rewrites a bare sourceRange (no leading '=') without adding one", async () => {
+    const SC = await loadSocialCalc();
+    const rule = { kind: "list", sourceRange: "B1:B2", allowBlank: false, mode: "reject" };
+    const adjusted = SC.DataValidation.AdjustRuleCoords(rule, 1, 0, 1, 1);
+    expect(adjusted.sourceRange).toBe("B2:B3");
   });
 });

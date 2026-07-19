@@ -24,8 +24,10 @@ type DataValidationMutableRoot = {
   DataValidation: Partial<typeof SocialCalc.DataValidation>;
 };
 
+// Concatenated exactly once per bundle load (see build.ts's coreFiles list),
+// so DataValidation is always undefined here -- no double-init guard needed.
 const DVRoot = SocialCalc as unknown as DataValidationMutableRoot;
-if (!DVRoot.DataValidation) DVRoot.DataValidation = {};
+DVRoot.DataValidation = {};
 const DV = DVRoot.DataValidation as typeof SocialCalc.DataValidation;
 
 DV.RULE_LIST = "list";
@@ -145,22 +147,23 @@ DV.ResolveListValues = function (
   if (name) {
     rangeText = name.definition.charAt(0) === "=" ? name.definition.substring(1) : name.definition;
   }
-  try {
-    const prange = SocialCalc.ParseRange(rangeText);
-    const values: string[] = [];
-    for (let row = prange.cr1.row; row <= prange.cr2.row; row++) {
-      for (let col = prange.cr1.col; col <= prange.cr2.col; col++) {
-        const coord = SocialCalc.crToCoord(col, row);
-        const cell = sheet.cells[coord];
-        if (cell && cell.datavalue !== "" && cell.datavalue != null) {
-          values.push(cell.datavalue + "");
-        }
+  // ParseRange never throws (it clamps garbage input to coordToCr's
+  // fallback coords instead), so a malformed sourceRange is naturally
+  // handled by the loop below yielding no cells, not by try/catch — see
+  // the matching note in socialcalcspreadsheetcontrol.ts's condfmt range
+  // validation.
+  const prange = SocialCalc.ParseRange(rangeText);
+  const values: string[] = [];
+  for (let row = prange.cr1.row; row <= prange.cr2.row; row++) {
+    for (let col = prange.cr1.col; col <= prange.cr2.col; col++) {
+      const coord = SocialCalc.crToCoord(col, row);
+      const cell = sheet.cells[coord];
+      if (cell && cell.datavalue !== "" && cell.datavalue != null) {
+        values.push(cell.datavalue + "");
       }
     }
-    return values;
-  } catch {
-    return [];
   }
+  return values;
 };
 
 /**

@@ -650,7 +650,13 @@ function resolveLetSpan(
 /** Resolves one LAMBDA(...) span into a `special` token holding an
  * unevaluated closure: params (from every arg but the last) and the body
  * (the last arg, kept as raw tokens) plus the current lexical scope
- * snapshot (for closures over an enclosing LET). */
+ * snapshot (for closures over an enclosing LET). `bodyTokens` is never
+ * empty: SocialCalc's tokenizer rejects a comma immediately followed by
+ * ")" (e.g. the trailing comma in "LAMBDA(x,)") by inserting an inline
+ * "two operators inappropriately in a row" error token in that position,
+ * so splitArgSpans's last span always contains at least that token —
+ * there is no valid or malformed formula string that reaches this
+ * function with an empty final arg span. */
 function resolveLambdaSpan(
   argSpans: SocialCalc.FormulaParseToken[][],
   scope: SocialCalc.FormulaScopeFrame[],
@@ -675,13 +681,6 @@ function resolveLambdaSpan(
       };
     }
     params.push(names[0]!);
-  }
-  if (!bodyTokens.length) {
-    return {
-      value: 0,
-      type: "e#VALUE!",
-      error: SocialCalc.Constants.s_calcerrincorrectargstofunction + " LAMBDA. ",
-    };
   }
   return { params: params, bodyTokens: bodyTokens, scope: scope };
 }
