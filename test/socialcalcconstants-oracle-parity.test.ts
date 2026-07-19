@@ -191,16 +191,11 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
   // — the second-largest StringLiteral survivor cluster in the file.
   //
   // RANK/MEDIAN/QUARTILE (audreyt/ethercalc#712, #726), SORT/UNIQUE (dynamic-array
-  // spill support), and EDATE/EOMONTH/DATEDIF/WEEKNUM/ISOWEEKNUM/YEARFRAC/WORKDAY/
-  // NETWORKDAYS/WORKDAY.INTL/NETWORKDAYS.INTL (date-arithmetic/workday compatibility
-  // batch) were added after the 3.0.8 baseline was vendored, so the oracle bundle can
-  // never contain their s_fdef_/s_farg_ keys — a byte-for-byte toEqual against the
-  // full candidate object would fail permanently on these keys alone, regardless of
-  // correctness. Carve out exactly this named, closed set (15 s_fdef_ + 10 s_farg_)
-  // before the oracle comparison; every other key still gets whole-object
-  // byte-for-byte parity, and the total counts (130/48) stay pinned so a future
-  // undocumented addition or removal still fails loudly instead of silently passing
-  // through this carve-out.
+  // spill support), date arithmetic/workday functions, and PPMT/IPMT/MIRR/XNPV/XIRR
+  // were added after the 3.0.8 baseline was vendored, so the oracle bundle can
+  // never contain their s_fdef_/s_farg_ keys. Carve out exactly this named, closed
+  // set; byte-for-byte parity and totals (135/52) remain pinned so undocumented
+  // additions or removals fail loudly instead of silently passing through.
   const postOracleFdefKeys = [
     "s_fdef_RANK",
     "s_fdef_MEDIAN",
@@ -217,6 +212,11 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
     "s_fdef_NETWORKDAYS",
     "s_fdef_WORKDAY.INTL",
     "s_fdef_NETWORKDAYS.INTL",
+    "s_fdef_PPMT",
+    "s_fdef_IPMT",
+    "s_fdef_MIRR",
+    "s_fdef_XNPV",
+    "s_fdef_XIRR",
   ];
   const postOracleFargKeys = [
     "s_farg_rank",
@@ -228,11 +228,17 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
     "s_farg_weeknum",
     "s_farg_yearfrac",
     "s_farg_workday",
-    "s_farg_workdayintl",
+    "s_farg_workday_intl",
+    "s_farg_networkdays",
+    "s_farg_networkdays_intl",
+    "s_farg_ppmt",
+    "s_farg_mirr",
+    "s_farg_xnpv",
+    "s_farg_xirr",
   ];
 
-  expect(Object.keys(candidateFdef).length).toBe(130);
-  expect(Object.keys(candidateFarg).length).toBe(48);
+  expect(Object.keys(candidateFdef).length).toBe(135);
+  expect(Object.keys(candidateFarg).length).toBe(52);
 
   const legacyFdef = { ...candidateFdef };
   const legacyFarg = { ...candidateFarg };
@@ -244,13 +250,10 @@ test("s_fdef_*/s_farg_* formula help text (function definitions and argument hin
   expect(legacyFdef).toEqual(pickByPrefix(Oracle.Constants, "s_fdef_"));
   expect(legacyFarg).toEqual(pickByPrefix(Oracle.Constants, "s_farg_"));
 
-  // The twenty-five post-3.0.8 keys have no oracle counterpart to diff against.
-  // The focused statistical-formula test (test/formula-rank-median-quartile.test.ts,
-  // "RANK/MEDIAN/QUARTILE are registered in FunctionList with help text and arg
-  // strings") covers FunctionList/picker plumbing for RANK/MEDIAN/QUARTILE,
-  // test/formula-dynamic-arrays.test.ts covers SORT/UNIQUE behavior, and
-  // test/formula-date-arithmetic.test.ts covers the date-arithmetic/workday
-  // compatibility batch; this test only asserts every carved-out key has
+  // The post-3.0.8 date and financial keys have no oracle counterpart to diff
+  // against. Focused date-arithmetic/workday and financial-function tests cover
+  // their registration, help text, and behavior; this test asserts every
+  // carved-out key has non-empty help text.
   // non-empty help text.
   for (const key of postOracleFdefKeys) {
     expect(candidateFdef[key]).toBeTruthy();

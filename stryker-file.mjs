@@ -56,29 +56,19 @@ const sheetCoreTests = [
 // Formula lexer/parser/operand-stack/rewrite tests, verified by name plus
 // grep for ParseFormulaIntoTokens/ConvertInfixToPolish/OperandAs*/
 // OffsetFormulaCoords/AdjustFormulaCoords/ReplaceFormulaCoords call sites.
-// Excludes test/lemma-*-facade.test.ts on purpose EXCEPT
-// lemma-weekday-policy-facade.test.ts: every other facade test exercises
-// only the non-shipping LemmaScript mirror (see each facade's header
-// comment), but weekday-policy's facade test also has a shipping
-// cross-check describe block that calls SC.Formula.DecodeWeekendArgument
-// directly and drives live WORKDAY.INTL formula evaluations, so it kills
-// real js/formula1.ts mutants and belongs in the mutation-owned set.
-// formula-date-arithmetic.test.ts is the direct command-level coverage for
-// EDATE/EOMONTH/DATEDIF/WEEKNUM/ISOWEEKNUM/YEARFRAC/WORKDAY[.INTL]/
-// NETWORKDAYS[.INTL] added with that batch (js/formula1.ts
-// EDateEoMonthFunctions/DateDifFunction/WeekNumFunctions/YearFracFunction/
-// WorkdayNetworkdaysFunctions). Includes the 2026-07-12 mutation-survivor
-// regression files added while closing the critical-scope Stryker gap (see
-// stryker-mutation-disposition.json), the semantic-audit-hardened
-// branch-coverage file (direct SC.Formula.* calls across
-// EvaluatePolish/ConvertInfixToPolish/DecodeRangeParts/FreshnessInfo/
-// FunctionClasses/etc.), and the NaN-vs-overflow numeric-error-message
-// regression (drives EvaluatePolish via a full sheet recalc).
+// Formula lexer/parser/operand-stack/rewrite tests, plus shipping compatibility
+// suites for weekday/date arithmetic and financial formulas. Facade tests cover
+// shipping cross-checks for weekday policy and finance policy; formula suites
+// cover EDATE/EOMONTH/DATEDIF/WEEKNUM/ISOWEEKNUM/YEARFRAC/WORKDAY,
+// NETWORKDAYS, WORKDAY.INTL, NETWORKDAYS.INTL, PPMT, IPMT, MIRR, XNPV,
+// and XIRR. Includes mutation-survivor regressions and direct SC.Formula
+// branch-coverage tests.
 const formulaOnlyTests = [
   "test/formula-coverage.test.ts",
   "test/formula.test.ts",
   "test/formula-column-range.test.ts",
   "test/formula-functions-coverage.test.ts",
+  "test/formula-financial-functions.test.ts",
   "test/formula-quote-escaping.test.ts",
   "test/formula-rewrite-cases.test.ts",
   "test/formula-rewrite-regressions.test.ts",

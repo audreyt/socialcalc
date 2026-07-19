@@ -612,6 +612,8 @@
     s_fdef_INT: 'Returns the value rounded down to the nearest integer (towards -infinity). ',
     s_fdef_IRR:
       'Returns the interest rate at which the cash flows in the range have a net present value of zero. Uses an iterative process that will return #NUM! error if it does not converge. There may be more than one possible solution. Providing the optional guess value may help in certain situations where it does not converge or finds an inappropriate solution (the default guess is 10%). ',
+    s_fdef_IPMT:
+      'Returns the interest portion of the payment for the given period (1-based, 1 to nper) of an investment at the given rate for the specified number of periods and present value, with optional future value (default 0) and payment type (default 0 = at end of period, 1 = beginning of period). ',
     s_fdef_ISBLANK: 'Returns "true" if the value is a reference to a blank cell. ',
     s_fdef_ISERR: 'Returns "true" if the value is of type "Error" but not "NA". ',
     s_fdef_ISERROR: 'Returns "true" if the value is of type "Error". ',
@@ -636,6 +638,8 @@
     s_fdef_MINUTE: 'Returns the minute portion of a time or date/time value. ',
     s_fdef_MEDIAN:
       'Returns the median (middle value) of the numeric values. If there is an even count, averages the two middle values. ',
+    s_fdef_MIRR:
+      'Returns the modified internal rate of return for the cash flows in the range, using finance_rate as the cost of financing negative flows and reinvest_rate as the return on reinvested positive flows. Requires at least two periods with at least one positive and one negative cash flow. ',
     s_fdef_MOD: 'Returns the remainder of the first value divided by the second. ',
     s_fdef_MONTH: 'Returns the month part of a date value. ',
     s_fdef_N: 'Returns the value if it is a numeric value otherwise an error. ',
@@ -651,6 +655,8 @@
     s_fdef_PI: 'The value 3.1415926... ',
     s_fdef_PMT:
       'Returns the amount of each payment that must be invested at the given rate for the specified number of periods to have the specified present value, with optional future value (default 0) and payment type (default 0 = at end of period, 1 = beginning of period). ',
+    s_fdef_PPMT:
+      'Returns the principal portion of the payment for the given period (1-based, 1 to nper) of an investment at the given rate for the specified number of periods and present value, with optional future value (default 0) and payment type (default 0 = at end of period, 1 = beginning of period). ',
     s_fdef_POWER: 'Returns the first value raised to the second value power. ',
     s_fdef_PRODUCT: 'Returns the result of multiplying the numeric values. ',
     s_fdef_PROPER:
@@ -740,6 +746,10 @@
       'Rounds the given number up to the nearest integer or multiple of significance. Significance is the value to whose multiple of ten the value is to be rounded up (.01, .1, 1, 10, etc.)',
     s_fdef_FLOOR:
       'Rounds the given number down to the nearest multiple of significance. Significance is the value to whose multiple of ten the number is to be rounded down (.01, .1, 1, 10, etc.)',
+    s_fdef_XNPV:
+      'Returns the net present value of a schedule of cash flows (which need not be periodic) discounted at the given rate on an actual-day/365 basis from the first date in the dates range. values and dates must be the same length. ',
+    s_fdef_XIRR:
+      'Returns the internal rate of return for a schedule of cash flows (which need not be periodic) given corresponding dates, discounted on an actual-day/365 basis. Requires at least one positive and one negative cash flow; uses an iterative process that will return #NUM! error if it does not converge (the default guess is 10%). ',
     s_farg_v: 'value',
     s_farg_vn: 'value1, value2, ...',
     s_farg_xy: 'valueX, valueY',
@@ -764,6 +774,10 @@
     s_farg_pmt: 'rate, n, pv, [fv, [paytype]]',
     s_farg_pv: 'rate, n, payment, [fv, [paytype]]',
     s_farg_rate: 'n, payment, pv, [fv, [paytype, [guess]]]',
+    s_farg_ppmt: 'rate, per, nper, pv, [fv, [paytype]]',
+    s_farg_mirr: 'range, finance_rate, reinvest_rate',
+    s_farg_xnpv: 'rate, values, dates',
+    s_farg_xirr: 'values, dates, [guess]',
     s_farg_rank: 'number, ref, [order]',
     s_farg_quartile: 'range, quart',
     s_farg_replace: 'text1, start, length, text2',
@@ -16991,6 +17005,142 @@ More comments yet to come...
     '',
     'financial',
   ];
+  FormulaMut.PPMTIPMTFunctions = function (fname, operand, foperand, sheet) {
+    var resulttype, rate, per, nper, pv, fv, paytype, dval, eval_;
+    var pmt, balance, interest, result;
+    var scf = SocialCalc.Formula;
+    var aval = scf.OperandAsNumber(sheet, foperand);
+    var bval = scf.OperandAsNumber(sheet, foperand);
+    var cval = scf.OperandAsNumber(sheet, foperand);
+    var dval2 = scf.OperandAsNumber(sheet, foperand);
+    resulttype = scf.LookupResultType(aval.type, bval.type, scf.TypeLookupTable.twoargnumeric);
+    resulttype = scf.LookupResultType(resulttype, cval.type, scf.TypeLookupTable.twoargnumeric);
+    resulttype = scf.LookupResultType(resulttype, dval2.type, scf.TypeLookupTable.twoargnumeric);
+    if (foperand.length) {
+      dval = scf.OperandAsNumber(sheet, foperand);
+      resulttype = scf.LookupResultType(resulttype, dval.type, scf.TypeLookupTable.twoargnumeric);
+      if (foperand.length) {
+        eval_ = scf.OperandAsNumber(sheet, foperand);
+        resulttype = scf.LookupResultType(
+          resulttype,
+          eval_.type,
+          scf.TypeLookupTable.twoargnumeric,
+        );
+        if (foperand.length) {
+          scf.FunctionArgsError(fname, operand);
+          return;
+        }
+      }
+    }
+    if (resulttype == 'n') {
+      rate = aval.value;
+      per = bval.value;
+      nper = cval.value;
+      pv = dval2.value;
+      fv = dval != null ? dval.value : 0;
+      paytype = eval_ != null ? (eval_.value ? 1 : 0) : 0;
+      if (nper <= 0 || per < 1 || per > nper || Math.floor(per) != per) {
+        scf.PushOperand(operand, 'e#NUM!', 0);
+        return;
+      }
+      if (rate == 0) {
+        pmt = (fv - pv) / nper;
+      } else {
+        pmt =
+          (0 - fv - pv * Math.pow(1 + rate, nper)) /
+          (((1 + rate * paytype) * (Math.pow(1 + rate, nper) - 1)) / rate);
+      }
+      if (paytype == 1 && per == 1) {
+        interest = 0;
+      } else {
+        if (rate == 0) {
+          balance = -pv - pmt * (per - 1);
+        } else {
+          balance = -(
+            pv * Math.pow(1 + rate, per - 1) +
+            (pmt * (1 + rate * paytype) * (Math.pow(1 + rate, per - 1) - 1)) / rate
+          );
+        }
+        interest = balance * rate;
+        if (paytype == 1) {
+          interest = interest / (1 + rate);
+        }
+      }
+      result = fname == 'IPMT' ? interest : pmt - interest;
+      resulttype = 'n$';
+    }
+    scf.PushOperand(operand, resulttype, result);
+    return;
+  };
+  SocialCalc.Formula.FunctionList['PPMT'] = [
+    SocialCalc.Formula.PPMTIPMTFunctions,
+    -4,
+    'ppmt',
+    '',
+    'financial',
+  ];
+  SocialCalc.Formula.FunctionList['IPMT'] = [
+    SocialCalc.Formula.PPMTIPMTFunctions,
+    -4,
+    'ppmt',
+    '',
+    'financial',
+  ];
+  FormulaMut.MIRRFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var rangeoperand = [];
+    var cashflows = [];
+    var hasNumericCashflow = false;
+    var value1, financerate, reinvestrate, n, i, negpv, posfv;
+    rangeoperand.push(foperand.pop());
+    while (rangeoperand.length) {
+      value1 = scf.OperandValueAndType(sheet, rangeoperand);
+      if (value1.type.charAt(0) == 'n') {
+        cashflows.push(value1.value);
+        hasNumericCashflow = true;
+      } else if (value1.type.charAt(0) == 'b' || value1.type.charAt(0) == 't') {
+        cashflows.push(0);
+      } else if (value1.type.charAt(0) == 'e') {
+        scf.PushOperand(operand, 'e#VALUE!', 0);
+        return;
+      }
+    }
+    if (!cashflows.length || !hasNumericCashflow) {
+      scf.PushOperand(operand, 'e#NUM!', 0);
+      return;
+    }
+    financerate = scf.OperandAsNumber(sheet, foperand);
+    if (scf.CheckForErrorValue(operand, financerate)) return;
+    reinvestrate = scf.OperandAsNumber(sheet, foperand);
+    if (scf.CheckForErrorValue(operand, reinvestrate)) return;
+    n = cashflows.length;
+    if (n < 2 || financerate.value <= -1) {
+      scf.PushOperand(operand, 'e#DIV/0!', 0);
+      return;
+    }
+    negpv = 0;
+    posfv = 0;
+    for (i = 0; i < n; i++) {
+      if (cashflows[i] < 0) {
+        negpv += cashflows[i] / Math.pow(1 + financerate.value, i);
+      } else if (cashflows[i] > 0) {
+        posfv += cashflows[i] * Math.pow(1 + reinvestrate.value, n - 1 - i);
+      }
+    }
+    if (negpv == 0 || posfv == 0) {
+      scf.PushOperand(operand, 'e#DIV/0!', 0);
+      return;
+    }
+    scf.PushOperand(operand, 'n%', Math.pow(-posfv / negpv, 1 / (n - 1)) - 1);
+    return;
+  };
+  SocialCalc.Formula.FunctionList['MIRR'] = [
+    SocialCalc.Formula.MIRRFunction,
+    3,
+    'mirr',
+    '',
+    'financial',
+  ];
   FormulaMut.NPVFunction = function (fname, operand, foperand, sheet) {
     var resulttypenpv, rate, sum, factor, value1;
     var scf = SocialCalc.Formula;
@@ -17117,6 +17267,224 @@ More comments yet to come...
     '',
     'financial',
   ];
+  FormulaMut.CollectAlignedPairedRanges = function (sheet, aoperand, boperand) {
+    var scf = SocialCalc.Formula;
+    var avalues = [];
+    var bvalues = [];
+    while (aoperand.length && boperand.length) {
+      avalues.push(scf.OperandValueAndType(sheet, aoperand));
+      bvalues.push(scf.OperandValueAndType(sheet, boperand));
+    }
+    return {
+      avalues,
+      bvalues,
+      mismatched: aoperand.length > 0 || boperand.length > 0,
+    };
+  };
+  FormulaMut.XNPVFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var rate = scf.OperandAsNumber(sheet, foperand);
+    if (scf.CheckForErrorValue(operand, rate)) return;
+    var valuesop = [foperand.pop()];
+    var datesop = [foperand.pop()];
+    if (rate.value <= -1) {
+      scf.PushOperand(operand, 'e#NUM!', 0);
+      return;
+    }
+    var collected = scf.CollectAlignedPairedRanges(sheet, valuesop, datesop);
+    if (collected.mismatched) {
+      scf.PushOperand(operand, 'e#NUM!', 0);
+      return;
+    }
+    var cashflows = scf.ResolveXCashflowSchedule(collected.avalues, collected.bvalues);
+    if (cashflows.errortype) {
+      scf.PushOperand(operand, cashflows.errortype, 0);
+      return;
+    }
+    scf.PushOperand(
+      operand,
+      'n$',
+      scf.ComputeXNPVValue(rate.value, cashflows.values, cashflows.dates),
+    );
+    return;
+  };
+  SocialCalc.Formula.FunctionList['XNPV'] = [
+    SocialCalc.Formula.XNPVFunction,
+    3,
+    'xnpv',
+    '',
+    'financial',
+  ];
+  FormulaMut.XIRRFunction = function (fname, operand, foperand, sheet) {
+    var scf = SocialCalc.Formula;
+    var valuesop = [foperand.pop()];
+    var datesop = [foperand.pop()];
+    var guess = {
+      value: 0.1,
+      type: 'n',
+    };
+    if (foperand.length) {
+      guess = scf.OperandAsNumber(sheet, foperand);
+      if (guess.type.charAt(0) != 'n' && guess.type.charAt(0) != 'b') {
+        scf.PushOperand(operand, 'e#VALUE!', 0);
+        return;
+      }
+      if (foperand.length) {
+        scf.FunctionArgsError(fname, operand);
+        return;
+      }
+      if (!guess.value) {
+        guess.value = 0.1;
+      }
+    }
+    var collected = scf.CollectAlignedPairedRanges(sheet, valuesop, datesop);
+    if (collected.mismatched) {
+      scf.PushOperand(operand, 'e#NUM!', 0);
+      return;
+    }
+    var cashflows = scf.ResolveXCashflowSchedule(collected.avalues, collected.bvalues);
+    if (cashflows.errortype) {
+      scf.PushOperand(operand, cashflows.errortype, 0);
+      return;
+    }
+    var hasPositive = false,
+      hasNegative = false;
+    for (var i = 0; i < cashflows.values.length; i++) {
+      if (cashflows.values[i] > 0) hasPositive = true;
+      else if (cashflows.values[i] < 0) hasNegative = true;
+    }
+    if (!hasPositive || !hasNegative) {
+      scf.PushOperand(operand, 'e#NUM!', 0);
+      return;
+    }
+    var solved = scf.SolveXIRRRate(cashflows.values, cashflows.dates, guess.value);
+    if (solved == null) {
+      scf.PushOperand(operand, 'e#NUM!', 0);
+      return;
+    }
+    scf.PushOperand(operand, 'n%', solved);
+    return;
+  };
+  SocialCalc.Formula.FunctionList['XIRR'] = [
+    SocialCalc.Formula.XIRRFunction,
+    -2,
+    'xirr',
+    '',
+    'financial',
+  ];
+  FormulaMut.ResolveXCashflowSchedule = function (avalues, bvalues) {
+    var values = [];
+    var dates = [];
+    var i, at, bt, av, bv;
+    for (i = 0; i < avalues.length; i++) {
+      at = avalues[i].type.charAt(0);
+      bt = bvalues[i].type.charAt(0);
+      if (at == 'e')
+        return {
+          values: [],
+          dates: [],
+          errortype: avalues[i].type,
+        };
+      if (bt == 'e')
+        return {
+          values: [],
+          dates: [],
+          errortype: bvalues[i].type,
+        };
+      if (bt == 't')
+        return {
+          values: [],
+          dates: [],
+          errortype: 'e#VALUE!',
+        };
+      av = at == 'n' ? avalues[i].value - 0 : 0;
+      bv = bt == 'n' ? Math.floor(bvalues[i].value - 0) : 0;
+      if (i > 0 && bv < dates[0]) {
+        return {
+          values: [],
+          dates: [],
+          errortype: 'e#NUM!',
+        };
+      }
+      values.push(av);
+      dates.push(bv);
+    }
+    return {
+      values,
+      dates,
+      errortype: '',
+    };
+  };
+  FormulaMut.ComputeXNPVValue = function (rate, values, dates) {
+    var d0 = dates[0];
+    var sum = 0;
+    for (var i = 0; i < values.length; i++) {
+      sum += values[i] / Math.pow(1 + rate, (dates[i] - d0) / 365);
+    }
+    return sum;
+  };
+  FormulaMut.ComputeXNPVDerivative = function (rate, values, dates) {
+    var d0 = dates[0];
+    var sum = 0;
+    for (var i = 0; i < values.length; i++) {
+      var t = (dates[i] - d0) / 365;
+      if (t == 0) continue;
+      sum += (-t * values[i]) / Math.pow(1 + rate, t + 1);
+    }
+    return sum;
+  };
+  FormulaMut.SolveXIRRRate = function (values, dates, guess) {
+    var scf = SocialCalc.Formula;
+    var maxLoop = 100;
+    var epsilon = 1e-7;
+    var lo = -0.999999;
+    var hi = guess > 0.1 ? guess : 0.1;
+    var flo = scf.ComputeXNPVValue(lo, values, dates);
+    var fhi = scf.ComputeXNPVValue(hi, values, dates);
+    var expandTries = 0;
+    while (flo * fhi > 0 && expandTries < 60) {
+      hi = hi * 2;
+      fhi = scf.ComputeXNPVValue(hi, values, dates);
+      expandTries++;
+    }
+    if (!(flo * fhi <= 0) || !isFinite(flo) || !isFinite(fhi)) {
+      return null;
+    }
+    var xlo = flo > 0 ? hi : lo;
+    var xhi = flo > 0 ? lo : hi;
+    var rts = (lo + hi) / 2;
+    var dxold = Math.abs(hi - lo);
+    var dx = dxold;
+    var fval = scf.ComputeXNPVValue(rts, values, dates);
+    var dfval = scf.ComputeXNPVDerivative(rts, values, dates);
+    for (var i = 0; i < maxLoop; i++) {
+      if (
+        dfval == 0 ||
+        ((rts - xhi) * dfval - fval) * ((rts - xlo) * dfval - fval) > 0 ||
+        Math.abs(2 * fval) > Math.abs(dxold * dfval)
+      ) {
+        dxold = dx;
+        dx = (xhi - xlo) / 2;
+        rts = xlo + dx;
+        if (xlo == rts) return rts;
+      } else {
+        dxold = dx;
+        dx = fval / dfval;
+        var temp = rts;
+        rts -= dx;
+        if (temp == rts) return rts;
+      }
+      if (Math.abs(dx) < epsilon) return rts;
+      fval = scf.ComputeXNPVValue(rts, values, dates);
+      dfval = scf.ComputeXNPVDerivative(rts, values, dates);
+      if (fval < 0) {
+        xlo = rts;
+      } else {
+        xhi = rts;
+      }
+    }
+    return null;
+  };
   FormulaMut.IoFunctions = function (fname, operand, foperand, sheet, coord) {
     var argList = {
       BUTTON: [2],

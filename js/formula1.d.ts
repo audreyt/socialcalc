@@ -454,8 +454,28 @@ declare namespace SocialCalc {
     const SLNFunction: FormulaFunctionImpl;
     const SYDFunction: FormulaFunctionImpl;
     const InterestFunctions: FormulaFunctionImpl;
+    const PPMTIPMTFunctions: FormulaFunctionImpl;
     const NPVFunction: FormulaFunctionImpl;
     const IRRFunction: FormulaFunctionImpl;
+    const MIRRFunction: FormulaFunctionImpl;
+    const XNPVFunction: FormulaFunctionImpl;
+    const XIRRFunction: FormulaFunctionImpl;
+    function CollectAlignedPairedRanges(
+      sheet: Sheet,
+      aoperand: FormulaOperand[],
+      boperand: FormulaOperand[],
+    ): {
+      avalues: FormulaValueResult[];
+      bvalues: FormulaValueResult[];
+      mismatched: boolean;
+    };
+    function ResolveXCashflowSchedule(
+      avalues: FormulaValueResult[],
+      bvalues: FormulaValueResult[],
+    ): { values: number[]; dates: number[]; errortype: FormulaOperandType | "" };
+    function ComputeXNPVValue(rate: number, values: number[], dates: number[]): number;
+    function ComputeXNPVDerivative(rate: number, values: number[], dates: number[]): number;
+    function SolveXIRRRate(values: number[], dates: number[], guess: number): number | null;
 
     // I/O widget functions (BUTTON, TEXTBOX, COPYVALUE, EMAIL, PANEL, STYLE, etc.)
     const IoFunctions: FormulaFunctionImpl;

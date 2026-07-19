@@ -787,6 +787,8 @@ ConstantsRoot.Constants = {
   s_fdef_INT: "Returns the value rounded down to the nearest integer (towards -infinity). ",
   s_fdef_IRR:
     "Returns the interest rate at which the cash flows in the range have a net present value of zero. Uses an iterative process that will return #NUM! error if it does not converge. There may be more than one possible solution. Providing the optional guess value may help in certain situations where it does not converge or finds an inappropriate solution (the default guess is 10%). ",
+  s_fdef_IPMT:
+    "Returns the interest portion of the payment for the given period (1-based, 1 to nper) of an investment at the given rate for the specified number of periods and present value, with optional future value (default 0) and payment type (default 0 = at end of period, 1 = beginning of period). ",
   s_fdef_ISBLANK: 'Returns "true" if the value is a reference to a blank cell. ',
   s_fdef_ISERR: 'Returns "true" if the value is of type "Error" but not "NA". ',
   s_fdef_ISERROR: 'Returns "true" if the value is of type "Error". ',
@@ -811,6 +813,8 @@ ConstantsRoot.Constants = {
   s_fdef_MINUTE: "Returns the minute portion of a time or date/time value. ",
   s_fdef_MEDIAN:
     "Returns the median (middle value) of the numeric values. If there is an even count, averages the two middle values. ",
+  s_fdef_MIRR:
+    "Returns the modified internal rate of return for the cash flows in the range, using finance_rate as the cost of financing negative flows and reinvest_rate as the return on reinvested positive flows. Requires at least two periods with at least one positive and one negative cash flow. ",
   s_fdef_MOD: "Returns the remainder of the first value divided by the second. ",
   s_fdef_MONTH: "Returns the month part of a date value. ",
   s_fdef_N: "Returns the value if it is a numeric value otherwise an error. ",
@@ -826,6 +830,8 @@ ConstantsRoot.Constants = {
   s_fdef_PI: "The value 3.1415926... ",
   s_fdef_PMT:
     "Returns the amount of each payment that must be invested at the given rate for the specified number of periods to have the specified present value, with optional future value (default 0) and payment type (default 0 = at end of period, 1 = beginning of period). ",
+  s_fdef_PPMT:
+    "Returns the principal portion of the payment for the given period (1-based, 1 to nper) of an investment at the given rate for the specified number of periods and present value, with optional future value (default 0) and payment type (default 0 = at end of period, 1 = beginning of period). ",
   s_fdef_POWER: "Returns the first value raised to the second value power. ",
   s_fdef_PRODUCT: "Returns the result of multiplying the numeric values. ",
   s_fdef_PROPER:
@@ -915,6 +921,10 @@ ConstantsRoot.Constants = {
     "Rounds the given number up to the nearest integer or multiple of significance. Significance is the value to whose multiple of ten the value is to be rounded up (.01, .1, 1, 10, etc.)",
   s_fdef_FLOOR:
     "Rounds the given number down to the nearest multiple of significance. Significance is the value to whose multiple of ten the number is to be rounded down (.01, .1, 1, 10, etc.)",
+  s_fdef_XNPV:
+    "Returns the net present value of a schedule of cash flows (which need not be periodic) discounted at the given rate on an actual-day/365 basis from the first date in the dates range. values and dates must be the same length. ",
+  s_fdef_XIRR:
+    "Returns the internal rate of return for a schedule of cash flows (which need not be periodic) given corresponding dates, discounted on an actual-day/365 basis. Requires at least one positive and one negative cash flow; uses an iterative process that will return #NUM! error if it does not converge (the default guess is 10%). ",
 
   s_farg_v: "value",
   s_farg_vn: "value1, value2, ...",
@@ -940,6 +950,10 @@ ConstantsRoot.Constants = {
   s_farg_pmt: "rate, n, pv, [fv, [paytype]]",
   s_farg_pv: "rate, n, payment, [fv, [paytype]]",
   s_farg_rate: "n, payment, pv, [fv, [paytype, [guess]]]",
+  s_farg_ppmt: "rate, per, nper, pv, [fv, [paytype]]",
+  s_farg_mirr: "range, finance_rate, reinvest_rate",
+  s_farg_xnpv: "rate, values, dates",
+  s_farg_xirr: "values, dates, [guess]",
   s_farg_rank: "number, ref, [order]",
   s_farg_quartile: "range, quart",
   s_farg_replace: "text1, start, length, text2",

@@ -5945,6 +5945,221 @@ SocialCalc.Formula.FunctionList["RATE"] = [
 
 /*
 #
+# PPMT(rate, per, nper, pv, [fv, [paytype]])
+# IPMT(rate, per, nper, pv, [fv, [paytype]])
+#
+# ODF/Excel/Sheets-compatible amortization split of PMT into principal and
+# interest components for a given period. per is 1-based and must satisfy
+# 1 <= per <= nper (Excel/Sheets #NUM! outside that domain). Reuses
+# InterestFunctions' PMT/FV formulas (transformed the same way) instead of
+# duplicating the annuity algebra: the interest portion of period `per` is
+# the interest that accrues on the balance outstanding at the start of that
+# period (FV of the annuity through per-1 payments), and the principal
+# portion is PMT minus that interest.
+#
+*/
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.PPMTIPMTFunctions = function (fname, operand, foperand, sheet) {
+  var resulttype, rate, per, nper, pv, fv, paytype, dval, eval_;
+  var pmt, balance, interest, result;
+
+  var scf = SocialCalc.Formula;
+
+  var aval = scf.OperandAsNumber(sheet, foperand); // rate
+  var bval = scf.OperandAsNumber(sheet, foperand); // per
+  var cval = scf.OperandAsNumber(sheet, foperand); // nper
+  var dval2 = scf.OperandAsNumber(sheet, foperand); // pv
+
+  resulttype = scf.LookupResultType(aval.type, bval.type, scf.TypeLookupTable.twoargnumeric);
+  resulttype = scf.LookupResultType(resulttype, cval.type, scf.TypeLookupTable.twoargnumeric);
+  resulttype = scf.LookupResultType(resulttype, dval2.type, scf.TypeLookupTable.twoargnumeric);
+
+  if (foperand.length) {
+    dval = scf.OperandAsNumber(sheet, foperand); // fv
+    resulttype = scf.LookupResultType(resulttype, dval.type, scf.TypeLookupTable.twoargnumeric);
+    if (foperand.length) {
+      eval_ = scf.OperandAsNumber(sheet, foperand); // paytype
+      resulttype = scf.LookupResultType(resulttype, eval_.type, scf.TypeLookupTable.twoargnumeric);
+      if (foperand.length) {
+        scf.FunctionArgsError(fname, operand);
+        return;
+      }
+    }
+  }
+
+  if (resulttype == "n") {
+    rate = aval.value;
+    per = bval.value;
+    nper = cval.value;
+    pv = dval2.value;
+    fv = dval != null ? dval.value : 0;
+    paytype = eval_ != null ? (eval_.value ? 1 : 0) : 0;
+
+    if (nper <= 0 || per < 1 || per > nper || Math.floor(per) != per) {
+      scf.PushOperand(operand, "e#NUM!", 0);
+      return;
+    }
+
+    // PMT (same transformed formula as InterestFunctions' "PMT" case).
+    if (rate == 0) {
+      pmt = (fv - pv) / nper;
+    } else {
+      pmt =
+        (0 - fv - pv * Math.pow(1 + rate, nper)) /
+        (((1 + rate * paytype) * (Math.pow(1 + rate, nper) - 1)) / rate);
+    }
+
+    if (paytype == 1 && per == 1) {
+      // Beginning-of-period annuity: the first payment happens before any
+      // interest accrues, so no interest is owed yet.
+      interest = 0;
+    } else {
+      // Balance outstanding at the start of `per` is the FV of the annuity
+      // through per-1 payments (same transformed formula as InterestFunctions'
+      // "FV" case, with n = per - 1).
+      if (rate == 0) {
+        balance = -pv - pmt * (per - 1);
+      } else {
+        balance = -(
+          pv * Math.pow(1 + rate, per - 1) +
+          (pmt * (1 + rate * paytype) * (Math.pow(1 + rate, per - 1) - 1)) / rate
+        );
+      }
+      interest = balance * rate;
+      if (paytype == 1) {
+        interest = interest / (1 + rate);
+      }
+    }
+
+    result = fname == "IPMT" ? interest : pmt - interest;
+    resulttype = "n$";
+  }
+
+  scf.PushOperand(operand, resulttype, result);
+
+  return;
+};
+
+SocialCalc.Formula.FunctionList["PPMT"] = [
+  SocialCalc.Formula.PPMTIPMTFunctions,
+  -4,
+  "ppmt",
+  "",
+  "financial",
+];
+SocialCalc.Formula.FunctionList["IPMT"] = [
+  SocialCalc.Formula.PPMTIPMTFunctions,
+  -4,
+  "ppmt",
+  "",
+  "financial",
+];
+
+/*
+#
+# MIRR(values, finance_rate, reinvest_rate)
+#
+# Modified IRR: negative cashflows are discounted at finance_rate (the cost
+# of financing) back to period 0, positive cashflows are compounded at
+# reinvest_rate forward to the final period, then a single rate is solved
+# for algebraically -- no iteration needed. Requires at least one positive
+# and one negative flow (Excel/Sheets #DIV/0!); requires at least two
+# periods (Excel/Sheets #DIV/0! for a single-value range too).
+#
+*/
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.MIRRFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+  var rangeoperand: SocialCalc.FormulaOperand[] = [];
+  var cashflows: number[] = [];
+  var hasNumericCashflow = false;
+  var value1, financerate, reinvestrate, n, i, negpv, posfv;
+
+  rangeoperand.push(foperand.pop() as SocialCalc.FormulaOperand); // first operand is a range
+
+  while (rangeoperand.length) {
+    value1 = scf.OperandValueAndType(sheet, rangeoperand);
+    if (value1.type.charAt(0) == "n") {
+      cashflows.push(value1.value as number);
+      hasNumericCashflow = true;
+    } else if (value1.type.charAt(0) == "b" || value1.type.charAt(0) == "t") {
+      cashflows.push(0);
+    } else if (value1.type.charAt(0) == "e") {
+      scf.PushOperand(operand, "e#VALUE!", 0);
+      return;
+    }
+  }
+
+  if (!cashflows.length || !hasNumericCashflow) {
+    scf.PushOperand(operand, "e#NUM!", 0);
+    return;
+  }
+
+  financerate = scf.OperandAsNumber(sheet, foperand);
+  if (scf.CheckForErrorValue(operand, financerate)) return;
+  reinvestrate = scf.OperandAsNumber(sheet, foperand);
+  if (scf.CheckForErrorValue(operand, reinvestrate)) return;
+
+  n = cashflows.length;
+
+  // n<2 is checked here to short-circuit the DIV/0! precisely (n===1 would
+  // otherwise reach the same DIV/0! anyway via the negpv/posfv==0 check
+  // below, since a single cashflow can never supply both a negative and a
+  // positive value).
+  if (n < 2 || financerate.value <= -1) {
+    scf.PushOperand(operand, "e#DIV/0!", 0);
+    return;
+  }
+
+  negpv = 0;
+  posfv = 0;
+  for (i = 0; i < n; i++) {
+    if (cashflows[i] < 0) {
+      // financerate.value > -1 is guaranteed above, so this base is always
+      // strictly positive and the divisor below is never 0.
+      negpv += cashflows[i] / Math.pow(1 + financerate.value, i);
+    } else if (cashflows[i] > 0) {
+      posfv += cashflows[i] * Math.pow(1 + reinvestrate.value, n - 1 - i);
+    }
+  }
+
+  if (negpv == 0 || posfv == 0) {
+    // needs at least one negative and one positive cashflow
+    scf.PushOperand(operand, "e#DIV/0!", 0);
+    return;
+  }
+
+  // negpv only accumulates negative-cashflow terms over a positive divisor
+  // (so negpv < 0 here), and posfv only accumulates positive-cashflow terms
+  // over a positive multiplier (so posfv > 0 here); -posfv/negpv is
+  // therefore always > 0, so the fractional-power root below is always real.
+  scf.PushOperand(operand, "n%", Math.pow(-posfv / negpv, 1 / (n - 1)) - 1);
+
+  return;
+};
+
+SocialCalc.Formula.FunctionList["MIRR"] = [
+  SocialCalc.Formula.MIRRFunction,
+  3,
+  "mirr",
+  "",
+  "financial",
+];
+
+/*
+#
 # NPV(rate,v1,v2,c1:c2,...)
 #
 */
@@ -6128,6 +6343,337 @@ SocialCalc.Formula.FunctionList["IRR"] = [
   "",
   "financial",
 ];
+
+/*
+#
+# {avalues, bvalues, mismatched} = SocialCalc.Formula.CollectAlignedPairedRanges(sheet, aoperand, boperand)
+#
+# Drains two single-entry operand-stack arrays (each holding one range or
+# scalar operand) in lockstep, resolving each element with
+# OperandValueAndType exactly as CollectNumericValues/IRR/MIRR resolve a
+# single range. Shared by XNPV and XIRR so neither duplicates the other's
+# values/dates alignment loop. Returns the raw {type, value} pairs (not
+# coerced to number) so callers can apply their own per-side validation
+# (values tolerate blank/text as 0 like NPV; dates require numeric).
+# `mismatched` is true when the two operands did not resolve to the same
+# number of elements (Excel/Sheets #NUM!).
+#
+*/
+
+/**
+ * @param {any} sheet
+ * @param {any[]} aoperand
+ * @param {any[]} boperand
+ */
+FormulaMut.CollectAlignedPairedRanges = function (sheet, aoperand, boperand) {
+  var scf = SocialCalc.Formula;
+  var avalues: SocialCalc.FormulaValueResult[] = [];
+  var bvalues: SocialCalc.FormulaValueResult[] = [];
+
+  while (aoperand.length && boperand.length) {
+    avalues.push(scf.OperandValueAndType(sheet, aoperand));
+    bvalues.push(scf.OperandValueAndType(sheet, boperand));
+  }
+
+  return {
+    avalues: avalues,
+    bvalues: bvalues,
+    mismatched: aoperand.length > 0 || boperand.length > 0,
+  };
+};
+
+/*
+#
+# XNPV(rate, values, dates)
+#
+# Net present value of a cashflow schedule that is not necessarily
+# periodic, discounted on an actual-day/365 basis from the first date in
+# `dates` (the anchor, not necessarily the earliest -- matching Excel/
+# Sheets, which key off dates[0]). values and dates must resolve to the
+# same number of elements. Blank/text cashflow members count as 0 (same
+# convention as NPV above); blank date members count as day 0 relative to
+# themselves (harmless since their value already collapses to 0); text
+# date members are #VALUE! (dates must be numeric serials, e.g. from
+# DATE()). Any date before the anchor date is #NUM!, matching Excel's
+# documented XIRR/XNPV domain restriction.
+#
+*/
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.XNPVFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+
+  var rate = scf.OperandAsNumber(sheet, foperand);
+  if (scf.CheckForErrorValue(operand, rate)) return;
+
+  var valuesop: SocialCalc.FormulaOperand[] = [foperand.pop() as SocialCalc.FormulaOperand];
+  var datesop: SocialCalc.FormulaOperand[] = [foperand.pop() as SocialCalc.FormulaOperand];
+
+  if (rate.value <= -1) {
+    scf.PushOperand(operand, "e#NUM!", 0);
+    return;
+  }
+
+  var collected = scf.CollectAlignedPairedRanges(sheet, valuesop, datesop);
+  if (collected.mismatched) {
+    scf.PushOperand(operand, "e#NUM!", 0);
+    return;
+  }
+
+  var cashflows = scf.ResolveXCashflowSchedule(collected.avalues, collected.bvalues);
+  if (cashflows.errortype) {
+    scf.PushOperand(operand, cashflows.errortype, 0);
+    return;
+  }
+  scf.PushOperand(
+    operand,
+    "n$",
+    scf.ComputeXNPVValue(rate.value, cashflows.values, cashflows.dates),
+  );
+
+  return;
+};
+
+SocialCalc.Formula.FunctionList["XNPV"] = [
+  SocialCalc.Formula.XNPVFunction,
+  3,
+  "xnpv",
+  "",
+  "financial",
+];
+
+/*
+#
+# XIRR(values, dates, [guess])
+#
+# Internal rate of return for a cashflow schedule that is not necessarily
+# periodic (the rate at which XNPV == 0), discounted on an actual-day/365
+# basis. Requires at least one positive and one negative cashflow
+# (Excel/Sheets #NUM!). Solved with a safeguarded Newton's method that
+# falls back to bisection whenever a Newton step would leave the current
+# bracket or fails to shrink the residual fast enough (Numerical Recipes'
+# rtsafe), so convergence is deterministic even for functions with poor
+# local curvature near the root, unlike plain secant iteration.
+#
+*/
+
+/**
+ * @param {string} fname
+ * @param {any[]} operand
+ * @param {any[]} foperand
+ * @param {any} sheet
+ */
+FormulaMut.XIRRFunction = function (fname, operand, foperand, sheet) {
+  var scf = SocialCalc.Formula;
+
+  var valuesop: SocialCalc.FormulaOperand[] = [foperand.pop() as SocialCalc.FormulaOperand];
+  var datesop: SocialCalc.FormulaOperand[] = [foperand.pop() as SocialCalc.FormulaOperand];
+
+  var guess = { value: 0.1, type: "n" };
+  if (foperand.length) {
+    guess = scf.OperandAsNumber(sheet, foperand);
+    if (guess.type.charAt(0) != "n" && guess.type.charAt(0) != "b") {
+      scf.PushOperand(operand, "e#VALUE!", 0);
+      return;
+    }
+    if (foperand.length) {
+      scf.FunctionArgsError(fname, operand);
+      return;
+    }
+    if (!guess.value) {
+      guess.value = 0.1;
+    }
+  }
+
+  var collected = scf.CollectAlignedPairedRanges(sheet, valuesop, datesop);
+  if (collected.mismatched) {
+    scf.PushOperand(operand, "e#NUM!", 0);
+    return;
+  }
+
+  var cashflows = scf.ResolveXCashflowSchedule(collected.avalues, collected.bvalues);
+  if (cashflows.errortype) {
+    scf.PushOperand(operand, cashflows.errortype, 0);
+    return;
+  }
+
+  var hasPositive = false,
+    hasNegative = false;
+  for (var i = 0; i < cashflows.values.length; i++) {
+    if (cashflows.values[i] > 0) hasPositive = true;
+    else if (cashflows.values[i] < 0) hasNegative = true;
+  }
+  if (!hasPositive || !hasNegative) {
+    scf.PushOperand(operand, "e#NUM!", 0);
+    return;
+  }
+
+  var solved = scf.SolveXIRRRate(cashflows.values, cashflows.dates, guess.value);
+  if (solved == null) {
+    scf.PushOperand(operand, "e#NUM!", 0);
+    return;
+  }
+
+  scf.PushOperand(operand, "n%", solved);
+
+  return;
+};
+
+SocialCalc.Formula.FunctionList["XIRR"] = [
+  SocialCalc.Formula.XIRRFunction,
+  -2,
+  "xirr",
+  "",
+  "financial",
+];
+
+/**
+ * Shared values/dates coercion for XNPV/XIRR: values follow NPV's
+ * blank/text-as-0 convention; dates must be numeric (blank collapses to
+ * day 0, which is harmless once its paired value is 0; text is #VALUE!).
+ * Truncates each date to an integer serial per Excel/Sheets documented
+ * behavior, then rejects any date earlier than the anchor (dates[0]) with
+ * #NUM!, matching the documented XIRR/XNPV domain restriction. The first
+ * error encountered on either side wins.
+ * @param {any[]} avalues
+ * @param {any[]} bvalues
+ */
+FormulaMut.ResolveXCashflowSchedule = function (avalues, bvalues) {
+  var values: number[] = [];
+  var dates: number[] = [];
+  var i, at, bt, av, bv;
+
+  for (i = 0; i < avalues.length; i++) {
+    at = avalues[i].type.charAt(0);
+    bt = bvalues[i].type.charAt(0);
+
+    if (at == "e") return { values: [], dates: [], errortype: avalues[i].type };
+    if (bt == "e") return { values: [], dates: [], errortype: bvalues[i].type };
+    if (bt == "t") return { values: [], dates: [], errortype: "e#VALUE!" };
+
+    av = at == "n" ? (avalues[i].value as number) - 0 : 0;
+    bv = bt == "n" ? Math.floor((bvalues[i].value as number) - 0) : 0;
+
+    if (i > 0 && bv < dates[0]!) {
+      return { values: [], dates: [], errortype: "e#NUM!" };
+    }
+
+    values.push(av);
+    dates.push(bv);
+  }
+
+  return { values: values, dates: dates, errortype: "" };
+};
+
+/**
+ * XNPV(rate, values, dates) evaluated at a given rate: sum of
+ * values[i] / (1+rate)^((dates[i]-dates[0])/365).
+ * @param {number} rate
+ * @param {number[]} values
+ * @param {number[]} dates
+ */
+FormulaMut.ComputeXNPVValue = function (rate, values, dates) {
+  var d0 = dates[0]!;
+  var sum = 0;
+  for (var i = 0; i < values.length; i++) {
+    sum += values[i]! / Math.pow(1 + rate, (dates[i]! - d0) / 365);
+  }
+  return sum;
+};
+
+/**
+ * Analytic d/dRate of ComputeXNPVValue, used by the safeguarded Newton
+ * solver below instead of a finite-difference approximation.
+ * @param {number} rate
+ * @param {number[]} values
+ * @param {number[]} dates
+ */
+FormulaMut.ComputeXNPVDerivative = function (rate, values, dates) {
+  var d0 = dates[0]!;
+  var sum = 0;
+  for (var i = 0; i < values.length; i++) {
+    var t = (dates[i]! - d0) / 365;
+    if (t == 0) continue;
+    sum += (-t * values[i]!) / Math.pow(1 + rate, t + 1);
+  }
+  return sum;
+};
+
+/**
+ * Safeguarded Newton's method (Numerical Recipes' rtsafe) for XIRR: finds
+ * rate such that ComputeXNPVValue(rate, values, dates) == 0. First
+ * brackets a sign change starting from [-0.999999, max(guess, 0.1)],
+ * expanding the upper bound geometrically. Every iteration takes a Newton
+ * step only if it stays inside the current bracket and roughly halves the
+ * residual; otherwise it bisects. This guarantees convergence whenever a
+ * bracket is found, unlike the unguarded secant iteration RATE/IRR use.
+ * Returns null (caller pushes #NUM!) if no bracket is found or the
+ * iteration budget is exhausted.
+ * @param {number[]} values
+ * @param {number[]} dates
+ * @param {number} guess
+ */
+FormulaMut.SolveXIRRRate = function (values, dates, guess) {
+  var scf = SocialCalc.Formula;
+  var maxLoop = 100;
+  var epsilon = 0.0000001;
+
+  var lo = -0.999999;
+  var hi = guess > 0.1 ? guess : 0.1;
+  var flo = scf.ComputeXNPVValue(lo, values, dates);
+  var fhi = scf.ComputeXNPVValue(hi, values, dates);
+  var expandTries = 0;
+  while (flo * fhi > 0 && expandTries < 60) {
+    hi = hi * 2;
+    fhi = scf.ComputeXNPVValue(hi, values, dates);
+    expandTries++;
+  }
+  if (!(flo * fhi <= 0) || !isFinite(flo) || !isFinite(fhi)) {
+    return null;
+  }
+
+  var xlo = flo > 0 ? hi : lo;
+  var xhi = flo > 0 ? lo : hi;
+  var rts = (lo + hi) / 2;
+  var dxold = Math.abs(hi - lo);
+  var dx = dxold;
+  var fval = scf.ComputeXNPVValue(rts, values, dates);
+  var dfval = scf.ComputeXNPVDerivative(rts, values, dates);
+
+  for (var i = 0; i < maxLoop; i++) {
+    if (
+      dfval == 0 ||
+      ((rts - xhi) * dfval - fval) * ((rts - xlo) * dfval - fval) > 0 ||
+      Math.abs(2 * fval) > Math.abs(dxold * dfval)
+    ) {
+      dxold = dx;
+      dx = (xhi - xlo) / 2;
+      rts = xlo + dx;
+      if (xlo == rts) return rts;
+    } else {
+      dxold = dx;
+      dx = fval / dfval;
+      var temp = rts;
+      rts -= dx;
+      if (temp == rts) return rts;
+    }
+    if (Math.abs(dx) < epsilon) return rts;
+    fval = scf.ComputeXNPVValue(rts, values, dates);
+    dfval = scf.ComputeXNPVDerivative(rts, values, dates);
+    if (fval < 0) {
+      xlo = rts;
+    } else {
+      xhi = rts;
+    }
+  }
+
+  return null;
+};
 
 // -----------------------------------------
 // eddy  BUTTON COPYVALUE COPYFORMULA {

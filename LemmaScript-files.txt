@@ -3,3 +3,4 @@ lemma/eval-ops.ts
 lemma/lookup-result.ts
 lemma/spill.ts
 lemma/weekday-policy.ts
+lemma/finance-policy.ts
