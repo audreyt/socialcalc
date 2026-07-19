@@ -280,36 +280,28 @@ function sha256OfFile(filePath) {
   return sha256(readFileSync(filePath));
 }
 
-function extractTarMember(tarballPath, memberPath) {
-  const result = spawnSync("tar", ["-xzOf", tarballPath, memberPath], { encoding: "buffer" });
-  if (result.error || result.status !== 0) {
-    throw new Error(
-      `tar extract of ${memberPath} failed: ${result.stderr?.toString() ?? result.error}`,
-    );
-  }
-  return result.stdout;
-}
-
-function summarizeVitestOutput(stdout) {
+export function summarizeVitestOutput(stdout) {
   const plain = stripVTControlCharacters(stdout);
-  // Order in vitest's own summary line is always passed, then failed, then
-  // skipped, but a segment is entirely OMITTED (not printed as "0 X") when
-  // its count is zero — including "passed" itself, e.g. a `-t` filter that
-  // matches nothing prints "Tests  17 skipped (17)" with no "N passed"
-  // segment at all. Each capture group is therefore independently
-  // optional so every combination the real reporter emits is matched.
-  const match = plain.match(
-    /Tests\s+(?:(\d+) passed)?(?:\s*\|\s*)?(?:(\d+) failed)?(?:\s*\|\s*)?(?:(\d+) skipped)?\s*\((\d+)\)/,
+  // A compound package script may run more than one Vitest configuration,
+  // each with its own summary line. Aggregate every invocation; treating
+  // only the first would hide a later suite's counts.
+  const matches = plain.matchAll(
+    /Tests\s+(?:(\d+) passed)?(?:\s*\|\s*)?(?:(\d+) failed)?(?:\s*\|\s*)?(?:(\d+) skipped)?\s*\((\d+)\)/g,
   );
-  if (!match)
+  const summary = { passed: 0, failed: 0, skipped: 0, total: 0 };
+  let found = false;
+  for (const match of matches) {
+    found = true;
+    const [, passed = "0", failed = "0", skipped = "0", total] = match;
+    summary.passed += Number(passed);
+    summary.failed += Number(failed);
+    summary.skipped += Number(skipped);
+    summary.total += Number(total);
+  }
+  if (!found) {
     throw new Error(`could not find a "Tests ... (N)" summary line in vitest output:\n${plain}`);
-  const [, passed = "0", failed = "0", skipped = "0", total] = match;
-  return {
-    passed: Number(passed),
-    failed: Number(failed),
-    skipped: Number(skipped),
-    total: Number(total),
-  };
+  }
+  return summary;
 }
 
 async function main() {
@@ -516,9 +508,11 @@ async function main() {
     step(
       "swapped node_modules/socialcalc/dist/SocialCalc.js is byte-identical to the candidate tarball",
       () => {
-        const installedHash = sha256OfFile(path.join(installedSocialcalcDir, "dist/SocialCalc.js"));
-        const tarballMemberHash = sha256(
-          extractTarMember(tarballPath, "package/dist/SocialCalc.js"),
+        const installedHash = sha256OfFile(
+          path.join(installedSocialcalcDir, "dist", "SocialCalc.js"),
+        );
+        const tarballMemberHash = sha256OfFile(
+          path.join(extractDir, "package", "dist", "SocialCalc.js"),
         );
         if (installedHash !== tarballMemberHash) {
           throw new Error(
@@ -604,11 +598,11 @@ async function main() {
               "run",
               "--cwd",
               HEADLESS_SUBDIR,
-              "test",
+              "test:workers",
               WORKBOOK_SMOKE_TEST_FILENAME.replace(/\.test\.ts$/, ""),
             ],
             { cwd: ethercalcDir },
-            "bun run --cwd packages/socialcalc-headless test candidate-workbook-smoke",
+            "bun run --cwd packages/socialcalc-headless test:workers candidate-workbook-smoke",
           );
           const summary = summarizeVitestOutput(result.stdout);
           if (summary.failed > 0 || summary.passed === 0) {

@@ -6,6 +6,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import {
   resolveEthercalcSource,
+  summarizeVitestOutput,
   validateShaOverride,
 } from "../scripts/verify-ethercalc-canary.mjs";
 
@@ -99,5 +100,42 @@ describe("resolveEthercalcSource", () => {
   test("setting SC_ETHERCALC_REPO to the exact default value is NOT reported as an override", () => {
     const source = resolveEthercalcSource({ SC_ETHERCALC_REPO: DEFAULT_REPO });
     expect(source.repoOverridden).toBe(false);
+  });
+});
+
+describe("summarizeVitestOutput", () => {
+  test("reads a single Vitest summary", () => {
+    expect(summarizeVitestOutput("Tests  7 passed (7)")).toEqual({
+      passed: 7,
+      failed: 0,
+      skipped: 0,
+      total: 7,
+    });
+  });
+
+  test("aggregates every summary emitted by a compound package script", () => {
+    expect(
+      summarizeVitestOutput(
+        ["Tests  4 passed (4)", "Tests  3 passed | 1 failed | 2 skipped (6)"].join("\n"),
+      ),
+    ).toEqual({
+      passed: 7,
+      failed: 1,
+      skipped: 2,
+      total: 10,
+    });
+  });
+
+  test("reports an all-skipped filtered run as zero passed", () => {
+    expect(summarizeVitestOutput("Tests  17 skipped (17)")).toEqual({
+      passed: 0,
+      failed: 0,
+      skipped: 17,
+      total: 17,
+    });
+  });
+
+  test("rejects output without a Vitest summary", () => {
+    expect(() => summarizeVitestOutput("no test reporter output")).toThrow(/could not find/);
   });
 });
