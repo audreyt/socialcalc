@@ -26,6 +26,17 @@ Highlights
   and an editable spreadsheet for browser-based development.
 - SORT now accepts omitted sort columns and directions, defaults to the first
   column ascending, and treats non-positive directions as descending.
+- Added editor productivity features: Find & Replace (literal and regex
+  modes, selected-range or whole-sheet scope, formula preservation by
+  default with an explicit "Include formulas" opt-in, one-undo
+  transaction for Replace-All), discoverable Freeze/Unfreeze Panes
+  toolbar buttons wired to the existing pane row/col commands, Ctrl+Y
+  and Ctrl+Shift+Z redo across all three browser keyboard maps, a
+  merged-cell guard that rejects sort over a range containing any
+  merged cell without corrupting spans, and a modern
+  `navigator.clipboard.writeText`/`readText` path for copy/paste with
+  the pre-existing focused-textarea fallback preserved unchanged when
+  the modern API is unavailable or rejected.
 
 
 Compatibility and runtime fixes

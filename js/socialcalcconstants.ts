@@ -314,8 +314,6 @@ ConstantsRoot.Constants = {
   defaultTCButtonThickness: 20, // length of scroll +/- buttons (numeric in pixels)
   defaultTCThumbThickness: 15, // length of thumb (numeric in pixels)
 
-  //*** SocialCalc.CreateTableControl
-
   TCmainStyle: "backgroundColor:#EEE;", // if present, pseudo style (text-align is textAlign) for main div of a table control
   TCmainClass: "", // if present, the CSS class of the main div for a table control
   TCendcapStyle: "backgroundColor:#FFF;", // backgroundColor may be used while waiting for image that may not come
@@ -541,11 +539,13 @@ ConstantsRoot.Constants = {
   s_loc_formula: "Formula",
   s_loc_function_list: "Function List",
   s_loc_functions: "Functions",
+  s_loc_freeze_panes: "Freeze Panes",
   s_loc_grid: "Grid",
   s_loc_hidden: "Hidden",
   s_loc_hide_column: "Hide Column",
   s_loc_hide_row: "Hide Row",
   s_loc_horizontal: "Horizontal",
+  s_loc_include_formulas: "Include formulas",
   s_loc_insert_column: "Insert Column Before",
   s_loc_insert_row: "Insert Row Before",
   s_loc_italic: "Italic",
@@ -579,7 +579,10 @@ ConstantsRoot.Constants = {
   s_loc_plain_text: "Plain Text",
   s_loc_recalc: "Recalc",
   s_loc_recalculation: "Recalculation",
+  s_loc_regex: "Regex",
   s_loc_redo: "Redo",
+  s_loc_replace: "Replace",
+  s_loc_replace_all: "All",
   s_loc_right: "Right",
   s_loc_right_border: "Right Border",
   s_loc_sheet_settings: "SHEET SETTINGS",
@@ -610,8 +613,10 @@ ConstantsRoot.Constants = {
   s_loc_undo: "Undo",
   s_loc_unlock_cell: "Unlock Cell",
   s_loc_unmerge_cells: "Unmerge Cells",
+  s_loc_unfreeze_panes: "Unfreeze Panes",
   s_loc_up: "Up",
   s_loc_value: "Value",
+  s_loc_whole_sheet: "Whole sheet",
   s_loc_vertical: "Vertical",
   s_loc_wikitext: "Wikitext",
   s_loc_workspace: "Workspace",

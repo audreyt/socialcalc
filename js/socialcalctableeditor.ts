@@ -192,9 +192,10 @@ TableEditorSC.TableEditor = function (context: any) {
   /**
    * @param {any} editor
    * @param {string} charname
+   * @param {any} [ev]
    */
-  this.ctrlkeyFunction = function (editor: any, charname: any) {
-    var ta, cell, position, cmd, sel, cliptext;
+  this.ctrlkeyFunction = function (editor: any, charname: any, ev: any) {
+    var ta: any, cell, position, cmd, sel, cliptext;
 
     switch (charname) {
       case "[ctrl-a]":
@@ -241,6 +242,23 @@ TableEditorSC.TableEditor = function (context: any) {
         }
         editor.EditorScheduleSheetCommands(cmd, true, false); // queue up command to put on SocialCalc clipboard
 
+        // Modern clipboard path: best-effort, fire-and-forget. Called
+        // synchronously from a real keydown handler, so it's within the
+        // user-gesture window Chromium/Firefox/WebKit require — this never
+        // triggers a permission prompt on its own. Swallow rejection
+        // (unsupported context, denied permission, insecure origin) and
+        // rely purely on the existing focused/selected-textarea native-copy
+        // path below, which every browser has always supported.
+        if (
+          typeof navigator !== "undefined" &&
+          navigator.clipboard &&
+          typeof navigator.clipboard.writeText === "function"
+        ) {
+          navigator.clipboard.writeText(cliptext).catch(function () {
+            // fallback below already provides the OS-clipboard copy
+          });
+        }
+
         ta.style.display = "block";
         ta.value = cliptext; // must follow "block" setting for Webkit
         ta.focus();
@@ -254,7 +272,7 @@ TableEditorSC.TableEditor = function (context: any) {
 
         return true;
 
-      case "[ctrl-v]":
+      case "[ctrl-v]": {
         if (editor.noEdit || editor.ECellReadonly()) return true; // not if no edit
         ta = editor.pasteTextarea;
         ta.value = "";
@@ -264,14 +282,13 @@ TableEditorSC.TableEditor = function (context: any) {
           ta.style.left = position.left - 1 + "px";
           ta.style.top = position.top - 1 + "px";
         }
-        ta.style.display = "block";
-        ta.value = ""; // must follow "block" setting for Webkit
-        ta.focus();
-        window.setTimeout(function () {
-          var ta = editor.pasteTextarea;
-          var value = ta.value;
-          ta.blur();
-          ta.style.display = "none";
+
+        // processPastedText(value): the shared tail of the paste pipeline,
+        // used by both the modern navigator.clipboard.readText() path (when
+        // it resolves) and the legacy focused-textarea native-paste
+        // fallback (when the modern API is unavailable or rejects) — same
+        // "loadclipboard"/"paste" command construction either way.
+        var processPastedText = function (value: any) {
           var cmd = "";
           if (editor.pastescclipboard) {
             // Clipboard loaded from "clipboard tab" - see  SpreadsheetControlClipboardLoad
@@ -317,11 +334,76 @@ TableEditorSC.TableEditor = function (context: any) {
           cmd += "paste " + cr + " formulas";
           editor.EditorScheduleSheetCommands(cmd, true, false);
           TableEditorSC.KeyboardFocus();
-        }, 200);
+        };
+
+        // fallbackViaFocusedTextarea(): the pre-existing behavior — focus
+        // the hidden textarea and let the browser's own native paste land
+        // in it, then read ta.value after a short delay.
+        var fallbackViaFocusedTextarea = function () {
+          ta.style.display = "block";
+          ta.value = ""; // must follow "block" setting for Webkit
+          ta.focus();
+          window.setTimeout(function () {
+            var ta = editor.pasteTextarea;
+            var value = ta.value;
+            ta.blur();
+            ta.style.display = "none";
+            processPastedText(value);
+          }, 200);
+        };
+
+        // Modern path: navigator.clipboard.readText() is only invoked from
+        // this synchronous keydown-originated handler, so it stays inside
+        // the user-gesture window and never raises a permission prompt on
+        // its own beyond what the browser already requires for the API.
+        // Any rejection (unsupported, denied, insecure origin, cross-origin
+        // iframe policy) falls straight back to the always-available
+        // focused-textarea path so paste keeps working everywhere.
+        if (
+          typeof navigator !== "undefined" &&
+          navigator.clipboard &&
+          typeof navigator.clipboard.readText === "function"
+        ) {
+          navigator.clipboard.readText().then(
+            function (text: any) {
+              // Runs only on a successful read; any error processPastedText
+              // itself throws propagates normally instead of being
+              // misattributed to "clipboard read failed" and silently
+              // rerouted into the legacy fallback (which would then act on
+              // a stale/empty textarea).
+              if (typeof text === "string") {
+                processPastedText(text);
+              } else {
+                fallbackViaFocusedTextarea();
+              }
+            },
+            function () {
+              // Only readText() itself rejecting (unsupported, denied,
+              // insecure origin, cross-origin iframe policy) lands here.
+              fallbackViaFocusedTextarea();
+            },
+          );
+        } else {
+          fallbackViaFocusedTextarea();
+        }
         return true;
+      }
 
       case "[ctrl-z]":
-        editor.EditorScheduleSheetCommands("undo", true, false);
+        // Ctrl+Shift+Z is the cross-platform redo chord alongside Ctrl+Y;
+        // both browser key tables map physical "z"/"y" to "[ctrl-z]"/
+        // "[ctrl-y]" without distinguishing the Shift modifier, so the
+        // shift check happens here where the real keyboard event (ev) is
+        // still available.
+        if (ev && ev.shiftKey) {
+          editor.EditorScheduleSheetCommands("redo", true, false);
+        } else {
+          editor.EditorScheduleSheetCommands("undo", true, false);
+        }
+        return false;
+
+      case "[ctrl-y]":
+        editor.EditorScheduleSheetCommands("redo", true, false);
         return false;
 
       case "[ctrl-s]": // !!!! temporary hack
@@ -2406,7 +2488,7 @@ TableEditorSC.EditorProcessKey = function (editor: any, ch: any, e: any) {
       if ((ch.length > 1 && ch.substr(0, 1) == "[") || ch.length == 0) {
         // some control key
         if (editor.ctrlkeyFunction && ch.length > 0) {
-          return editor.ctrlkeyFunction(editor, ch);
+          return editor.ctrlkeyFunction(editor, ch, e);
         } else {
           return true;
         }
@@ -6701,6 +6783,7 @@ TableEditorSC.keyboardTables = {
     83: "[ctrl-s]",
     86: "[ctrl-v]",
     88: "[ctrl-x]",
+    89: "[ctrl-y]",
     90: "[ctrl-z]",
   },
 
@@ -6728,6 +6811,7 @@ TableEditorSC.keyboardTables = {
     115: "[ctrl-s]",
     118: "[ctrl-v]",
     120: "[ctrl-x]",
+    121: "[ctrl-y]",
     122: "[ctrl-z]",
   },
 
@@ -6771,6 +6855,7 @@ TableEditorSC.keyboardTables = {
     115: "[ctrl-s]",
     118: "[ctrl-v]",
     120: "[ctrl-x]",
+    121: "[ctrl-y]",
     122: "[ctrl-z]",
   },
 };

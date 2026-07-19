@@ -315,10 +315,12 @@ declare namespace SocialCalc {
     s_loc_formula: string;
     s_loc_function_list: string;
     s_loc_functions: string;
+    s_loc_freeze_panes: string;
     s_loc_grid: string;
     s_loc_hidden: string;
     s_loc_hide_column: string;
     s_loc_hide_row: string;
+    s_loc_include_formulas: string;
     s_loc_horizontal: string;
     s_loc_insert_column: string;
     s_loc_insert_row: string;
@@ -353,6 +355,9 @@ declare namespace SocialCalc {
     s_loc_plain_text: string;
     s_loc_recalc: string;
     s_loc_recalculation: string;
+    s_loc_regex: string;
+    s_loc_replace: string;
+    s_loc_replace_all: string;
     s_loc_redo: string;
     s_loc_right: string;
     s_loc_right_border: string;
@@ -384,8 +389,10 @@ declare namespace SocialCalc {
     s_loc_undo: string;
     s_loc_unlock_cell: string;
     s_loc_unmerge_cells: string;
+    s_loc_unfreeze_panes: string;
     s_loc_up: string;
     s_loc_value: string;
+    s_loc_whole_sheet: string;
     s_loc_vertical: string;
     s_loc_wikitext: string;
     s_loc_workspace: string;

@@ -3032,6 +3032,18 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
       ParseRange();
       errortext = SocialCalc.PrepareSpillMutation(sheet, [{ cr1: cr1, cr2: cr2 }], true);
       if (errortext) break;
+      for (row = cr1.row; row <= cr2.row; row++) {
+        for (col = cr1.col; col <= cr2.col; col++) {
+          cr = SocialCalc.crToCoord(col, row);
+          cell = sheet.cells[cr];
+          if (cell && (cell.colspan > 1 || cell.rowspan > 1)) {
+            errortext = "Unable to sort, because cell " + cr + " is part of a merged area";
+            break;
+          }
+        }
+        if (errortext) break;
+      }
+      if (errortext) break;
       if (saveundo) changes.AddUndo("changedrendervalues"); // to take care of undone pasted spans
       cols = []; // get columns and sort directions (or "")
       dirs = [];

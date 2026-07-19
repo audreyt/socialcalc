@@ -1423,6 +1423,63 @@ SpreadsheetControlSC.InitializeSpreadsheetControl = function (
   );
   spreadsheet.formulabarDiv.appendChild(searchBar[0]);
 
+  // Replace panel: literal/regex text input, formulas/whole-sheet toggles,
+  // and One/All buttons. Lives beside the existing Find bar and reuses its
+  // #searchbarinput as the search-pattern source.
+  var replaceInput = $("<input id='replacebarinput' value='' placeholder='Replace with…'>");
+  var replaceRegexCheckbox = $("<input type='checkbox' id='replaceregexinput'>");
+  var replaceFormulasCheckbox = $("<input type='checkbox' id='replaceformulasinput'>");
+  var replaceWholeSheetCheckbox = $("<input type='checkbox' id='replacewholesheetinput'>");
+  var replaceBar = $("<span id='replacebar'></span>");
+  replaceBar.append(replaceInput);
+  replaceBar.append(replaceRegexCheckbox);
+  replaceBar.append("<label for='replaceregexinput'>" + SCLoc("Regex") + "</label>");
+  replaceBar.append(replaceFormulasCheckbox);
+  replaceBar.append("<label for='replaceformulasinput'>" + SCLoc("Include formulas") + "</label>");
+  replaceBar.append(replaceWholeSheetCheckbox);
+  replaceBar.append("<label for='replacewholesheetinput'>" + SCLoc("Whole sheet") + "</label>");
+  var replaceOneButton = document.createElement("button");
+  replaceOneButton.id = spreadsheet.idPrefix + "replaceonebutton";
+  replaceOneButton.type = "button";
+  replaceOneButton.textContent = SCLoc("Replace");
+  replaceOneButton.addEventListener("click", SpreadsheetControlSC.SpreadsheetControl.ReplaceOne);
+  var replaceAllButton = document.createElement("button");
+  replaceAllButton.id = spreadsheet.idPrefix + "replaceallbutton";
+  replaceAllButton.type = "button";
+  replaceAllButton.textContent = SCLoc("All");
+  replaceAllButton.addEventListener("click", SpreadsheetControlSC.SpreadsheetControl.ReplaceAll);
+  replaceBar[0].appendChild(replaceOneButton);
+  replaceBar[0].appendChild(replaceAllButton);
+  replaceInput.on("focus", function () {
+    SpreadsheetControlSC.Keyboard.passThru = true;
+  });
+  replaceInput.on("blur", function () {
+    SpreadsheetControlSC.Keyboard.passThru = false;
+  });
+  spreadsheet.formulabarDiv.appendChild(replaceBar[0]);
+
+  // Freeze/Unfreeze Panes: freezes at the current selection (top-left of
+  // range, or ecell) using the existing "pane row"/"pane col" commands;
+  // Unfreeze collapses back to a single pane via "pane row 0"/"pane col 0"
+  // (the pre-existing collapse path in ExecuteSheetCommand's "pane" case).
+  var freezeButton = document.createElement("button");
+  freezeButton.id = spreadsheet.idPrefix + "freezepanesbutton";
+  freezeButton.type = "button";
+  freezeButton.textContent = SCLoc("Freeze Panes");
+  freezeButton.title = SCLoc("Freeze Panes");
+  freezeButton.addEventListener(
+    "click",
+    SpreadsheetControlSC.SpreadsheetControl.FreezePanesAtSelection,
+  );
+  var unfreezeButton = document.createElement("button");
+  unfreezeButton.id = spreadsheet.idPrefix + "unfreezepanesbutton";
+  unfreezeButton.type = "button";
+  unfreezeButton.textContent = SCLoc("Unfreeze Panes");
+  unfreezeButton.title = SCLoc("Unfreeze Panes");
+  unfreezeButton.addEventListener("click", SpreadsheetControlSC.SpreadsheetControl.UnfreezePanes);
+  spreadsheet.formulabarDiv.appendChild(freezeButton);
+  spreadsheet.formulabarDiv.appendChild(unfreezeButton);
+
   // initialize tabs that need it
 
   for (i = 0; i < tabs.length; i++) {
@@ -3193,6 +3250,31 @@ SpreadsheetControlSC.SpreadsheetControl.DoSum = function () {
   editor.EditorScheduleSheetCommands(cmd, true, false);
 };
 
+// SocialCalc.SpreadsheetControlCellIsHidden(spreadsheet, cr)
+//
+// Shared hidden-row/hidden-col predicate used by Find and Replace so both
+// features skip exactly the same cells.
+//
+
+/** @param {any} spreadsheet @param {any} cr */
+SpreadsheetControlSC.SpreadsheetControlCellIsHidden = function (spreadsheet: any, cr: any) {
+  return (
+    spreadsheet.sheet.rowattribs.hide[cr.row] === "yes" ||
+    spreadsheet.sheet.colattribs.hide[SocialCalc.rcColname(cr.col)] === "yes"
+  );
+};
+
+// SocialCalc.SpreadsheetControlEscapeRegexLiteral(text)
+//
+// Escapes every regex metacharacter so a literal-mode Find/Replace pattern
+// is matched byte-for-byte instead of being interpreted as a regex.
+//
+
+/** @param {string} text */
+SpreadsheetControlSC.SpreadsheetControlEscapeRegexLiteral = function (text: any) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+};
+
 SpreadsheetControlSC.SpreadsheetControl.FindInSheet = function () {
   var searchstatus = $("#searchstatus");
   var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
@@ -3209,10 +3291,7 @@ SpreadsheetControlSC.SpreadsheetControl.FindInSheet = function () {
   for (var cell_id in cells) {
     cell = cells[cell_id];
     var cr = SocialCalc.coordToCr(cell_id);
-    if (
-      spreadsheet.sheet.rowattribs.hide[cr.row] === "yes" ||
-      spreadsheet.sheet.colattribs.hide[SocialCalc.rcColname(cr.col)] === "yes"
-    ) {
+    if (SpreadsheetControlSC.SpreadsheetControlCellIsHidden(spreadsheet, cr)) {
       continue;
     }
     if (cell.datatype === "c") {
@@ -3233,6 +3312,223 @@ SpreadsheetControlSC.SpreadsheetControl.FindInSheet = function () {
     spreadsheet.sheet.selected_search_cell = undefined;
     searchstatus.text("No Matches");
   }
+};
+
+// SocialCalc.SpreadsheetControlReplaceCandidateCoords(spreadsheet, wholeSheet)
+//
+// Coordinates eligible for Find/Replace: every non-hidden cell, scoped to
+// the current selected range unless wholeSheet is true or there is no
+// active range (matching Excel/Sheets "search selection, else whole sheet"
+// convention).
+//
+
+/** @param {any} spreadsheet @param {any} wholeSheet */
+SpreadsheetControlSC.SpreadsheetControlReplaceCandidateCoords = function (
+  spreadsheet: any,
+  wholeSheet: any,
+) {
+  var editor = spreadsheet.editor;
+  var cells = spreadsheet.sheet.cells;
+  var useRange = !wholeSheet && editor.range && editor.range.hasrange;
+  var coords = [];
+  for (var cell_id in cells) {
+    var cr = SocialCalc.coordToCr(cell_id);
+    if (SpreadsheetControlSC.SpreadsheetControlCellIsHidden(spreadsheet, cr)) continue;
+    if (useRange) {
+      if (
+        cr.col < editor.range.left ||
+        cr.col > editor.range.right ||
+        cr.row < editor.range.top ||
+        cr.row > editor.range.bottom
+      ) {
+        continue;
+      }
+    }
+    coords.push(cell_id);
+  }
+  return coords;
+};
+
+// SocialCalc.SpreadsheetControlBuildReplaceCommand(cell, coord, pattern, replaceRegex, replacement, includeFormulas)
+//
+// Pure (no DOM/editor access) command-string builder for one cell. Returns
+// null when the cell has no match under the current mode/policy, or a
+// "set coord ..." command line matching EditorSaveEdit's grammar otherwise.
+// Formula-bearing cells ("f"/"c" datatype) are left untouched unless
+// includeFormulas is true, in which case the match runs against the
+// formula source text (without the leading "=") and the command rewrites
+// the formula, never the computed value.
+//
+
+/**
+ * @param {any} cell
+ * @param {string} coord
+ * @param {RegExp} replaceRegex
+ * @param {string} replacement
+ * @param {boolean} includeFormulas
+ */
+SpreadsheetControlSC.SpreadsheetControlBuildReplaceCommand = function (
+  cell: any,
+  coord: any,
+  replaceRegex: any,
+  replacement: any,
+  includeFormulas: any,
+  regexMode: any,
+) {
+  // In literal mode the search pattern is already escaped (see
+  // EscapeRegexLiteral), but String.prototype.replace still interprets
+  // "$&", "$1", "$$", etc. in the REPLACEMENT string as backreferences
+  // regardless of how the pattern was built. Escape every literal "$" in
+  // the replacement text so literal mode never accidentally triggers
+  // regex substitution syntax; regex mode keeps native "$" semantics.
+  var effectiveReplacement = regexMode ? replacement : String(replacement).replace(/\$/g, "$$$$");
+  var isFormula = cell.datatype === "f" || cell.datatype === "c";
+  if (isFormula) {
+    if (!includeFormulas) return null;
+    var oldFormula = cell.formula || "";
+    replaceRegex.lastIndex = 0;
+    if (!replaceRegex.test(oldFormula)) return null;
+    replaceRegex.lastIndex = 0;
+    var newFormula = oldFormula.replace(replaceRegex, effectiveReplacement);
+    if (newFormula === oldFormula) return null;
+    // "set coord formula ..." consumes the rest of the command LINE
+    // verbatim (SC.ExecuteSheetCommand's "formula" attrib branch never
+    // decodeFromSave's it, unlike "text"), and cmdLines are joined with
+    // "\n" into one multi-command batch — an embedded newline in the
+    // replaced formula would silently truncate the command or corrupt a
+    // sibling replacement, so skip rather than emit a broken command.
+    if (newFormula.indexOf("\n") !== -1) return null;
+    return "set " + coord + " formula " + newFormula;
+  }
+  var oldValue = String(cell.datavalue == null ? "" : cell.datavalue);
+  replaceRegex.lastIndex = 0;
+  if (!replaceRegex.test(oldValue)) return null;
+  replaceRegex.lastIndex = 0;
+  var newValue = oldValue.replace(replaceRegex, effectiveReplacement);
+  if (newValue === oldValue) return null;
+  var valueinfo = SocialCalc.DetermineValueType(newValue);
+  var type;
+  if (valueinfo.type === "n" && newValue === valueinfo.value + "") {
+    type = "value n";
+  } else if (valueinfo.type.charAt(0) === "t") {
+    type = "text " + valueinfo.type;
+  } else {
+    type = "constant " + valueinfo.type + " " + valueinfo.value;
+  }
+  var encoded = type.charAt(0) === "t" ? SocialCalc.encodeForSave(newValue) : newValue;
+  return "set " + coord + " " + type + " " + encoded;
+};
+
+// SocialCalc.SpreadsheetControlRunReplace(all)
+//
+// Reads the Find/Replace toolbar inputs and executes zero or more
+// replacements as exactly one undo transaction (a single
+// EditorScheduleSheetCommands call). `all` selects Replace-All vs.
+// Replace-One (only the currently selected search match).
+//
+
+/** @param {boolean} all */
+SpreadsheetControlSC.SpreadsheetControlRunReplace = function (all: any) {
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  var searchInput = /** @type {any} */ ((document as any).getElementById("searchbarinput"));
+  var replaceInput = /** @type {any} */ ((document as any).getElementById("replacebarinput"));
+  var regexCheckbox = /** @type {any} */ ((document as any).getElementById("replaceregexinput"));
+  var formulasCheckbox = /** @type {any} */ (
+    (document as any).getElementById("replaceformulasinput")
+  );
+  var wholeSheetCheckbox = /** @type {any} */ (
+    (document as any).getElementById("replacewholesheetinput")
+  );
+  var pattern = searchInput ? searchInput.value : "";
+  if (!pattern.length) return;
+  var replacement = replaceInput ? replaceInput.value : "";
+  var regexMode = !!(regexCheckbox && regexCheckbox.checked);
+  var includeFormulas = !!(formulasCheckbox && formulasCheckbox.checked);
+  var wholeSheet = !!(wholeSheetCheckbox && wholeSheetCheckbox.checked);
+  var searchPattern = regexMode
+    ? pattern
+    : SpreadsheetControlSC.SpreadsheetControlEscapeRegexLiteral(pattern);
+  var replaceRegex;
+  try {
+    replaceRegex = new RegExp(searchPattern, "gi");
+  } catch {
+    return; // malformed regex in regex mode: no-op rather than throwing
+  }
+  var cells = spreadsheet.sheet.cells;
+  var coords;
+  if (all) {
+    coords = SpreadsheetControlSC.SpreadsheetControlReplaceCandidateCoords(spreadsheet, wholeSheet);
+  } else {
+    // Replace-One only ever targets the currently active cell.
+    coords = spreadsheet.editor && spreadsheet.editor.ecell ? [spreadsheet.editor.ecell.coord] : [];
+  }
+  var cmdLines = [];
+  for (var i = 0; i < coords.length; i++) {
+    var coord = coords[i];
+    var cell = cells[coord];
+    if (!cell) continue;
+    var cmdLine = SpreadsheetControlSC.SpreadsheetControlBuildReplaceCommand(
+      cell,
+      coord,
+      replaceRegex,
+      replacement,
+      includeFormulas,
+      regexMode,
+    );
+    if (cmdLine) cmdLines.push(cmdLine);
+    if (!all && cmdLines.length) break; // Replace-One stops at the first hit
+  }
+  if (!cmdLines.length) return;
+  spreadsheet.editor.EditorScheduleSheetCommands(cmdLines.join("\n"), true, false);
+};
+
+SpreadsheetControlSC.SpreadsheetControl.ReplaceOne = function () {
+  SpreadsheetControlSC.SpreadsheetControlRunReplace(false);
+};
+
+SpreadsheetControlSC.SpreadsheetControl.ReplaceAll = function () {
+  SpreadsheetControlSC.SpreadsheetControlRunReplace(true);
+};
+
+// SocialCalc.SpreadsheetControl.FreezePanesAtSelection()
+//
+// Freezes rows/columns at the current selection's top-left corner (or the
+// active cell, when there is no range) by issuing the existing "pane row"/
+// "pane col" commands. Matches the Excel/Sheets "Freeze Panes" convention:
+// everything above/left of the anchor stays fixed, everything else scrolls.
+// No-ops when the anchor is A1 (nothing to freeze).
+//
+
+SpreadsheetControlSC.SpreadsheetControl.FreezePanesAtSelection = function () {
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  var editor = spreadsheet.editor;
+  var anchorRow, anchorCol;
+  if (editor.range && editor.range.hasrange) {
+    anchorRow = editor.range.top;
+    anchorCol = editor.range.left;
+  } else if (editor.ecell) {
+    anchorRow = editor.ecell.row;
+    anchorCol = editor.ecell.col;
+  } else {
+    return;
+  }
+  if (anchorRow <= 1 && anchorCol <= 1) return; // nothing to freeze at A1
+  var cmd = "";
+  if (anchorRow > 1) cmd += "pane row " + anchorRow + "\n";
+  if (anchorCol > 1) cmd += "pane col " + anchorCol;
+  editor.EditorScheduleSheetCommands(cmd.replace(/\n$/, ""), true, false);
+};
+
+// SocialCalc.SpreadsheetControl.UnfreezePanes()
+//
+// Collapses both row and column panes back to one, reusing the existing
+// "pane row 0"/"pane col 0" collapse path already implemented in
+// ExecuteSheetCommand's "pane" case.
+//
+
+SpreadsheetControlSC.SpreadsheetControl.UnfreezePanes = function () {
+  var spreadsheet = SocialCalc.GetSpreadsheetControlObject() as any;
+  spreadsheet.editor.EditorScheduleSheetCommands("pane row 0\npane col 0", true, false);
 };
 
 /** @param {0|1} direction */

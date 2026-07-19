@@ -144,7 +144,7 @@ test("s_FormatNumber_ day/month name arrays and am/pm markers match the oracle 3
   ]);
 });
 
-test("s_loc_* localization strings (every key SC.LocalizeString/LocalizeSubstrings can look up) match the oracle 3.0.8 baseline byte-for-byte", async () => {
+test("s_loc_* localization strings (every key SC.LocalizeString/LocalizeSubstrings can look up) match the oracle 3.0.8 baseline byte-for-byte, plus post-3.0.8 additions", async () => {
   const SC = await loadSocialCalc();
   const Oracle = loadOracleSocialCalc();
   const candidate = pickByPrefix(SC.Constants, "s_loc_");
@@ -152,8 +152,33 @@ test("s_loc_* localization strings (every key SC.LocalizeString/LocalizeSubstrin
   // LocalizeSubstrings for menu/toolbar/settings labels — by far the largest single
   // StringLiteral survivor cluster in the file. One deep-equality comparison against
   // an independently-vendored 133-key snapshot closes all of them at once.
-  expect(Object.keys(candidate).length).toBe(133);
-  expect(candidate).toEqual(pickByPrefix(Oracle.Constants, "s_loc_"));
+  //
+  // Find/Replace, Freeze/Unfreeze Panes (editor productivity features added
+  // after the 3.0.8 baseline was vendored) introduced 7 new s_loc_* keys with
+  // no oracle counterpart — carve out exactly this named, closed set before
+  // the oracle comparison, same pattern as the s_fdef_*/s_farg_* post-3.0.8
+  // carve-out below.
+  const postOracleLocKeys = [
+    "s_loc_freeze_panes",
+    "s_loc_include_formulas",
+    "s_loc_regex",
+    "s_loc_replace",
+    "s_loc_replace_all",
+    "s_loc_unfreeze_panes",
+    "s_loc_whole_sheet",
+  ];
+
+  expect(Object.keys(candidate).length).toBe(140);
+
+  const legacyLoc = { ...candidate };
+  for (const key of postOracleLocKeys) delete legacyLoc[key];
+
+  expect(Object.keys(legacyLoc).length).toBe(133);
+  expect(legacyLoc).toEqual(pickByPrefix(Oracle.Constants, "s_loc_"));
+
+  for (const key of postOracleLocKeys) {
+    expect(candidate[key]).toBeTruthy();
+  }
 });
 
 test("s_fdef_*/s_farg_* formula help text (function definitions and argument hints) match the oracle 3.0.8 baseline byte-for-byte, plus post-3.0.8 additions", async () => {

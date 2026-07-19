@@ -386,11 +386,13 @@
     s_loc_formula: 'Formula',
     s_loc_function_list: 'Function List',
     s_loc_functions: 'Functions',
+    s_loc_freeze_panes: 'Freeze Panes',
     s_loc_grid: 'Grid',
     s_loc_hidden: 'Hidden',
     s_loc_hide_column: 'Hide Column',
     s_loc_hide_row: 'Hide Row',
     s_loc_horizontal: 'Horizontal',
+    s_loc_include_formulas: 'Include formulas',
     s_loc_insert_column: 'Insert Column Before',
     s_loc_insert_row: 'Insert Row Before',
     s_loc_italic: 'Italic',
@@ -424,7 +426,10 @@
     s_loc_plain_text: 'Plain Text',
     s_loc_recalc: 'Recalc',
     s_loc_recalculation: 'Recalculation',
+    s_loc_regex: 'Regex',
     s_loc_redo: 'Redo',
+    s_loc_replace: 'Replace',
+    s_loc_replace_all: 'All',
     s_loc_right: 'Right',
     s_loc_right_border: 'Right Border',
     s_loc_sheet_settings: 'SHEET SETTINGS',
@@ -455,8 +460,10 @@
     s_loc_undo: 'Undo',
     s_loc_unlock_cell: 'Unlock Cell',
     s_loc_unmerge_cells: 'Unmerge Cells',
+    s_loc_unfreeze_panes: 'Unfreeze Panes',
     s_loc_up: 'Up',
     s_loc_value: 'Value',
+    s_loc_whole_sheet: 'Whole sheet',
     s_loc_vertical: 'Vertical',
     s_loc_wikitext: 'Wikitext',
     s_loc_workspace: 'Workspace',
@@ -3228,6 +3235,18 @@ More comments yet to come...
           ],
           true,
         );
+        if (errortext) break;
+        for (row = cr1.row; row <= cr2.row; row++) {
+          for (col = cr1.col; col <= cr2.col; col++) {
+            cr = SocialCalc.crToCoord(col, row);
+            cell = sheet.cells[cr];
+            if (cell && (cell.colspan > 1 || cell.rowspan > 1)) {
+              errortext = 'Unable to sort, because cell ' + cr + ' is part of a merged area';
+              break;
+            }
+          }
+          if (errortext) break;
+        }
         if (errortext) break;
         if (saveundo) changes.AddUndo('changedrendervalues');
         cols = [];
@@ -6600,7 +6619,7 @@ More comments yet to come...
         editor.context.sheetobj.RecalcSheet(TableEditorSC.EditorSheetStatusCallback, editor);
       return null;
     };
-    this.ctrlkeyFunction = function (editor, charname) {
+    this.ctrlkeyFunction = function (editor, charname, ev) {
       var ta, cell, position, cmd, sel, cliptext;
       switch (charname) {
         case '[ctrl-a]':
@@ -6641,6 +6660,13 @@ More comments yet to come...
             cmd = 'cut ' + sel + ' formulas';
           }
           editor.EditorScheduleSheetCommands(cmd, true, false);
+          if (
+            typeof navigator !== 'undefined' &&
+            navigator.clipboard &&
+            typeof navigator.clipboard.writeText === 'function'
+          ) {
+            navigator.clipboard.writeText(cliptext).catch(function () {});
+          }
           ta.style.display = 'block';
           ta.value = cliptext;
           ta.focus();
@@ -6652,7 +6678,7 @@ More comments yet to come...
             TableEditorSC.KeyboardFocus();
           }, 200);
           return true;
-        case '[ctrl-v]':
+        case '[ctrl-v]': {
           if (editor.noEdit || editor.ECellReadonly()) return true;
           ta = editor.pasteTextarea;
           ta.value = '';
@@ -6662,14 +6688,7 @@ More comments yet to come...
             ta.style.left = position.left - 1 + 'px';
             ta.style.top = position.top - 1 + 'px';
           }
-          ta.style.display = 'block';
-          ta.value = '';
-          ta.focus();
-          window.setTimeout(function () {
-            var ta = editor.pasteTextarea;
-            var value = ta.value;
-            ta.blur();
-            ta.style.display = 'none';
+          var processPastedText = function (value) {
             var cmd = '';
             if (editor.pastescclipboard) {
               editor.pastescclipboard = false;
@@ -6711,10 +6730,50 @@ More comments yet to come...
             cmd += 'paste ' + cr + ' formulas';
             editor.EditorScheduleSheetCommands(cmd, true, false);
             TableEditorSC.KeyboardFocus();
-          }, 200);
+          };
+          var fallbackViaFocusedTextarea = function () {
+            ta.style.display = 'block';
+            ta.value = '';
+            ta.focus();
+            window.setTimeout(function () {
+              var ta = editor.pasteTextarea;
+              var value = ta.value;
+              ta.blur();
+              ta.style.display = 'none';
+              processPastedText(value);
+            }, 200);
+          };
+          if (
+            typeof navigator !== 'undefined' &&
+            navigator.clipboard &&
+            typeof navigator.clipboard.readText === 'function'
+          ) {
+            navigator.clipboard.readText().then(
+              function (text) {
+                if (typeof text === 'string') {
+                  processPastedText(text);
+                } else {
+                  fallbackViaFocusedTextarea();
+                }
+              },
+              function () {
+                fallbackViaFocusedTextarea();
+              },
+            );
+          } else {
+            fallbackViaFocusedTextarea();
+          }
           return true;
+        }
         case '[ctrl-z]':
-          editor.EditorScheduleSheetCommands('undo', true, false);
+          if (ev && ev.shiftKey) {
+            editor.EditorScheduleSheetCommands('redo', true, false);
+          } else {
+            editor.EditorScheduleSheetCommands('undo', true, false);
+          }
+          return false;
+        case '[ctrl-y]':
+          editor.EditorScheduleSheetCommands('redo', true, false);
           return false;
         case '[ctrl-s]':
           if (!TableEditorSC.Constants.AllowCtrlS) break;
@@ -8264,7 +8323,7 @@ More comments yet to come...
         }
         if ((ch.length > 1 && ch.substr(0, 1) == '[') || ch.length == 0) {
           if (editor.ctrlkeyFunction && ch.length > 0) {
-            return editor.ctrlkeyFunction(editor, ch);
+            return editor.ctrlkeyFunction(editor, ch, e);
           } else {
             return true;
           }
@@ -11377,6 +11436,7 @@ More comments yet to come...
       83: '[ctrl-s]',
       86: '[ctrl-v]',
       88: '[ctrl-x]',
+      89: '[ctrl-y]',
       90: '[ctrl-z]',
     },
     specialKeysSafari: {
@@ -11402,6 +11462,7 @@ More comments yet to come...
       115: '[ctrl-s]',
       118: '[ctrl-v]',
       120: '[ctrl-x]',
+      121: '[ctrl-y]',
       122: '[ctrl-z]',
     },
     ignoreKeysSafari: {
@@ -11442,6 +11503,7 @@ More comments yet to come...
       115: '[ctrl-s]',
       118: '[ctrl-v]',
       120: '[ctrl-x]',
+      121: '[ctrl-y]',
       122: '[ctrl-z]',
     },
   };
@@ -21451,6 +21513,56 @@ not governed by the terms of the CPAL.
       }
     });
     spreadsheet.formulabarDiv.appendChild(searchBar[0]);
+    var replaceInput = $("<input id='replacebarinput' value='' placeholder='Replace with…'>");
+    var replaceRegexCheckbox = $("<input type='checkbox' id='replaceregexinput'>");
+    var replaceFormulasCheckbox = $("<input type='checkbox' id='replaceformulasinput'>");
+    var replaceWholeSheetCheckbox = $("<input type='checkbox' id='replacewholesheetinput'>");
+    var replaceBar = $("<span id='replacebar'></span>");
+    replaceBar.append(replaceInput);
+    replaceBar.append(replaceRegexCheckbox);
+    replaceBar.append("<label for='replaceregexinput'>" + SCLoc('Regex') + '</label>');
+    replaceBar.append(replaceFormulasCheckbox);
+    replaceBar.append(
+      "<label for='replaceformulasinput'>" + SCLoc('Include formulas') + '</label>',
+    );
+    replaceBar.append(replaceWholeSheetCheckbox);
+    replaceBar.append("<label for='replacewholesheetinput'>" + SCLoc('Whole sheet') + '</label>');
+    var replaceOneButton = document.createElement('button');
+    replaceOneButton.id = spreadsheet.idPrefix + 'replaceonebutton';
+    replaceOneButton.type = 'button';
+    replaceOneButton.textContent = SCLoc('Replace');
+    replaceOneButton.addEventListener('click', SpreadsheetControlSC.SpreadsheetControl.ReplaceOne);
+    var replaceAllButton = document.createElement('button');
+    replaceAllButton.id = spreadsheet.idPrefix + 'replaceallbutton';
+    replaceAllButton.type = 'button';
+    replaceAllButton.textContent = SCLoc('All');
+    replaceAllButton.addEventListener('click', SpreadsheetControlSC.SpreadsheetControl.ReplaceAll);
+    replaceBar[0].appendChild(replaceOneButton);
+    replaceBar[0].appendChild(replaceAllButton);
+    replaceInput.on('focus', function () {
+      SpreadsheetControlSC.Keyboard.passThru = true;
+    });
+    replaceInput.on('blur', function () {
+      SpreadsheetControlSC.Keyboard.passThru = false;
+    });
+    spreadsheet.formulabarDiv.appendChild(replaceBar[0]);
+    var freezeButton = document.createElement('button');
+    freezeButton.id = spreadsheet.idPrefix + 'freezepanesbutton';
+    freezeButton.type = 'button';
+    freezeButton.textContent = SCLoc('Freeze Panes');
+    freezeButton.title = SCLoc('Freeze Panes');
+    freezeButton.addEventListener(
+      'click',
+      SpreadsheetControlSC.SpreadsheetControl.FreezePanesAtSelection,
+    );
+    var unfreezeButton = document.createElement('button');
+    unfreezeButton.id = spreadsheet.idPrefix + 'unfreezepanesbutton';
+    unfreezeButton.type = 'button';
+    unfreezeButton.textContent = SCLoc('Unfreeze Panes');
+    unfreezeButton.title = SCLoc('Unfreeze Panes');
+    unfreezeButton.addEventListener('click', SpreadsheetControlSC.SpreadsheetControl.UnfreezePanes);
+    spreadsheet.formulabarDiv.appendChild(freezeButton);
+    spreadsheet.formulabarDiv.appendChild(unfreezeButton);
     for (i = 0; i < tabs.length; i++) {
       if (tabs[i].oncreate) {
         tabs[i].oncreate(spreadsheet, tabs[i].name);
@@ -22630,6 +22742,15 @@ not governed by the terms of the CPAL.
     }
     editor.EditorScheduleSheetCommands(cmd, true, false);
   };
+  SpreadsheetControlSC.SpreadsheetControlCellIsHidden = function (spreadsheet, cr) {
+    return (
+      spreadsheet.sheet.rowattribs.hide[cr.row] === 'yes' ||
+      spreadsheet.sheet.colattribs.hide[SocialCalc.rcColname(cr.col)] === 'yes'
+    );
+  };
+  SpreadsheetControlSC.SpreadsheetControlEscapeRegexLiteral = function (text) {
+    return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  };
   SpreadsheetControlSC.SpreadsheetControl.FindInSheet = function () {
     var searchstatus = $('#searchstatus');
     var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
@@ -22646,10 +22767,7 @@ not governed by the terms of the CPAL.
     for (var cell_id in cells) {
       cell = cells[cell_id];
       var cr = SocialCalc.coordToCr(cell_id);
-      if (
-        spreadsheet.sheet.rowattribs.hide[cr.row] === 'yes' ||
-        spreadsheet.sheet.colattribs.hide[SocialCalc.rcColname(cr.col)] === 'yes'
-      ) {
+      if (SpreadsheetControlSC.SpreadsheetControlCellIsHidden(spreadsheet, cr)) {
         continue;
       }
       if (cell.datatype === 'c') {
@@ -22670,6 +22788,151 @@ not governed by the terms of the CPAL.
       spreadsheet.sheet.selected_search_cell = undefined;
       searchstatus.text('No Matches');
     }
+  };
+  SpreadsheetControlSC.SpreadsheetControlReplaceCandidateCoords = function (
+    spreadsheet,
+    wholeSheet,
+  ) {
+    var editor = spreadsheet.editor;
+    var cells = spreadsheet.sheet.cells;
+    var useRange = !wholeSheet && editor.range && editor.range.hasrange;
+    var coords = [];
+    for (var cell_id in cells) {
+      var cr = SocialCalc.coordToCr(cell_id);
+      if (SpreadsheetControlSC.SpreadsheetControlCellIsHidden(spreadsheet, cr)) continue;
+      if (useRange) {
+        if (
+          cr.col < editor.range.left ||
+          cr.col > editor.range.right ||
+          cr.row < editor.range.top ||
+          cr.row > editor.range.bottom
+        ) {
+          continue;
+        }
+      }
+      coords.push(cell_id);
+    }
+    return coords;
+  };
+  SpreadsheetControlSC.SpreadsheetControlBuildReplaceCommand = function (
+    cell,
+    coord,
+    replaceRegex,
+    replacement,
+    includeFormulas,
+    regexMode,
+  ) {
+    var effectiveReplacement = regexMode ? replacement : String(replacement).replace(/\$/g, '$$$$');
+    var isFormula = cell.datatype === 'f' || cell.datatype === 'c';
+    if (isFormula) {
+      if (!includeFormulas) return null;
+      var oldFormula = cell.formula || '';
+      replaceRegex.lastIndex = 0;
+      if (!replaceRegex.test(oldFormula)) return null;
+      replaceRegex.lastIndex = 0;
+      var newFormula = oldFormula.replace(replaceRegex, effectiveReplacement);
+      if (newFormula === oldFormula) return null;
+      if (newFormula.indexOf('\n') !== -1) return null;
+      return 'set ' + coord + ' formula ' + newFormula;
+    }
+    var oldValue = String(cell.datavalue == null ? '' : cell.datavalue);
+    replaceRegex.lastIndex = 0;
+    if (!replaceRegex.test(oldValue)) return null;
+    replaceRegex.lastIndex = 0;
+    var newValue = oldValue.replace(replaceRegex, effectiveReplacement);
+    if (newValue === oldValue) return null;
+    var valueinfo = SocialCalc.DetermineValueType(newValue);
+    var type;
+    if (valueinfo.type === 'n' && newValue === valueinfo.value + '') {
+      type = 'value n';
+    } else if (valueinfo.type.charAt(0) === 't') {
+      type = 'text ' + valueinfo.type;
+    } else {
+      type = 'constant ' + valueinfo.type + ' ' + valueinfo.value;
+    }
+    var encoded = type.charAt(0) === 't' ? SocialCalc.encodeForSave(newValue) : newValue;
+    return 'set ' + coord + ' ' + type + ' ' + encoded;
+  };
+  SpreadsheetControlSC.SpreadsheetControlRunReplace = function (all) {
+    var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
+    var searchInput = document.getElementById('searchbarinput');
+    var replaceInput = document.getElementById('replacebarinput');
+    var regexCheckbox = document.getElementById('replaceregexinput');
+    var formulasCheckbox = document.getElementById('replaceformulasinput');
+    var wholeSheetCheckbox = document.getElementById('replacewholesheetinput');
+    var pattern = searchInput ? searchInput.value : '';
+    if (!pattern.length) return;
+    var replacement = replaceInput ? replaceInput.value : '';
+    var regexMode = !!(regexCheckbox && regexCheckbox.checked);
+    var includeFormulas = !!(formulasCheckbox && formulasCheckbox.checked);
+    var wholeSheet = !!(wholeSheetCheckbox && wholeSheetCheckbox.checked);
+    var searchPattern = regexMode
+      ? pattern
+      : SpreadsheetControlSC.SpreadsheetControlEscapeRegexLiteral(pattern);
+    var replaceRegex;
+    try {
+      replaceRegex = new RegExp(searchPattern, 'gi');
+    } catch {
+      return;
+    }
+    var cells = spreadsheet.sheet.cells;
+    var coords;
+    if (all) {
+      coords = SpreadsheetControlSC.SpreadsheetControlReplaceCandidateCoords(
+        spreadsheet,
+        wholeSheet,
+      );
+    } else {
+      coords =
+        spreadsheet.editor && spreadsheet.editor.ecell ? [spreadsheet.editor.ecell.coord] : [];
+    }
+    var cmdLines = [];
+    for (var i = 0; i < coords.length; i++) {
+      var coord = coords[i];
+      var cell = cells[coord];
+      if (!cell) continue;
+      var cmdLine = SpreadsheetControlSC.SpreadsheetControlBuildReplaceCommand(
+        cell,
+        coord,
+        replaceRegex,
+        replacement,
+        includeFormulas,
+        regexMode,
+      );
+      if (cmdLine) cmdLines.push(cmdLine);
+      if (!all && cmdLines.length) break;
+    }
+    if (!cmdLines.length) return;
+    spreadsheet.editor.EditorScheduleSheetCommands(cmdLines.join('\n'), true, false);
+  };
+  SpreadsheetControlSC.SpreadsheetControl.ReplaceOne = function () {
+    SpreadsheetControlSC.SpreadsheetControlRunReplace(false);
+  };
+  SpreadsheetControlSC.SpreadsheetControl.ReplaceAll = function () {
+    SpreadsheetControlSC.SpreadsheetControlRunReplace(true);
+  };
+  SpreadsheetControlSC.SpreadsheetControl.FreezePanesAtSelection = function () {
+    var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
+    var editor = spreadsheet.editor;
+    var anchorRow, anchorCol;
+    if (editor.range && editor.range.hasrange) {
+      anchorRow = editor.range.top;
+      anchorCol = editor.range.left;
+    } else if (editor.ecell) {
+      anchorRow = editor.ecell.row;
+      anchorCol = editor.ecell.col;
+    } else {
+      return;
+    }
+    if (anchorRow <= 1 && anchorCol <= 1) return;
+    var cmd = '';
+    if (anchorRow > 1) cmd += 'pane row ' + anchorRow + '\n';
+    if (anchorCol > 1) cmd += 'pane col ' + anchorCol;
+    editor.EditorScheduleSheetCommands(cmd.replace(/\n$/, ''), true, false);
+  };
+  SpreadsheetControlSC.SpreadsheetControl.UnfreezePanes = function () {
+    var spreadsheet = SocialCalc.GetSpreadsheetControlObject();
+    spreadsheet.editor.EditorScheduleSheetCommands('pane row 0\npane col 0', true, false);
   };
   SpreadsheetControlSC.SpreadsheetControl.SearchSheet = function (direction) {
     var spreadsheet = SocialCalc.GetSpreadsheetControlObject();

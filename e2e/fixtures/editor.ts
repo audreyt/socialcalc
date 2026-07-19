@@ -332,6 +332,7 @@ declare global {
   interface Window {
     SocialCalc: {
       Callbacks: { untrustedContent: boolean; [key: string]: unknown };
+      Clipboard: { clipboard: string };
       coordToCr(coord: string): { col: number; row: number };
       GetEditorCellElement(
         editor: unknown,
@@ -345,6 +346,7 @@ declare global {
           ecell: { coord: string };
           SheetRedo(): void;
           SheetUndo(): void;
+          context: { rowpanes: unknown[]; colpanes: unknown[] };
         };
         CreateSheetSave(): string;
         CreateSpreadsheetSave(): string;
