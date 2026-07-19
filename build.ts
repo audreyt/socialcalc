@@ -143,6 +143,7 @@ const coreFiles = [
   "formula-operand.ts",
   "formula-ref.ts",
   "workbook.ts",
+  "socialcalcdatavalidation.ts",
   "socialcalcpopup.js",
   "socialcalcspreadsheetcontrol.js",
   "workbook-ui.ts",

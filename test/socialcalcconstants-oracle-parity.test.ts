@@ -75,18 +75,23 @@ function pickRemainingStringLeaves(source: unknown): Record<string, string> {
   return picked;
 }
 
-test("remaining Constants string data leaves match the oracle 3.0.8 baseline byte-for-byte", async () => {
+test("remaining Constants string data leaves match the oracle 3.0.8 baseline byte-for-byte, plus post-3.0.8 additions", async () => {
   const SC = await loadSocialCalc();
   const Oracle = loadOracleSocialCalc();
   const candidate = pickRemainingStringLeaves(SC.Constants);
-  // 188 oracle-matched leaves + 1 new defaultLockedComment (sheet-protection
-  // lock hint; not present in the oracle, so excluded from the equality
-  // check below via key-set diffing against the oracle candidate).
-  expect(Object.keys(candidate).length).toBe(189);
-  const oracleCandidate = pickRemainingStringLeaves(Oracle.Constants);
+  // 188 oracle-matched leaves + 2 post-3.0.8 additions with no oracle
+  // counterpart, carved out before the whole-object comparison, same as
+  // the s_fdef_/s_farg_ post-3.0.8 carve-out below:
+  // - defaultLockedComment (sheet-protection lock hint)
+  // - s_dvDefaultError (default data-validation rejection message)
+  expect(Object.keys(candidate).length).toBe(190);
+  const legacy = { ...candidate };
+  delete legacy.defaultLockedComment;
+  delete legacy.s_dvDefaultError;
+  expect(Object.keys(legacy).length).toBe(188);
+  expect(legacy).toEqual(pickRemainingStringLeaves(Oracle.Constants));
   expect(candidate.defaultLockedComment).toBe("Locked cell (sheet is protected)");
-  delete candidate.defaultLockedComment;
-  expect(candidate).toEqual(oracleCandidate);
+  expect(candidate.s_dvDefaultError).toBeTruthy();
 });
 
 test("SCFormat* settings-dropdown data strings match the oracle 3.0.8 baseline byte-for-byte", async () => {

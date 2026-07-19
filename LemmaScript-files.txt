@@ -13,3 +13,4 @@ lemma/protect.ts
 lemma/condfmt.ts
 lemma/workbook.ts
 lemma/chart.ts
+lemma/validation.ts

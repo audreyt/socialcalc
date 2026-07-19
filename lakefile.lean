@@ -113,4 +113,8 @@ lean_lib Protect where
 lean_lib CondFmt where
   srcDir := "lemma"
   roots := #[`«condfmt.types», `«condfmt.def», `«condfmt.proof»]
+
+lean_lib Validation where
+  srcDir := "lemma"
+  roots := #[`«validation.types», `«validation.def», `«validation.proof»]
   extraDepTargets := #[``downloadDependencies]

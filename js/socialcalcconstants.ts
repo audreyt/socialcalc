@@ -129,6 +129,10 @@ ConstantsRoot.Constants = {
   s_escUnknownSetCoordCmd: "Unknown set coord command: ",
   s_escUnknownCmd: "Unknown command: ",
 
+  //*** SocialCalc.DataValidation
+
+  s_dvDefaultError: "The value entered does not meet validation rules.",
+
   //*** SocialCalc.CheckAndCalcCell
 
   s_caccCircRef: "Circular reference to ", // circular reference found during recalc

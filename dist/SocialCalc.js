@@ -85,6 +85,7 @@
     s_escUnknownSheetCmd: 'Unknown sheet command: ',
     s_escUnknownSetCoordCmd: 'Unknown set coord command: ',
     s_escUnknownCmd: 'Unknown command: ',
+    s_dvDefaultError: 'The value entered does not meet validation rules.',
     s_caccCircRef: 'Circular reference to ',
     defaultRowNameWidth: '30',
     defaultAssumedRowHeight: 15,
@@ -1154,6 +1155,7 @@ More comments yet to come...
     valuetype: 1,
     errors: 1,
     comment: 1,
+    validation: 1,
     readonly: 1,
     bt: 2,
     br: 2,
@@ -1758,6 +1760,20 @@ More comments yet to come...
   SC.Sheet.prototype.RecalcSheet = function () {
     return SocialCalc.RecalcSheet(this);
   };
+  SC.Sheet.prototype.SetCellValidation = function (range, rule, saveundo) {
+    var encoded = SocialCalc.encodeForSave(SocialCalc.DataValidation.EncodeRule(rule));
+    return this.ScheduleSheetCommands(
+      'set ' + range + ' validation ' + encoded,
+      saveundo !== false,
+    );
+  };
+  SC.Sheet.prototype.ClearCellValidation = function (range, saveundo) {
+    return this.ScheduleSheetCommands('set ' + range + ' clearvalidation', saveundo !== false);
+  };
+  SC.Sheet.prototype.GetCellValidation = function (coord) {
+    var cell = this.cells[coord];
+    return cell ? SocialCalc.DataValidation.DecodeRule(cell.validation) : null;
+  };
   SC.ParseSheetSave = function (savedsheet, sheetobj) {
     var lines = savedsheet.split(/\r\n|\n/);
     var parts = [];
@@ -2097,6 +2113,9 @@ More comments yet to come...
           break;
         case 'comment':
           cell.comment = SocialCalc.decodeFromSave(parts[j++]);
+          break;
+        case 'validation':
+          cell.validation = SocialCalc.decodeFromSave(parts[j++]);
           break;
         case 'spillrows':
           cell.spillrows = parts[j++] - 0;
@@ -2440,6 +2459,7 @@ More comments yet to come...
     if (cell.csss) line += ':csss:' + SocialCalc.encodeForSave(cell.csss);
     if (cell.mod) line += ':mod:' + cell.mod;
     if (cell.comment) line += ':comment:' + SocialCalc.encodeForSave(cell.comment);
+    if (cell.validation) line += ':validation:' + SocialCalc.encodeForSave(cell.validation);
     if (cell.spillrows != null) line += ':spillrows:' + cell.spillrows;
     if (cell.spillcols != null) line += ':spillcols:' + cell.spillcols;
     if (cell.spillowner) line += ':spillowner:' + SocialCalc.encodeForSave(cell.spillowner);
@@ -3349,6 +3369,26 @@ More comments yet to come...
                 attrib != 'unlocked'
               )
                 continue;
+              if (attrib == 'value' || attrib == 'text' || attrib == 'constant') {
+                var dvRule = SocialCalc.DataValidation.DecodeRule(cell.validation);
+                if (dvRule) {
+                  var dvPos = rest.indexOf(' ');
+                  var dvRaw = '';
+                  if (attrib == 'value') {
+                    dvRaw = rest.substring(dvPos + 1);
+                  } else if (attrib == 'text') {
+                    dvRaw = SocialCalc.decodeFromSave(rest.substring(dvPos + 1));
+                  } else {
+                    var dvPos2 = rest.substring(dvPos + 1).indexOf(' ');
+                    dvRaw = rest.substring(dvPos + dvPos2 + 2);
+                  }
+                  var dvOutcome = SocialCalc.DataValidation.EvaluateRule(sheet, dvRule, dvRaw);
+                  if (dvOutcome == 'reject') {
+                    errortext = SocialCalc.DataValidation.DefaultErrorMessage(dvRule);
+                    continue;
+                  }
+                }
+              }
               if (saveundo) changes.AddUndo('set ' + cr + ' all', sheet.CellToString(cell));
               if (attrib == 'value') {
                 pos = rest.indexOf(' ');
@@ -3454,6 +3494,10 @@ More comments yet to come...
                 cell.readonly = rest.toLowerCase() == 'yes';
               } else if (attrib == 'unlocked') {
                 cell.unlocked = rest.toLowerCase() == 'yes' || rest.toLowerCase() == 'y';
+              } else if (attrib == 'validation') {
+                cell.validation = SocialCalc.decodeFromSave(rest);
+              } else if (attrib == 'clearvalidation') {
+                delete cell.validation;
               } else {
                 errortext = scc.s_escUnknownSetCoordCmd + cmdstr;
               }
@@ -3717,6 +3761,16 @@ More comments yet to come...
                 cell.formula = basecell.formula;
               }
               delete cell.parseinfo;
+              if (basecell.validation) {
+                var fillDvRule = SocialCalc.DataValidation.DecodeRule(basecell.validation);
+                cell.validation = fillDvRule
+                  ? SocialCalc.DataValidation.EncodeRule(
+                      SocialCalc.DataValidation.OffsetRuleCoords(fillDvRule, coloffset, rowoffset),
+                    )
+                  : basecell.validation;
+              } else {
+                delete cell.validation;
+              }
               cell.errors = basecell.errors;
             }
             delete cell.displaystring;
@@ -3854,6 +3908,20 @@ More comments yet to come...
                 cell.comment = basecell.comment;
               } else if (cell.comment) {
                 delete cell.comment;
+              }
+              if (basecell.validation) {
+                var pasteDvRule = SocialCalc.DataValidation.DecodeRule(basecell.validation);
+                cell.validation = pasteDvRule
+                  ? SocialCalc.DataValidation.EncodeRule(
+                      SocialCalc.DataValidation.OffsetRuleCoords(
+                        pasteDvRule,
+                        col - currentClipCol,
+                        row - currentClipRow,
+                      ),
+                    )
+                  : basecell.validation;
+              } else if (cell.validation) {
+                delete cell.validation;
               }
             }
             delete cell.displaystring;
@@ -4106,6 +4174,20 @@ More comments yet to come...
           }
           if (cell) {
             delete cell.parseinfo;
+            if (cell.validation) {
+              var insDvRule = SocialCalc.DataValidation.DecodeRule(cell.validation);
+              if (insDvRule) {
+                cell.validation = SocialCalc.DataValidation.EncodeRule(
+                  SocialCalc.DataValidation.AdjustRuleCoords(
+                    insDvRule,
+                    cr1.col,
+                    coloffset,
+                    cr1.row,
+                    rowoffset,
+                  ),
+                );
+              }
+            }
           }
         }
         for (name in sheet.names) {
@@ -4294,6 +4376,20 @@ More comments yet to come...
               }
             } else {
               delete cell.parseinfo;
+            }
+            if (cell.validation) {
+              var delDvRule = SocialCalc.DataValidation.DecodeRule(cell.validation);
+              if (delDvRule) {
+                cell.validation = SocialCalc.DataValidation.EncodeRule(
+                  SocialCalc.DataValidation.AdjustRuleCoords(
+                    delDvRule,
+                    cr1.col,
+                    coloffset,
+                    cr1.row,
+                    rowoffset,
+                  ),
+                );
+              }
             }
           }
         }
@@ -4704,6 +4800,11 @@ More comments yet to come...
               } else if (cell.comment) {
                 delete cell.comment;
               }
+              if (basecell.validation) {
+                cell.validation = basecell.validation;
+              } else if (cell.validation) {
+                delete cell.validation;
+              }
             }
             delete cell.displaystring;
           }
@@ -4722,6 +4823,14 @@ More comments yet to come...
               }
             } else {
               delete cell.parseinfo;
+            }
+            if (cell.validation) {
+              var moveDvRule = SocialCalc.DataValidation.DecodeRule(cell.validation);
+              if (moveDvRule) {
+                cell.validation = SocialCalc.DataValidation.EncodeRule(
+                  SocialCalc.DataValidation.ReplaceRuleCoords(moveDvRule, movedto),
+                );
+              }
             }
           }
         }
@@ -10299,6 +10408,11 @@ More comments yet to come...
       AssignID(editor, editor.inputEcho.main, 'inputecho');
     }
     editor.cellhandles = new TableEditorSC.CellHandles(editor);
+    if (!editor.noEdit) {
+      editor.dvDropdown = new TableEditorSC.ValidationDropdown(editor);
+      AssignID(editor, editor.dvDropdown.main, 'dvdropdown');
+      AssignID(editor, editor.dvDropdown.anchor, 'dvdropdownanchor');
+    }
     ta = document.createElement('textarea');
     TableEditorSC.setStyles(
       ta,
@@ -11769,6 +11883,7 @@ More comments yet to come...
         type = 'constant ' + valueinfo.type + ' ' + valueinfo.value;
       }
     }
+    var rawForValidation = value;
     if (type.charAt(0) == 't') {
       value = TableEditorSC.encodeForSave(value);
     }
@@ -11779,6 +11894,26 @@ More comments yet to come...
       editor.cellhandles.ShowCellHandles(true);
       editor.inputBox.DisplayCellContents(null);
       return;
+    }
+    if (type != 'formula' && liveCell && liveCell.validation) {
+      var dvRule = SocialCalc.DataValidation.DecodeRule(liveCell.validation);
+      if (dvRule) {
+        var dvOutcome = SocialCalc.DataValidation.EvaluateRule(sheetobj, dvRule, rawForValidation);
+        if (dvOutcome == 'reject') {
+          var dvMsg = SocialCalc.DataValidation.DefaultErrorMessage(dvRule);
+          if (typeof alert == 'function') alert(dvMsg);
+          editor.inputBox.Focus();
+          return;
+        }
+        if (dvOutcome == 'warn') {
+          var dvWarnMsg = SocialCalc.DataValidation.DefaultErrorMessage(dvRule);
+          var dvProceed = typeof confirm == 'function' ? confirm(dvWarnMsg) : true;
+          if (!dvProceed) {
+            editor.inputBox.Focus();
+            return;
+          }
+        }
+      }
     }
     cmdline = 'set ' + wval.ecoord + ' ' + type + ' ' + value;
     editor.EditorScheduleSheetCommands(cmdline, true, false);
@@ -13241,6 +13376,7 @@ More comments yet to come...
       rowinc = 1;
     if (!editor) return;
     if (!editor.ecell) return;
+    if (editor.dvDropdown) editor.dvDropdown.Update();
     showCellHandlesBlock: {
       if (!show) break showCellHandlesBlock;
       row = editor.ecell.row;
@@ -13297,6 +13433,92 @@ More comments yet to come...
       cellhandles.dragpalette.style.display = 'none';
       cellhandles.dragtooltip.style.display = 'none';
     }
+  };
+  TableEditorSC.ValidationDropdown = function (editor) {
+    if (editor.noEdit) return;
+    this.editor = editor;
+    this.coord = null;
+    this.main = document.createElement('div');
+    TableEditorSC.setStyles(
+      this.main,
+      'display:none;position:absolute;zIndex:8;cursor:pointer;' +
+        'width:14px;height:14px;font-size:9px;text-align:center;line-height:14px;' +
+        'background-color:#EEE;border:1px solid #888;',
+    );
+    this.main.innerHTML = '&#9660;';
+    this.main.addEventListener('mousedown', TableEditorSC.ValidationDropdownMouseDown, false);
+    editor.toplevel.appendChild(this.main);
+    this.anchor = document.createElement('div');
+    TableEditorSC.setStyles(this.anchor, 'display:none;width:1px;height:1px;');
+    editor.toplevel.appendChild(this.anchor);
+  };
+  TableEditorSC.ValidationDropdown.prototype.Update = function () {
+    return TableEditorSC.UpdateValidationDropdown(this);
+  };
+  TableEditorSC.UpdateValidationDropdown = function (dvDropdown) {
+    var editor = dvDropdown.editor;
+    if (!editor || !editor.ecell) {
+      dvDropdown.main.style.display = 'none';
+      return;
+    }
+    var hide = function () {
+      dvDropdown.main.style.display = 'none';
+      dvDropdown.coord = null;
+    };
+    if (editor.state != 'start') return hide();
+    var row = editor.ecell.row;
+    var col = editor.ecell.col;
+    if (row >= editor.lastvisiblerow || col >= editor.lastvisiblecol) return hide();
+    if (row < editor.firstscrollingrow || col < editor.firstscrollingcol) return hide();
+    var cell = editor.context.sheetobj.cells[editor.ecell.coord];
+    if (!cell || !cell.validation) return hide();
+    var rule = SocialCalc.DataValidation.DecodeRule(cell.validation);
+    if (!rule || rule.kind != SocialCalc.DataValidation.RULE_LIST) return hide();
+    dvDropdown.coord = editor.ecell.coord;
+    dvDropdown.main.style.left = editor.colpositions[col + 1] - 15 + 'px';
+    dvDropdown.main.style.top = editor.rowpositions[row] + 'px';
+    dvDropdown.main.style.display = 'block';
+    return undefined;
+  };
+  TableEditorSC.ValidationDropdownMouseDown = function (e) {
+    var event = e || window.event;
+    var editor = TableEditorSC.Keyboard.focusTable;
+    if (!editor || !editor.dvDropdown || !editor.dvDropdown.coord) return true;
+    var sheetobj = editor.context.sheetobj;
+    var coord = editor.dvDropdown.coord;
+    var cell = sheetobj.cells[coord];
+    var rule = cell ? SocialCalc.DataValidation.DecodeRule(cell.validation) : null;
+    if (!rule || rule.kind != SocialCalc.DataValidation.RULE_LIST) return true;
+    var values = SocialCalc.DataValidation.ResolveListValues(sheetobj, rule);
+    var options = [];
+    for (var i = 0; i < values.length; i++) {
+      options.push({
+        o: SocialCalc.special_chars(values[i]),
+        v: values[i],
+      });
+    }
+    var id = editor.dvDropdown.anchor.id;
+    editor.dvDropdown.anchor.style.position = 'absolute';
+    editor.dvDropdown.anchor.style.left = editor.dvDropdown.main.style.left;
+    editor.dvDropdown.anchor.style.top = editor.dvDropdown.main.style.top;
+    SocialCalc.Popup.Create('List', id, { ensureWithin: editor.toplevel });
+    SocialCalc.Popup.Initialize(id, {
+      options,
+      value: cell.datavalue,
+      attribs: {
+        changedcallback: function (_attribs, _cid, newvalue) {
+          editor.MoveECell(coord);
+          editor.workingvalues.ecoord = coord;
+          editor.workingvalues.erow = editor.ecell.row;
+          editor.workingvalues.ecol = editor.ecell.col;
+          editor.EditorSaveEdit(newvalue + '');
+        },
+      },
+    });
+    SocialCalc.Popup.CClick(id);
+    if (event.preventDefault) event.preventDefault();
+    if (event.stopPropagation) event.stopPropagation();
+    return false;
   };
   TableEditorSC.CellHandlesMouseMoveOnHandle = function (e) {
     var scc = TableEditorSC.Constants;
@@ -27612,6 +27834,236 @@ More comments yet to come...
     workbook.sheets = staged.sheets;
     workbook.activeSheetName = staged.activeSheetName;
     workbook.changes = new SocialCalc.UndoStack();
+  };
+
+  // SocialCalc data-validation engine (Excel/Sheets-style cell/range rules).
+  // Shipping source. Concatenated after socialcalc-3 (needs SC.Cell/Sheet,
+  // SC.DetermineValueType, SC.decodeFromSave/encodeForSave, SC.special_chars)
+  // and after formula1 + formula-ref (needs SocialCalc.Formula.ParseFormulaIntoTokens
+  // / evaluate_parsed_formula for formula-driven bounds/list sources/custom
+  // rules, and AdjustFormulaCoords/OffsetFormulaCoords/ReplaceFormulaCoords for
+  // structural-edit rewriting). Ambient declarations live in
+  // socialcalc-3.d.ts (same pattern as OffsetFormulaCoords etc., since a
+  // same-basename sibling .d.ts is silently shadowed by tsc when a .ts of the
+  // same name exists in the directory).
+  //
+  // Policy semantics mirror lemma/validation.ts (RULE_LIST/NUMBER/DATE/
+  // TEXT_LENGTH/CUSTOM, 8 comparison ops, allowBlank short-circuit, reject/warn
+  // mode) — this file is the native shipping oracle; the lemma facade test
+  // covers the pure decision core in isolation, matching eval-ops.ts's split
+  // between a standalone LemmaScript module and formula1.ts's native engine.
+  //
+  // Wire format: cell.validation is a JSON string (SocialCalc.encodeForSave'd
+  // for the ":" / "\n" save-format delimiters) so it round-trips through
+  // CellToString / CellFromStringParts exactly like any other opaque cell
+  // attribute (see "comment").
+
+  const DVRoot = SocialCalc;
+  if (!DVRoot.DataValidation) DVRoot.DataValidation = {};
+  const DV = DVRoot.DataValidation;
+  DV.RULE_LIST = 'list';
+  DV.RULE_NUMBER = 'number';
+  DV.RULE_DATE = 'date';
+  DV.RULE_TEXT_LENGTH = 'textLength';
+  DV.RULE_CUSTOM = 'custom';
+  DV.MODE_REJECT = 'reject';
+  DV.MODE_WARN = 'warn';
+  DV.EncodeRule = function (rule) {
+    return JSON.stringify(rule);
+  };
+  DV.DecodeRule = function (encoded) {
+    if (!encoded) return null;
+    let parsed;
+    try {
+      parsed = JSON.parse(encoded);
+    } catch {
+      return null;
+    }
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      'kind' in parsed &&
+      typeof parsed.kind === 'string'
+    ) {
+      return parsed;
+    }
+    return null;
+  };
+  DV.IsBlank = function (raw) {
+    return raw === '';
+  };
+  DV.CompareOk = function (op, value, bound1, bound2) {
+    if (op === 'between') return value >= bound1 && value <= bound2;
+    if (op === 'notBetween') return value < bound1 || value > bound2;
+    if (op === 'eq') return value === bound1;
+    if (op === 'ne') return value !== bound1;
+    if (op === 'gt') return value > bound1;
+    if (op === 'lt') return value < bound1;
+    if (op === 'ge') return value >= bound1;
+    if (op === 'le') return value <= bound1;
+    return false;
+  };
+  DV.ComputeOutcome = function (allowBlank, isBlankValue, checkPassed, mode) {
+    if (allowBlank === true && isBlankValue === true) return 'pass';
+    if (checkPassed === true) return 'pass';
+    if (mode === 'warn') return 'warn';
+    return 'reject';
+  };
+  DV.ListContainsCI = function (values, raw) {
+    const needle = raw.toLowerCase();
+    for (let i = 0; i < values.length; i++) {
+      if (values[i].toLowerCase() === needle) return true;
+    }
+    return false;
+  };
+  DV.ResolveBound = function (sheet, spec) {
+    if (spec === undefined || spec === null)
+      return {
+        value: 0,
+        valid: false,
+      };
+    if (typeof spec === 'number')
+      return {
+        value: spec,
+        valid: !isNaN(spec),
+      };
+    const text = spec + '';
+    if (text.charAt(0) === '=') {
+      try {
+        const parseinfo = SocialCalc.Formula.ParseFormulaIntoTokens(text.substring(1));
+        const result = SocialCalc.Formula.evaluate_parsed_formula(parseinfo, sheet, false);
+        const num = Number(result.value);
+        return {
+          value: num,
+          valid: !isNaN(num) && result.type.charAt(0) !== 'e',
+        };
+      } catch {
+        return {
+          value: 0,
+          valid: false,
+        };
+      }
+    }
+    const determined = SocialCalc.DetermineValueType(text);
+    const num = Number(determined.type.charAt(0) === 'n' ? determined.value : text);
+    return {
+      value: num,
+      valid: !isNaN(num),
+    };
+  };
+  DV.ResolveListValues = function (sheet, rule) {
+    if (rule.values && rule.values.length > 0) return rule.values;
+    if (!rule.sourceRange) return [];
+    let rangeText =
+      rule.sourceRange.charAt(0) === '=' ? rule.sourceRange.substring(1) : rule.sourceRange;
+    const name = sheet.names && sheet.names[rangeText.toUpperCase()];
+    if (name) {
+      rangeText =
+        name.definition.charAt(0) === '=' ? name.definition.substring(1) : name.definition;
+    }
+    try {
+      const prange = SocialCalc.ParseRange(rangeText);
+      const values = [];
+      for (let row = prange.cr1.row; row <= prange.cr2.row; row++) {
+        for (let col = prange.cr1.col; col <= prange.cr2.col; col++) {
+          const coord = SocialCalc.crToCoord(col, row);
+          const cell = sheet.cells[coord];
+          if (cell && cell.datavalue !== '' && cell.datavalue != null) {
+            values.push(cell.datavalue + '');
+          }
+        }
+      }
+      return values;
+    } catch {
+      return [];
+    }
+  };
+  DV.ComputeCustomPass = function (sheet, rule) {
+    if (!rule.formula) return true;
+    try {
+      const parseinfo = SocialCalc.Formula.ParseFormulaIntoTokens(rule.formula);
+      const result = SocialCalc.Formula.evaluate_parsed_formula(parseinfo, sheet, false);
+      if (result.type.charAt(0) === 'e') return false;
+      return Number(result.value) !== 0;
+    } catch {
+      return false;
+    }
+  };
+  DV.RuleCheckPassed = function (sheet, rule, raw) {
+    if (rule.kind === DV.RULE_LIST) {
+      return DV.ListContainsCI(DV.ResolveListValues(sheet, rule), raw);
+    }
+    if (rule.kind === DV.RULE_CUSTOM) {
+      return DV.ComputeCustomPass(sheet, rule);
+    }
+    if (rule.kind === DV.RULE_TEXT_LENGTH) {
+      const b1 = DV.ResolveBound(sheet, rule.bound1);
+      const b2 = DV.ResolveBound(sheet, rule.bound2);
+      if (!b1.valid) return false;
+      return DV.CompareOk(rule.op || 'eq', raw.length, b1.value, b2.value);
+    }
+    const determined = SocialCalc.DetermineValueType(raw);
+    if (determined.type.charAt(0) !== 'n') return false;
+    const value = Number(determined.value);
+    if (isNaN(value)) return false;
+    const b1 = DV.ResolveBound(sheet, rule.bound1);
+    const b2 = DV.ResolveBound(sheet, rule.bound2);
+    if (!b1.valid) return false;
+    return DV.CompareOk(rule.op || 'eq', value, b1.value, b2.value);
+  };
+  DV.EvaluateRule = function (sheet, rule, raw) {
+    const blankValue = DV.IsBlank(raw);
+    const passed = DV.RuleCheckPassed(sheet, rule, raw);
+    return DV.ComputeOutcome(rule.allowBlank, blankValue, passed, rule.mode);
+  };
+  DV.EvaluateForCell = function (sheet, coord, raw) {
+    const cell = sheet.cells[coord];
+    const rule = cell ? DV.DecodeRule(cell.validation) : null;
+    if (!rule)
+      return {
+        outcome: 'pass',
+        rule: null,
+      };
+    return {
+      outcome: DV.EvaluateRule(sheet, rule, raw),
+      rule,
+    };
+  };
+  DV.DefaultErrorMessage = function (rule) {
+    if (rule.errorMessage) return rule.errorMessage;
+    return (
+      SocialCalc.Constants.s_dvDefaultError || 'The value entered does not meet validation rules.'
+    );
+  };
+  function dvRewriteAllFields(rule, rewrite) {
+    const next = { ...rule };
+    if (next.sourceRange) {
+      next.sourceRange =
+        next.sourceRange.charAt(0) === '='
+          ? '=' + rewrite(next.sourceRange.substring(1))
+          : rewrite(next.sourceRange);
+    }
+    if (next.formula) next.formula = rewrite(next.formula);
+    if (typeof next.bound1 === 'string' && next.bound1.charAt(0) === '=') {
+      next.bound1 = '=' + rewrite(next.bound1.substring(1));
+    }
+    if (typeof next.bound2 === 'string' && next.bound2.charAt(0) === '=') {
+      next.bound2 = '=' + rewrite(next.bound2.substring(1));
+    }
+    return next;
+  }
+  DV.AdjustRuleCoords = function (rule, col, coloffset, row, rowoffset) {
+    return dvRewriteAllFields(rule, (text) =>
+      SocialCalc.AdjustFormulaCoords(text, col, coloffset, row, rowoffset),
+    );
+  };
+  DV.OffsetRuleCoords = function (rule, coloffset, rowoffset) {
+    return dvRewriteAllFields(rule, (text) =>
+      SocialCalc.OffsetFormulaCoords(text, coloffset, rowoffset),
+    );
+  };
+  DV.ReplaceRuleCoords = function (rule, movedto) {
+    return dvRewriteAllFields(rule, (text) => SocialCalc.ReplaceFormulaCoords(text, movedto));
   };
 
   // Opt this module into TypeScript strict checking via the r2scout config.

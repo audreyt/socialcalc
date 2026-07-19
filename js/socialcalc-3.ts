@@ -228,6 +228,7 @@ SC.CellProperties = {
   valuetype: 1,
   errors: 1,
   comment: 1,
+  validation: 1,
   readonly: 1,
   bt: 2,
   br: 2,
@@ -998,6 +999,29 @@ SC.Sheet.prototype.RecalcSheet = function () {
   return SocialCalc.RecalcSheet(this);
 };
 
+// --- Data validation convenience API (js/socialcalcdatavalidation.ts) ---
+//
+// SetCellValidation/ClearCellValidation issue "set <range> validation ..."/
+// "set <range> clearvalidation" commands through ExecuteSheetCommand (so
+// they're undoable/redoable and enforce the same reject-on-existing-invalid-
+// data rules as any other set command). GetCellValidation is a pure read
+// with no undo implications.
+
+/** @param {any} range @param {any} rule @param {any} saveundo */
+SC.Sheet.prototype.SetCellValidation = function (range: any, rule: any, saveundo: any) {
+  var encoded = SocialCalc.encodeForSave(SocialCalc.DataValidation.EncodeRule(rule));
+  return this.ScheduleSheetCommands("set " + range + " validation " + encoded, saveundo !== false);
+};
+/** @param {any} range @param {any} saveundo */
+SC.Sheet.prototype.ClearCellValidation = function (range: any, saveundo: any) {
+  return this.ScheduleSheetCommands("set " + range + " clearvalidation", saveundo !== false);
+};
+/** @param {any} coord */
+SC.Sheet.prototype.GetCellValidation = function (coord: any) {
+  var cell = this.cells[coord];
+  return cell ? SocialCalc.DataValidation.DecodeRule(cell.validation) : null;
+};
+
 //
 // Sheet save format:
 //
@@ -1454,6 +1478,9 @@ SC.CellFromStringParts = function (sheet: any, cell: any, parts: any, j: any) {
       case "comment":
         cell.comment = SocialCalc.decodeFromSave(parts[j++]);
         break;
+      case "validation":
+        cell.validation = SocialCalc.decodeFromSave(parts[j++]);
+        break;
       case "spillrows":
         cell.spillrows = parts[j++] - 0;
         break;
@@ -1839,6 +1866,7 @@ SC.CellToString = function (sheet: any, cell: any) {
   if (cell.csss) line += ":csss:" + SocialCalc.encodeForSave(cell.csss);
   if (cell.mod) line += ":mod:" + cell.mod;
   if (cell.comment) line += ":comment:" + SocialCalc.encodeForSave(cell.comment);
+  if (cell.validation) line += ":validation:" + SocialCalc.encodeForSave(cell.validation);
 
   // Spill tags are compact optional fields; absent tags preserve legacy saves.
   if (cell.spillrows != null) line += ":spillrows:" + cell.spillrows;
@@ -2756,6 +2784,8 @@ SC.SheetCommandsTimerRoutine = function (sci: any, parseobj: any, saveundo: any)
 //    set 22 attributename value
 //    set B attributename value
 //    set A1 attributename value1 value2... (see each attribute in code for details)
+//       - set A1 validation encoded-JSON-rule (js/socialcalcdatavalidation.ts DataValidationRule)
+//       - set A1 clearvalidation (removes any rule; ignores its rest-of-string arg)
 //    set A1:B5 attributename value1 value2...
 //    erase/copy/cut/paste/fillright/filldown A1:B5 all/formulas/format
 //    loadclipboard save-encoded-clipboard-data
@@ -3099,6 +3129,35 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
               attrib != "unlocked"
             )
               continue;
+            // Data-validation enforcement: reject mode blocks manual/programmatic
+            // "value"/"text"/"constant" commits outright. Warn mode is enforced
+            // interactively in EditorSaveEdit (confirm dialog) before the command
+            // is ever scheduled; a warn-mode command that reaches here always
+            // commits. The "all" attrib (used exclusively by undo/redo replay,
+            // load-from-save's CellFromStringParts, and copy/paste/fill, all of
+            // which write already-validated or trusted historical data) never
+            // enters this branch, so restoration is never blocked. See
+            // js/socialcalcdatavalidation.ts for the rule engine.
+            if (attrib == "value" || attrib == "text" || attrib == "constant") {
+              var dvRule = SocialCalc.DataValidation.DecodeRule(cell.validation);
+              if (dvRule) {
+                var dvPos = rest.indexOf(" ");
+                var dvRaw = "";
+                if (attrib == "value") {
+                  dvRaw = rest.substring(dvPos + 1);
+                } else if (attrib == "text") {
+                  dvRaw = SocialCalc.decodeFromSave(rest.substring(dvPos + 1));
+                } else {
+                  var dvPos2 = rest.substring(dvPos + 1).indexOf(" ");
+                  dvRaw = rest.substring(dvPos + dvPos2 + 2);
+                }
+                var dvOutcome = SocialCalc.DataValidation.EvaluateRule(sheet, dvRule, dvRaw);
+                if (dvOutcome == "reject") {
+                  errortext = SocialCalc.DataValidation.DefaultErrorMessage(dvRule);
+                  continue;
+                }
+              }
+            }
             if (saveundo) changes.AddUndo("set " + cr + " all", sheet.CellToString(cell));
             if (attrib == "value") {
               // set coord value type numeric-value
@@ -3212,6 +3271,10 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
               cell.readonly = rest.toLowerCase() == "yes";
             } else if (attrib == "unlocked") {
               cell.unlocked = rest.toLowerCase() == "yes" || rest.toLowerCase() == "y";
+            } else if (attrib == "validation") {
+              cell.validation = SocialCalc.decodeFromSave(rest);
+            } else if (attrib == "clearvalidation") {
+              delete cell.validation;
             } else {
               errortext = scc.s_escUnknownSetCoordCmd + cmdstr;
             }
@@ -3469,6 +3532,16 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
               cell.formula = basecell.formula;
             }
             delete cell.parseinfo;
+            if (basecell.validation) {
+              var fillDvRule = SocialCalc.DataValidation.DecodeRule(basecell.validation);
+              cell.validation = fillDvRule
+                ? SocialCalc.DataValidation.EncodeRule(
+                    SocialCalc.DataValidation.OffsetRuleCoords(fillDvRule, coloffset, rowoffset),
+                  )
+                : basecell.validation;
+            } else {
+              delete cell.validation;
+            }
             cell.errors = basecell.errors;
           }
           delete cell.displaystring;
@@ -3615,6 +3688,22 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
               cell.comment = basecell.comment;
             } else if (cell.comment) {
               delete cell.comment;
+            }
+            if (basecell.validation) {
+              // validation rules are pasted as content, with source-range/
+              // formula-bound refs offset just like formulas (see fillright).
+              var pasteDvRule = SocialCalc.DataValidation.DecodeRule(basecell.validation);
+              cell.validation = pasteDvRule
+                ? SocialCalc.DataValidation.EncodeRule(
+                    SocialCalc.DataValidation.OffsetRuleCoords(
+                      pasteDvRule,
+                      col - currentClipCol,
+                      row - currentClipRow,
+                    ),
+                  )
+                : basecell.validation;
+            } else if (cell.validation) {
+              delete cell.validation;
             }
           }
           delete cell.displaystring;
@@ -3886,6 +3975,20 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
         }
         if (cell) {
           delete cell.parseinfo;
+          if (cell.validation) {
+            var insDvRule = SocialCalc.DataValidation.DecodeRule(cell.validation);
+            if (insDvRule) {
+              cell.validation = SocialCalc.DataValidation.EncodeRule(
+                SocialCalc.DataValidation.AdjustRuleCoords(
+                  insDvRule,
+                  cr1.col,
+                  coloffset,
+                  cr1.row,
+                  rowoffset,
+                ),
+              );
+            }
+          }
         }
       }
 
@@ -4116,6 +4219,20 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
             }
           } else {
             delete cell.parseinfo;
+          }
+          if (cell.validation) {
+            var delDvRule = SocialCalc.DataValidation.DecodeRule(cell.validation);
+            if (delDvRule) {
+              cell.validation = SocialCalc.DataValidation.EncodeRule(
+                SocialCalc.DataValidation.AdjustRuleCoords(
+                  delDvRule,
+                  cr1.col,
+                  coloffset,
+                  cr1.row,
+                  rowoffset,
+                ),
+              );
+            }
           }
         }
       }
@@ -4576,6 +4693,11 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
             } else if (cell.comment) {
               delete cell.comment;
             }
+            if (basecell.validation) {
+              cell.validation = basecell.validation; // rewritten below in the movedto fixup pass
+            } else if (cell.validation) {
+              delete cell.validation;
+            }
           }
           delete cell.displaystring;
         }
@@ -4599,6 +4721,14 @@ SC.ExecuteSheetCommand = function (sheet: any, cmd: any, saveundo: any) {
             }
           } else {
             delete cell.parseinfo;
+          }
+          if (cell.validation) {
+            var moveDvRule = SocialCalc.DataValidation.DecodeRule(cell.validation);
+            if (moveDvRule) {
+              cell.validation = SocialCalc.DataValidation.EncodeRule(
+                SocialCalc.DataValidation.ReplaceRuleCoords(moveDvRule, movedto),
+              );
+            }
           }
         }
       }

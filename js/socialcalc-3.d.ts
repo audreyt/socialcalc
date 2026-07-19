@@ -130,6 +130,8 @@ declare namespace SocialCalc {
 
     errors: string;
     comment: string;
+    /** JSON-encoded DataValidationRule (see js/socialcalcdatavalidation.ts); absent = no rule. */
+    validation?: string;
     displayvalue: string;
     parseinfo: any;
     spillrows?: number;
@@ -251,6 +253,9 @@ declare namespace SocialCalc {
     GetStyleNum(atype: string, style: string): number;
     GetStyleString(atype: string, num: number): string | null;
     RecalcSheet(): void;
+    SetCellValidation(range: string, rule: DataValidationRule, saveundo?: boolean): void;
+    ClearCellValidation(range: string, saveundo?: boolean): void;
+    GetCellValidation(coord: string): DataValidationRule | null;
 
     [key: string]: any;
   }
@@ -421,6 +426,79 @@ declare namespace SocialCalc {
     newSheetName: string | null,
     normalize: (name: string) => string,
   ): string;
+
+  // --- Data validation (js/socialcalcdatavalidation.ts) ---
+  type DVComparisonOp = "between" | "notBetween" | "eq" | "ne" | "gt" | "lt" | "ge" | "le";
+  type DVMode = "reject" | "warn";
+  type DVOutcome = "pass" | "warn" | "reject";
+
+  interface DataValidationRule {
+    kind: "list" | "number" | "date" | "textLength" | "custom";
+    mode: DVMode;
+    allowBlank: boolean;
+    values?: string[];
+    sourceRange?: string;
+    op?: DVComparisonOp;
+    bound1?: number | string;
+    bound2?: number | string;
+    formula?: string;
+    inputTitle?: string;
+    inputMessage?: string;
+    errorTitle?: string;
+    errorMessage?: string;
+  }
+
+  interface DataValidationOutcomeInfo {
+    outcome: DVOutcome;
+    rule: DataValidationRule | null;
+  }
+
+  const DataValidation: {
+    RULE_LIST: "list";
+    RULE_NUMBER: "number";
+    RULE_DATE: "date";
+    RULE_TEXT_LENGTH: "textLength";
+    RULE_CUSTOM: "custom";
+    MODE_REJECT: "reject";
+    MODE_WARN: "warn";
+    EncodeRule(rule: DataValidationRule): string;
+    DecodeRule(encoded: string | undefined | null): DataValidationRule | null;
+    IsBlank(raw: string): boolean;
+    CompareOk(op: string, value: number, bound1: number, bound2: number): boolean;
+    ComputeOutcome(
+      allowBlank: boolean,
+      isBlankValue: boolean,
+      checkPassed: boolean,
+      mode: string,
+    ): DVOutcome;
+    ListContainsCI(values: string[], raw: string): boolean;
+    ResolveBound(
+      sheet: Sheet,
+      spec: number | string | undefined,
+    ): { value: number; valid: boolean };
+    ResolveListValues(sheet: Sheet, rule: DataValidationRule): string[];
+    ComputeCustomPass(sheet: Sheet, rule: DataValidationRule): boolean;
+    RuleCheckPassed(sheet: Sheet, rule: DataValidationRule, raw: string): boolean;
+    EvaluateRule(sheet: Sheet, rule: DataValidationRule, raw: string): DVOutcome;
+    EvaluateForCell(sheet: Sheet, coord: string, raw: string): DataValidationOutcomeInfo;
+    AdjustRuleCoords(
+      rule: DataValidationRule,
+      col: number,
+      coloffset: number,
+      row: number,
+      rowoffset: number,
+    ): DataValidationRule;
+    OffsetRuleCoords(
+      rule: DataValidationRule,
+      coloffset: number,
+      rowoffset: number,
+    ): DataValidationRule;
+    ReplaceRuleCoords(
+      rule: DataValidationRule,
+      movedto: { [coord: string]: string },
+    ): DataValidationRule;
+    DefaultErrorMessage(rule: DataValidationRule): string;
+  };
 
   const RecalcInfo: {
     sheet: Sheet | null;

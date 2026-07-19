@@ -444,8 +444,13 @@ shipping bundle.
   and its min/max clamping, degenerate-domain detection, sheet-bounds and
   pixel-dimension validity/clamping, and overlay placement-status
   precedence (bounds before dimensions) — 16 Dafny VCs.
+- `lemma/validation.ts`: data-validation rule evaluation policy — blank-value
+  detection, comparison-operator decision table (between/notBetween/eq/ne/
+  le/…), and reject/warn/pass outcome precedence (blank-with-allowBlank
+  short-circuits to pass; a failed check falls to warn only in warn mode,
+  else reject) — 3 Dafny VCs.
 
-Total: **152 VCs (36 + 5 + 3 + 17 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2 + 8 + 9 + 16)**.
+Total: **155 VCs (36 + 5 + 3 + 17 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2 + 8 + 9 + 16 + 3)**.
 
 After a facade edit:
 

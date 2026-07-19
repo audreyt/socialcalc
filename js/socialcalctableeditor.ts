@@ -810,6 +810,12 @@ TableEditorSC.CreateTableEditor = function (editor: any, width: any, height: any
 
   editor.cellhandles = new TableEditorSC.CellHandles(editor);
 
+  if (!editor.noEdit) {
+    editor.dvDropdown = new TableEditorSC.ValidationDropdown(editor);
+    AssignID(editor, editor.dvDropdown.main, "dvdropdown");
+    AssignID(editor, editor.dvDropdown.anchor, "dvdropdownanchor");
+  }
+
   ta = document.createElement("textarea"); // used for ctrl-c/ctrl-v where an invisible text area is needed
   TableEditorSC.setStyles(
     ta,
@@ -2723,6 +2729,8 @@ TableEditorSC.EditorSaveEdit = function (editor: any, text: any) {
     }
   }
 
+  var rawForValidation = value; // pre-encode text, matches what ExecuteSheetCommand will decode back
+
   if (type.charAt(0) == "t") {
     // text
     value = TableEditorSC.encodeForSave(value); // newlines, :, and \ are escaped
@@ -2736,6 +2744,33 @@ TableEditorSC.EditorSaveEdit = function (editor: any, text: any) {
     editor.inputBox.DisplayCellContents(null);
     return;
   }
+
+  // Data-validation enforcement: reject mode blocks the edit outright (no
+  // command is even scheduled, so nothing reaches the undo stack). Warn mode
+  // asks the user to confirm before committing. Formula entries are exempt
+  // (their value isn't known until recalc; ExecuteSheetCommand's "formula"
+  // attrib is never validation-gated either — see js/socialcalc-3.ts).
+  if (type != "formula" && liveCell && liveCell.validation) {
+    var dvRule = SocialCalc.DataValidation.DecodeRule(liveCell.validation);
+    if (dvRule) {
+      var dvOutcome = SocialCalc.DataValidation.EvaluateRule(sheetobj, dvRule, rawForValidation);
+      if (dvOutcome == "reject") {
+        var dvMsg = SocialCalc.DataValidation.DefaultErrorMessage(dvRule);
+        if (typeof alert == "function") alert(dvMsg);
+        editor.inputBox.Focus();
+        return;
+      }
+      if (dvOutcome == "warn") {
+        var dvWarnMsg = SocialCalc.DataValidation.DefaultErrorMessage(dvRule);
+        var dvProceed = typeof confirm == "function" ? confirm(dvWarnMsg) : true;
+        if (!dvProceed) {
+          editor.inputBox.Focus();
+          return;
+        }
+      }
+    }
+  }
+
   cmdline = "set " + wval.ecoord + " " + type + " " + value;
   editor.EditorScheduleSheetCommands(cmdline, true, false);
   // eddy EditorSaveEdit {
@@ -4778,6 +4813,7 @@ TableEditorSC.ShowCellHandles = function (cellhandles: any, show: any, moveshow:
 
   if (!editor) return;
   if (!editor.ecell) return;
+  if (editor.dvDropdown) editor.dvDropdown.Update();
 
   showCellHandlesBlock: {
     // a block that can you can "break" out of easily
@@ -4850,6 +4886,138 @@ TableEditorSC.ShowCellHandles = function (cellhandles: any, show: any, moveshow:
     cellhandles.dragpalette.style.display = "none";
     cellhandles.dragtooltip.style.display = "none";
   }
+};
+
+// *************************************
+//
+// ValidationDropdown class:
+//
+// Shows a dropdown arrow next to the current edit cell when it carries a
+// "list" data-validation rule, and reuses SocialCalc.Popup.Types.List (the
+// same escaped-HTML popup machinery as elsewhere in the codebase) to let the
+// user pick one of the allowed values. Selecting an item commits it via the
+// normal EditorSaveEdit/ExecuteSheetCommand path — no bespoke HTML/CSS
+// surface, no unescaped interpolation of list labels.
+//
+// *************************************
+
+/** @param {any} editor */
+TableEditorSC.ValidationDropdown = function (editor: any) {
+  if (editor.noEdit) return; // leave us with nothing
+
+  this.editor = editor;
+  this.coord = null;
+
+  this.main = document.createElement("div");
+  TableEditorSC.setStyles(
+    this.main,
+    "display:none;position:absolute;zIndex:8;cursor:pointer;" +
+      "width:14px;height:14px;font-size:9px;text-align:center;line-height:14px;" +
+      "background-color:#EEE;border:1px solid #888;",
+  );
+  this.main.innerHTML = "&#9660;"; // ▼, plain text glyph — no injected markup
+  this.main.addEventListener("mousedown", TableEditorSC.ValidationDropdownMouseDown, false);
+  editor.toplevel.appendChild(this.main);
+
+  // Popup.Create/Show anchor to a DOM id and overwrite that element's
+  // innerHTML (see Popup.Types.List.Create), so the popup control's anchor
+  // element must be separate from the persistent arrow button — otherwise
+  // opening the dropdown once would permanently replace the arrow glyph.
+  this.anchor = document.createElement("div");
+  TableEditorSC.setStyles(this.anchor, "display:none;width:1px;height:1px;");
+  editor.toplevel.appendChild(this.anchor);
+};
+
+// Methods:
+
+TableEditorSC.ValidationDropdown.prototype.Update = function () {
+  return TableEditorSC.UpdateValidationDropdown(this);
+};
+
+// Functions:
+
+/**
+ * Shows/hides and repositions the dropdown arrow for the current ecell.
+ * Only shown when: not currently mid-edit, ecell is visible, and the cell
+ * carries a "list" validation rule (any mode — reject or warn).
+ * @param {any} dvDropdown
+ */
+TableEditorSC.UpdateValidationDropdown = function (dvDropdown: any) {
+  var editor = dvDropdown.editor;
+  if (!editor || !editor.ecell) {
+    dvDropdown.main.style.display = "none";
+    return;
+  }
+
+  var hide = function () {
+    dvDropdown.main.style.display = "none";
+    dvDropdown.coord = null;
+  };
+
+  if (editor.state != "start") return hide();
+
+  var row = editor.ecell.row;
+  var col = editor.ecell.col;
+  if (row >= editor.lastvisiblerow || col >= editor.lastvisiblecol) return hide();
+  if (row < editor.firstscrollingrow || col < editor.firstscrollingcol) return hide();
+
+  var cell = editor.context.sheetobj.cells[editor.ecell.coord];
+  if (!cell || !cell.validation) return hide();
+  var rule = SocialCalc.DataValidation.DecodeRule(cell.validation);
+  if (!rule || rule.kind != SocialCalc.DataValidation.RULE_LIST) return hide();
+
+  dvDropdown.coord = editor.ecell.coord;
+  dvDropdown.main.style.left = editor.colpositions[col + 1] - 15 + "px";
+  dvDropdown.main.style.top = editor.rowpositions[row] + "px";
+  dvDropdown.main.style.display = "block";
+  return undefined;
+};
+
+/** @param {any} e */
+TableEditorSC.ValidationDropdownMouseDown = function (e: any) {
+  var event = e || window.event;
+  var editor = TableEditorSC.Keyboard.focusTable;
+  if (!editor || !editor.dvDropdown || !editor.dvDropdown.coord) return true;
+
+  var sheetobj = editor.context.sheetobj;
+  var coord = editor.dvDropdown.coord;
+  var cell = sheetobj.cells[coord];
+  var rule = cell ? SocialCalc.DataValidation.DecodeRule(cell.validation) : null;
+  if (!rule || rule.kind != SocialCalc.DataValidation.RULE_LIST) return true;
+  var values = SocialCalc.DataValidation.ResolveListValues(sheetobj, rule);
+  // Every option label is escaped via SocialCalc.special_chars before being
+  // handed to Popup.Types.List (which interpolates {o: ...} verbatim into
+  // HTML) — see the security note atop MakeList in socialcalcpopup.ts.
+  var options: Array<{ o: string; v: string }> = [];
+  for (var i = 0; i < values.length; i++) {
+    options.push({ o: SocialCalc.special_chars(values[i]!), v: values[i]! });
+  }
+
+  var id = editor.dvDropdown.anchor.id;
+  editor.dvDropdown.anchor.style.position = "absolute";
+  editor.dvDropdown.anchor.style.left = editor.dvDropdown.main.style.left;
+  editor.dvDropdown.anchor.style.top = editor.dvDropdown.main.style.top;
+  SocialCalc.Popup.Create("List", id, {
+    ensureWithin: editor.toplevel,
+  });
+  SocialCalc.Popup.Initialize(id, {
+    options: options,
+    value: cell.datavalue,
+    attribs: {
+      changedcallback: function (_attribs: any, _cid: string, newvalue: unknown) {
+        editor.MoveECell(coord);
+        editor.workingvalues.ecoord = coord;
+        editor.workingvalues.erow = editor.ecell.row;
+        editor.workingvalues.ecol = editor.ecell.col;
+        editor.EditorSaveEdit(newvalue + "");
+      },
+    },
+  });
+  SocialCalc.Popup.CClick(id);
+
+  if (event.preventDefault) event.preventDefault();
+  if (event.stopPropagation) event.stopPropagation();
+  return false;
 };
 
 /** @param {any} e */

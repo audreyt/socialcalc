@@ -35,6 +35,9 @@ declare namespace SocialCalc {
     s_escUnknownSetCoordCmd: string;
     s_escUnknownCmd: string;
 
+    // SocialCalc.DataValidation
+    s_dvDefaultError: string;
+
     // SocialCalc.CheckAndCalcCell
     s_caccCircRef: string;
 
