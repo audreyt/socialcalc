@@ -61,14 +61,14 @@ const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
 // --- Provenance: pinned immutable EtherCalc commit --------------------------
 // Full 40-hex SHA of audreyt/ethercalc's `main` branch tip, researched
-// 2026-07-12. A git commit SHA is content-addressed and immutable no matter
+// 2026-07-21. A git commit SHA is content-addressed and immutable no matter
 // which ref later moves past it — this script always fetches exactly this
 // object (never a branch/tag name) and verifies the checkout matches it
 // exactly before doing anything else with it (see "provenance:" check below).
 const ETHERCALC_REPO = "https://github.com/audreyt/ethercalc.git";
-const ETHERCALC_PINNED_SHA = "8674374d2a4da7aff7004b6e7bdf35a310ad1aab";
-const ETHERCALC_PINNED_DATE = "2026-07-12T01:23:14+08:00";
-const ETHERCALC_PINNED_SUBJECT = "chore: remove obsolete pre-rewrite deployment/legacy files";
+const ETHERCALC_PINNED_SHA = "b160b7df96c64ad2962bce35b170ba6b0fc98112";
+const ETHERCALC_PINNED_DATE = "2026-07-18T04:19:06+08:00";
+const ETHERCALC_PINNED_SUBJECT = "Harden self-host Docker build context";
 const HEADLESS_WORKSPACE = "@ethercalc/socialcalc-headless";
 const HEADLESS_SUBDIR = "packages/socialcalc-headless";
 const WORKER_SUBDIR = "packages/worker";

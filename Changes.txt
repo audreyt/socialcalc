@@ -1,5 +1,5 @@
 ==============================================================================
-Unreleased — interoperability improvements
+v3.2.0 — 2026-07-21
 ==============================================================================
 
 CSV/TSV import/export
@@ -149,6 +149,15 @@ Spreadsheet capabilities
 - Added rich HTML-table clipboard paste with sanitized text, rowspan/colspan
   expansion, and an allowlisted formatting subset (bold, italic, alignment,
   foreground/background colors), applied as one undoable paste transaction.
+
+Editor productivity
+- Refined Find/Replace: Find remains globally visible and right-aligned on the
+  formula row; replacement controls appear only for a non-empty query in their
+  own right-aligned row, dynamically resizing editor chrome and the grid.
+  Queries and replacements persist across tool tabs, and clearing the query
+  restores the prior layout.
+- Fixed pane-slider freezing to retain the visible rows and columns, with
+  unfreeze restoring the original pane boundaries.
 
 Formal verification
 - Added `lemma/number-parse.ts` facade (5th LemmaScript module):
