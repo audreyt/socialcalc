@@ -141,14 +141,11 @@ const adversarialTests = [
   "test/adversarial/save-load-recalc-invariants.test.ts",
 ];
 
-// TableEditor/SpreadsheetControl UI surface, verified by grep for
-// `new SC.TableEditor`, `control.editor.*`, and `SC.SpreadsheetControl.*`
-// call sites (all six files construct or drive an editor/control instance).
-// Includes the two hardening interaction/command-dispatch files (direct
-// editor.EditorScheduleSheetCommands/CalculateEditorPositions/MoveECell/
-// RangeAnchor/RangeExtend/ScrollRelative/EditorProcessKey/DoRenderStep
-// call sites, incl. the setemailparameters busy/deferred-cycle fix
-// regressions).
+// TableEditor/SpreadsheetControl UI surface. Every listed test constructs a
+// real editor/control or calls a TableEditor entry point directly. Keep the
+// focused coverage-gap, final-push, chart-dialog, validation-dropdown, and
+// dynamic-array editor suites here: each drives production keyboard, mouse,
+// layout, command, or edit behavior that originates in socialcalctableeditor.ts.
 const editorTests = [
   "test/ui-coverage.test.ts",
   "test/control-coverage.test.ts",
@@ -160,6 +157,18 @@ const editorTests = [
   "test/hardening-tableeditor-commands.test.ts",
   "test/sheet-protection.test.ts",
   "test/hardening-tableeditor-interactions.test.ts",
+  "test/editor-coverage-gaps-a.test.ts",
+  "test/editor-coverage-gaps-b.test.ts",
+  "test/editor-coverage-gaps-c.test.ts",
+  "test/editor-coverage-gaps-d.test.ts",
+  "test/editor-coverage-gaps-e.test.ts",
+  "test/editor-coverage-gaps-f.test.ts",
+  "test/editor-final-push-controls.test.ts",
+  "test/editor-final-push-mouse.test.ts",
+  "test/editor-final-push-render.test.ts",
+  "test/chart-editor-ui.test.ts",
+  "test/data-validation-security-browser.test.ts",
+  "test/dynamic-array-spill-editor.test.ts",
 ];
 
 // Tests that exercise each source module. Keep in sync with the coverage
@@ -265,6 +274,15 @@ export const testsByFile = {
     "test/dynamic-array-spill-editor.test.ts",
     "test/dynamic-array-spill-persistence.test.ts",
     "test/dynamic-array-spill-family2.test.ts",
+    // CSV/TSV/FODS and normalized-workbook adapters are implemented here,
+    // not in a separate import/export module. Their direct behavior suites
+    // must be visible to the exact socialcalc-3 mutation leg.
+    "test/csv-locale-interop.test.ts",
+    "test/fods-export.test.ts",
+    "test/normalized-workbook-ingestion.test.ts",
+    "test/workbook.test.ts",
+    "test/workbook-save-load.test.ts",
+    "test/lemma-workbook-facade.test.ts",
   ],
 
   // Pure pivot-table engine (grouping, aggregation, grid rendering,
@@ -303,8 +321,15 @@ export const testsByFile = {
     "test/hardening-popup-behavior.test.ts",
   ],
   "socialcalcspreadsheetcontrol.ts": [...editorTests, "test/hardening-control-viewer.test.ts"],
+  // Viewer initialization, save/load, resize, status, localization, and
+  // repeating-macro behavior lives here. The broader UI/control suites invoke
+  // those shipped functions directly, so they belong to this owned subset.
   "socialcalcviewer.ts": [
     "test/popup-viewer-coverage.test.ts",
+    "test/popup-viewer-coverage-gaps.test.ts",
+    "test/ui-coverage.test.ts",
+    "test/control-coverage.test.ts",
+    "test/iofunctions-coverage.test.ts",
     "test/hardening-control-viewer.test.ts",
   ],
 };
