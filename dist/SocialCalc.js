@@ -32820,7 +32820,8 @@ not governed by the terms of the CPAL.
         }
       }
     });
-    spreadsheet.formulabarDiv.appendChild(searchBar[0]);
+    spreadsheet.searchBarDiv = searchBar[0];
+    spreadsheet.formulabarDiv.appendChild(spreadsheet.searchBarDiv);
     var replaceInput = $("<input id='replacebarinput' value='' placeholder='Replace with…'>");
     var replaceRegexCheckbox = $("<input type='checkbox' id='replaceregexinput'>");
     var replaceFormulasCheckbox = $("<input type='checkbox' id='replaceformulasinput'>");
@@ -32872,7 +32873,11 @@ not governed by the terms of the CPAL.
         SpreadsheetControlSC.Keyboard.passThru = false;
       });
     }
-    spreadsheet.formulabarDiv.appendChild(replaceBar[0]);
+    spreadsheet.replaceBarDiv = replaceBar[0];
+    spreadsheet.formulabarDiv.appendChild(spreadsheet.replaceBarDiv);
+    var findReplaceVisible = tabs[spreadsheet.currentTab].name == 'edit';
+    spreadsheet.searchBarDiv.style.display = findReplaceVisible ? '' : 'none';
+    spreadsheet.replaceBarDiv.style.display = findReplaceVisible ? '' : 'none';
     for (i = 0; i < tabs.length; i++) {
       if (tabs[i].oncreate) {
         tabs[i].oncreate(spreadsheet, tabs[i].name);
@@ -32972,13 +32977,21 @@ not governed by the terms of the CPAL.
     return;
   };
   SpreadsheetControlSC.CalculateSheetNonViewHeight = function (spreadsheet) {
+    var views = spreadsheet.views || {};
     spreadsheet.nonviewheight = spreadsheet.statuslineheight;
     for (var nodeIndex = 0; nodeIndex < spreadsheet.spreadsheetDiv.childNodes.length; nodeIndex++) {
       var childNode = spreadsheet.spreadsheetDiv.childNodes[nodeIndex];
-      if (childNode.id == 'SocialCalc-statusline') continue;
+      if (childNode === spreadsheet.statuslineDiv) continue;
       if (childNode === spreadsheet.ariaStatusDiv || childNode === spreadsheet.ariaErrorDiv)
         continue;
-      spreadsheet.nonviewheight += childNode.offsetHeight;
+      var isView = false;
+      for (var viewname in views) {
+        if (childNode === views[viewname].element) {
+          isView = true;
+          break;
+        }
+      }
+      if (!isView) spreadsheet.nonviewheight += childNode.offsetHeight;
     }
   };
   SpreadsheetControlSC.GetSpreadsheetControlObject = function () {
@@ -33042,6 +33055,9 @@ not governed by the terms of the CPAL.
       }
     }
     spreadsheet.currentTab = newtabnum;
+    var findReplaceVisible = tabs[newtabnum].name == 'edit';
+    spreadsheet.searchBarDiv.style.display = findReplaceVisible ? '' : 'none';
+    spreadsheet.replaceBarDiv.style.display = findReplaceVisible ? '' : 'none';
     if (tabs[newtabnum].onclick) {
       tabs[newtabnum].onclick(spreadsheet, newtab);
     }
@@ -33051,6 +33067,17 @@ not governed by the terms of the CPAL.
         newview = vname;
       } else {
         views[vname].element.style.display = 'none';
+      }
+    }
+    var oldnonviewheight = spreadsheet.nonviewheight;
+    SocialCalc.CalculateSheetNonViewHeight(spreadsheet);
+    if (oldnonviewheight != spreadsheet.nonviewheight) {
+      spreadsheet.viewheight = spreadsheet.height - spreadsheet.nonviewheight;
+      for (vname in views) {
+        views[vname].element.style.height = spreadsheet.viewheight + 'px';
+      }
+      if (!SocialCalc._app) {
+        spreadsheet.editor.ResizeTableEditor(spreadsheet.width, spreadsheet.viewheight);
       }
     }
     if (tabs[newtabnum].onclickFocus) {

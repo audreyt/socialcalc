@@ -239,6 +239,112 @@ test("SetTab: switch through every tab, also via element and via string", async 
   expect(control.tabs[control.currentTab].name).toBe("edit");
 });
 
+test("SetTab removes each contextual bar from layout and excludes registered views from chrome", async () => {
+  const SC = await loadSocialCalc();
+  type ContextualLayoutControl = {
+    formulabarDiv: HTMLElement;
+    searchBarDiv: HTMLElement;
+    replaceBarDiv: HTMLElement;
+    nonviewheight: number;
+    viewheight: number;
+    height: number;
+    width: number;
+    views: Record<string, { element: HTMLElement }>;
+    editor: {
+      busy: boolean;
+      height: number;
+      ResizeTableEditor(width: number, height: number): void;
+    };
+  };
+
+  function measureContextualBars(control: ContextualLayoutControl) {
+    Object.defineProperty(control.formulabarDiv, "offsetHeight", {
+      configurable: true,
+      get() {
+        return (
+          20 +
+          (control.searchBarDiv.style.display === "none" ? 0 : 20) +
+          (control.replaceBarDiv.style.display === "none" ? 0 : 20)
+        );
+      },
+    });
+    SC.CalculateSheetNonViewHeight(control);
+    control.viewheight = control.height - control.nonviewheight;
+    control.editor.ResizeTableEditor(control.width, control.viewheight);
+  }
+
+  const { control: rawFindControl } = await newControl(SC, "FindLayout-");
+  const findControl: ContextualLayoutControl = rawFindControl;
+  measureContextualBars(findControl);
+  findControl.replaceBarDiv.style.display = "none";
+  measureContextualBars(findControl);
+  const findBefore = {
+    nonviewheight: findControl.nonviewheight,
+    viewheight: findControl.viewheight,
+  };
+  SC.SetSpreadsheetControlObject(findControl);
+  findControl.editor.busy = false;
+  SC.SetTab("print");
+  expect(findControl.searchBarDiv.style.display).toBe("none");
+  expect(findControl.nonviewheight).toBe(findBefore.nonviewheight - 20);
+  expect(findControl.viewheight).toBe(findBefore.viewheight + 20);
+  expect(findControl.editor.height).toBe(findControl.viewheight);
+
+  const { control: rawReplaceControl } = await newControl(SC, "ReplaceLayout-");
+  const replaceControl: ContextualLayoutControl = rawReplaceControl;
+  measureContextualBars(replaceControl);
+  replaceControl.searchBarDiv.style.display = "none";
+  measureContextualBars(replaceControl);
+  const replaceBefore = {
+    nonviewheight: replaceControl.nonviewheight,
+    viewheight: replaceControl.viewheight,
+  };
+  SC.SetSpreadsheetControlObject(replaceControl);
+  replaceControl.editor.busy = false;
+  SC.SetTab("print");
+  expect(replaceControl.replaceBarDiv.style.display).toBe("none");
+  expect(replaceControl.nonviewheight).toBe(replaceBefore.nonviewheight - 20);
+  expect(replaceControl.viewheight).toBe(replaceBefore.viewheight + 20);
+  expect(replaceControl.editor.height).toBe(replaceControl.viewheight);
+
+  const { control: rawViewControl } = await newControl(SC, "ViewLayout-");
+  const viewControl: ContextualLayoutControl = rawViewControl;
+  measureContextualBars(viewControl);
+  const chromeHeight = viewControl.nonviewheight;
+  for (const view of Object.values(viewControl.views)) {
+    Object.defineProperty(view.element, "offsetHeight", { configurable: true, value: 10_000 });
+    view.element.style.display = "block";
+  }
+  SC.CalculateSheetNonViewHeight(viewControl);
+  expect(viewControl.nonviewheight).toBe(chromeHeight);
+
+  const chromeOnly = {
+    views: null,
+    statuslineheight: 7,
+    nonviewheight: 0,
+    spreadsheetDiv: { childNodes: [] as HTMLElement[] },
+  };
+  SC.CalculateSheetNonViewHeight(chromeOnly);
+  expect(chromeOnly.nonviewheight).toBe(7);
+
+  const { control: rawAppControl } = await newControl(SC, "AppLayout-");
+  const appControl: ContextualLayoutControl = rawAppControl;
+  measureContextualBars(appControl);
+  const initialEditorHeight = appControl.editor.height;
+  const originalApp = SC._app;
+  SC._app = true;
+  try {
+    SC.SetSpreadsheetControlObject(appControl);
+    appControl.editor.busy = false;
+    SC.SetTab("edit");
+    appControl.editor.busy = false;
+    SC.SetTab("print");
+    expect(appControl.editor.height).toBe(initialEditorHeight);
+  } finally {
+    SC._app = originalApp;
+  }
+});
+
 // -------------------------------------------------------------------
 // Test 4: DoCmd — undo/redo + SpreadsheetCmdLookup defaults
 // -------------------------------------------------------------------
@@ -2161,9 +2267,10 @@ test("DoOnResize + SizeSSDiv + CalculateSheetNonViewHeight", async () => {
   expect(control.width).toBe(700);
   expect(control.height).toBe(500);
 
-  // CalculateSheetNonViewHeight
+  // Only toolbar/formula/status chrome reduces the sheet view; rendered tab
+  // views themselves must not be recursively counted as non-view height.
   SC.CalculateSheetNonViewHeight(control);
-  expect(control.nonviewheight).toBe(140);
+  expect(control.nonviewheight).toBe(60);
 });
 
 // -------------------------------------------------------------------

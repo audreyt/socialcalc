@@ -50,6 +50,7 @@ class FakeElement {
   offsetHeight: number;
   offsetTop: number;
   offsetLeft: number;
+  eventListeners: Record<string, Array<(event: Event) => void>>;
 
   constructor(ownerDocument: FakeDocument, tagName: string, nodeType = 1) {
     this.ownerDocument = ownerDocument;
@@ -75,6 +76,7 @@ class FakeElement {
     this.offsetHeight = 20;
     this.offsetTop = 0;
     this.offsetLeft = 0;
+    this.eventListeners = {};
   }
 
   get firstChild() {
@@ -205,9 +207,21 @@ class FakeElement {
 
   blur() {}
 
-  addEventListener() {}
+  addEventListener(type: string, listener: (event: Event) => void) {
+    (this.eventListeners[type] ??= []).push(listener);
+  }
 
-  removeEventListener() {}
+  removeEventListener(type: string, listener: (event: Event) => void) {
+    const listeners = this.eventListeners[type];
+    if (!listeners) return;
+    const index = listeners.indexOf(listener);
+    if (index >= 0) listeners.splice(index, 1);
+  }
+
+  dispatchEvent(event: Event) {
+    for (const listener of this.eventListeners[event.type] ?? []) listener(event);
+    return true;
+  }
 }
 
 class FakeDocument {

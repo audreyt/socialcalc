@@ -390,6 +390,25 @@ test("replace-bar input focus/blur toggle Keyboard.passThru (same wiring as the 
   expect(SC.Keyboard.passThru).toBe(false);
 });
 
+test("replace toolbar tab stops toggle Keyboard.passThru", async () => {
+  const { SC, control } = await newBrowserControl("ReplaceTabStops-");
+  const tabStops = [
+    document.getElementById("replaceregexinput"),
+    document.getElementById("replaceformulasinput"),
+    document.getElementById("replacewholesheetinput"),
+    document.getElementById(control.idPrefix + "replaceonebutton"),
+    document.getElementById(control.idPrefix + "replaceallbutton"),
+  ];
+
+  for (const tabStop of tabStops) {
+    expect(tabStop).not.toBeNull();
+    tabStop!.dispatchEvent(new Event("focus"));
+    expect(SC.Keyboard.passThru).toBe(true);
+    tabStop!.dispatchEvent(new Event("blur"));
+    expect(SC.Keyboard.passThru).toBe(false);
+  }
+});
+
 test("Replace-All with a range selection only rewrites cells inside the range", async () => {
   const { SC, control } = await newBrowserControl("ReplaceRange-");
   await scheduleCommands(SC, control.sheet, ["set A1 text t foo", "set D4 text t foo"]);

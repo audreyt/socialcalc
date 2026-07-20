@@ -16,6 +16,16 @@ import {
   scheduleCommand,
 } from "./fixtures/editor";
 
+type TabLayoutControl = {
+  requestedWidth: number;
+  DoOnResize(): void;
+  editor: { busy: boolean };
+};
+
+type TabSocialCalc = {
+  SetTab(tab: string): void;
+};
+
 test.describe("redo keyboard shortcuts", () => {
   test("Ctrl+Y redoes an undone edit", async ({ page }) => {
     await gotoBundle(page, "normal");
@@ -115,6 +125,210 @@ test.describe("tab tools and pane sliders", () => {
 
     await page.click("#SocialCalc-edittab");
     await expect(page.locator("#SocialCalc-print-area")).toBeHidden();
+  });
+
+  test("Find/Replace is Edit-only while the formula input remains global", async ({ page }) => {
+    await gotoBundle(page, "normal");
+    await createControl(page);
+    await page.evaluate((idPrefix) => {
+      // The fixture's published control map intentionally exposes only the
+      // helpers most e2e tests need; this test validates the tab lifecycle.
+      const spreadsheet = window.__scControls[idPrefix] as unknown as TabLayoutControl;
+      const socialCalc = window.SocialCalc as unknown as TabSocialCalc;
+      spreadsheet.editor.busy = false;
+      socialCalc.SetTab("edit");
+    }, "SocialCalc-");
+
+    const find = page.locator("#searchbar");
+    const replace = page.locator("#replacebar");
+    const formula = page.locator('input[size="60"]');
+    await expect(find).toBeVisible();
+    await expect(replace).toBeVisible();
+    await expect(formula).toBeVisible();
+    await page.fill("#searchbarinput", "needle");
+    await page.fill("#replacebarinput", "replacement");
+
+    const initialLayout = await page.evaluate((idPrefix) => {
+      const spreadsheet = window.__scControls[idPrefix] as unknown as {
+        formulabarDiv: HTMLElement;
+        nonviewheight: number;
+        viewheight: number;
+        height: number;
+        editor: { griddiv: HTMLElement };
+      };
+      const formula = document.querySelector('input[size="60"]')!;
+      const search = document.getElementById("searchbar")!;
+      const replace = document.getElementById("replacebar")!;
+      return {
+        formulaParentIsFormulaBar: formula.parentElement === spreadsheet.formulabarDiv,
+        searchParentIsFormulaBar: search.parentElement === spreadsheet.formulabarDiv,
+        replaceParentIsFormulaBar: replace.parentElement === spreadsheet.formulabarDiv,
+        formulaBarHeight: spreadsheet.formulabarDiv.getBoundingClientRect().height,
+        gridHeight: spreadsheet.editor.griddiv.getBoundingClientRect().height,
+        nonviewheight: spreadsheet.nonviewheight,
+        viewheight: spreadsheet.viewheight,
+        height: spreadsheet.height,
+      };
+    }, "SocialCalc-");
+    expect(initialLayout.formulaParentIsFormulaBar).toBe(true);
+    expect(initialLayout.searchParentIsFormulaBar).toBe(true);
+    expect(initialLayout.replaceParentIsFormulaBar).toBe(true);
+    expect(initialLayout.nonviewheight + initialLayout.viewheight).toBe(initialLayout.height);
+
+    for (const tab of [
+      "print",
+      "settings",
+      "sort",
+      "audit",
+      "comment",
+      "names",
+      "condfmt",
+      "pivot",
+      "clipboard",
+    ]) {
+      await page.click(`#SocialCalc-${tab}tab`);
+      await expect(find).toBeHidden();
+      await expect(replace).toBeHidden();
+      await expect(formula).toBeVisible();
+      const layout = await page.evaluate((idPrefix) => {
+        const spreadsheet = window.__scControls[idPrefix] as unknown as {
+          nonviewheight: number;
+          viewheight: number;
+          height: number;
+          formulabarDiv: HTMLElement;
+          editor: { griddiv: HTMLElement };
+        };
+        return {
+          findDisplay: getComputedStyle(document.getElementById("searchbar")!).display,
+          replaceDisplay: getComputedStyle(document.getElementById("replacebar")!).display,
+          formulaBarHeight: spreadsheet.formulabarDiv.getBoundingClientRect().height,
+          gridHeight: spreadsheet.editor.griddiv.getBoundingClientRect().height,
+          nonviewheight: spreadsheet.nonviewheight,
+          viewheight: spreadsheet.viewheight,
+          height: spreadsheet.height,
+        };
+      }, "SocialCalc-");
+      expect(layout.findDisplay).toBe("none");
+      expect(layout.replaceDisplay).toBe("none");
+      expect(layout.nonviewheight + layout.viewheight).toBe(layout.height);
+      if (tab === "print") {
+        expect(layout.formulaBarHeight).toBeLessThan(initialLayout.formulaBarHeight);
+        expect(layout.gridHeight - initialLayout.gridHeight).toBe(
+          layout.viewheight - initialLayout.viewheight,
+        );
+        expect(layout.nonviewheight).toBeLessThan(initialLayout.nonviewheight);
+        expect(layout.viewheight).toBeGreaterThan(initialLayout.viewheight);
+      }
+    }
+
+    await page.click("#SocialCalc-edittab");
+    await expect(find).toBeVisible();
+    await expect(replace).toBeVisible();
+    await expect(page.locator("#searchbarinput")).toHaveValue("needle");
+    await expect(page.locator("#replacebarinput")).toHaveValue("replacement");
+    await page.locator("#searchbarinput").focus();
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const socialCalc = window.SocialCalc;
+          if (
+            !("Keyboard" in socialCalc) ||
+            !socialCalc.Keyboard ||
+            typeof socialCalc.Keyboard !== "object" ||
+            !("passThru" in socialCalc.Keyboard)
+          ) {
+            return false;
+          }
+          return (
+            document.activeElement?.id === "searchbarinput" && socialCalc.Keyboard.passThru === true
+          );
+        }),
+      )
+      .toBe(true);
+    await page.locator("#replacebarinput").focus();
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const socialCalc = window.SocialCalc;
+          if (
+            !("Keyboard" in socialCalc) ||
+            !socialCalc.Keyboard ||
+            typeof socialCalc.Keyboard !== "object" ||
+            !("passThru" in socialCalc.Keyboard)
+          ) {
+            return false;
+          }
+          return (
+            document.activeElement?.id === "replacebarinput" &&
+            socialCalc.Keyboard.passThru === true
+          );
+        }),
+      )
+      .toBe(true);
+    const restoredLayout = await page.evaluate((idPrefix) => {
+      const spreadsheet = window.__scControls[idPrefix] as unknown as {
+        nonviewheight: number;
+        viewheight: number;
+        height: number;
+        formulabarDiv: HTMLElement;
+        editor: { griddiv: HTMLElement };
+      };
+      return {
+        formulaBarHeight: spreadsheet.formulabarDiv.getBoundingClientRect().height,
+        gridHeight: spreadsheet.editor.griddiv.getBoundingClientRect().height,
+        nonviewheight: spreadsheet.nonviewheight,
+        viewheight: spreadsheet.viewheight,
+        height: spreadsheet.height,
+      };
+    }, "SocialCalc-");
+    expect(restoredLayout).toEqual({
+      formulaBarHeight: initialLayout.formulaBarHeight,
+      gridHeight: initialLayout.gridHeight,
+      nonviewheight: initialLayout.nonviewheight,
+      viewheight: initialLayout.viewheight,
+      height: initialLayout.height,
+    });
+
+    await page.evaluate((idPrefix) => {
+      // See the narrow fixture-boundary types above.
+      const spreadsheet = window.__scControls[idPrefix] as unknown as TabLayoutControl;
+      const socialCalc = window.SocialCalc as unknown as TabSocialCalc;
+      spreadsheet.requestedWidth = 400;
+      spreadsheet.DoOnResize();
+      spreadsheet.editor.busy = false;
+      socialCalc.SetTab("edit");
+    }, "SocialCalc-");
+    const wrappedEdit = await page.evaluate((idPrefix) => {
+      const spreadsheet = window.__scControls[idPrefix] as unknown as {
+        formulabarDiv: HTMLElement;
+        nonviewheight: number;
+        viewheight: number;
+        editor: { griddiv: HTMLElement };
+      };
+      return {
+        formulaBarHeight: spreadsheet.formulabarDiv.getBoundingClientRect().height,
+        gridHeight: spreadsheet.editor.griddiv.getBoundingClientRect().height,
+        nonviewheight: spreadsheet.nonviewheight,
+        viewheight: spreadsheet.viewheight,
+      };
+    }, "SocialCalc-");
+    await page.click("#SocialCalc-printtab");
+    await page.click("#SocialCalc-edittab");
+    const restoredWrappedEdit = await page.evaluate((idPrefix) => {
+      const spreadsheet = window.__scControls[idPrefix] as unknown as {
+        formulabarDiv: HTMLElement;
+        nonviewheight: number;
+        viewheight: number;
+        editor: { griddiv: HTMLElement };
+      };
+      return {
+        formulaBarHeight: spreadsheet.formulabarDiv.getBoundingClientRect().height,
+        gridHeight: spreadsheet.editor.griddiv.getBoundingClientRect().height,
+        nonviewheight: spreadsheet.nonviewheight,
+        viewheight: spreadsheet.viewheight,
+      };
+    }, "SocialCalc-");
+    expect(restoredWrappedEdit).toEqual(wrappedEdit);
   });
 
   test("pane sliders freeze visible rows and columns, then unfreeze at their origins", async ({

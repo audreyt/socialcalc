@@ -1635,7 +1635,8 @@ SpreadsheetControlSC.InitializeSpreadsheetControl = function (
       }
     },
   );
-  spreadsheet.formulabarDiv.appendChild(searchBar[0]);
+  spreadsheet.searchBarDiv = searchBar[0];
+  spreadsheet.formulabarDiv.appendChild(spreadsheet.searchBarDiv);
 
   // Replace panel: literal/regex text input, formulas/whole-sheet toggles,
   // and One/All buttons. Lives beside the existing Find bar and reuses its
@@ -1689,7 +1690,11 @@ SpreadsheetControlSC.InitializeSpreadsheetControl = function (
       SpreadsheetControlSC.Keyboard.passThru = false;
     });
   }
-  spreadsheet.formulabarDiv.appendChild(replaceBar[0]);
+  spreadsheet.replaceBarDiv = replaceBar[0];
+  spreadsheet.formulabarDiv.appendChild(spreadsheet.replaceBarDiv);
+  var findReplaceVisible = tabs[spreadsheet.currentTab].name == "edit";
+  spreadsheet.searchBarDiv.style.display = findReplaceVisible ? "" : "none";
+  spreadsheet.replaceBarDiv.style.display = findReplaceVisible ? "" : "none";
 
   // initialize tabs that need it
 
@@ -1833,14 +1838,22 @@ SpreadsheetControlSC.InitializeSpreadsheetControl = function (
 // eddy CalculateSheetNonViewHeight {
 /** @param {any} spreadsheet */
 SpreadsheetControlSC.CalculateSheetNonViewHeight = function (spreadsheet: any) {
+  var views = spreadsheet.views || {};
   spreadsheet.nonviewheight = spreadsheet.statuslineheight;
   for (var nodeIndex = 0; nodeIndex < spreadsheet.spreadsheetDiv.childNodes.length; nodeIndex++) {
     var childNode = spreadsheet.spreadsheetDiv.childNodes[nodeIndex];
-    if (childNode.id == "SocialCalc-statusline") continue;
+    if (childNode === spreadsheet.statuslineDiv) continue;
     // Visually-hidden aria-live regions take no layout space (see .sr-only in
     // css/socialcalc.css) and must not be counted against the view height.
     if (childNode === spreadsheet.ariaStatusDiv || childNode === spreadsheet.ariaErrorDiv) continue;
-    spreadsheet.nonviewheight += childNode.offsetHeight;
+    var isView = false;
+    for (var viewname in views) {
+      if (childNode === views[viewname].element) {
+        isView = true;
+        break;
+      }
+    }
+    if (!isView) spreadsheet.nonviewheight += childNode.offsetHeight;
   }
 };
 
@@ -1966,6 +1979,9 @@ SpreadsheetControlSC.SetTab = function (obj: any) {
   }
 
   spreadsheet.currentTab = newtabnum;
+  var findReplaceVisible = tabs[newtabnum].name == "edit";
+  spreadsheet.searchBarDiv.style.display = findReplaceVisible ? "" : "none";
+  spreadsheet.replaceBarDiv.style.display = findReplaceVisible ? "" : "none";
 
   if (tabs[newtabnum].onclick) {
     tabs[newtabnum].onclick(spreadsheet, newtab);
@@ -1980,6 +1996,17 @@ SpreadsheetControlSC.SetTab = function (obj: any) {
     }
   }
 
+  var oldnonviewheight = spreadsheet.nonviewheight;
+  SocialCalc.CalculateSheetNonViewHeight(spreadsheet);
+  if (oldnonviewheight != spreadsheet.nonviewheight) {
+    spreadsheet.viewheight = spreadsheet.height - spreadsheet.nonviewheight;
+    for (vname in views) {
+      views[vname].element.style.height = spreadsheet.viewheight + "px";
+    }
+    if (!SocialCalc._app) {
+      spreadsheet.editor.ResizeTableEditor(spreadsheet.width, spreadsheet.viewheight);
+    }
+  }
   if (tabs[newtabnum].onclickFocus) {
     ele = tabs[newtabnum].onclickFocus;
     if (typeof ele == "string") {
