@@ -663,27 +663,24 @@ test("XIRR: safeguarded solver converges on a many-sign-change schedule via bise
   expect(Math.abs(getDV("C2"))).toBeLessThan(1e-8);
 });
 
-test("XIRR: solver returns #NUM! when the safeguarded iteration budget is exhausted on a genuinely hard multi-sign-change schedule", async () => {
-  // A schedule with several irregular sign flips across a wide date range
-  // where the bracket keeps narrowing but the residual never settles
-  // within 100 rtsafe iterations at double precision -- the deterministic
-  // #NUM! fallback (not a hang or an exception) for a pathological input,
-  // matching Excel's documented "#NUM! if it can't find a result after 100
-  // tries" contract.
-  const { getVT } = await buildSheet([
-    "set A1 value n -1833.7183710344686",
-    "set A2 value n 8606.686762816593",
-    "set A3 value n -771.1205458134041",
-    "set A4 value n 8361.093050968413",
-    "set A5 value n 13132.192143766299",
-    "set B1 formula DATE(2000,1,1)",
-    "set B2 formula DATE(2000,1,20)",
-    "set B3 formula DATE(2007,2,24)",
-    "set B4 formula DATE(2011,10,14)",
-    "set B5 formula DATE(2016,5,25)",
-    "set C1 formula XIRR(A1:A5,B1:B5)",
-  ]);
-  expect(getVT("C1")).toBe("e#NUM!");
+test("XIRR solver: returns null after its fixed budget when bisection cannot reach epsilon", async () => {
+  const { SC } = await buildSheet([]);
+  const formula = SC.Formula;
+  const originalValue = formula.ComputeXNPVValue;
+  const originalDerivative = formula.ComputeXNPVDerivative;
+  try {
+    // This controlled numerical case has a real root at 1 and a valid sign
+    // bracket. A flat derivative forces the solver's safeguarded bisection
+    // path; the deliberately huge (but valid) upper guess needs more than
+    // 100 halvings to reach epsilon. It locks the budget fallback without
+    // relying on platform-specific floating-point cashflow behavior.
+    formula.ComputeXNPVValue = (rate: number) => rate - 1;
+    formula.ComputeXNPVDerivative = () => 0;
+    expect(formula.SolveXIRRRate([], [], 1e30)).toBeNull();
+  } finally {
+    formula.ComputeXNPVValue = originalValue;
+    formula.ComputeXNPVDerivative = originalDerivative;
+  }
 });
 
 test("XIRR: float-precision-degenerate bisection step (xlo collapses onto rts) still returns a finite rate, not a hang", async () => {

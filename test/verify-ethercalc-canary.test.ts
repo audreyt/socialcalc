@@ -11,12 +11,12 @@ import {
 } from "../scripts/verify-ethercalc-canary.mjs";
 
 const DEFAULT_REPO = "https://github.com/audreyt/ethercalc.git";
-const DEFAULT_SHA = "8674374d2a4da7aff7004b6e7bdf35a310ad1aab";
-const VALID_FULL_SHA = "b160b7df96c64ad2962bce35b170ba6b0fc98112";
+const DEFAULT_SHA = "b160b7df96c64ad2962bce35b170ba6b0fc98112";
+const OVERRIDE_SHA = "8674374d2a4da7aff7004b6e7bdf35a310ad1aab";
 
 describe("validateShaOverride", () => {
   test("accepts a full 40-character lowercase-hex SHA and returns it trimmed", () => {
-    expect(validateShaOverride(`  ${VALID_FULL_SHA}  `)).toBe(VALID_FULL_SHA);
+    expect(validateShaOverride(`  ${OVERRIDE_SHA}  `)).toBe(OVERRIDE_SHA);
   });
 
   test("rejects a short/abbreviated SHA (ambiguity risk to the immutability guarantee)", () => {
@@ -24,7 +24,7 @@ describe("validateShaOverride", () => {
   });
 
   test("rejects uppercase hex (git SHAs are canonically lowercase)", () => {
-    expect(() => validateShaOverride(VALID_FULL_SHA.toUpperCase())).toThrow(/40-character/);
+    expect(() => validateShaOverride(OVERRIDE_SHA.toUpperCase())).toThrow(/40-character/);
   });
 
   test("rejects a non-hex string of the right length", () => {
@@ -67,9 +67,9 @@ describe("resolveEthercalcSource", () => {
   });
 
   test("SC_ETHERCALC_SHA overrides the SHA only, repo stays pinned", () => {
-    const source = resolveEthercalcSource({ SC_ETHERCALC_SHA: VALID_FULL_SHA });
+    const source = resolveEthercalcSource({ SC_ETHERCALC_SHA: OVERRIDE_SHA });
     expect(source.repo).toBe(DEFAULT_REPO);
-    expect(source.sha).toBe(VALID_FULL_SHA);
+    expect(source.sha).toBe(OVERRIDE_SHA);
     expect(source.repoOverridden).toBe(false);
     expect(source.shaOverridden).toBe(true);
   });
@@ -77,11 +77,11 @@ describe("resolveEthercalcSource", () => {
   test("both overrides apply together (local tandem rehearsal: local checkout + its exact tip SHA)", () => {
     const source = resolveEthercalcSource({
       SC_ETHERCALC_REPO: "/Users/au/w/ethercalc",
-      SC_ETHERCALC_SHA: VALID_FULL_SHA,
+      SC_ETHERCALC_SHA: OVERRIDE_SHA,
     });
     expect(source).toEqual({
       repo: "/Users/au/w/ethercalc",
-      sha: VALID_FULL_SHA,
+      sha: OVERRIDE_SHA,
       repoOverridden: true,
       shaOverridden: true,
     });
