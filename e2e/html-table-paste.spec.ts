@@ -21,13 +21,14 @@ import {
 } from "./fixtures/editor";
 
 /**
- * Dispatches a real `ClipboardEvent("paste", { clipboardData })` on the
- * editor's `pasteTextarea` -- the exact event
- * `js/socialcalctableeditor.ts`'s `CreateTableEditor` listens for to capture
- * `event.clipboardData.getData("text/html")` into `editor.pasteHtmlData`
- * (see that file's "paste" addEventListener). `DataTransfer` is a real
- * constructible browser API in all three engines, so this exercises the
- * genuine `ClipboardEvent`/`DataTransfer` machinery, not a hand-rolled stub.
+ * Drives the native paste event sequence: Ctrl+V first lets the editor focus
+ * its hidden textarea and clear stale clipboard state; the synthetic event
+ * then supplies the browser clipboard payload while that textarea is focused.
+ * Native browsers deliver the `paste` event in that order.
+ *
+ * `DataTransfer` is a real constructible browser API in all three engines, so
+ * this exercises genuine `ClipboardEvent`/`DataTransfer` machinery, not a
+ * hand-rolled stub.
  */
 async function dispatchPasteEvent(
   page: Parameters<typeof cellLocator>[0],
@@ -35,12 +36,18 @@ async function dispatchPasteEvent(
   plainText: string,
   idPrefix = "SocialCalc-",
 ): Promise<void> {
+  await page.keyboard.press("Control+v");
+  await waitFor(
+    page,
+    (idPrefix) => {
+      const textarea = window.__scControls[idPrefix].editor.pasteTextarea;
+      return document.activeElement === textarea && textarea.style.display === "block";
+    },
+    idPrefix,
+  );
   await page.evaluate(
     ({ html, plainText, idPrefix }) => {
-      const editor = window.__scControls[idPrefix].editor as unknown as {
-        pasteTextarea: HTMLTextAreaElement;
-      };
-      const ta = editor.pasteTextarea;
+      const ta = window.__scControls[idPrefix].editor.pasteTextarea;
       const dataTransfer = new DataTransfer();
       if (html) dataTransfer.setData("text/html", html);
       if (plainText) dataTransfer.setData("text/plain", plainText);
@@ -66,10 +73,6 @@ test.describe("real ClipboardEvent HTML table paste", () => {
       "</tr><tr><td>Ann</td><td>85.5</td></tr><tr><td>Bob</td><td>92</td></tr></table></body></html>";
 
     await dispatchPasteEvent(page, excelHtml, "Name\tScore\nAnn\t85.5\nBob\t92\n");
-    // Drive the real ctrl-v pipeline: press Ctrl+V on the focused editor so
-    // the shipping ctrlkeyFunction handler (which reads editor.pasteHtmlData
-    // set by the dispatched event above) runs end to end.
-    await page.keyboard.press("Control+v");
 
     await waitFor(
       page,
@@ -102,7 +105,6 @@ test.describe("real ClipboardEvent HTML table paste", () => {
       "Merged Title</td></tr><tr><td>1</td><td>2</td></tr></tbody></table></google-sheets-html-origin>";
 
     await dispatchPasteEvent(page, sheetsHtml, "Merged Title\t\n1\t2\n");
-    await page.keyboard.press("Control+v");
 
     await waitFor(
       page,
@@ -126,7 +128,6 @@ test.describe("real ClipboardEvent HTML table paste", () => {
     await createControl(page);
 
     await dispatchPasteEvent(page, "", "plainA\tplainB\n");
-    await page.keyboard.press("Control+v");
 
     await waitFor(
       page,
@@ -144,7 +145,6 @@ test.describe("real ClipboardEvent HTML table paste", () => {
     await createControl(page);
 
     await dispatchPasteEvent(page, "<div>no table here</div>", "fallback-value\n");
-    await page.keyboard.press("Control+v");
 
     await waitFor(
       page,
@@ -160,7 +160,6 @@ test.describe("real ClipboardEvent HTML table paste", () => {
     await scheduleCommand(page, "set A1 value n 99");
 
     await dispatchPasteEvent(page, "<table><tr><td>new-value</td></tr></table>", "new-value\n");
-    await page.keyboard.press("Control+v");
     await waitFor(
       page,
       (idPrefix) => window.__scControls[idPrefix].sheet.cells.A1?.datavalue === "new-value",
@@ -199,7 +198,6 @@ test.describe("real ClipboardEvent HTML table paste", () => {
       "safe-text</td></tr></table>";
 
     await dispatchPasteEvent(page, hostileHtml, "safe-text\n");
-    await page.keyboard.press("Control+v");
 
     await waitFor(
       page,

@@ -349,6 +349,7 @@ declare global {
       TriggerPrint(): void;
       SpreadsheetControl: new (idPrefix?: string) => {
         editor: {
+          pasteTextarea: HTMLTextAreaElement;
           EditorScheduleSheetCommands(cmd: string, saveundo: boolean): void;
           ecell: { coord: string };
           SheetRedo(): void;

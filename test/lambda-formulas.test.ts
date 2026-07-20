@@ -120,6 +120,14 @@ describe("LAMBDA", () => {
     expect(result.value).toBe(6);
   });
 
+  test("immediate invocation accepts a parenthesized body without mistaking its inner close for the call close", async () => {
+    const SC = await loadSocialCalc();
+    const sheet = new SC.Sheet();
+    const result = await evalFormula(SC, sheet, "LAMBDA(x,(x+1))(5)");
+    expect(result.type).toBe("n");
+    expect(result.value).toBe(6);
+  });
+
   test("multi-parameter immediate invocation", async () => {
     const SC = await loadSocialCalc();
     const sheet = new SC.Sheet();

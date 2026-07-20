@@ -127,14 +127,18 @@ sourcemapDescribe("SOCIALCALC_COVERAGE=1 vp build: dist/SocialCalc.js sourcemap"
       "../js/socialcalcconstants.ts",
       "../js/socialcalc-3.ts",
       "../js/chart.ts",
+      "../js/pivot.ts",
       "../js/socialcalctableeditor.ts",
       "../js/formatnumber2.ts",
       "../js/formula1.ts",
       "../js/formula-parse.ts",
       "../js/formula-operand.ts",
       "../js/formula-ref.ts",
+      "../js/workbook.ts",
+      "../js/socialcalcdatavalidation.ts",
       "../js/socialcalcpopup.ts",
       "../js/socialcalcspreadsheetcontrol.ts",
+      "../js/workbook-ui.ts",
       "../js/socialcalcviewer.ts",
     ];
     expect(map.sources).toEqual(expectedSources);

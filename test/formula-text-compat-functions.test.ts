@@ -19,6 +19,27 @@ async function setup(commands: string[]) {
   return { SC, sheet, getDV, getVT };
 }
 
+function formulaOperand(
+  type: SocialCalc.FormulaOperandType,
+  value: unknown,
+): SocialCalc.FormulaOperand {
+  return { type, value };
+}
+
+function reversedFormulaInputs(
+  ...sourceOrder: SocialCalc.FormulaOperand[]
+): SocialCalc.FormulaOperand[] {
+  return sourceOrder.reverse();
+}
+
+function expectErrorOperand(
+  operand: SocialCalc.FormulaOperand[],
+  expectedType: SocialCalc.FormulaOperandType,
+) {
+  expect(operand).toHaveLength(1);
+  expect(operand[0]).toMatchObject({ type: expectedType, value: 0 });
+}
+
 // ---------------------------------------------------------------------------
 // SEARCH
 // ---------------------------------------------------------------------------
@@ -462,4 +483,213 @@ test("TEXTSPLIT: propagates an upstream error in row_delimiter", async () => {
 test("TEXTSPLIT: propagates an upstream error in ignore_empty", async () => {
   const { getVT } = await setup(['set A1 formula TEXTSPLIT("a,b",",","",1/0)']);
   expect(getVT("A1")).toBe("e#DIV/0!");
+});
+
+// Parser-level formulas short-circuit an error argument before a function
+// receives it. These dispatch tests lock the function-level contract too:
+// every optional argument position must preserve its typed error unchanged.
+test("TEXTBEFORE dispatch preserves an error from each accepted argument position", async () => {
+  const { SC, sheet } = await setup([]);
+  const text = formulaOperand("t", "alpha");
+  const delimiter = formulaOperand("t", ":");
+  const one = formulaOperand("n", 1);
+  const zero = formulaOperand("n", 0);
+  const cases: Array<{
+    expected: SocialCalc.FormulaOperandType;
+    sourceOrder: SocialCalc.FormulaOperand[];
+  }> = [
+    { expected: "e#DIV/0!", sourceOrder: [formulaOperand("e#DIV/0!", 0)] },
+    { expected: "e#REF!", sourceOrder: [text, formulaOperand("e#REF!", 0)] },
+    { expected: "e#VALUE!", sourceOrder: [text, delimiter, formulaOperand("e#VALUE!", 0)] },
+    {
+      expected: "e#NUM!",
+      sourceOrder: [text, delimiter, one, formulaOperand("e#NUM!", 0)],
+    },
+    {
+      expected: "e#N/A",
+      sourceOrder: [text, delimiter, one, zero, formulaOperand("e#N/A", 0)],
+    },
+    {
+      expected: "e#NAME?",
+      sourceOrder: [text, formulaOperand("t", "?"), one, zero, zero, formulaOperand("e#NAME?", 0)],
+    },
+  ];
+
+  for (const { expected, sourceOrder } of cases) {
+    const operand: SocialCalc.FormulaOperand[] = [];
+    SC.Formula.TextBeforeAfterFunction(
+      "TEXTBEFORE",
+      operand,
+      reversedFormulaInputs(...sourceOrder),
+      sheet,
+    );
+    expectErrorOperand(operand, expected);
+  }
+});
+
+test("TEXTSPLIT dispatch preserves errors from text and every optional argument", async () => {
+  const { SC, sheet } = await setup([]);
+  const text = formulaOperand("t", "a,b");
+  const columnDelimiter = formulaOperand("t", ",");
+  const rowDelimiter = formulaOperand("t", ";");
+  const zero = formulaOperand("n", 0);
+  const cases: Array<{
+    expected: SocialCalc.FormulaOperandType;
+    sourceOrder: SocialCalc.FormulaOperand[];
+  }> = [
+    { expected: "e#DIV/0!", sourceOrder: [formulaOperand("e#DIV/0!", 0)] },
+    { expected: "e#REF!", sourceOrder: [text, formulaOperand("e#REF!", 0)] },
+    { expected: "e#VALUE!", sourceOrder: [text, columnDelimiter, formulaOperand("e#VALUE!", 0)] },
+    {
+      expected: "e#NUM!",
+      sourceOrder: [text, columnDelimiter, rowDelimiter, formulaOperand("e#NUM!", 0)],
+    },
+    {
+      expected: "e#N/A",
+      sourceOrder: [text, columnDelimiter, rowDelimiter, zero, formulaOperand("e#N/A", 0)],
+    },
+    {
+      expected: "e#NAME?",
+      sourceOrder: [text, columnDelimiter, rowDelimiter, zero, zero, formulaOperand("e#NAME?", 0)],
+    },
+  ];
+
+  for (const { expected, sourceOrder } of cases) {
+    const operand: SocialCalc.FormulaOperand[] = [];
+    SC.Formula.TextSplitFunction(
+      "TEXTSPLIT",
+      operand,
+      reversedFormulaInputs(...sourceOrder),
+      sheet,
+    );
+    expectErrorOperand(operand, expected);
+  }
+});
+
+test("regex dispatch preserves typed argument errors and returns its documented result shapes", async () => {
+  const { SC, sheet } = await setup([]);
+  const text = formulaOperand("t", "abc-123");
+  const pattern = formulaOperand("t", "([a-z]+)-(\\d+)");
+
+  const matchTextError: SocialCalc.FormulaOperand[] = [];
+  SC.Formula.RegexMatchFunction(
+    "REGEXMATCH",
+    matchTextError,
+    reversedFormulaInputs(formulaOperand("e#DIV/0!", 0)),
+    sheet,
+  );
+  expectErrorOperand(matchTextError, "e#DIV/0!");
+
+  const matchPatternError: SocialCalc.FormulaOperand[] = [];
+  SC.Formula.RegexMatchFunction(
+    "REGEXMATCH",
+    matchPatternError,
+    reversedFormulaInputs(text, formulaOperand("e#REF!", 0)),
+    sheet,
+  );
+  expectErrorOperand(matchPatternError, "e#REF!");
+
+  const invalidPattern: SocialCalc.FormulaOperand[] = [];
+  SC.Formula.RegexMatchFunction(
+    "REGEXMATCH",
+    invalidPattern,
+    reversedFormulaInputs(text, formulaOperand("t", "[")),
+    sheet,
+  );
+  expectErrorOperand(invalidPattern, "e#VALUE!");
+
+  const missingExtraction: SocialCalc.FormulaOperand[] = [];
+  SC.Formula.RegexExtractFunction(
+    "REGEXEXTRACT",
+    missingExtraction,
+    reversedFormulaInputs(text, formulaOperand("t", "z+")),
+    sheet,
+  );
+  expectErrorOperand(missingExtraction, "e#N/A");
+
+  const groupedExtraction: SocialCalc.FormulaOperand[] = [];
+  SC.Formula.RegexExtractFunction(
+    "REGEXEXTRACT",
+    groupedExtraction,
+    reversedFormulaInputs(text, pattern),
+    sheet,
+  );
+  expect(groupedExtraction).toEqual([
+    {
+      type: "array",
+      value: {
+        rows: 1,
+        cols: 2,
+        cells: [
+          [
+            { type: "t", value: "abc" },
+            { type: "t", value: "123" },
+          ],
+        ],
+      },
+    },
+  ]);
+
+  const replacementError: SocialCalc.FormulaOperand[] = [];
+  SC.Formula.RegexReplaceFunction(
+    "REGEXREPLACE",
+    replacementError,
+    reversedFormulaInputs(text, pattern, formulaOperand("e#NUM!", 0)),
+    sheet,
+  );
+  expectErrorOperand(replacementError, "e#NUM!");
+
+  const replacement: SocialCalc.FormulaOperand[] = [];
+  SC.Formula.RegexReplaceFunction(
+    "REGEXREPLACE",
+    replacement,
+    reversedFormulaInputs(text, pattern, formulaOperand("t", "\\2/\\1")),
+    sheet,
+  );
+  expect(replacement).toEqual([{ type: "t", value: "123/abc" }]);
+});
+
+test("TEXTJOIN and JOIN dispatch retain typed failures from delimiters and items", async () => {
+  const { SC, sheet } = await setup([]);
+
+  const delimiterError: SocialCalc.FormulaOperand[] = [];
+  SC.Formula.TextJoinFunction(
+    "TEXTJOIN",
+    delimiterError,
+    reversedFormulaInputs(formulaOperand("e#DIV/0!", 0)),
+    sheet,
+  );
+  expectErrorOperand(delimiterError, "e#DIV/0!");
+
+  const ignoreEmptyError: SocialCalc.FormulaOperand[] = [];
+  SC.Formula.TextJoinFunction(
+    "TEXTJOIN",
+    ignoreEmptyError,
+    reversedFormulaInputs(formulaOperand("t", ","), formulaOperand("e#REF!", 0)),
+    sheet,
+  );
+  expectErrorOperand(ignoreEmptyError, "e#REF!");
+
+  const itemError: SocialCalc.FormulaOperand[] = [];
+  SC.Formula.TextJoinFunction(
+    "TEXTJOIN",
+    itemError,
+    reversedFormulaInputs(
+      formulaOperand("t", ","),
+      formulaOperand("n", 0),
+      formulaOperand("t", "first"),
+      formulaOperand("e#VALUE!", 0),
+    ),
+    sheet,
+  );
+  expectErrorOperand(itemError, "e#VALUE!");
+
+  const joinDelimiterError: SocialCalc.FormulaOperand[] = [];
+  SC.Formula.JoinFunction(
+    "JOIN",
+    joinDelimiterError,
+    reversedFormulaInputs(formulaOperand("e#N/A", 0)),
+    sheet,
+  );
+  expectErrorOperand(joinDelimiterError, "e#N/A");
 });

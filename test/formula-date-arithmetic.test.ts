@@ -919,3 +919,17 @@ test("WORKDAY.INTL/NETWORKDAYS.INTL: weekend argument plus holidays together", a
 
   expect(getDV("B1")).toBe(getDV("B2") - 1);
 });
+
+test("DecodeWeekendArgument preserves the full .INTL weekend-code compatibility matrix", async () => {
+  const SC = await loadSocialCalc();
+  const decode = SC.Formula.DecodeWeekendArgument;
+
+  expect(decode(1, "n")).toEqual({ mask: 96, errortype: "" });
+  expect(decode(11.9, "n")).toEqual({ mask: 64, errortype: "" });
+  expect(decode(8, "n")).toEqual({ mask: 0, errortype: "e#NUM!" });
+  expect(decode("0000110", "t")).toEqual({ mask: 48, errortype: "" });
+  expect(decode("000001x", "t")).toEqual({ mask: 0, errortype: "e#VALUE!" });
+  expect(decode("1111111", "t")).toEqual({ mask: 0, errortype: "e#VALUE!" });
+  expect(decode(0, "e#DIV/0!")).toEqual({ mask: 0, errortype: "e#DIV/0!" });
+  expect(decode(0, "b")).toEqual({ mask: 0, errortype: "e#VALUE!" });
+});

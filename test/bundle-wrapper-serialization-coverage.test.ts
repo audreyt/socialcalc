@@ -71,7 +71,7 @@ function installSortDocument() {
   });
 }
 
-function loadBundleInContext(options: { document?: unknown } = {}) {
+function loadBundleInContext(options: { define?: unknown; document?: unknown } = {}) {
   const module = { exports: {} as unknown };
   const context = createContext({
     console,
@@ -79,6 +79,7 @@ function loadBundleInContext(options: { document?: unknown } = {}) {
     module,
     exports: module.exports,
     document: options.document,
+    define: options.define,
   });
   const script = new Script(bundleSource, { filename: bundlePath });
   script.runInContext(context);
@@ -94,6 +95,19 @@ describe("bundle loader and DOM-free fallback wrappers", () => {
     expect(exported).toBe(globalExport);
     expect(typeof exported.Sheet).toBe("function");
     expect(typeof exported.FormatNumber).toBe("object");
+  });
+
+  test("UMD loader ignores an AMD registration hook", () => {
+    let amdCalls = 0;
+    const define = (..._args: unknown[]) => {
+      amdCalls += 1;
+    };
+    Object.assign(define, { amd: {} });
+
+    const { exported, globalExport } = loadBundleInContext({ define });
+
+    expect(amdCalls).toBe(0);
+    expect(exported).toBe(globalExport);
   });
 
   test("fallback-wrapped DOM helpers use DOM-free fallbacks before document exists", () => {
