@@ -127,7 +127,7 @@
   z-index: 110;
 }
 #searchbar {
-  float: right;
+  float: none;
 }
 
 /* Visually hidden but available to assistive technology (aria-live status/error regions). */

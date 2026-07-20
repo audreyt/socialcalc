@@ -32775,6 +32775,10 @@ not governed by the terms of the CPAL.
     var input = $("<input id='searchbarinput' value='' placeholder='Search sheet…'>");
     var searchBar = $("<span id='searchbar'></span>");
     searchBar.append("<div id='searchstatus'></div>");
+    var searchLabel = document.createElement('label');
+    searchLabel.htmlFor = 'searchbarinput';
+    searchLabel.textContent = SCLoc('Find');
+    searchBar[0].appendChild(searchLabel);
     searchBar.append(input);
     for (button in spreadsheet.findbuttons) {
       bele = document.createElement('img');
@@ -32822,6 +32826,10 @@ not governed by the terms of the CPAL.
     var replaceFormulasCheckbox = $("<input type='checkbox' id='replaceformulasinput'>");
     var replaceWholeSheetCheckbox = $("<input type='checkbox' id='replacewholesheetinput'>");
     var replaceBar = $("<span id='replacebar'></span>");
+    var replaceLabel = document.createElement('label');
+    replaceLabel.htmlFor = 'replacebarinput';
+    replaceLabel.textContent = SCLoc('Replace with');
+    replaceBar[0].appendChild(replaceLabel);
     replaceBar.append(replaceInput);
     replaceBar.append(replaceRegexCheckbox);
     replaceBar.append("<label for='replaceregexinput'>" + SCLoc('Regex') + '</label>');
@@ -32849,6 +32857,21 @@ not governed by the terms of the CPAL.
     replaceInput.on('blur', function () {
       SpreadsheetControlSC.Keyboard.passThru = false;
     });
+    const replaceTabStops = [
+      replaceRegexCheckbox[0],
+      replaceFormulasCheckbox[0],
+      replaceWholeSheetCheckbox[0],
+      replaceOneButton,
+      replaceAllButton,
+    ];
+    for (const replaceTabStop of replaceTabStops) {
+      replaceTabStop.addEventListener('focus', function () {
+        SpreadsheetControlSC.Keyboard.passThru = true;
+      });
+      replaceTabStop.addEventListener('blur', function () {
+        SpreadsheetControlSC.Keyboard.passThru = false;
+      });
+    }
     spreadsheet.formulabarDiv.appendChild(replaceBar[0]);
     for (i = 0; i < tabs.length; i++) {
       if (tabs[i].oncreate) {

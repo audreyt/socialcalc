@@ -1585,6 +1585,10 @@ SpreadsheetControlSC.InitializeSpreadsheetControl = function (
   var input = $("<input id='searchbarinput' value='' placeholder='Search sheet…'>");
   var searchBar = $("<span id='searchbar'></span>");
   searchBar.append("<div id='searchstatus'></div>");
+  var searchLabel = document.createElement("label");
+  searchLabel.htmlFor = "searchbarinput";
+  searchLabel.textContent = SCLoc("Find");
+  searchBar[0].appendChild(searchLabel);
   searchBar.append(input);
 
   // find buttons (right of formula bar)
@@ -1641,6 +1645,10 @@ SpreadsheetControlSC.InitializeSpreadsheetControl = function (
   var replaceFormulasCheckbox = $("<input type='checkbox' id='replaceformulasinput'>");
   var replaceWholeSheetCheckbox = $("<input type='checkbox' id='replacewholesheetinput'>");
   var replaceBar = $("<span id='replacebar'></span>");
+  var replaceLabel = document.createElement("label");
+  replaceLabel.htmlFor = "replacebarinput";
+  replaceLabel.textContent = SCLoc("Replace with");
+  replaceBar[0].appendChild(replaceLabel);
   replaceBar.append(replaceInput);
   replaceBar.append(replaceRegexCheckbox);
   replaceBar.append("<label for='replaceregexinput'>" + SCLoc("Regex") + "</label>");
@@ -1666,6 +1674,21 @@ SpreadsheetControlSC.InitializeSpreadsheetControl = function (
   replaceInput.on("blur", function () {
     SpreadsheetControlSC.Keyboard.passThru = false;
   });
+  const replaceTabStops = [
+    replaceRegexCheckbox[0],
+    replaceFormulasCheckbox[0],
+    replaceWholeSheetCheckbox[0],
+    replaceOneButton,
+    replaceAllButton,
+  ];
+  for (const replaceTabStop of replaceTabStops) {
+    replaceTabStop.addEventListener("focus", function () {
+      SpreadsheetControlSC.Keyboard.passThru = true;
+    });
+    replaceTabStop.addEventListener("blur", function () {
+      SpreadsheetControlSC.Keyboard.passThru = false;
+    });
+  }
   spreadsheet.formulabarDiv.appendChild(replaceBar[0]);
 
   // initialize tabs that need it

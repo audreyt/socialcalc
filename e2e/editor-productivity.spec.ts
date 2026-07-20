@@ -230,6 +230,72 @@ test.describe("Find & Replace", () => {
     await gotoBundle(page, "normal");
     await createControl(page);
 
+    await expect(page.getByRole("textbox", { name: "Find", exact: true })).toHaveAttribute(
+      "id",
+      "searchbarinput",
+    );
+    await expect(page.getByRole("textbox", { name: "Replace with", exact: true })).toHaveAttribute(
+      "id",
+      "replacebarinput",
+    );
+    const findReplaceOrder = await page.evaluate(() => {
+      const controls = Array.from(
+        document.querySelectorAll(
+          "#searchbar input, #searchbar img, #replacebar input, #replacebar button",
+        ),
+      ).map((element) => element.id);
+      const visibleControls = Array.from(
+        document.querySelectorAll(
+          "#searchbar input, #searchbar img, #replacebar input, #replacebar button",
+        ),
+      )
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          return { id: element.id, x: rect.x, y: rect.y };
+        })
+        .sort((left, right) =>
+          Math.abs(left.y - right.y) < 10 ? left.x - right.x : left.y - right.y,
+        )
+        .map((element) => element.id);
+      const find = document.getElementById("searchbarinput")!.getBoundingClientRect();
+      const replace = document.getElementById("replacebarinput")!.getBoundingClientRect();
+      return {
+        controls,
+        visibleControls,
+        find: { x: find.x, y: find.y },
+        replace: { x: replace.x, y: replace.y },
+      };
+    });
+    expect(findReplaceOrder.controls).toEqual([
+      "searchbarinput",
+      "SocialCalc-last",
+      "SocialCalc-next",
+      "replacebarinput",
+      "replaceregexinput",
+      "replaceformulasinput",
+      "replacewholesheetinput",
+      "SocialCalc-replaceonebutton",
+      "SocialCalc-replaceallbutton",
+    ]);
+    expect(findReplaceOrder.visibleControls).toEqual(findReplaceOrder.controls);
+    expect(findReplaceOrder.find.y).toBe(findReplaceOrder.replace.y);
+    expect(findReplaceOrder.find.x).toBeLessThan(findReplaceOrder.replace.x);
+
+    await page.locator("#searchbarinput").focus();
+    const tabOrder: string[] = [];
+    for (let i = 0; i < 6; i++) {
+      await page.keyboard.press("Tab");
+      tabOrder.push(await page.evaluate(() => document.activeElement?.id ?? ""));
+    }
+    expect(tabOrder).toEqual([
+      "replacebarinput",
+      "replaceregexinput",
+      "replaceformulasinput",
+      "replacewholesheetinput",
+      "SocialCalc-replaceonebutton",
+      "SocialCalc-replaceallbutton",
+    ]);
+
     await clickCell(page, "A1");
     await page.keyboard.type("cat");
     await page.keyboard.press("Enter");
