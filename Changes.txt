@@ -2,6 +2,22 @@
 v3.2.0 — 2026-07-21
 ==============================================================================
 
+Highlights
+- Interoperability now covers BOM-safe CSV/TSV input, csv-eu input,
+  csv-excel/tab-excel output, normalized-workbook ingestion, and FODS export.
+- Multi-sheet workbook operations, cross-sheet recalculation, workbook
+  save/load, AutoFilter, structured tables, pivot tables, charts, data
+  validation, sheet protection, conditional formatting, and rich HTML-table
+  clipboard paste are documented in this release.
+- Added dynamic arrays and new formula families including RANK/MEDIAN/QUARTILE,
+  statistics, weekday/workday, criteria, and XMATCH/XLOOKUP functions, plus
+  LET/LAMBDA and higher-order array functions.
+- Find remains globally visible and right-aligned; the replacement controls use
+  a progressive right-aligned row.
+- Added print/page-setup metadata and a Print toolbar tab, an ARIA-accessible
+  grid, and formal-verification growth from 48 to 195 Dafny VCs across the
+  release's expanded LemmaScript facade set.
+
 CSV/TSV import/export
 - UTF-8 BOM is now stripped from csv/tab/csv-eu import input (fixes corrupted
   first cell on every Excel-exported UTF-8 CSV). Default csv/tab output is
@@ -159,21 +175,7 @@ Editor productivity
 - Fixed pane-slider freezing to retain the visible rows and columns, with
   unfreeze restoring the original pane boundaries.
 
-Formal verification
-- Added `lemma/number-parse.ts` facade (5th LemmaScript module):
-  `groupingCharFor` (explicit-locale decimal/grouping classifier, NOT an
-  autodetecting tie-break), `isAsciiDigit`, `isNameChar`,
-  `normalizeNamedRangeName`, `isValidNamedRangeName`,
-  `isValidNormalizedCellCoord`, `replaceUnquotedChar` (quote-aware formula
-  separator normalization), `hasBom`/`stripBom`. 4 Dafny VCs verified
-  (groupingCharFor, isAsciiDigit, isNameChar); remaining functions are
-  runtime-locked (charAt loops unsupported by the Dafny backend, same
-  convention as lemma/lookup-result.ts's typeChar0/parsePipeRow). Lean
-  types/def/proof generated; `verify:dafny` and `verify:lean` pass. Total
-  Dafny VC count: 52 (was 48).
-
-
-Highlights
+Printing and page setup
 - Added print/page-setup sheet metadata: `printarea`, `printrepeatrows`,
   `printrepeatcols`, `printorientation`, `printscale`, and `printmargins` are
   new sheet attributes, set via `set sheet print...` commands (undo-able,
@@ -184,6 +186,8 @@ Highlights
   and injects a real `@page` CSS rule (orientation/margins/scale) so
   `@media print` hides editor chrome, prints only the configured area, and
   repeats header rows across pages as CSS `table-header-group` permits.
+
+Accessibility
 - Added real ARIA accessibility to the rendered grid: `role="grid"` with
   `aria-rowcount`/`aria-colcount`, `role="row"`/`"rowheader"`/
   `"columnheader"`/`"gridcell"` with row/column indices and plain-text
@@ -195,7 +199,14 @@ Highlights
   `textContent` from plain cell data, never by concatenating sheet content
   into markup.
 
-
+Formal verification
+- Expanded the LemmaScript proof surface with facades for dynamic-array spill,
+  weekday policy, statistics, visibility, XMATCH/XLOOKUP, protection,
+  conditional formatting, workbooks, charts, validation, LET/LAMBDA scope,
+  pivot tables, criteria aggregation, and HTML-table clipboard policy.
+- The release now documents 20 proof-bearing facades and 195 total Dafny VCs,
+  up from the prior 48; the original A1, evaluation-operations, lookup-result,
+  and number-parse facades remain part of that total.
 
 Changes
 =======
