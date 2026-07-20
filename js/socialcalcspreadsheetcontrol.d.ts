@@ -134,6 +134,8 @@ declare namespace SocialCalc {
     spacebelow?: number,
   ): void;
   function CalculateSheetNonViewHeight(spreadsheet: SpreadsheetControl): number;
+  function UpdateSpreadsheetChromeLayout(spreadsheet: SpreadsheetControl, force?: boolean): boolean;
+  function UpdateFindReplaceVisibility(spreadsheet: SpreadsheetControl, value?: string): boolean;
   function LocalizeString(str: string): string;
   function LocalizeSubstrings(str: string): string;
   function GetSpreadsheetControlObject(): SpreadsheetControl | undefined;

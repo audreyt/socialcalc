@@ -32773,12 +32773,9 @@ not governed by the terms of the CPAL.
       spreadsheet.formulabarDiv.appendChild(bele);
     }
     var input = $("<input id='searchbarinput' value='' placeholder='Search sheet…'>");
+    input[0].setAttribute('aria-label', SCLoc('Find'));
     var searchBar = $("<span id='searchbar'></span>");
     searchBar.append("<div id='searchstatus'></div>");
-    var searchLabel = document.createElement('label');
-    searchLabel.htmlFor = 'searchbarinput';
-    searchLabel.textContent = SCLoc('Find');
-    searchBar[0].appendChild(searchLabel);
     searchBar.append(input);
     for (button in spreadsheet.findbuttons) {
       bele = document.createElement('img');
@@ -32804,7 +32801,12 @@ not governed by the terms of the CPAL.
       );
       searchBar[0].appendChild(bele);
     }
-    input.on('input', SpreadsheetControlSC.SpreadsheetControl.FindInSheet);
+    input.on('input', function () {
+      SpreadsheetControlSC.SpreadsheetControl.FindInSheet.call(this);
+      if (SocialCalc.UpdateFindReplaceVisibility(spreadsheet, this.value)) {
+        SocialCalc.UpdateSpreadsheetChromeLayout(spreadsheet);
+      }
+    });
     input.on('focus', function () {
       SpreadsheetControlSC.Keyboard.passThru = true;
     });
@@ -32875,9 +32877,7 @@ not governed by the terms of the CPAL.
     }
     spreadsheet.replaceBarDiv = replaceBar[0];
     spreadsheet.formulabarDiv.appendChild(spreadsheet.replaceBarDiv);
-    var findReplaceVisible = tabs[spreadsheet.currentTab].name == 'edit';
-    spreadsheet.searchBarDiv.style.display = findReplaceVisible ? '' : 'none';
-    spreadsheet.replaceBarDiv.style.display = findReplaceVisible ? '' : 'none';
+    spreadsheet.replaceBarDiv.style.display = 'none';
     for (i = 0; i < tabs.length; i++) {
       if (tabs[i].oncreate) {
         tabs[i].oncreate(spreadsheet, tabs[i].name);
@@ -32994,6 +32994,46 @@ not governed by the terms of the CPAL.
       if (!isView) spreadsheet.nonviewheight += childNode.offsetHeight;
     }
   };
+  SpreadsheetControlSC.UpdateSpreadsheetChromeLayout = function (spreadsheet, force) {
+    var views = spreadsheet.views || {};
+    var oldnonviewheight = spreadsheet.nonviewheight;
+    SocialCalc.CalculateSheetNonViewHeight(spreadsheet);
+    if (!force && oldnonviewheight == spreadsheet.nonviewheight) return false;
+    spreadsheet.viewheight = spreadsheet.height - spreadsheet.nonviewheight;
+    for (var viewname in views) {
+      views[viewname].element.style.width = spreadsheet.width + 'px';
+      views[viewname].element.style.height = spreadsheet.viewheight + 'px';
+    }
+    if (!SocialCalc._app) {
+      spreadsheet.editor.ResizeTableEditor(spreadsheet.width, spreadsheet.viewheight);
+    }
+    return true;
+  };
+  SpreadsheetControlSC.UpdateFindReplaceVisibility = function (spreadsheet, value) {
+    var searchInput = null;
+    if (spreadsheet.searchBarDiv) {
+      for (
+        var childIndex = 0;
+        childIndex < spreadsheet.searchBarDiv.childNodes.length;
+        childIndex++
+      ) {
+        var child = spreadsheet.searchBarDiv.childNodes[childIndex];
+        if (child.id == 'searchbarinput') {
+          searchInput = child;
+          break;
+        }
+      }
+    }
+    if (!searchInput) {
+      searchInput = document.getElementById('searchbarinput');
+    }
+    var searchValue = value === undefined ? (searchInput?.value ?? '') : value;
+    var shouldShow = searchValue.length != 0;
+    var display = shouldShow ? '' : 'none';
+    if (spreadsheet.replaceBarDiv.style.display == display) return false;
+    spreadsheet.replaceBarDiv.style.display = display;
+    return true;
+  };
   SpreadsheetControlSC.GetSpreadsheetControlObject = function () {
     var csco =
       SocialCalc.CurrentSpreadsheetControlObject != null
@@ -33055,9 +33095,7 @@ not governed by the terms of the CPAL.
       }
     }
     spreadsheet.currentTab = newtabnum;
-    var findReplaceVisible = tabs[newtabnum].name == 'edit';
-    spreadsheet.searchBarDiv.style.display = findReplaceVisible ? '' : 'none';
-    spreadsheet.replaceBarDiv.style.display = findReplaceVisible ? '' : 'none';
+    spreadsheet.searchBarDiv.style.display = '';
     if (tabs[newtabnum].onclick) {
       tabs[newtabnum].onclick(spreadsheet, newtab);
     }
@@ -33069,17 +33107,9 @@ not governed by the terms of the CPAL.
         views[vname].element.style.display = 'none';
       }
     }
-    var oldnonviewheight = spreadsheet.nonviewheight;
-    SocialCalc.CalculateSheetNonViewHeight(spreadsheet);
-    if (oldnonviewheight != spreadsheet.nonviewheight) {
-      spreadsheet.viewheight = spreadsheet.height - spreadsheet.nonviewheight;
-      for (vname in views) {
-        views[vname].element.style.height = spreadsheet.viewheight + 'px';
-      }
-      if (!SocialCalc._app) {
-        spreadsheet.editor.ResizeTableEditor(spreadsheet.width, spreadsheet.viewheight);
-      }
-    }
+    SocialCalc.UpdateFindReplaceVisibility(spreadsheet);
+    spreadsheet.statuslineDiv.style.display = newview == 'sheet' ? 'block' : 'none';
+    SocialCalc.UpdateSpreadsheetChromeLayout(spreadsheet, true);
     if (tabs[newtabnum].onclickFocus) {
       ele = tabs[newtabnum].onclickFocus;
       if (typeof ele == 'string') {
@@ -33095,10 +33125,7 @@ not governed by the terms of the CPAL.
       views[newview].onresize(spreadsheet, views[newview]);
     }
     if (newview == 'sheet') {
-      spreadsheet.statuslineDiv.style.display = 'block';
       spreadsheet.editor.ScheduleRender();
-    } else {
-      spreadsheet.statuslineDiv.style.display = 'none';
     }
     return;
   };
@@ -36176,21 +36203,9 @@ not governed by the terms of the CPAL.
     throw 'No current SpreadsheetViewer object.';
   };
   function SocialCalc_DoOnResize_Viewer(spreadsheet) {
-    var v;
-    var vname;
-    var views = spreadsheet.views || {};
     var needresize = spreadsheet.SizeSSDiv();
     if (!needresize) return;
-    for (vname in views) {
-      v = views[vname].element;
-      v.style.width = spreadsheet.width + 'px';
-      v.style.height = spreadsheet.height - spreadsheet.nonviewheight + 'px';
-    }
-    if (SocialCalc._app) return;
-    spreadsheet.editor.ResizeTableEditor(
-      spreadsheet.width,
-      spreadsheet.height - spreadsheet.nonviewheight,
-    );
+    SocialCalc.UpdateSpreadsheetChromeLayout(spreadsheet, true);
   }
   function SocialCalc_SizeSSDiv_Viewer(spreadsheet) {
     var sizes;

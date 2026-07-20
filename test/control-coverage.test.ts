@@ -239,9 +239,9 @@ test("SetTab: switch through every tab, also via element and via string", async 
   expect(control.tabs[control.currentTab].name).toBe("edit");
 });
 
-test("SetTab removes each contextual bar from layout and excludes registered views from chrome", async () => {
+test("Find is global while query-driven Replace changes chrome layout and preserves each control state", async () => {
   const SC = await loadSocialCalc();
-  type ContextualLayoutControl = {
+  type FindReplaceControl = {
     formulabarDiv: HTMLElement;
     searchBarDiv: HTMLElement;
     replaceBarDiv: HTMLElement;
@@ -256,67 +256,100 @@ test("SetTab removes each contextual bar from layout and excludes registered vie
       ResizeTableEditor(width: number, height: number): void;
     };
   };
-
-  function measureContextualBars(control: ContextualLayoutControl) {
+  type InputWithJqHandler = HTMLInputElement & {
+    __jqHandlers?: { input?: (this: HTMLInputElement) => void };
+  };
+  const measureBars = (control: FindReplaceControl) => {
     Object.defineProperty(control.formulabarDiv, "offsetHeight", {
       configurable: true,
       get() {
-        return (
-          20 +
-          (control.searchBarDiv.style.display === "none" ? 0 : 20) +
-          (control.replaceBarDiv.style.display === "none" ? 0 : 20)
-        );
+        return 40 + (control.replaceBarDiv.style.display === "none" ? 0 : 20);
       },
     });
-    SC.CalculateSheetNonViewHeight(control);
-    control.viewheight = control.height - control.nonviewheight;
-    control.editor.ResizeTableEditor(control.width, control.viewheight);
+    SC.UpdateSpreadsheetChromeLayout(control, true);
+  };
+
+  const { control: rawFirst } = await newControl(SC, "FindLayout-");
+  const first: FindReplaceControl = rawFirst;
+  measureBars(first);
+  const firstSearch = Array.from(first.searchBarDiv.childNodes).find(
+    (node) => (node as HTMLElement).id === "searchbarinput",
+  ) as InputWithJqHandler;
+  expect(first.searchBarDiv.style.display).not.toBe("none");
+  expect(first.replaceBarDiv.style.display).toBe("none");
+  const emptyLayout = { nonviewheight: first.nonviewheight, viewheight: first.viewheight };
+
+  expect(SC.UpdateFindReplaceVisibility({ ...first, searchBarDiv: null })).toBe(false);
+  let findCalls = 0;
+  const originalFindInSheet = SC.SpreadsheetControl.FindInSheet;
+  const originalGetElementById = document.getElementById.bind(document);
+  document.getElementById = (id: string) =>
+    id === "searchbarinput" ? null : originalGetElementById(id);
+  try {
+    expect(
+      SC.UpdateFindReplaceVisibility({ ...first, searchBarDiv: document.createElement("span") }),
+    ).toBe(false);
+  } finally {
+    document.getElementById = originalGetElementById;
   }
-
-  const { control: rawFindControl } = await newControl(SC, "FindLayout-");
-  const findControl: ContextualLayoutControl = rawFindControl;
-  measureContextualBars(findControl);
-  findControl.replaceBarDiv.style.display = "none";
-  measureContextualBars(findControl);
-  const findBefore = {
-    nonviewheight: findControl.nonviewheight,
-    viewheight: findControl.viewheight,
+  SC.SpreadsheetControl.FindInSheet = function () {
+    findCalls++;
   };
-  SC.SetSpreadsheetControlObject(findControl);
-  findControl.editor.busy = false;
-  SC.SetTab("print");
-  expect(findControl.searchBarDiv.style.display).toBe("none");
-  expect(findControl.nonviewheight).toBe(findBefore.nonviewheight - 20);
-  expect(findControl.viewheight).toBe(findBefore.viewheight + 20);
-  expect(findControl.editor.height).toBe(findControl.viewheight);
+  try {
+    firstSearch.value = " ";
+    const inputHandler = firstSearch.__jqHandlers?.input;
+    expect(inputHandler).toBeTypeOf("function");
+    inputHandler!.call(firstSearch);
+    expect(findCalls).toBe(1);
+    inputHandler!.call(firstSearch);
+    expect(findCalls).toBe(2);
+  } finally {
+    SC.SpreadsheetControl.FindInSheet = originalFindInSheet;
+  }
+  expect(first.replaceBarDiv.style.display).toBe("");
+  expect(first.nonviewheight).toBe(emptyLayout.nonviewheight + 20);
+  expect(first.viewheight).toBe(emptyLayout.viewheight - 20);
+  expect(first.editor.height).toBe(first.viewheight);
+  for (const view of Object.values(first.views)) {
+    expect(view.element.style.width).toBe(first.width + "px");
+    expect(view.element.style.height).toBe(first.viewheight + "px");
+  }
+  expect(SC.UpdateSpreadsheetChromeLayout(first)).toBe(false);
 
-  const { control: rawReplaceControl } = await newControl(SC, "ReplaceLayout-");
-  const replaceControl: ContextualLayoutControl = rawReplaceControl;
-  measureContextualBars(replaceControl);
-  replaceControl.searchBarDiv.style.display = "none";
-  measureContextualBars(replaceControl);
-  const replaceBefore = {
-    nonviewheight: replaceControl.nonviewheight,
-    viewheight: replaceControl.viewheight,
-  };
-  SC.SetSpreadsheetControlObject(replaceControl);
-  replaceControl.editor.busy = false;
-  SC.SetTab("print");
-  expect(replaceControl.replaceBarDiv.style.display).toBe("none");
-  expect(replaceControl.nonviewheight).toBe(replaceBefore.nonviewheight - 20);
-  expect(replaceControl.viewheight).toBe(replaceBefore.viewheight + 20);
-  expect(replaceControl.editor.height).toBe(replaceControl.viewheight);
+  const { control: rawSecond } = await newControl(SC, "SecondFindLayout-");
+  const second: FindReplaceControl = rawSecond;
+  measureBars(second);
+  const secondSearch = Array.from(second.searchBarDiv.childNodes).find(
+    (node) => (node as HTMLElement).id === "searchbarinput",
+  ) as InputWithJqHandler;
+  secondSearch.value = "second";
+  expect(SC.UpdateFindReplaceVisibility(second)).toBe(true);
+  measureBars(second);
 
-  const { control: rawViewControl } = await newControl(SC, "ViewLayout-");
-  const viewControl: ContextualLayoutControl = rawViewControl;
-  measureContextualBars(viewControl);
-  const chromeHeight = viewControl.nonviewheight;
-  for (const view of Object.values(viewControl.views)) {
+  SC.SetSpreadsheetControlObject(first);
+  first.editor.busy = false;
+  SC.SetTab("print");
+  expect(first.searchBarDiv.style.display).not.toBe("none");
+  expect(first.replaceBarDiv.style.display).not.toBe("none");
+  expect(first.viewheight).toBe(emptyLayout.viewheight - 20);
+  expect(second.replaceBarDiv.style.display).not.toBe("none");
+
+  firstSearch.value = "";
+  expect(SC.UpdateFindReplaceVisibility(first)).toBe(true);
+  measureBars(first);
+  expect(first.replaceBarDiv.style.display).toBe("none");
+  expect(first.nonviewheight).toBe(emptyLayout.nonviewheight);
+  expect(first.viewheight).toBe(emptyLayout.viewheight);
+  expect(first.editor.height).toBe(first.viewheight);
+  expect(SC.UpdateFindReplaceVisibility(first)).toBe(false);
+
+  const chromeHeight = first.nonviewheight;
+  for (const view of Object.values(first.views)) {
     Object.defineProperty(view.element, "offsetHeight", { configurable: true, value: 10_000 });
     view.element.style.display = "block";
   }
-  SC.CalculateSheetNonViewHeight(viewControl);
-  expect(viewControl.nonviewheight).toBe(chromeHeight);
+  SC.CalculateSheetNonViewHeight(first);
+  expect(first.nonviewheight).toBe(chromeHeight);
 
   const chromeOnly = {
     views: null,
@@ -327,19 +360,15 @@ test("SetTab removes each contextual bar from layout and excludes registered vie
   SC.CalculateSheetNonViewHeight(chromeOnly);
   expect(chromeOnly.nonviewheight).toBe(7);
 
-  const { control: rawAppControl } = await newControl(SC, "AppLayout-");
-  const appControl: ContextualLayoutControl = rawAppControl;
-  measureContextualBars(appControl);
-  const initialEditorHeight = appControl.editor.height;
+  const editorHeightBeforeAppMode = first.editor.height;
   const originalApp = SC._app;
   SC._app = true;
   try {
-    SC.SetSpreadsheetControlObject(appControl);
-    appControl.editor.busy = false;
-    SC.SetTab("edit");
-    appControl.editor.busy = false;
-    SC.SetTab("print");
-    expect(appControl.editor.height).toBe(initialEditorHeight);
+    firstSearch.value = "app";
+    expect(SC.UpdateFindReplaceVisibility(first)).toBe(true);
+    SC.UpdateSpreadsheetChromeLayout(first, true);
+    expect(first.viewheight).toBe(emptyLayout.viewheight - 20);
+    expect(first.editor.height).toBe(editorHeightBeforeAppMode);
   } finally {
     SC._app = originalApp;
   }

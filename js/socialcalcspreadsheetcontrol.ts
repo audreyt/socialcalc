@@ -1583,12 +1583,9 @@ SpreadsheetControlSC.InitializeSpreadsheetControl = function (
   }
 
   var input = $("<input id='searchbarinput' value='' placeholder='Search sheet…'>");
+  input[0].setAttribute("aria-label", SCLoc("Find"));
   var searchBar = $("<span id='searchbar'></span>");
   searchBar.append("<div id='searchstatus'></div>");
-  var searchLabel = document.createElement("label");
-  searchLabel.htmlFor = "searchbarinput";
-  searchLabel.textContent = SCLoc("Find");
-  searchBar[0].appendChild(searchLabel);
   searchBar.append(input);
 
   // find buttons (right of formula bar)
@@ -1616,7 +1613,12 @@ SpreadsheetControlSC.InitializeSpreadsheetControl = function (
     );
     searchBar[0].appendChild(bele);
   }
-  input.on("input", SpreadsheetControlSC.SpreadsheetControl.FindInSheet);
+  input.on("input", function (this: HTMLInputElement) {
+    SpreadsheetControlSC.SpreadsheetControl.FindInSheet.call(this);
+    if (SocialCalc.UpdateFindReplaceVisibility(spreadsheet, this.value)) {
+      SocialCalc.UpdateSpreadsheetChromeLayout(spreadsheet);
+    }
+  });
   input.on("focus", function () {
     SpreadsheetControlSC.Keyboard.passThru = true;
   });
@@ -1692,9 +1694,7 @@ SpreadsheetControlSC.InitializeSpreadsheetControl = function (
   }
   spreadsheet.replaceBarDiv = replaceBar[0];
   spreadsheet.formulabarDiv.appendChild(spreadsheet.replaceBarDiv);
-  var findReplaceVisible = tabs[spreadsheet.currentTab].name == "edit";
-  spreadsheet.searchBarDiv.style.display = findReplaceVisible ? "" : "none";
-  spreadsheet.replaceBarDiv.style.display = findReplaceVisible ? "" : "none";
+  spreadsheet.replaceBarDiv.style.display = "none";
 
   // initialize tabs that need it
 
@@ -1857,6 +1857,67 @@ SpreadsheetControlSC.CalculateSheetNonViewHeight = function (spreadsheet: any) {
   }
 };
 
+/**
+ * Recompute every sheet view after chrome changes. `force` additionally applies
+ * a width-driven resize, which may have changed wrapping without a tab change.
+ * @param {SocialCalc.SpreadsheetControl} spreadsheet
+ * @param {boolean=} force
+ */
+SpreadsheetControlSC.UpdateSpreadsheetChromeLayout = function (
+  spreadsheet: SocialCalc.SpreadsheetControl,
+  force?: boolean,
+) {
+  var views = spreadsheet.views || {};
+  var oldnonviewheight = spreadsheet.nonviewheight;
+  SocialCalc.CalculateSheetNonViewHeight(spreadsheet);
+  if (!force && oldnonviewheight == spreadsheet.nonviewheight) return false;
+
+  spreadsheet.viewheight = spreadsheet.height - spreadsheet.nonviewheight;
+  for (var viewname in views) {
+    views[viewname].element.style.width = spreadsheet.width + "px";
+    views[viewname].element.style.height = spreadsheet.viewheight + "px";
+  }
+  if (!SocialCalc._app) {
+    spreadsheet.editor.ResizeTableEditor(spreadsheet.width, spreadsheet.viewheight);
+  }
+  return true;
+};
+
+/**
+ * Show replacement controls for every nonempty find value, including whitespace.
+ * @param {SocialCalc.SpreadsheetControl} spreadsheet
+ * @param {string=} value
+ */
+SpreadsheetControlSC.UpdateFindReplaceVisibility = function (
+  spreadsheet: SocialCalc.SpreadsheetControl,
+  value?: string,
+) {
+  var searchInput: HTMLInputElement | null = null;
+  if (spreadsheet.searchBarDiv) {
+    for (
+      var childIndex = 0;
+      childIndex < spreadsheet.searchBarDiv.childNodes.length;
+      childIndex++
+    ) {
+      var child = spreadsheet.searchBarDiv.childNodes[childIndex] as HTMLElement;
+      if (child.id == "searchbarinput") {
+        searchInput = child as HTMLInputElement;
+        break;
+      }
+    }
+  }
+  if (!searchInput) {
+    searchInput = document.getElementById("searchbarinput") as HTMLInputElement | null;
+  }
+  var searchValue = value === undefined ? (searchInput?.value ?? "") : value;
+  var shouldShow = searchValue.length != 0;
+  var display = shouldShow ? "" : "none";
+  if (spreadsheet.replaceBarDiv.style.display == display) return false;
+
+  spreadsheet.replaceBarDiv.style.display = display;
+  return true;
+};
+
 // }
 
 //
@@ -1979,9 +2040,7 @@ SpreadsheetControlSC.SetTab = function (obj: any) {
   }
 
   spreadsheet.currentTab = newtabnum;
-  var findReplaceVisible = tabs[newtabnum].name == "edit";
-  spreadsheet.searchBarDiv.style.display = findReplaceVisible ? "" : "none";
-  spreadsheet.replaceBarDiv.style.display = findReplaceVisible ? "" : "none";
+  spreadsheet.searchBarDiv.style.display = "";
 
   if (tabs[newtabnum].onclick) {
     tabs[newtabnum].onclick(spreadsheet, newtab);
@@ -1996,17 +2055,9 @@ SpreadsheetControlSC.SetTab = function (obj: any) {
     }
   }
 
-  var oldnonviewheight = spreadsheet.nonviewheight;
-  SocialCalc.CalculateSheetNonViewHeight(spreadsheet);
-  if (oldnonviewheight != spreadsheet.nonviewheight) {
-    spreadsheet.viewheight = spreadsheet.height - spreadsheet.nonviewheight;
-    for (vname in views) {
-      views[vname].element.style.height = spreadsheet.viewheight + "px";
-    }
-    if (!SocialCalc._app) {
-      spreadsheet.editor.ResizeTableEditor(spreadsheet.width, spreadsheet.viewheight);
-    }
-  }
+  SocialCalc.UpdateFindReplaceVisibility(spreadsheet);
+  spreadsheet.statuslineDiv.style.display = newview == "sheet" ? "block" : "none";
+  SocialCalc.UpdateSpreadsheetChromeLayout(spreadsheet, true);
   if (tabs[newtabnum].onclickFocus) {
     ele = tabs[newtabnum].onclickFocus;
     if (typeof ele == "string") {
@@ -2024,10 +2075,7 @@ SpreadsheetControlSC.SetTab = function (obj: any) {
   }
 
   if (newview == "sheet") {
-    spreadsheet.statuslineDiv.style.display = "block";
     spreadsheet.editor.ScheduleRender();
-  } else {
-    spreadsheet.statuslineDiv.style.display = "none";
   }
 
   return;

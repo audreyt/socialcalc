@@ -542,24 +542,10 @@ SocialCalc.GetSpreadsheetViewerObject = function (): SocialCalc.SpreadsheetViewe
 //
 
 function SocialCalc_DoOnResize_Viewer(spreadsheet: SocialCalc.SpreadsheetViewer): void {
-  var v: HTMLElement;
-  var vname: string;
-  var views = spreadsheet.views || {};
-
   var needresize = spreadsheet.SizeSSDiv();
   if (!needresize) return;
 
-  for (vname in views) {
-    v = views[vname]!.element;
-    v.style.width = spreadsheet.width + "px";
-    v.style.height = spreadsheet.height - spreadsheet.nonviewheight + "px";
-  }
-
-  if (SocialCalc._app) return; // app has no scroll bars and keep normal HTML style page scroll - for mobile
-  spreadsheet.editor.ResizeTableEditor(
-    spreadsheet.width,
-    spreadsheet.height - spreadsheet.nonviewheight,
-  );
+  SocialCalc.UpdateSpreadsheetChromeLayout(spreadsheet, true);
 }
 
 //

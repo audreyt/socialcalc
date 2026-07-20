@@ -108,6 +108,7 @@ declare namespace SocialCalc {
   // Shared free functions also declared for SpreadsheetControl — use overloads via re-declare is fine in merged namespace.
   function DoOnResize(spreadsheet: SpreadsheetViewer): void;
   function SizeSSDiv(spreadsheet: SpreadsheetViewer): boolean;
+  function UpdateSpreadsheetChromeLayout(spreadsheet: SpreadsheetViewer, force?: boolean): boolean;
   function SpreadsheetViewerStatuslineCallback(
     editor: TableEditor,
     status: string,
