@@ -1549,6 +1549,7 @@ SpreadsheetControlSC.InitializeSpreadsheetControl = function (
   // create formula bar
 
   spreadsheet.formulabarDiv = document.createElement("div");
+  spreadsheet.formulabarDiv.className = "socialcalc-formulabar";
   //spreadsheet.formulabarDiv.style.height = spreadsheet.formulabarheight + "px"; // Allow line wrapping
   spreadsheet.formulabarDiv.innerHTML = '<input type="text" size="60" value="">&nbsp;'; //'<textarea rows="4" cols="60" style="z-index:5;background-color:white;position:relative;"></textarea>&nbsp;';
   spreadsheet.spreadsheetDiv.appendChild(spreadsheet.formulabarDiv);

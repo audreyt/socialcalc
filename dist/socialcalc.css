@@ -127,7 +127,18 @@
   z-index: 110;
 }
 #searchbar {
-  float: none;
+  display: inline;
+  float: right;
+}
+/* Keep the formula field, its buttons, and EtherCalc-aligned Find on one
+   row when the control is narrower than the field's legacy 60-character size. */
+.socialcalc-formulabar > input[type="text"][size="60"] {
+  max-width: calc(100% - 310px);
+}
+#replacebar {
+  clear: both;
+  display: block;
+  text-align: right;
 }
 
 /* Visually hidden but available to assistive technology (aria-live status/error regions). */

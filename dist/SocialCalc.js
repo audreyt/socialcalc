@@ -32742,6 +32742,7 @@ not governed by the terms of the CPAL.
       );
     }
     spreadsheet.formulabarDiv = document.createElement('div');
+    spreadsheet.formulabarDiv.className = 'socialcalc-formulabar';
     spreadsheet.formulabarDiv.innerHTML = '<input type="text" size="60" value="">&nbsp;';
     spreadsheet.spreadsheetDiv.appendChild(spreadsheet.formulabarDiv);
     new SocialCalc.InputBox(spreadsheet.formulabarDiv.firstChild, spreadsheet.editor);

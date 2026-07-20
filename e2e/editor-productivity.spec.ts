@@ -22,6 +22,33 @@ type TabLayoutControl = {
   editor: { busy: boolean };
 };
 
+type ChromeBounds = {
+  x: number;
+  y: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+};
+
+type ChromeLayout = {
+  formulaBar: ChromeBounds;
+  formula: ChromeBounds;
+  find: ChromeBounds;
+  replace: ChromeBounds;
+  grid: ChromeBounds;
+  replaceAll: ChromeBounds;
+  replaceControls: ChromeBounds[];
+  replaceFragments: ChromeBounds[];
+  replaceTextAlign: string;
+  formulaBarClass: string;
+  findFloat: string;
+  replaceDisplay: string;
+  nonviewheight: number;
+  viewheight: number;
+  height: number;
+};
+
 test.describe("redo keyboard shortcuts", () => {
   test("Ctrl+Y redoes an undone edit", async ({ page }) => {
     await gotoBundle(page, "normal");
@@ -123,7 +150,7 @@ test.describe("tab tools and pane sliders", () => {
     await expect(page.locator("#SocialCalc-print-area")).toBeHidden();
   });
 
-  test("Find stays global and reveals query-driven Replace controls without losing layout", async ({
+  test("Find shares the formula row and reveals a query-driven Replace pane without losing layout", async ({
     page,
   }) => {
     await gotoBundle(page, "normal");
@@ -147,14 +174,104 @@ test.describe("tab tools and pane sliders", () => {
           height: number;
           editor: { griddiv: HTMLElement };
         };
+        const bounds = (element: HTMLElement) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            x: rect.x,
+            y: rect.y,
+            right: rect.right,
+            bottom: rect.bottom,
+            width: rect.width,
+            height: rect.height,
+          };
+        };
+        const formula = spreadsheet.formulabarDiv.querySelector('input[size="60"]') as HTMLElement;
+        const find = document.getElementById("searchbar")!;
+        const replace = document.getElementById("replacebar")!;
+        const findStyle = getComputedStyle(find);
+        const replaceAll = document.getElementById("SocialCalc-replaceallbutton")!;
+        const replaceControls = Array.from(replace.querySelectorAll("label, input, button")).map(
+          (element) => bounds(element as HTMLElement),
+        );
+        const replaceFragments = Array.from(
+          replace.querySelectorAll("label, input, button"),
+        ).flatMap((element) =>
+          Array.from(element.getClientRects()).map((rect) => ({
+            x: rect.x,
+            y: rect.y,
+            right: rect.right,
+            bottom: rect.bottom,
+            width: rect.width,
+            height: rect.height,
+          })),
+        );
+        const replaceStyle = getComputedStyle(replace);
         return {
-          formulaBarHeight: spreadsheet.formulabarDiv.getBoundingClientRect().height,
-          gridHeight: spreadsheet.editor.griddiv.getBoundingClientRect().height,
+          formulaBar: bounds(spreadsheet.formulabarDiv),
+          formula: bounds(formula),
+          find: bounds(find),
+          replace: bounds(replace),
+          grid: bounds(spreadsheet.editor.griddiv),
+          formulaBarClass: spreadsheet.formulabarDiv.className,
+          replaceAll: bounds(replaceAll),
+          replaceControls,
+          replaceFragments,
+          replaceTextAlign: replaceStyle.textAlign,
+          findFloat: findStyle.float,
+          replaceDisplay: replaceStyle.display,
           nonviewheight: spreadsheet.nonviewheight,
           viewheight: spreadsheet.viewheight,
           height: spreadsheet.height,
         };
       }, "SocialCalc-");
+    const assertChromeHeight = (value: ChromeLayout) => {
+      expect(value.nonviewheight + value.viewheight).toBe(value.height);
+    };
+    const assertNoOverlapOrClipping = (value: ChromeLayout) => {
+      const overlaps =
+        value.formula.x < value.find.right &&
+        value.find.x < value.formula.right &&
+        value.formula.y < value.find.bottom &&
+        value.find.y < value.formula.bottom;
+      expect(overlaps).toBe(false);
+      for (const element of [value.formula, value.find, value.replace]) {
+        expect(element.x).toBeGreaterThanOrEqual(value.formulaBar.x);
+        expect(element.right).toBeLessThanOrEqual(value.formulaBar.right);
+      }
+    };
+    const assertRightAlignedReplace = (value: ChromeLayout, hasLeadingInset: boolean) => {
+      expect(value.replaceTextAlign).toBe("right");
+      expect(value.replaceAll.right).toBe(value.replace.right);
+      const visibleControls = value.replaceControls.filter(
+        (control) => control.width > 0 && control.height > 0,
+      );
+      expect(visibleControls.length).toBeGreaterThan(0);
+      for (const control of visibleControls) {
+        expect(control.x).toBeGreaterThanOrEqual(value.replace.x);
+        expect(control.right).toBeLessThanOrEqual(value.replace.right);
+      }
+      for (let firstIndex = 0; firstIndex < value.replaceFragments.length; firstIndex++) {
+        const first = value.replaceFragments[firstIndex];
+        for (
+          let secondIndex = firstIndex + 1;
+          secondIndex < value.replaceFragments.length;
+          secondIndex++
+        ) {
+          const second = value.replaceFragments[secondIndex];
+          expect(
+            first.x < second.right &&
+              second.x < first.right &&
+              first.y < second.bottom &&
+              second.y < first.bottom,
+          ).toBe(false);
+        }
+      }
+      if (hasLeadingInset) {
+        expect(Math.min(...visibleControls.map((control) => control.x))).toBeGreaterThan(
+          value.replace.x,
+        );
+      }
+    };
     const find = page.locator("#searchbar");
     const searchInput = page.locator("#searchbarinput");
     const replace = page.locator("#replacebar");
@@ -169,7 +286,13 @@ test.describe("tab tools and pane sliders", () => {
     await expect(searchInput).toHaveAttribute("placeholder", "Search sheet…");
 
     const emptyLayout = await layout();
-    expect(emptyLayout.nonviewheight + emptyLayout.viewheight).toBe(emptyLayout.height);
+    assertChromeHeight(emptyLayout);
+    expect(emptyLayout.findFloat).toBe("right");
+    expect(emptyLayout.replaceDisplay).toBe("none");
+    expect(emptyLayout.formulaBarClass).toContain("socialcalc-formulabar");
+    expect(emptyLayout.find.y).toBe(emptyLayout.formula.y);
+    expect(emptyLayout.find.right).toBe(emptyLayout.formulaBar.right);
+    expect(emptyLayout.find.x).toBeGreaterThan(emptyLayout.formula.right);
     await searchInput.focus();
     await page.keyboard.press("Tab");
     await expect
@@ -185,6 +308,19 @@ test.describe("tab tools and pane sliders", () => {
     await expect(page.locator("#replacewholesheetinput")).toHaveAccessibleName("Whole sheet");
     await expect(page.getByRole("button", { name: "Replace", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "All", exact: true })).toBeVisible();
+    const expandedLayout = await layout();
+    assertChromeHeight(expandedLayout);
+    expect(expandedLayout.find.y).toBe(expandedLayout.formula.y);
+    expect(expandedLayout.find.right).toBe(expandedLayout.formulaBar.right);
+    expect(expandedLayout.replaceDisplay).toBe("block");
+    expect(expandedLayout.replace.y).toBeGreaterThanOrEqual(
+      Math.max(expandedLayout.formula.bottom, expandedLayout.find.bottom),
+    );
+    expect(expandedLayout.formulaBar.height).toBeGreaterThan(emptyLayout.formulaBar.height);
+    expect(expandedLayout.grid.height).toBeLessThan(emptyLayout.grid.height);
+    expect(expandedLayout.viewheight).toBeLessThan(emptyLayout.viewheight);
+    assertNoOverlapOrClipping(expandedLayout);
+    assertRightAlignedReplace(expandedLayout, true);
     await expect
       .poll(() =>
         page.evaluate(() => {
@@ -200,12 +336,6 @@ test.describe("tab tools and pane sliders", () => {
     await page.keyboard.press("Tab");
     await expect(replaceInput).toBeFocused();
     await page.fill("#replacebarinput", "replacement");
-
-    const expandedLayout = await layout();
-    expect(expandedLayout.nonviewheight + expandedLayout.viewheight).toBe(expandedLayout.height);
-    expect(expandedLayout.formulaBarHeight).toBeGreaterThan(emptyLayout.formulaBarHeight);
-    expect(expandedLayout.gridHeight).toBeLessThan(emptyLayout.gridHeight);
-    expect(expandedLayout.viewheight).toBeLessThan(emptyLayout.viewheight);
 
     for (const tab of [
       "print",
@@ -225,10 +355,28 @@ test.describe("tab tools and pane sliders", () => {
       await expect(searchInput).toHaveValue("needle");
       await expect(replaceInput).toHaveValue("replacement");
       const tabLayout = await layout();
-      expect(tabLayout.nonviewheight + tabLayout.viewheight).toBe(tabLayout.height);
+      assertChromeHeight(tabLayout);
+      expect(tabLayout.find.y).toBe(tabLayout.formula.y);
+      expect(tabLayout.replace.y).toBeGreaterThanOrEqual(
+        Math.max(tabLayout.formula.bottom, tabLayout.find.bottom),
+      );
+      assertRightAlignedReplace(tabLayout, true);
     }
     await page.click("#SocialCalc-edittab");
     await waitForEditorIdle();
+
+    await page.fill("#searchbarinput", "");
+    await expect(replace).toBeHidden();
+    const desktopBaselineAfterTabSweep = await layout();
+    assertChromeHeight(desktopBaselineAfterTabSweep);
+
+    await page.fill("#searchbarinput", "needle");
+    await expect(replace).toBeVisible();
+    await page.fill("#searchbarinput", "");
+    await expect(replace).toBeHidden();
+    const restoredDesktopLayout = await layout();
+    assertChromeHeight(restoredDesktopLayout);
+    expect(restoredDesktopLayout).toEqual(desktopBaselineAfterTabSweep);
 
     await page.evaluate((idPrefix) => {
       const spreadsheet = window.__scControls[idPrefix] as unknown as TabLayoutControl;
@@ -236,21 +384,25 @@ test.describe("tab tools and pane sliders", () => {
       spreadsheet.DoOnResize();
     }, "SocialCalc-");
     await waitForEditorIdle();
-    const wrappedLayout = await layout();
-    expect(wrappedLayout.nonviewheight + wrappedLayout.viewheight).toBe(wrappedLayout.height);
-    expect(wrappedLayout.formulaBarHeight).toBeGreaterThanOrEqual(expandedLayout.formulaBarHeight);
-    await page.click("#SocialCalc-printtab");
-    await waitForEditorIdle();
-    await page.click("#SocialCalc-edittab");
-    await waitForEditorIdle();
-    expect(await layout()).toEqual(wrappedLayout);
+    const narrowEmptyLayout = await layout();
+    assertChromeHeight(narrowEmptyLayout);
+    expect(narrowEmptyLayout.findFloat).toBe("right");
+    assertNoOverlapOrClipping(narrowEmptyLayout);
 
+    await page.fill("#searchbarinput", "needle");
+    await expect(replace).toBeVisible();
+    const narrowExpandedLayout = await layout();
+    assertChromeHeight(narrowExpandedLayout);
+    assertNoOverlapOrClipping(narrowExpandedLayout);
+    expect(narrowExpandedLayout.replace.y).toBeGreaterThanOrEqual(
+      Math.max(narrowExpandedLayout.formula.bottom, narrowExpandedLayout.find.bottom),
+    );
+    assertRightAlignedReplace(narrowExpandedLayout, false);
     await page.fill("#searchbarinput", "");
     await expect(replace).toBeHidden();
-    const clearedLayout = await layout();
-    expect(clearedLayout.nonviewheight + clearedLayout.viewheight).toBe(clearedLayout.height);
-    expect(clearedLayout.formulaBarHeight).toBeLessThan(wrappedLayout.formulaBarHeight);
-    expect(clearedLayout.gridHeight).toBeGreaterThan(wrappedLayout.gridHeight);
+    const clearedNarrowLayout = await layout();
+    assertChromeHeight(clearedNarrowLayout);
+    expect(clearedNarrowLayout).toEqual(narrowEmptyLayout);
     await searchInput.focus();
     await page.keyboard.press("Tab");
     await expect
@@ -404,7 +556,7 @@ test.describe("Find & Replace", () => {
       return {
         controls,
         visibleControls,
-        find: { x: find.x, y: find.y },
+        find: { x: find.x, y: find.y, bottom: find.bottom },
         replace: { x: replace.x, y: replace.y },
       };
     });
@@ -420,8 +572,7 @@ test.describe("Find & Replace", () => {
       "SocialCalc-replaceallbutton",
     ]);
     expect(findReplaceOrder.visibleControls).toEqual(findReplaceOrder.controls);
-    expect(findReplaceOrder.find.y).toBe(findReplaceOrder.replace.y);
-    expect(findReplaceOrder.find.x).toBeLessThan(findReplaceOrder.replace.x);
+    expect(findReplaceOrder.replace.y).toBeGreaterThanOrEqual(findReplaceOrder.find.bottom);
 
     await page.locator("#searchbarinput").focus();
     const tabOrder: string[] = [];
