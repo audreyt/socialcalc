@@ -107,6 +107,9 @@ test.describe("tab tools and pane sliders", () => {
       initialVisibility.filter((tool) => tool.name !== "edit").map((tool) => tool.display),
     ).toEqual(Array(initialVisibility.length - 1).fill("none"));
 
+    await expect(page.locator("#SocialCalc-freezepanesbutton")).toHaveCount(0);
+    await expect(page.locator("#SocialCalc-unfreezepanesbutton")).toHaveCount(0);
+
     await page.click("#SocialCalc-printtab");
     await expect(page.locator("#SocialCalc-print-area")).toBeVisible();
 
@@ -131,8 +134,14 @@ test.describe("tab tools and pane sliders", () => {
       "SocialCalc-",
     );
 
+    const sliderLocator = async (selector: string) => {
+      const axis = selector.endsWith("h") ? "h" : "v";
+      const slider = page.locator(`${selector}, #te_paneslider${axis}`);
+      if (await slider.count()) return slider.first();
+      throw new Error(`missing pane slider ${selector}`);
+    };
     const dragSlider = async (selector: string, axis: "x" | "y", target: number) => {
-      const slider = await page.locator(selector).boundingBox();
+      const slider = await (await sliderLocator(selector)).boundingBox();
       if (!slider) throw new Error(`missing pane slider ${selector}`);
       await page.mouse.move(slider.x + slider.width / 2, slider.y + slider.height / 2);
       await page.mouse.down();
@@ -142,9 +151,18 @@ test.describe("tab tools and pane sliders", () => {
       );
       await page.mouse.up();
     };
-    const horizontalControl = await page.locator("#SocialCalc-tablecontrolh").boundingBox();
-    const verticalControl = await page.locator("#SocialCalc-tablecontrolv").boundingBox();
-    if (!horizontalControl || !verticalControl) throw new Error("missing pane slider controls");
+    const controlExtent = async (selector: string) => {
+      const extent = await (
+        await sliderLocator(selector)
+      ).evaluate((element) => {
+        const rect = element.parentElement?.getBoundingClientRect();
+        return rect && { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+      });
+      if (!extent) throw new Error(`missing pane slider parent ${selector}`);
+      return extent;
+    };
+    const horizontalControl = await controlExtent("#SocialCalc-panesliderh");
+    const verticalControl = await controlExtent("#SocialCalc-panesliderv");
 
     await dragSlider(
       "#SocialCalc-panesliderh",
@@ -188,9 +206,8 @@ test.describe("tab tools and pane sliders", () => {
     expect(frozen.row).toBeGreaterThanOrEqual(3);
     expect(frozen.col).toBeGreaterThanOrEqual(6);
 
-    const horizontalOrigin = await page.locator("#SocialCalc-tablecontrolh").boundingBox();
-    const verticalOrigin = await page.locator("#SocialCalc-tablecontrolv").boundingBox();
-    if (!horizontalOrigin || !verticalOrigin) throw new Error("missing pane slider controls");
+    const horizontalOrigin = await controlExtent("#SocialCalc-panesliderh");
+    const verticalOrigin = await controlExtent("#SocialCalc-panesliderv");
     await dragSlider("#SocialCalc-panesliderh", "x", horizontalOrigin.x + 1);
     await waitFor(
       page,
