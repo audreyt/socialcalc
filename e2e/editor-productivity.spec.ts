@@ -1,6 +1,6 @@
-// Real-browser coverage for the editor productivity features: Find/Replace,
-// Freeze/Unfreeze Panes, Ctrl+Y / Ctrl+Shift+Z redo, and the modern
-// navigator.clipboard copy/paste path with its legacy-textarea fallback.
+// Real-browser coverage for the editor productivity features: pane sliders,
+// Find/Replace, Ctrl+Y / Ctrl+Shift+Z redo, and the modern navigator.clipboard
+// copy/paste path with its legacy-textarea fallback.
 // Runs against the normal bundle only (bundle-parity.spec.ts already
 // re-exercises a subset of the base editor-core suite against the
 // minified bundle; these are new features, not parity checks).
@@ -13,6 +13,7 @@ import {
   gotoBundle,
   test,
   waitFor,
+  scheduleCommand,
 } from "./fixtures/editor";
 
 test.describe("redo keyboard shortcuts", () => {
@@ -81,43 +82,127 @@ test.describe("redo keyboard shortcuts", () => {
   });
 });
 
-test.describe("Freeze / Unfreeze Panes", () => {
-  test("Freeze Panes button freezes at the active cell; Unfreeze collapses back to one pane", async ({
+test.describe("tab tools and pane sliders", () => {
+  test("initial Edit hides every other tool root, while Print toggles its controls", async ({
     page,
   }) => {
     await gotoBundle(page, "normal");
     await createControl(page);
 
-    await clickCell(page, "C3");
+    const initialVisibility: Array<{ name: string; display: string }> = await page.evaluate(
+      (idPrefix) => {
+        const spreadsheet = window.__scControls[idPrefix] as unknown as {
+          tabs: Array<{ name: string }>;
+        };
+        return spreadsheet.tabs.map((tab: { name: string }) => ({
+          name: tab.name,
+          display: getComputedStyle(document.getElementById(idPrefix + tab.name + "tools")!)
+            .display,
+        }));
+      },
+      "SocialCalc-",
+    );
+    expect(initialVisibility.find((tool) => tool.name === "edit")?.display).not.toBe("none");
+    expect(
+      initialVisibility.filter((tool) => tool.name !== "edit").map((tool) => tool.display),
+    ).toEqual(Array(initialVisibility.length - 1).fill("none"));
+
+    await page.click("#SocialCalc-printtab");
+    await expect(page.locator("#SocialCalc-print-area")).toBeVisible();
+
+    await page.click("#SocialCalc-edittab");
+    await expect(page.locator("#SocialCalc-print-area")).toBeHidden();
+  });
+
+  test("pane sliders freeze visible rows and columns, then unfreeze at their origins", async ({
+    page,
+  }) => {
+    await gotoBundle(page, "normal");
+    await createControl(page);
+    await scheduleCommand(page, "set sheet lastrow 100\nset sheet lastcol 30");
     await waitFor(
       page,
-      (idPrefix) => window.__scControls[idPrefix].editor.ecell.coord === "C3",
+      (idPrefix) => {
+        const sheet = window.__scControls[idPrefix].sheet as unknown as {
+          attribs: { lastrow?: number; lastcol?: number };
+        };
+        return sheet.attribs.lastrow === 100 && sheet.attribs.lastcol === 30;
+      },
       "SocialCalc-",
     );
 
-    await page.click("#SocialCalc-freezepanesbutton");
+    const dragSlider = async (selector: string, axis: "x" | "y", target: number) => {
+      const slider = await page.locator(selector).boundingBox();
+      if (!slider) throw new Error(`missing pane slider ${selector}`);
+      await page.mouse.move(slider.x + slider.width / 2, slider.y + slider.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(
+        axis === "x" ? target : slider.x + slider.width / 2,
+        axis === "y" ? target : slider.y + slider.height / 2,
+      );
+      await page.mouse.up();
+    };
+    const horizontalControl = await page.locator("#SocialCalc-tablecontrolh").boundingBox();
+    const verticalControl = await page.locator("#SocialCalc-tablecontrolv").boundingBox();
+    if (!horizontalControl || !verticalControl) throw new Error("missing pane slider controls");
+
+    await dragSlider(
+      "#SocialCalc-panesliderh",
+      "x",
+      horizontalControl.x + horizontalControl.width - 40,
+    );
     await waitFor(
       page,
-      (idPrefix) => window.__scControls[idPrefix].editor.context.rowpanes.length === 2,
+      (idPrefix) => {
+        const panes = window.__scControls[idPrefix].editor.context.colpanes as Array<{
+          last: number;
+        }>;
+        return panes.length === 2 && panes[0].last >= 6;
+      },
       "SocialCalc-",
     );
-    const paneCounts = await page.evaluate((idPrefix) => {
-      const ctx = window.__scControls[idPrefix].editor.context;
-      return { rowpanes: ctx.rowpanes.length, colpanes: ctx.colpanes.length };
+
+    await dragSlider(
+      "#SocialCalc-panesliderv",
+      "y",
+      verticalControl.y + verticalControl.height - 40,
+    );
+    await waitFor(
+      page,
+      (idPrefix) => {
+        const panes = window.__scControls[idPrefix].editor.context.rowpanes as Array<{
+          last: number;
+        }>;
+        return panes.length === 2 && panes[0].last >= 3;
+      },
+      "SocialCalc-",
+    );
+
+    const frozen = await page.evaluate((idPrefix) => {
+      const context = window.__scControls[idPrefix].editor.context as {
+        rowpanes: Array<{ last: number }>;
+        colpanes: Array<{ last: number }>;
+      };
+      return { row: context.rowpanes[0].last, col: context.colpanes[0].last };
     }, "SocialCalc-");
-    expect(paneCounts).toEqual({ rowpanes: 2, colpanes: 2 });
+    expect(frozen.row).toBeGreaterThanOrEqual(3);
+    expect(frozen.col).toBeGreaterThanOrEqual(6);
 
-    await page.click("#SocialCalc-unfreezepanesbutton");
+    const horizontalOrigin = await page.locator("#SocialCalc-tablecontrolh").boundingBox();
+    const verticalOrigin = await page.locator("#SocialCalc-tablecontrolv").boundingBox();
+    if (!horizontalOrigin || !verticalOrigin) throw new Error("missing pane slider controls");
+    await dragSlider("#SocialCalc-panesliderh", "x", horizontalOrigin.x + 1);
+    await waitFor(
+      page,
+      (idPrefix) => window.__scControls[idPrefix].editor.context.colpanes.length === 1,
+      "SocialCalc-",
+    );
+    await dragSlider("#SocialCalc-panesliderv", "y", verticalOrigin.y + 1);
     await waitFor(
       page,
       (idPrefix) => window.__scControls[idPrefix].editor.context.rowpanes.length === 1,
       "SocialCalc-",
     );
-    const afterUnfreeze = await page.evaluate((idPrefix) => {
-      const ctx = window.__scControls[idPrefix].editor.context;
-      return { rowpanes: ctx.rowpanes.length, colpanes: ctx.colpanes.length };
-    }, "SocialCalc-");
-    expect(afterUnfreeze).toEqual({ rowpanes: 1, colpanes: 1 });
   });
 });
 

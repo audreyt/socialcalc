@@ -416,29 +416,6 @@ test("Replace-All with a range selection only rewrites cells inside the range", 
   expect(control.sheet.cells.D4.datavalue).toBe("foo"); // outside range, untouched
 });
 
-test("Freeze/Unfreeze Panes toolbar buttons dispatch to FreezePanesAtSelection/UnfreezePanes on click", async () => {
-  const { SC, control } = await newBrowserControl("FreezeButtons-");
-  await scheduleCommands(SC, control.sheet, ["set A1 value n 1"]);
-  await recalcSheet(SC, control.sheet);
-
-  control.editor.ecell = { coord: "C3", row: 3, col: 3 };
-  control.editor.range = { hasrange: false };
-
-  const freezeButton: any = document.getElementById(control.idPrefix + "freezepanesbutton");
-  expect(freezeButton).toBeTruthy();
-  const freezeDone = waitCmdEnd(control.sheet);
-  freezeButton.__listeners.click[0]();
-  await freezeDone;
-  expect(control.editor.context.rowpanes.length).toBe(2);
-
-  const unfreezeButton: any = document.getElementById(control.idPrefix + "unfreezepanesbutton");
-  expect(unfreezeButton).toBeTruthy();
-  const unfreezeDone = waitCmdEnd(control.sheet);
-  unfreezeButton.__listeners.click[0]();
-  await unfreezeDone;
-  expect(control.editor.context.rowpanes.length).toBe(1);
-});
-
 test("Replace-All rewrites every matching cell in one undo transaction, skips hidden and formula cells by default, and honors range scope", async () => {
   const { SC, control } = await newBrowserControl("Replace-");
 

@@ -341,7 +341,7 @@ SpreadsheetControlSC.SpreadsheetControl = function (idPrefix: any) {
     name: "print",
     text: "Print",
     html:
-      '<div id="%id.printtools" style="padding:10px 0px 0px 0px;">' +
+      '<div id="%id.printtools" style="display:none;padding:10px 0px 0px 0px;">' +
       '<label>%loc!Print area!: <input id="%id.print-area" type="text" size="16" placeholder="A1:D20"></label>' +
       "&nbsp;&nbsp;" +
       '<label>%loc!Repeat rows!: <input id="%id.print-repeatrows" type="text" size="6" placeholder="1:2"></label>' +
@@ -1667,28 +1667,6 @@ SpreadsheetControlSC.InitializeSpreadsheetControl = function (
     SpreadsheetControlSC.Keyboard.passThru = false;
   });
   spreadsheet.formulabarDiv.appendChild(replaceBar[0]);
-
-  // Freeze/Unfreeze Panes: freezes at the current selection (top-left of
-  // range, or ecell) using the existing "pane row"/"pane col" commands;
-  // Unfreeze collapses back to a single pane via "pane row 0"/"pane col 0"
-  // (the pre-existing collapse path in ExecuteSheetCommand's "pane" case).
-  var freezeButton = document.createElement("button");
-  freezeButton.id = spreadsheet.idPrefix + "freezepanesbutton";
-  freezeButton.type = "button";
-  freezeButton.textContent = SCLoc("Freeze Panes");
-  freezeButton.title = SCLoc("Freeze Panes");
-  freezeButton.addEventListener(
-    "click",
-    SpreadsheetControlSC.SpreadsheetControl.FreezePanesAtSelection,
-  );
-  var unfreezeButton = document.createElement("button");
-  unfreezeButton.id = spreadsheet.idPrefix + "unfreezepanesbutton";
-  unfreezeButton.type = "button";
-  unfreezeButton.textContent = SCLoc("Unfreeze Panes");
-  unfreezeButton.title = SCLoc("Unfreeze Panes");
-  unfreezeButton.addEventListener("click", SpreadsheetControlSC.SpreadsheetControl.UnfreezePanes);
-  spreadsheet.formulabarDiv.appendChild(freezeButton);
-  spreadsheet.formulabarDiv.appendChild(unfreezeButton);
 
   // initialize tabs that need it
 

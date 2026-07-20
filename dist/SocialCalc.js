@@ -31527,7 +31527,7 @@ not governed by the terms of the CPAL.
       name: 'print',
       text: 'Print',
       html:
-        '<div id="%id.printtools" style="padding:10px 0px 0px 0px;">' +
+        '<div id="%id.printtools" style="display:none;padding:10px 0px 0px 0px;">' +
         '<label>%loc!Print area!: <input id="%id.print-area" type="text" size="16" placeholder="A1:D20"></label>' +
         '&nbsp;&nbsp;' +
         '<label>%loc!Repeat rows!: <input id="%id.print-repeatrows" type="text" size="6" placeholder="1:2"></label>' +
@@ -32850,23 +32850,6 @@ not governed by the terms of the CPAL.
       SpreadsheetControlSC.Keyboard.passThru = false;
     });
     spreadsheet.formulabarDiv.appendChild(replaceBar[0]);
-    var freezeButton = document.createElement('button');
-    freezeButton.id = spreadsheet.idPrefix + 'freezepanesbutton';
-    freezeButton.type = 'button';
-    freezeButton.textContent = SCLoc('Freeze Panes');
-    freezeButton.title = SCLoc('Freeze Panes');
-    freezeButton.addEventListener(
-      'click',
-      SpreadsheetControlSC.SpreadsheetControl.FreezePanesAtSelection,
-    );
-    var unfreezeButton = document.createElement('button');
-    unfreezeButton.id = spreadsheet.idPrefix + 'unfreezepanesbutton';
-    unfreezeButton.type = 'button';
-    unfreezeButton.textContent = SCLoc('Unfreeze Panes');
-    unfreezeButton.title = SCLoc('Unfreeze Panes');
-    unfreezeButton.addEventListener('click', SpreadsheetControlSC.SpreadsheetControl.UnfreezePanes);
-    spreadsheet.formulabarDiv.appendChild(freezeButton);
-    spreadsheet.formulabarDiv.appendChild(unfreezeButton);
     for (i = 0; i < tabs.length; i++) {
       if (tabs[i].oncreate) {
         tabs[i].oncreate(spreadsheet, tabs[i].name);
