@@ -130,6 +130,20 @@ test.describe("tab tools and pane sliders", () => {
   test("Find/Replace is Edit-only while the formula input remains global", async ({ page }) => {
     await gotoBundle(page, "normal");
     await createControl(page);
+    const waitForEditorIdle = async () => {
+      await expect
+        .poll(() =>
+          page.evaluate((idPrefix) => {
+            // See the narrow fixture-boundary types above.
+            const spreadsheet = window.__scControls[idPrefix] as unknown as TabLayoutControl;
+            return !spreadsheet.editor.busy;
+          }, "SocialCalc-"),
+        )
+        .toBe(true);
+    };
+    await expect
+      .poll(() => page.evaluate(() => Array.from(document.images).every((image) => image.complete)))
+      .toBe(true);
     await page.evaluate((idPrefix) => {
       // The fixture's published control map intentionally exposes only the
       // helpers most e2e tests need; this test validates the tab lifecycle.
@@ -138,6 +152,7 @@ test.describe("tab tools and pane sliders", () => {
       spreadsheet.editor.busy = false;
       socialCalc.SetTab("edit");
     }, "SocialCalc-");
+    await waitForEditorIdle();
 
     const find = page.locator("#searchbar");
     const replace = page.locator("#replacebar");
@@ -186,7 +201,9 @@ test.describe("tab tools and pane sliders", () => {
       "pivot",
       "clipboard",
     ]) {
+      await waitForEditorIdle();
       await page.click(`#SocialCalc-${tab}tab`);
+      await waitForEditorIdle();
       await expect(find).toBeHidden();
       await expect(replace).toBeHidden();
       await expect(formula).toBeVisible();
@@ -221,7 +238,9 @@ test.describe("tab tools and pane sliders", () => {
       }
     }
 
+    await waitForEditorIdle();
     await page.click("#SocialCalc-edittab");
+    await waitForEditorIdle();
     await expect(find).toBeVisible();
     await expect(replace).toBeVisible();
     await expect(page.locator("#searchbarinput")).toHaveValue("needle");
@@ -281,13 +300,30 @@ test.describe("tab tools and pane sliders", () => {
         height: spreadsheet.height,
       };
     }, "SocialCalc-");
-    expect(restoredLayout).toEqual({
-      formulaBarHeight: initialLayout.formulaBarHeight,
-      gridHeight: initialLayout.gridHeight,
-      nonviewheight: initialLayout.nonviewheight,
-      viewheight: initialLayout.viewheight,
-      height: initialLayout.height,
-    });
+    await page.evaluate((idPrefix) => {
+      const spreadsheet = window.__scControls[idPrefix] as unknown as TabLayoutControl;
+      const socialCalc = window.SocialCalc as unknown as TabSocialCalc;
+      spreadsheet.editor.busy = false;
+      socialCalc.SetTab("edit");
+    }, "SocialCalc-");
+    await waitForEditorIdle();
+    const settledEditLayout = await page.evaluate((idPrefix) => {
+      const spreadsheet = window.__scControls[idPrefix] as unknown as {
+        nonviewheight: number;
+        viewheight: number;
+        height: number;
+        formulabarDiv: HTMLElement;
+        editor: { griddiv: HTMLElement };
+      };
+      return {
+        formulaBarHeight: spreadsheet.formulabarDiv.getBoundingClientRect().height,
+        gridHeight: spreadsheet.editor.griddiv.getBoundingClientRect().height,
+        nonviewheight: spreadsheet.nonviewheight,
+        viewheight: spreadsheet.viewheight,
+        height: spreadsheet.height,
+      };
+    }, "SocialCalc-");
+    expect(settledEditLayout).toEqual(restoredLayout);
 
     await page.evaluate((idPrefix) => {
       // See the narrow fixture-boundary types above.
@@ -298,6 +334,7 @@ test.describe("tab tools and pane sliders", () => {
       spreadsheet.editor.busy = false;
       socialCalc.SetTab("edit");
     }, "SocialCalc-");
+    await waitForEditorIdle();
     const wrappedEdit = await page.evaluate((idPrefix) => {
       const spreadsheet = window.__scControls[idPrefix] as unknown as {
         formulabarDiv: HTMLElement;
@@ -312,8 +349,11 @@ test.describe("tab tools and pane sliders", () => {
         viewheight: spreadsheet.viewheight,
       };
     }, "SocialCalc-");
+    await waitForEditorIdle();
     await page.click("#SocialCalc-printtab");
+    await waitForEditorIdle();
     await page.click("#SocialCalc-edittab");
+    await waitForEditorIdle();
     const restoredWrappedEdit = await page.evaluate((idPrefix) => {
       const spreadsheet = window.__scControls[idPrefix] as unknown as {
         formulabarDiv: HTMLElement;
