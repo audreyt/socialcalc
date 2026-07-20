@@ -155,6 +155,7 @@ const editorTests = [
   "test/editor-coverage-a.test.ts",
   "test/editor-coverage-b.test.ts",
   "test/editor-dom-coverage.test.ts",
+  "test/editor-productivity.test.ts",
   "test/page-scroll.test.ts",
   "test/hardening-tableeditor-commands.test.ts",
   "test/sheet-protection.test.ts",

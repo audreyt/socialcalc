@@ -1,4 +1,4 @@
-import { expect, test } from "vite-plus/test";
+import { expect, test, vi } from "vite-plus/test";
 
 import {
   installBrowserShim,
@@ -376,18 +376,81 @@ test("BuildReplaceCommand: replacement producing a non-numeric, non-text constan
   expect(cmd).toBe("set A1 constant nl 1 TRUE");
 });
 
-test("replace-bar input focus/blur toggle Keyboard.passThru (same wiring as the search bar)", async () => {
+test("find and replace blur handoff preserves keyboard input inside either toolbar", async () => {
   const { SC, control } = await newBrowserControl("ReplaceFocus-");
   await scheduleCommands(SC, control.sheet, ["set A1 value n 1"]);
   await recalcSheet(SC, control.sheet);
 
-  const input: any = document.getElementById("replacebarinput");
-  expect(input).toBeTruthy();
-  const handlers = input.__jqHandlers;
-  handlers.focus();
-  expect(SC.Keyboard.passThru).toBe(true);
-  handlers.blur();
-  expect(SC.Keyboard.passThru).toBe(false);
+  type FocusBlurHandlers = { focus: () => void; blur: () => void };
+  const getInputAndHandlers = (
+    input: Element | null,
+    name: string,
+  ): [Element, FocusBlurHandlers] => {
+    if (!input) throw new Error(`missing ${name} input`);
+    // The shared browser shim installs these jQuery-compatible callbacks.
+    const { __jqHandlers } = input as unknown as { __jqHandlers?: FocusBlurHandlers };
+    if (!__jqHandlers) throw new Error(`missing ${name} input handlers`);
+    return [input, __jqHandlers];
+  };
+  const [searchInput, searchHandlers] = getInputAndHandlers(
+    document.getElementById("searchbarinput"),
+    "Find",
+  );
+  const [replaceInput, replaceHandlers] = getInputAndHandlers(
+    document.getElementById("replacebarinput"),
+    "Replace",
+  );
+
+  const activeElementDescriptor = Object.getOwnPropertyDescriptor(document, "activeElement");
+  let activeElement: Element | null = null;
+  Object.defineProperty(document, "activeElement", {
+    configurable: true,
+    get: () => activeElement,
+  });
+
+  vi.useFakeTimers();
+  try {
+    searchHandlers.focus();
+    expect(SC.Keyboard.passThru).toBe(true);
+    activeElement = replaceInput;
+    searchHandlers.blur();
+    vi.runOnlyPendingTimers();
+    expect(SC.Keyboard.passThru).toBe(true);
+
+    SC.Keyboard.passThru = false;
+    replaceHandlers.focus();
+    expect(SC.Keyboard.passThru).toBe(true);
+    activeElement = searchInput;
+    replaceHandlers.blur();
+    vi.runOnlyPendingTimers();
+    expect(SC.Keyboard.passThru).toBe(true);
+
+    activeElement = replaceInput;
+    replaceHandlers.blur();
+    vi.runOnlyPendingTimers();
+    expect(SC.Keyboard.passThru).toBe(true);
+
+    const outsideToolbar = document.createElement("button");
+    document.body.appendChild(outsideToolbar);
+    activeElement = outsideToolbar;
+    searchHandlers.blur();
+    vi.runOnlyPendingTimers();
+    expect(SC.Keyboard.passThru).toBe(false);
+
+    replaceHandlers.blur();
+    vi.runOnlyPendingTimers();
+    expect(SC.Keyboard.passThru).toBe(false);
+
+    activeElement = null;
+    replaceHandlers.blur();
+    vi.runOnlyPendingTimers();
+    expect(SC.Keyboard.passThru).toBe(false);
+  } finally {
+    vi.useRealTimers();
+    if (activeElementDescriptor)
+      Object.defineProperty(document, "activeElement", activeElementDescriptor);
+    else Reflect.deleteProperty(document, "activeElement");
+  }
 });
 
 test("replace toolbar tab stops toggle Keyboard.passThru", async () => {
@@ -400,13 +463,60 @@ test("replace toolbar tab stops toggle Keyboard.passThru", async () => {
     document.getElementById(control.idPrefix + "replaceallbutton"),
   ];
 
-  for (const tabStop of tabStops) {
-    expect(tabStop).not.toBeNull();
-    tabStop!.dispatchEvent(new Event("focus"));
-    expect(SC.Keyboard.passThru).toBe(true);
-    tabStop!.dispatchEvent(new Event("blur"));
-    expect(SC.Keyboard.passThru).toBe(false);
+  vi.useFakeTimers();
+  try {
+    for (const tabStop of tabStops) {
+      expect(tabStop).not.toBeNull();
+      tabStop!.dispatchEvent(new Event("focus"));
+      expect(SC.Keyboard.passThru).toBe(true);
+      tabStop!.dispatchEvent(new Event("blur"));
+      vi.runOnlyPendingTimers();
+      expect(SC.Keyboard.passThru).toBe(false);
+    }
+  } finally {
+    vi.useRealTimers();
   }
+});
+
+test("replace toolbar Tab traversal moves within the controls and hands boundary keys to the browser", async () => {
+  const { control } = await newBrowserControl("ReplaceTabTraversal-");
+  const replaceInput = document.getElementById("replacebarinput");
+  const regexInput = document.getElementById("replaceregexinput");
+  const replaceAll = document.getElementById(control.idPrefix + "replaceallbutton");
+  if (!replaceInput || !regexInput || !replaceAll)
+    throw new Error("missing Replace toolbar controls");
+
+  const dispatchKey = (target: HTMLElement, key: string, shiftKey = false): Event => {
+    const event = new Event("keydown", { cancelable: true });
+    Object.defineProperties(event, {
+      currentTarget: { value: target },
+      key: { value: key },
+      shiftKey: { value: shiftKey },
+    });
+    target.dispatchEvent(event);
+    return event;
+  };
+
+  const regexFocus = vi.spyOn(regexInput, "focus").mockImplementation(() => {});
+  try {
+    expect(dispatchKey(replaceInput, "Tab").defaultPrevented).toBe(true);
+    expect(regexFocus).toHaveBeenCalledOnce();
+  } finally {
+    regexFocus.mockRestore();
+  }
+
+  const replaceFocus = vi.spyOn(replaceInput, "focus").mockImplementation(() => {});
+  try {
+    expect(dispatchKey(regexInput, "Tab", true).defaultPrevented).toBe(true);
+    expect(replaceFocus).toHaveBeenCalledOnce();
+  } finally {
+    replaceFocus.mockRestore();
+  }
+
+  // Non-Tab and boundary Tabs retain native browser navigation.
+  expect(dispatchKey(replaceInput, "ArrowRight").defaultPrevented).toBe(false);
+  expect(dispatchKey(replaceInput, "Tab", true).defaultPrevented).toBe(false);
+  expect(dispatchKey(replaceAll, "Tab").defaultPrevented).toBe(false);
 });
 
 test("Replace-All with a range selection only rewrites cells inside the range", async () => {

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test } from "vite-plus/test";
+import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 
 import {
   loadSocialCalc as _loadSocialCalc,
@@ -1251,8 +1251,14 @@ test("FindInSheet + SearchUp/SearchDown wrap correctly", async () => {
   const handlers = input.__jqHandlers;
   handlers.focus();
   expect(SC.Keyboard.passThru).toBe(true);
-  handlers.blur();
-  expect(SC.Keyboard.passThru).toBe(false);
+  vi.useFakeTimers();
+  try {
+    handlers.blur();
+    vi.runOnlyPendingTimers();
+    expect(SC.Keyboard.passThru).toBe(false);
+  } finally {
+    vi.useRealTimers();
+  }
   // Enter triggers SearchDown
   control.sheet.search_cells = [{ coord: "A1" }, { coord: "A2" }];
   control.sheet.selected_search_cell = 0;

@@ -1624,7 +1624,13 @@ SpreadsheetControlSC.InitializeSpreadsheetControl = function (
     SpreadsheetControlSC.Keyboard.passThru = true;
   });
   input.on("blur", function () {
-    SpreadsheetControlSC.Keyboard.passThru = false;
+    setTimeout(function () {
+      const nextTarget = document.activeElement;
+      SpreadsheetControlSC.Keyboard.passThru =
+        !!nextTarget &&
+        (spreadsheet.searchBarDiv.contains(nextTarget) ||
+          spreadsheet.replaceBarDiv.contains(nextTarget));
+    });
   });
   input.keyup(
     /** @param {any} e */ function (e: any) {
@@ -1672,26 +1678,41 @@ SpreadsheetControlSC.InitializeSpreadsheetControl = function (
   replaceAllButton.addEventListener("click", SpreadsheetControlSC.SpreadsheetControl.ReplaceAll);
   replaceBar[0].appendChild(replaceOneButton);
   replaceBar[0].appendChild(replaceAllButton);
+  const setFindReplacePassThru = function () {
+    setTimeout(function () {
+      const nextTarget = document.activeElement;
+      SpreadsheetControlSC.Keyboard.passThru =
+        !!nextTarget &&
+        (spreadsheet.searchBarDiv.contains(nextTarget) ||
+          spreadsheet.replaceBarDiv.contains(nextTarget));
+    });
+  };
   replaceInput.on("focus", function () {
     SpreadsheetControlSC.Keyboard.passThru = true;
   });
-  replaceInput.on("blur", function () {
-    SpreadsheetControlSC.Keyboard.passThru = false;
-  });
+  replaceInput.on("blur", setFindReplacePassThru);
   const replaceTabStops = [
+    replaceInput[0],
     replaceRegexCheckbox[0],
     replaceFormulasCheckbox[0],
     replaceWholeSheetCheckbox[0],
     replaceOneButton,
     replaceAllButton,
   ];
+  const moveReplaceFocus = function (event: KeyboardEvent) {
+    if (event.key !== "Tab") return;
+    const currentIndex = replaceTabStops.indexOf(event.currentTarget as HTMLElement);
+    const nextIndex = currentIndex + (event.shiftKey ? -1 : 1);
+    if (nextIndex < 0 || nextIndex >= replaceTabStops.length) return;
+    event.preventDefault();
+    replaceTabStops[nextIndex].focus();
+  };
   for (const replaceTabStop of replaceTabStops) {
     replaceTabStop.addEventListener("focus", function () {
       SpreadsheetControlSC.Keyboard.passThru = true;
     });
-    replaceTabStop.addEventListener("blur", function () {
-      SpreadsheetControlSC.Keyboard.passThru = false;
-    });
+    replaceTabStop.addEventListener("keydown", moveReplaceFocus);
+    replaceTabStop.addEventListener("blur", setFindReplacePassThru);
   }
   spreadsheet.replaceBarDiv = replaceBar[0];
   spreadsheet.formulabarDiv.appendChild(spreadsheet.replaceBarDiv);

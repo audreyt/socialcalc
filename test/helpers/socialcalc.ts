@@ -86,6 +86,12 @@ class FakeElement {
   get lastChild() {
     return this.childNodes[this.childNodes.length - 1] || null;
   }
+  contains(node: FakeElement | null) {
+    for (let current = node; current; current = current.parentNode) {
+      if (current === this) return true;
+    }
+    return false;
+  }
 
   appendChild(child: FakeElement) {
     child.parentNode = this;

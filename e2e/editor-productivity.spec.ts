@@ -42,7 +42,6 @@ type ChromeLayout = {
   replaceFragments: ChromeBounds[];
   replaceTextAlign: string;
   formulaBarClass: string;
-  findFloat: string;
   replaceDisplay: string;
   nonviewheight: number;
   viewheight: number;
@@ -165,6 +164,7 @@ test.describe("tab tools and pane sliders", () => {
         )
         .toBe(true);
     };
+    await waitForEditorIdle();
     const layout = () =>
       page.evaluate((idPrefix) => {
         const spreadsheet = window.__scControls[idPrefix] as unknown as {
@@ -188,7 +188,6 @@ test.describe("tab tools and pane sliders", () => {
         const formula = spreadsheet.formulabarDiv.querySelector('input[size="60"]') as HTMLElement;
         const find = document.getElementById("searchbar")!;
         const replace = document.getElementById("replacebar")!;
-        const findStyle = getComputedStyle(find);
         const replaceAll = document.getElementById("SocialCalc-replaceallbutton")!;
         const replaceControls = Array.from(replace.querySelectorAll("label, input, button")).map(
           (element) => bounds(element as HTMLElement),
@@ -217,7 +216,6 @@ test.describe("tab tools and pane sliders", () => {
           replaceControls,
           replaceFragments,
           replaceTextAlign: replaceStyle.textAlign,
-          findFloat: findStyle.float,
           replaceDisplay: replaceStyle.display,
           nonviewheight: spreadsheet.nonviewheight,
           viewheight: spreadsheet.viewheight,
@@ -241,7 +239,7 @@ test.describe("tab tools and pane sliders", () => {
     };
     const assertRightAlignedReplace = (value: ChromeLayout, hasLeadingInset: boolean) => {
       expect(value.replaceTextAlign).toBe("right");
-      expect(value.replaceAll.right).toBe(value.replace.right);
+      expect(Math.abs(value.replaceAll.right - value.replace.right)).toBeLessThan(1);
       const visibleControls = value.replaceControls.filter(
         (control) => control.width > 0 && control.height > 0,
       );
@@ -287,10 +285,9 @@ test.describe("tab tools and pane sliders", () => {
 
     const emptyLayout = await layout();
     assertChromeHeight(emptyLayout);
-    expect(emptyLayout.findFloat).toBe("right");
     expect(emptyLayout.replaceDisplay).toBe("none");
     expect(emptyLayout.formulaBarClass).toContain("socialcalc-formulabar");
-    expect(emptyLayout.find.y).toBe(emptyLayout.formula.y);
+    expect(Math.abs(emptyLayout.find.y - emptyLayout.formula.y)).toBeLessThan(1);
     expect(emptyLayout.find.right).toBe(emptyLayout.formulaBar.right);
     expect(emptyLayout.find.x).toBeGreaterThan(emptyLayout.formula.right);
     await searchInput.focus();
@@ -310,9 +307,9 @@ test.describe("tab tools and pane sliders", () => {
     await expect(page.getByRole("button", { name: "All", exact: true })).toBeVisible();
     const expandedLayout = await layout();
     assertChromeHeight(expandedLayout);
-    expect(expandedLayout.find.y).toBe(expandedLayout.formula.y);
+    expect(Math.abs(expandedLayout.find.y - expandedLayout.formula.y)).toBeLessThan(1);
     expect(expandedLayout.find.right).toBe(expandedLayout.formulaBar.right);
-    expect(expandedLayout.replaceDisplay).toBe("block");
+    expect(expandedLayout.replaceDisplay).toBe("flex");
     expect(expandedLayout.replace.y).toBeGreaterThanOrEqual(
       Math.max(expandedLayout.formula.bottom, expandedLayout.find.bottom),
     );
@@ -356,7 +353,7 @@ test.describe("tab tools and pane sliders", () => {
       await expect(replaceInput).toHaveValue("replacement");
       const tabLayout = await layout();
       assertChromeHeight(tabLayout);
-      expect(tabLayout.find.y).toBe(tabLayout.formula.y);
+      expect(Math.abs(tabLayout.find.y - tabLayout.formula.y)).toBeLessThan(1);
       expect(tabLayout.replace.y).toBeGreaterThanOrEqual(
         Math.max(tabLayout.formula.bottom, tabLayout.find.bottom),
       );
@@ -386,7 +383,6 @@ test.describe("tab tools and pane sliders", () => {
     await waitForEditorIdle();
     const narrowEmptyLayout = await layout();
     assertChromeHeight(narrowEmptyLayout);
-    expect(narrowEmptyLayout.findFloat).toBe("right");
     assertNoOverlapOrClipping(narrowEmptyLayout);
 
     await page.fill("#searchbarinput", "needle");
@@ -588,6 +584,14 @@ test.describe("Find & Replace", () => {
       "SocialCalc-replaceonebutton",
       "SocialCalc-replaceallbutton",
     ]);
+
+    // The final Replace control deliberately hands Tab back to the editor
+    // instead of trapping keyboard focus. This must run in every Playwright
+    // project: WebKit was the regression that Chromium-only coverage missed.
+    await page.keyboard.press("Tab");
+    await expect(
+      page.locator("#containerDiv table[role='grid']:not(#te_formData table[role='grid'])"),
+    ).toBeFocused();
 
     await clickCell(page, "A1");
     await page.keyboard.type("cat");

@@ -32812,7 +32812,13 @@ not governed by the terms of the CPAL.
       SpreadsheetControlSC.Keyboard.passThru = true;
     });
     input.on('blur', function () {
-      SpreadsheetControlSC.Keyboard.passThru = false;
+      setTimeout(function () {
+        const nextTarget = document.activeElement;
+        SpreadsheetControlSC.Keyboard.passThru =
+          !!nextTarget &&
+          (spreadsheet.searchBarDiv.contains(nextTarget) ||
+            spreadsheet.replaceBarDiv.contains(nextTarget));
+      });
     });
     input.keyup(function (e) {
       if (e.keyCode == 13) {
@@ -32855,26 +32861,41 @@ not governed by the terms of the CPAL.
     replaceAllButton.addEventListener('click', SpreadsheetControlSC.SpreadsheetControl.ReplaceAll);
     replaceBar[0].appendChild(replaceOneButton);
     replaceBar[0].appendChild(replaceAllButton);
+    const setFindReplacePassThru = function () {
+      setTimeout(function () {
+        const nextTarget = document.activeElement;
+        SpreadsheetControlSC.Keyboard.passThru =
+          !!nextTarget &&
+          (spreadsheet.searchBarDiv.contains(nextTarget) ||
+            spreadsheet.replaceBarDiv.contains(nextTarget));
+      });
+    };
     replaceInput.on('focus', function () {
       SpreadsheetControlSC.Keyboard.passThru = true;
     });
-    replaceInput.on('blur', function () {
-      SpreadsheetControlSC.Keyboard.passThru = false;
-    });
+    replaceInput.on('blur', setFindReplacePassThru);
     const replaceTabStops = [
+      replaceInput[0],
       replaceRegexCheckbox[0],
       replaceFormulasCheckbox[0],
       replaceWholeSheetCheckbox[0],
       replaceOneButton,
       replaceAllButton,
     ];
+    const moveReplaceFocus = function (event) {
+      if (event.key !== 'Tab') return;
+      const currentIndex = replaceTabStops.indexOf(event.currentTarget);
+      const nextIndex = currentIndex + (event.shiftKey ? -1 : 1);
+      if (nextIndex < 0 || nextIndex >= replaceTabStops.length) return;
+      event.preventDefault();
+      replaceTabStops[nextIndex].focus();
+    };
     for (const replaceTabStop of replaceTabStops) {
       replaceTabStop.addEventListener('focus', function () {
         SpreadsheetControlSC.Keyboard.passThru = true;
       });
-      replaceTabStop.addEventListener('blur', function () {
-        SpreadsheetControlSC.Keyboard.passThru = false;
-      });
+      replaceTabStop.addEventListener('keydown', moveReplaceFocus);
+      replaceTabStop.addEventListener('blur', setFindReplacePassThru);
     }
     spreadsheet.replaceBarDiv = replaceBar[0];
     spreadsheet.formulabarDiv.appendChild(spreadsheet.replaceBarDiv);
@@ -35884,6 +35905,9 @@ not governed by the terms of the CPAL.
     if (proposed == null) return;
     const code = state.workbook.RenameSheet(name, proposed);
     if (code === SocialCalc.WorkbookNameValidation.OK) {
+      if (state.renderedActiveName === name) {
+        state.renderedActiveName = state.workbook.activeSheetName;
+      }
       SocialCalc.SpreadsheetControlRenderSheetTabs(spreadsheet);
     }
   }
@@ -35908,6 +35932,7 @@ not governed by the terms of the CPAL.
     if (!state) return;
     const wb = state.workbook;
     if (!wb.IsSheetVisible(name)) return;
+    if (state.renderedActiveName === name) return;
     wbUiPersistCurrentEditorSettings(spreadsheet);
     wb.SetActiveSheet(name);
     const newSheet = wb.GetSheet(name);

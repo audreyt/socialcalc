@@ -30,7 +30,9 @@ test.describe("ARIA grid roles and accessible structure", () => {
       "SocialCalc-",
     );
 
-    const grid = page.locator("#containerDiv table[role='grid']").first();
+    const grid = page.locator(
+      "#containerDiv table[role='grid']:not(#te_formData table[role='grid'])",
+    );
     await expect(grid).toHaveCount(1);
     await expect(grid).toHaveAttribute("aria-rowcount", /^\d+$/);
     await expect(grid).toHaveAttribute("aria-colcount", /^\d+$/);
@@ -123,7 +125,9 @@ test.describe("keyboard navigation keeps ARIA selection state live", () => {
     await createControl(page);
     await clickCell(page, "A1");
 
-    const grid = page.locator("#containerDiv table[role='grid']").first();
+    const grid = page.locator(
+      "#containerDiv table[role='grid']:not(#te_formData table[role='grid'])",
+    );
     await expect(cellLocator(page, "A1")).toHaveAttribute("aria-selected", "true");
     await expect(grid).toHaveAttribute("aria-activedescendant", "cell_A1");
 
@@ -159,7 +163,9 @@ test.describe("keyboard navigation keeps ARIA selection state live", () => {
     await createControl(page);
     await clickCell(page, "A1"); // triggers the initial full render (see createControl note)
 
-    const grid = page.locator("#containerDiv table[role='grid']").first();
+    const grid = page.locator(
+      "#containerDiv table[role='grid']:not(#te_formData table[role='grid'])",
+    );
     await expect(grid).toHaveAttribute("tabindex", "0");
   });
 });
@@ -232,31 +238,25 @@ test.describe("focus-visible styling", () => {
     await createControl(page);
     await clickCell(page, "A1");
 
-    // SocialCalc installs its own document-level keydown handler and
-    // treats Tab as a cell-navigation key (ProcessKey maps keyCode 9 to
-    // "[tab]" -> move selection right/left), calling preventDefault() --
-    // so native Tab-driven focus traversal never reaches the grid element
-    // while the editor owns keyboard focus; verified directly (Tab
-    // repeatedly leaves document.activeElement on <body>). The genuinely
-    // reachable focus path for the grid element itself is a direct
-    // .focus() call (e.g. from assistive-tech APIs, or a host script).
-    //
-    // `:focus-visible` keys off the browser's last-input-modality
-    // heuristic, not element type: the preceding `clickCell` sets that
-    // modality to "mouse", so a bare programmatic `.focus()` right after
-    // would NOT show the outline even though the CSS rule is correct --
-    // that would be testing browser focus-modality tracking, not this
-    // change. A real (not synthetic-dispatched) keyboard event resets the
-    // modality to "keyboard" first, matching how a real keyboard user
-    // would actually reach this state.
-    await page.keyboard.press("Escape");
+    // Reveal the Replace controls, then use a genuine Tab transition from
+    // their final button into the live grid. This establishes :focus-visible
+    // modality in every supported engine. The print/download clone under
+    // #te_formData has the same role/id but is not interactive.
+    await page.fill("#searchbarinput", "focus");
+    await expect(page.locator("#replacebar")).toBeVisible();
+    const grid = page.locator(
+      "#containerDiv table[role='grid']:not(#te_formData table[role='grid'])",
+    );
+    await page.locator("#SocialCalc-replaceallbutton").focus();
+    await page.keyboard.press("Tab");
+    await expect(grid).toBeFocused();
 
     const result = await page.evaluate(() => {
-      const el = document.querySelector("table[role='grid']") as HTMLElement;
-      el.focus();
+      const el = document.activeElement;
+      if (!(el instanceof HTMLElement)) throw new Error("grid did not receive keyboard focus");
       const style = getComputedStyle(el);
       return {
-        focused: document.activeElement === el,
+        focused: true,
         outlineStyle: style.outlineStyle,
         outlineColor: style.outlineColor,
       };
@@ -308,7 +308,12 @@ test.describe("print setup and @media print CSS", () => {
 
   test("Chromium's print media emulation applies @media print rules: editor chrome is hidden, the grid is visible", async ({
     page,
+    browserName,
   }) => {
+    test.skip(
+      browserName !== "chromium",
+      "print-media visibility is a Chromium emulation contract",
+    );
     await gotoBundle(page, "normal");
     await createControl(page);
     await scheduleCommand(page, "set A1 value n 1");
@@ -325,10 +330,14 @@ test.describe("print setup and @media print CSS", () => {
       window.SocialCalc.PreparePrintArea(window.__scControls["SocialCalc-"]);
     });
     await page.emulateMedia({ media: "print" });
-
     const grid = page.locator("#containerDiv table[role='grid']").first();
-    await expect(grid).toBeVisible();
-    await expect(cellLocator(page, "A1")).toBeVisible();
+    // The print stylesheet deliberately restores visibility on the grid and
+    // its descendants while their editor-layout ancestors remain hidden.
+    // Assert the CSS contract directly: Playwright's actionability visibility
+    // treats a hidden layout ancestor as hidden even though the printed grid
+    // itself is explicitly visible.
+    await expect(grid).toHaveCSS("visibility", "visible");
+    await expect(cellLocator(page, "A1")).toHaveCSS("visibility", "visible");
 
     // Editor chrome (the Undo toolbar button) is outside .sc-print-area and
     // must be hidden by the `body * { visibility: hidden }` print rule.
@@ -443,6 +452,8 @@ test.describe("print setup and @media print CSS", () => {
     expect(await page.evaluate(() => window.__printInvoked)).toBe(false);
 
     const printButton = page.locator("#SocialCalc-print-now");
+    await page.click("#SocialCalc-printtab");
+    await expect(printButton).toBeVisible();
     await printButton.click();
     await waitFor(page, () => window.__printInvoked === true, "SocialCalc-");
     expect(await page.evaluate(() => window.__printInvoked)).toBe(true);

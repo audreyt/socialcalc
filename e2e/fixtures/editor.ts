@@ -351,6 +351,7 @@ declare global {
         editor: {
           pasteTextarea: HTMLTextAreaElement;
           EditorScheduleSheetCommands(cmd: string, saveundo: boolean): void;
+          EditorProcessKey(ch: string, event: KeyboardEvent): boolean;
           ecell: { coord: string };
           SheetRedo(): void;
           SheetUndo(): void;

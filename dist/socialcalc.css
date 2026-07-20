@@ -126,18 +126,36 @@
   width: auto;
   z-index: 110;
 }
+.socialcalc-formulabar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+}
+.socialcalc-formulabar > img {
+  flex: 0 0 auto;
+}
+.socialcalc-formulabar > input[type="text"][size="60"] {
+  flex: 1 1 0;
+  max-width: none;
+  min-width: 0;
+}
 #searchbar {
   display: inline;
-  float: right;
+  flex: 0 0 auto;
+  margin-left: 4px;
 }
-/* Keep the formula field, its buttons, and EtherCalc-aligned Find on one
-   row when the control is narrower than the field's legacy 60-character size. */
-.socialcalc-formulabar > input[type="text"][size="60"] {
-  max-width: calc(100% - 310px);
+#searchstatus {
+  display: inline-block;
 }
 #replacebar {
-  clear: both;
-  display: block;
+  align-items: center;
+  clear: none;
+  column-gap: 2px;
+  display: flex;
+  flex: 0 0 100%;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  row-gap: 2px;
   text-align: right;
 }
 

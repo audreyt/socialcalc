@@ -287,6 +287,96 @@ test("double-click on a tab invokes the rename flow via window.prompt", async ()
   expect(document.getElementById(control.idPrefix + "sheettab-Renamed")).not.toBeNull();
 });
 
+test("renaming the active sheet preserves its render identity, so the renamed tab self-switches without re-rendering", async () => {
+  const SC = await freshSC();
+  const { control } = await newControl(SC);
+  const wb = new SC.Workbook();
+  wb.AddSheet("Original");
+  control.EnableWorkbookMode(wb);
+
+  const originalPrompt = Object.getOwnPropertyDescriptor(globalThis, "prompt");
+  Object.defineProperty(globalThis, "prompt", {
+    configurable: true,
+    value: () => "Renamed",
+  });
+  try {
+    const tab = document.getElementById(control.idPrefix + "sheettab-Original");
+    if (!tab || typeof tab.ondblclick !== "function") throw new Error("missing Original sheet tab");
+    // wbUiRenamePrompt ignores the DOM event; the FakeDOM has no MouseEvent constructor.
+    const noEvent = undefined as unknown as MouseEvent;
+    tab.ondblclick(noEvent);
+  } finally {
+    if (originalPrompt) Object.defineProperty(globalThis, "prompt", originalPrompt);
+    else Reflect.deleteProperty(globalThis, "prompt");
+  }
+
+  expect(control.workbookState!.renderedActiveName).toBe("Renamed");
+  const renderedSheet = control.sheet;
+  let renderCalls = 0;
+  const render = control.editor.EditorRenderSheet;
+  control.editor.EditorRenderSheet = () => {
+    renderCalls++;
+    render.call(control.editor);
+  };
+  try {
+    control.SwitchToSheet("Renamed");
+  } finally {
+    control.editor.EditorRenderSheet = render;
+  }
+  expect(control.sheet).toBe(renderedSheet);
+  expect(renderCalls).toBe(0);
+});
+
+test("renaming an inactive sheet preserves the control's rendered identity when workbook selection changed externally", async () => {
+  const SC = await freshSC();
+  const { control } = await newControl(SC);
+  const wb = new SC.Workbook();
+  wb.AddSheet("Original");
+  wb.AddSheet("Other");
+  wb.AddSheet("Elsewhere");
+  control.EnableWorkbookMode(wb);
+  expect(wb.SetActiveSheet("Elsewhere")).toBe(true);
+  expect(control.sheet).toBe(wb.GetSheet("Original"));
+
+  const originalPrompt = Object.getOwnPropertyDescriptor(globalThis, "prompt");
+  Object.defineProperty(globalThis, "prompt", {
+    configurable: true,
+    value: () => "Renamed",
+  });
+  try {
+    const tab = document.getElementById(control.idPrefix + "sheettab-Other");
+    if (!tab || typeof tab.ondblclick !== "function") throw new Error("missing Other sheet tab");
+    // wbUiRenamePrompt ignores the DOM event; the FakeDOM has no MouseEvent constructor.
+    const noEvent = undefined as unknown as MouseEvent;
+    tab.ondblclick(noEvent);
+  } finally {
+    if (originalPrompt) Object.defineProperty(globalThis, "prompt", originalPrompt);
+    else Reflect.deleteProperty(globalThis, "prompt");
+  }
+
+  expect(wb.sheetOrder).toEqual(["Original", "Renamed", "Elsewhere"]);
+  expect(wb.activeSheetName).toBe("Elsewhere");
+  expect(control.workbookState!.renderedActiveName).toBe("Original");
+  expect(control.sheet).toBe(wb.GetSheet("Original"));
+});
+
+test("SwitchToSheet renders the workbook's reselection after its active sheet is deleted programmatically", async () => {
+  const SC = await freshSC();
+  const { control } = await newControl(SC);
+  const wb = new SC.Workbook();
+  wb.AddSheet("First");
+  wb.AddSheet("Second");
+  control.EnableWorkbookMode(wb);
+  control.SwitchToSheet("Second");
+
+  expect(wb.DeleteSheet("Second")).toBe(true);
+  expect(wb.activeSheetName).toBe("First");
+  control.SwitchToSheet(wb.activeSheetName!);
+
+  expect(control.sheet).toBe(wb.GetSheet("First"));
+  expect(control.workbookState!.renderedActiveName).toBe("First");
+});
+
 test("right-click (contextmenu) on a tab invokes the default confirm-driven delete flow", async () => {
   const SC = await freshSC();
   const { control } = await newControl(SC);

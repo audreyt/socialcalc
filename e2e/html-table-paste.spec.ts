@@ -21,14 +21,12 @@ import {
 } from "./fixtures/editor";
 
 /**
- * Drives the native paste event sequence: Ctrl+V first lets the editor focus
- * its hidden textarea and clear stale clipboard state; the synthetic event
- * then supplies the browser clipboard payload while that textarea is focused.
- * Native browsers deliver the `paste` event in that order.
- *
- * `DataTransfer` is a real constructible browser API in all three engines, so
- * this exercises genuine `ClipboardEvent`/`DataTransfer` machinery, not a
- * hand-rolled stub.
+ * Drives the product's Ctrl+V handler directly through its focused-textarea
+ * fallback, then reproduces the browser paste ordering there: plain text is
+ * available to the delayed textarea fallback while the synchronous
+ * ClipboardEvent carries HTML for the listener. The distinct Chromium-only
+ * OS-clipboard test below covers navigator.clipboard.read(); this helper
+ * deliberately takes the portable fallback that all three engines support.
  */
 async function dispatchPasteEvent(
   page: Parameters<typeof cellLocator>[0],
@@ -36,7 +34,20 @@ async function dispatchPasteEvent(
   plainText: string,
   idPrefix = "SocialCalc-",
 ): Promise<void> {
-  await page.keyboard.press("Control+v");
+  await page.evaluate((idPrefix) => {
+    const originalClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
+    try {
+      const editor = window.__scControls[idPrefix].editor;
+      editor.EditorProcessKey(
+        "[ctrl-v]",
+        new KeyboardEvent("keydown", { ctrlKey: true, key: "v" }),
+      );
+    } finally {
+      if (originalClipboard) Object.defineProperty(navigator, "clipboard", originalClipboard);
+      else Reflect.deleteProperty(navigator, "clipboard");
+    }
+  }, idPrefix);
   await waitFor(
     page,
     (idPrefix) => {
@@ -47,13 +58,25 @@ async function dispatchPasteEvent(
   );
   await page.evaluate(
     ({ html, plainText, idPrefix }) => {
-      const ta = window.__scControls[idPrefix].editor.pasteTextarea;
+      const editor = window.__scControls[idPrefix].editor;
+      const ta = editor.pasteTextarea;
       const dataTransfer = new DataTransfer();
       if (html) dataTransfer.setData("text/html", html);
       if (plainText) dataTransfer.setData("text/plain", plainText);
-      const event = new ClipboardEvent("paste", { clipboardData: dataTransfer, bubbles: true });
-      ta.dispatchEvent(event);
+
+      // Native paste changes an input's value as its default action, after
+      // listeners inspect clipboardData. Populate before dispatch so the
+      // product's delayed fallback observes that deterministic final value.
       ta.value = plainText;
+      const event = new ClipboardEvent("paste", {
+        clipboardData: dataTransfer,
+        bubbles: true,
+        cancelable: true,
+      });
+      if (event.clipboardData?.getData("text/html") !== html) {
+        Object.defineProperty(event, "clipboardData", { value: dataTransfer });
+      }
+      ta.dispatchEvent(event);
     },
     { html, plainText, idPrefix },
   );
@@ -112,11 +135,17 @@ test.describe("real ClipboardEvent HTML table paste", () => {
       "SocialCalc-",
     );
     expect(await cellValue(page, "A1")).toBe("Merged Title");
-    // A real rendered <td> at A1 carries colSpan=2 in the live DOM.
-    const colSpan = await page.evaluate(
-      () => (document.querySelector("#containerDiv #cell_A1") as HTMLTableCellElement).colSpan,
-    );
-    expect(colSpan).toBe(2);
+    // The editor temporarily keeps a zero-width duplicate of cells in a
+    // measurement pane. Assert the visible grid cell rather than whichever
+    // duplicate happens to appear first in a browser's DOM order.
+    const visibleColSpans = await page
+      .locator("#containerDiv #cell_A1")
+      .evaluateAll((cells) =>
+        cells
+          .filter((cell) => cell.getBoundingClientRect().width > 0)
+          .map((cell) => (cell as HTMLTableCellElement).colSpan),
+      );
+    expect(visibleColSpans).toContain(2);
     expect(await cellValue(page, "A2")).toBe(1);
     expect(await cellValue(page, "B2")).toBe(2);
   });

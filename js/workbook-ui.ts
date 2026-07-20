@@ -243,6 +243,13 @@ function wbUiRenamePrompt(spreadsheet: SocialCalc.SpreadsheetControl, name: stri
   if (proposed == null) return;
   const code = state.workbook.RenameSheet(name, proposed);
   if (code === SocialCalc.WorkbookNameValidation.OK) {
+    // RenameSheet retains the current Sheet instance but changes its active
+    // display name. Keep the render identity in the same namespace so a
+    // subsequent click/double-click on the renamed active tab is a true
+    // no-op rather than a redundant self-switch.
+    if (state.renderedActiveName === name) {
+      state.renderedActiveName = state.workbook.activeSheetName;
+    }
     SocialCalc.SpreadsheetControlRenderSheetTabs(spreadsheet);
   }
 }
@@ -290,6 +297,7 @@ WorkbookUiRoot.SpreadsheetControlSwitchToSheet = function (
   if (!state) return;
   const wb = state.workbook;
   if (!wb.IsSheetVisible(name)) return;
+  if (state.renderedActiveName === name) return;
 
   wbUiPersistCurrentEditorSettings(spreadsheet);
   wb.SetActiveSheet(name);
