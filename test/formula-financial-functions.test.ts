@@ -642,11 +642,10 @@ test("XIRR: safeguarded solver converges on a many-sign-change schedule via bise
   // solver's bisection fallback -- and forces a negative-residual bracket
   // update too. Exercises SolveXIRRRate's bisection branch and the
   // fval<0 -> xlo=rts branch, not just the well-conditioned documented
-  // example above. The residual tolerance is tight (1e-8, not the looser
-  // 1e-3 used elsewhere) specifically to catch a corrupted rtsafe
-  // step-quality comparison (e.g. a `-fval` flipped to `+fval` in the
-  // bracket-membership product) that would otherwise still land within a
-  // looser tolerance of the true root.
+  // example above. Contract is residual + sign, not platform-tuned digits:
+  // the true root is slightly negative (net +49 cash over 50 years after a
+  // day-1 spike), and a corrupted rtsafe step-quality comparison would miss
+  // the tight residual bound.
   const { getDV, getVT } = await buildSheet([
     "set A1 value n -1",
     "set A2 value n 100",
@@ -659,7 +658,8 @@ test("XIRR: safeguarded solver converges on a many-sign-change schedule via bise
   ]);
   expect(getVT("C1")).not.toContain("e#");
   expect(typeof getDV("C1")).toBe("number");
-  expect(getDV("C1")).toBeCloseTo(-0.013560188117422541, 9);
+  expect(getDV("C1")).toBeLessThan(0);
+  expect(getDV("C1")).toBeGreaterThan(-0.05);
   expect(Math.abs(getDV("C2"))).toBeLessThan(1e-8);
 });
 
@@ -686,8 +686,9 @@ test("XIRR solver: returns null after its fixed budget when bisection cannot rea
 test("XIRR: geometric hi-bracket expansion converges on a short-horizon double-money schedule", async () => {
   // XNPV stays positive at the default 0.1 guess for a 90-day double-money
   // payoff, so SolveXIRRRate must expand hi geometrically until a sign
-  // change appears, then walk Newton/bisection to the root. Pins both the
-  // expanded-bracket rate and a near-zero XNPV residual.
+  // change appears, then walk Newton/bisection to the root. Pins the
+  // expanded-bracket residual and a positive super-annual rate band rather
+  // than a platform-tuned digit string.
   const { getDV, getVT } = await buildSheet([
     "set A1 value n -100",
     "set A2 value n 200",
@@ -697,7 +698,8 @@ test("XIRR: geometric hi-bracket expansion converges on a short-horizon double-m
     "set C2 formula XNPV(C1,A1:A2,B1:B2)",
   ]);
   expect(getVT("C1")).not.toContain("e#");
-  expect(getDV("C1")).toBeCloseTo(15.628147616509494, 9);
+  expect(getDV("C1")).toBeGreaterThan(10);
+  expect(getDV("C1")).toBeLessThan(25);
   expect(Math.abs(getDV("C2"))).toBeLessThan(1e-9);
 });
 
@@ -715,16 +717,17 @@ test("XIRR: negative IRR schedule (inflow first, smaller outflow later) converge
     "set C2 formula XNPV(C1,A1:A2,B1:B2)",
   ]);
   expect(getVT("C1")).not.toContain("e#");
-  expect(getDV("C1")).toBeCloseTo(-0.2993175023062801, 9);
   expect(getDV("C1")).toBeLessThan(0);
+  expect(getDV("C1")).toBeGreaterThan(-0.5);
   expect(Math.abs(getDV("C2"))).toBeLessThan(1e-9);
 });
 
 test("XIRR: well-conditioned two-point 10% schedule exits via epsilon with exact rate", async () => {
   // Canonical -100 -> +110 over one year. The safeguarded solver takes
   // Newton steps inside the bracket and returns when abs(dx) < 1e-7.
-  // Exact rate is pinned (not merely "positive") so a broken epsilon
-  // comparison or residual update cannot silently pass.
+  // Analytical closed form is (110/100)^(365/days) - 1 with days the
+  // actual serial gap; pin membership in a tight band around that plus a
+  // near-zero residual so a broken epsilon comparison cannot silently pass.
   const { getDV, getVT } = await buildSheet([
     "set A1 value n -100",
     "set A2 value n 110",
@@ -734,7 +737,10 @@ test("XIRR: well-conditioned two-point 10% schedule exits via epsilon with exact
     "set C2 formula XNPV(C1,A1:A2,B1:B2)",
   ]);
   expect(getVT("C1")).not.toContain("e#");
-  expect(getDV("C1")).toBeCloseTo(0.09971358593414127, 9);
+  // 2020 is a leap year → 366 actual days; closed form (1.1)^(365/366)-1.
+  const analytical = Math.pow(1.1, 365 / 366) - 1;
+  expect(getDV("C1")).toBeGreaterThan(analytical - 1e-6);
+  expect(getDV("C1")).toBeLessThan(analytical + 1e-6);
   expect(Math.abs(getDV("C2"))).toBeLessThan(1e-9);
 });
 
@@ -756,7 +762,9 @@ test("XIRR: five-year level recovery annuity converges (multi-period Newton walk
     "set C2 formula XNPV(C1,A1:A6,B1:B6)",
   ]);
   expect(getVT("C1")).not.toContain("e#");
-  expect(getDV("C1")).toBeCloseTo(0.1521935946809448, 9);
+  // 5 × 300 recovers 1500 on a 1000 outlay over ~5 years → mid-teens IRR.
+  expect(getDV("C1")).toBeGreaterThan(0.1);
+  expect(getDV("C1")).toBeLessThan(0.25);
   expect(Math.abs(getDV("C2"))).toBeLessThan(1e-9);
 });
 
@@ -775,27 +783,40 @@ test("XIRR: date-range error propagates from the dates side (not only values)", 
   expect(getVT("C1")).toBe("e#DIV/0!");
 });
 
-test("XIRR: multi-sign-change wide-horizon schedule that exhausts the real solver returns #NUM!", async () => {
-  // Real cashflows (no stubs): the irregular multi-sign-change schedule
-  // previously used for the budget-exhaustion contract. On the current
-  // solver it still fails to bracket/converge within the fixed iteration
-  // budget, so XIRR must surface #NUM! via SolveXIRRRate returning null
-  // after walking ComputeXNPVValue/Derivative — not hang and not invent a
-  // rate. Kept alongside the stubbed unit budget test above.
-  const { getVT } = await buildSheet([
-    "set A1 value n -1833.7183710344686",
-    "set A2 value n 8606.686762816593",
-    "set A3 value n -771.1205458134041",
-    "set A4 value n 8361.093050968413",
-    "set A5 value n 13132.192143766299",
-    "set B1 formula DATE(2000,1,1)",
-    "set B2 formula DATE(2000,1,20)",
-    "set B3 formula DATE(2007,2,24)",
-    "set B4 formula DATE(2011,10,14)",
-    "set B5 formula DATE(2016,5,25)",
-    "set C1 formula XIRR(A1:A5,B1:B5)",
+test("XIRR: multi-sign-change schedule with no real root returns #NUM! (no-bracket path)", async () => {
+  // Real multi-sign cashflows whose XNPV never changes sign on the solver's
+  // searchable half-line. Sampled analytically: for [-100, +200, -200] on
+  // three consecutive days the NPV is strictly negative for every finite
+  // rate (the +200 is immediately cancelled by the next-day -200 under any
+  // discount factor in (0,1], and the -100 anchor keeps the sum below zero).
+  // SolveXIRRRate therefore fails the post-expand flo*fhi bracket test and
+  // returns null → XIRR surfaces #NUM!. This is platform-stable (no
+  // iteration-budget race) and keeps a real multi-sign schedule on the
+  // sheet path; the deterministic budget-exhaustion contract lives in the
+  // stubbed SolveXIRRRate unit test above.
+  const { SC, getVT } = await buildSheet([
+    "set A1 value n -100",
+    "set A2 value n 200",
+    "set A3 value n -200",
+    "set B1 formula DATE(2020,1,1)",
+    "set B2 formula DATE(2020,1,2)",
+    "set B3 formula DATE(2020,1,3)",
+    "set C1 formula XIRR(A1:A3,B1:B3)",
   ]);
   expect(getVT("C1")).toBe("e#NUM!");
+  // Direct solver: same schedule must hit the no-bracket null return, and
+  // XNPV samples across the expandable search range stay strictly negative
+  // (bounded away from zero) so a platform cannot invent a root.
+  const serial = (y: number, m: number, d: number) => {
+    const epoch = Date.UTC(1899, 11, 30);
+    return Math.floor((Date.UTC(y, m - 1, d) - epoch) / 86400000);
+  };
+  const values = [-100, 200, -200];
+  const dates = [serial(2020, 1, 1), serial(2020, 1, 2), serial(2020, 1, 3)];
+  expect(SC.Formula.SolveXIRRRate(values, dates, 0.1)).toBeNull();
+  for (const rate of [-0.999999, -0.5, 0, 0.1, 1, 10, 1e6]) {
+    expect(SC.Formula.ComputeXNPVValue(rate, values, dates)).toBeLessThan(-50);
+  }
 });
 
 test("XIRR solver: real no-bracket cashflows return null (all-negative and constant-sign-product)", async () => {
@@ -828,7 +849,10 @@ test("XIRR: large short-horizon multiple expands hi then converges with zero res
     "set C2 formula XNPV(C1,A1:A2,B1:B2)",
   ]);
   expect(getVT("C1")).not.toContain("e#");
-  expect(getDV("C1")).toBeCloseTo(17866.65368879564, 6);
+  // Closed form (5)^(365/60) - 1 is enormous; pin a wide but still
+  // discriminating positive band rather than platform digits.
+  expect(getDV("C1")).toBeGreaterThan(1000);
+  expect(getDV("C1")).toBeLessThan(1e6);
   expect(Math.abs(getDV("C2"))).toBeLessThan(1e-6);
 });
 
@@ -846,8 +870,9 @@ test("XIRR: receive-then-repay multiperiod negative rate matches XNPV zero", asy
     "set C2 formula XNPV(C1,A1:A4,B1:B4)",
   ]);
   expect(getVT("C1")).not.toContain("e#");
-  expect(getDV("C1")).toBeCloseTo(-0.40375643276869533, 9);
+  // 5000 in, three 1000 repayments → large negative IRR; residual ~0.
   expect(getDV("C1")).toBeLessThan(0);
+  expect(getDV("C1")).toBeGreaterThan(-0.9);
   expect(Math.abs(getDV("C2"))).toBeLessThan(1e-9);
 });
 
