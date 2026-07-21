@@ -2,40 +2,21 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema#",
   "description": "Machine-readable disposition of `vp pm audit --level low` findings for the socialcalc devDependency tree. Regenerate by re-running the audit command below after any dependency change.",
   "auditCommand": "vp pm audit --level low",
-  "lastReviewed": "2026-07-12",
+  "lastReviewed": "2026-07-21",
   "scope": "All findings are devDependency-only (build/verification tooling). No advisory package appears in the published npm tarball (see package.json \"files\"); none are reachable from any code shipped to consumers of the socialcalc package.",
   "summary": {
     "before": { "advisories": 6, "high": 2, "moderate": 3, "low": 1 },
-    "after": { "advisories": 2, "high": 0, "moderate": 2, "low": 0 },
+    "after": { "advisories": 1, "high": 0, "moderate": 1, "low": 0 },
     "fixed": [
       "@babel/core (low, GHSA-4x5r-pxfx-6jf8)",
       "fast-uri (high, GHSA-v39h-62p7-jpjc)",
       "fast-uri (high, GHSA-q3j6-qgpj-74h6)",
-      "qs (moderate, GHSA-q8mj-m7cp-5q26)"
+      "qs (moderate, GHSA-q8mj-m7cp-5q26)",
+      "brace-expansion 5.x (moderate GHSA-jxxr-4gwj-5jf2 + high GHSA-3jxr-9vmj-r5cp)"
     ],
-    "fixMethod": "Narrow package.json \"overrides\" pinning each package to the lowest already-in-range patched release its real parent(s) already declare compatibility with (no parent's own semver range was violated): @babel/core 7.29.0->7.29.7 (stryker-mutator/instrumenter allows ~7.29.0/^7.28.6), fast-uri 3.1.0->3.1.3 (ajv allows ^3.0.1), qs 6.15.1->6.15.3 (typed-rest-client allows ^6.14.1). Applied via `vp update` after editing the overrides map; verified via `vp install --frozen-lockfile` and `vp pm audit` that no other resolution moved and no peer range was violated."
+    "fixMethod": "Narrow package.json \"overrides\" pinning each package to the lowest already-in-range patched release its real parent(s) already declare compatibility with (no parent's own semver range was violated): @babel/core 7.29.0->7.29.7 (stryker-mutator/instrumenter allows ~7.29.0/^7.28.6), fast-uri 3.1.0->3.1.3 (ajv allows ^3.0.1), qs 6.15.1->6.15.3 (typed-rest-client allows ^6.14.1), brace-expansion@5 -> 5.0.7 via Bun version-scoped override key \"brace-expansion@5\" (keeps the unrelated brace-expansion@2.1.2 edge under lemmascript > ts-morph > @ts-morph/common > minimatch@9 intact). Applied via package.json overrides + lockfile packages entry update; verified via `vp install --frozen-lockfile` and `vp pm audit` that high is clean and only the dormant uuid moderate remains."
   },
   "accepted": [
-    {
-      "package": "brace-expansion",
-      "resolvedVersion": "5.0.5",
-      "advisory": {
-        "id": 1120311,
-        "url": "https://github.com/advisories/GHSA-jxxr-4gwj-5jf2",
-        "title": "brace-expansion: Large numeric range defeats documented `max` DoS protection",
-        "severity": "moderate",
-        "cvss": 6.5,
-        "cwe": ["CWE-400"],
-        "vulnerableVersions": ">=5.0.0 <5.0.6",
-        "fixedVersion": "5.0.6"
-      },
-      "dependencyPath": "socialcalc (devDependency) > @stryker-mutator/core@9.6.1 > minimatch@10.2.5 (requires ^5.0.5) > brace-expansion@5.0.5",
-      "ciReachability": "The dependency itself IS loaded and exercised in CI: `vp exec stryker run` (mutation testing, .github/workflows/mutation.yml) requires @stryker-mutator/core, which requires minimatch@10.2.5, which requires brace-expansion@5.0.5 - do not describe this dependency edge as unreachable from CI, it is not. What is unreachable is the specific DoS *precondition*: the vulnerability requires an attacker-controlled brace pattern with an extreme numeric range (e.g. `{1..1e9}`) reaching brace-expansion's parser. Every glob pattern minimatch evaluates through this path is a static, repo-authored string in stryker.config.mjs's own include/exclude lists (checked into version control, reviewed like any other source change) - no external, network-, or user-supplied string ever reaches this parser in this repo. Not present in the published npm tarball (devDependency only).",
-      "whyNotFixed": "brace-expansion also resolves at 2.1.2 via an unrelated, non-vulnerable chain: lemmascript@0.5.13 > ts-morph@25.0.1 > @ts-morph/common@0.26.1 > minimatch@9.0.9 (requires ^2.0.2) > brace-expansion@2.1.2. Bun's package.json \"overrides\" are top-level-only (no per-parent/nested scoping, unlike npm), so a single override key forces the SAME resolved version onto both chains. Empirically verified: overriding to 5.0.7 collapses the 2.x edge to 5.0.7 too, silently breaking the ^2.0.2 range minimatch@9.0.9 (and therefore @ts-morph/common, used by lemmascript's `lsc gen`/`lsc check`) actually declares. Forcing that cross-major jump on an otherwise non-vulnerable, unrelated edge is the exact kind of breaking/hiding shortcut this remediation pass was told not to take, so the moderate finding on the 5.x edge is left in place instead. No newer minimatch/@stryker-mutator/core release exists yet that self-bumps past 5.0.5 within its own declared range.",
-      "mitigation": "None required beyond the existing isolation (dev-only dependency, not shipped, and its DoS precondition - an attacker-controlled extreme-range brace pattern - is unreachable since every pattern reaching it is a static, repo-authored config string). No code or config change reduces risk further without the breaking override described above.",
-      "owner": "socialcalc maintainers (dependency hygiene)",
-      "expiryCondition": "Re-audit when any of: (a) @stryker-mutator/core or minimatch publish a release pinning brace-expansion >=5.0.6, (b) Bun ships nested/per-parent \"overrides\" (tracked upstream: oven-sh/bun#6608), letting the 5.x and 2.x edges be pinned independently, or (c) 90 days have elapsed since lastReviewed, whichever is first."
-    },
     {
       "package": "uuid",
       "resolvedVersion": "9.0.1",

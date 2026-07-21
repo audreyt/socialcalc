@@ -48,6 +48,15 @@ type ChromeLayout = {
   height: number;
 };
 
+// Firefox getBoundingClientRect can report fractional right edges that differ
+// by a subpixel from the flex container on CI DPI/font stacks. Keep exact
+// equality for y-coordinates (cross-browser stable); tolerate <=1px on shared
+// right edges only.
+const FIREFOX_SUBPIXEL_EDGE_TOLERANCE_PX = 1;
+const assertRightEdgeAligned = (left: number, right: number) => {
+  expect(Math.abs(left - right)).toBeLessThanOrEqual(FIREFOX_SUBPIXEL_EDGE_TOLERANCE_PX);
+};
+
 test.describe("redo keyboard shortcuts", () => {
   test("Ctrl+Y redoes an undone edit", async ({ page }) => {
     await gotoBundle(page, "normal");
@@ -288,7 +297,7 @@ test.describe("tab tools and pane sliders", () => {
     expect(emptyLayout.replaceDisplay).toBe("none");
     expect(emptyLayout.formulaBarClass).toContain("socialcalc-formulabar");
     expect(Math.abs(emptyLayout.find.y - emptyLayout.formula.y)).toBeLessThan(1);
-    expect(emptyLayout.find.right).toBe(emptyLayout.formulaBar.right);
+    assertRightEdgeAligned(emptyLayout.find.right, emptyLayout.formulaBar.right);
     expect(emptyLayout.find.x).toBeGreaterThan(emptyLayout.formula.right);
     await searchInput.focus();
     await page.keyboard.press("Tab");
@@ -308,7 +317,7 @@ test.describe("tab tools and pane sliders", () => {
     const expandedLayout = await layout();
     assertChromeHeight(expandedLayout);
     expect(Math.abs(expandedLayout.find.y - expandedLayout.formula.y)).toBeLessThan(1);
-    expect(expandedLayout.find.right).toBe(expandedLayout.formulaBar.right);
+    assertRightEdgeAligned(expandedLayout.find.right, expandedLayout.formulaBar.right);
     expect(expandedLayout.replaceDisplay).toBe("flex");
     expect(expandedLayout.replace.y).toBeGreaterThanOrEqual(
       Math.max(expandedLayout.formula.bottom, expandedLayout.find.bottom),
