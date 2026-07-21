@@ -15,7 +15,7 @@ Highlights
 - Find remains globally visible and right-aligned; the replacement controls use
   a progressive right-aligned row.
 - Added print/page-setup metadata and a Print toolbar tab, an ARIA-accessible
-  grid, and formal-verification growth from 48 to 195 Dafny VCs across the
+  grid, and formal-verification growth from 48 to 194 Dafny VCs across the
   release's expanded LemmaScript facade set.
 
 CSV/TSV import/export
@@ -204,7 +204,7 @@ Formal verification
   weekday policy, statistics, visibility, XMATCH/XLOOKUP, protection,
   conditional formatting, workbooks, charts, validation, LET/LAMBDA scope,
   pivot tables, criteria aggregation, and HTML-table clipboard policy.
-- The release now documents 20 proof-bearing facades and 195 total Dafny VCs,
+- The release now documents 20 proof-bearing facades and 194 total Dafny VCs,
   up from the prior 48; the original A1, evaluation-operations, lookup-result,
   and number-parse facades remain part of that total.
 

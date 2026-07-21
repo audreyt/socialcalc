@@ -394,8 +394,9 @@ shipping bundle.
 
 - `lemma/a1.ts`: A1 coordinate/clamp algebra, absolute helpers, overflow
   `#REF!` policy, OFFSET rectangle policy, and ADDRESS bounds/formatting —
-  36 Dafny VCs;
-- `lemma/eval-ops.ts`: `/` and `&` error/type lattice — 4 VCs;
+  35 Dafny VCs;
+- `lemma/branch.ts`: pure branch/decision policy facade — 3 Dafny VCs;
+- `lemma/eval-ops.ts`: `/` and `&` error/type lattice — 5 VCs;
 - `lemma/lookup-result.ts`: token resolution and exact-before-wildcard-before-
   miss precedence — 3 VCs. Full row scanning stays runtime-tested;
 - `lemma/spill.ts`: dynamic-array spill runtime pure policies — rectangle
@@ -409,6 +410,8 @@ shipping bundle.
   all-non-working mask), per-day mask lookup, and the working-day/step-
   direction decision — 29 Dafny VCs. Calendar/holiday-scan loops stay
   runtime-tested.
+- `lemma/finance-policy.ts`: pure finance policy facade (shipping-oracle
+  cross-check; calendar/solver loops stay runtime-tested) — 3 Dafny VCs.
 - `lemma/statistics.ts`: RANK.AVG tie-averaging and QUARTILE.EXC
   interpolation-domain policies, restated as exact-integer arithmetic (the
   real-valued average/position are unverified one-line bridges around the
@@ -473,7 +476,7 @@ shipping bundle.
   bounds-precedence status (invalid span before bounds overflow),
   mirroring spill.ts's planSpillStatus precedence — 9 Dafny VCs.
 
-Total: **195 VCs (36 + 5 + 3 + 17 + 29 + 3 + 3 + 3 + 7 + 7 + 4 + 2 + 8 + 9 + 16 + 3 + 6 + 20 + 5 + 9)**.
+Total: **194 VCs (35 + 3 + 5 + 3 + 17 + 29 + 3 + 3 + 7 + 7 + 4 + 2 + 8 + 9 + 16 + 3 + 6 + 20 + 5 + 9)**.
 
 After a facade edit:
 
