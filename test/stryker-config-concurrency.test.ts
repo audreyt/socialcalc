@@ -2,7 +2,10 @@
 // scope and concurrency from process.env at module-load time, so each case
 // imports a fresh module under an isolated environment snapshot.
 
-import { describe, expect, test } from "vite-plus/test";
+import * as os from "node:os";
+
+import { describe, expect, test, vi } from "vite-plus/test";
+const defaultConcurrency = (parallelism: number) => Math.max(4, Math.min(8, parallelism));
 
 const CONFIG_ENV_KEYS = [
   "MUTATE_SCOPE",
@@ -77,7 +80,7 @@ describe("stryker.config.mjs hybrid runner", () => {
       testRunner: "command",
       coverageAnalysis: "off",
       commandRunner: { command: "vp test --maxWorkers=2" },
-      concurrency: 4,
+      concurrency: defaultConcurrency(os.availableParallelism()),
     });
     expect(mutationRun).toBe("1");
     expect(mutationTestFiles).toBeUndefined();
@@ -153,15 +156,38 @@ describe("stryker.config.mjs hybrid runner", () => {
     expect(mutationTestFiles).toEqual(["test/viewer-a.test.ts", "test/viewer-b.test.ts"]);
   });
 
+  test("default concurrency derives floor 4 and cap 8 from host parallelism", async () => {
+    const cases = [
+      [2, 4],
+      [6, 6],
+      [16, 8],
+    ] as const;
+    for (const [parallelism, expected] of cases) {
+      vi.resetModules();
+      vi.doMock("node:os", async () => ({
+        ...(await vi.importActual("node:os")),
+        availableParallelism: () => parallelism,
+      }));
+      try {
+        const loaded = await loadConfig({});
+        expect(loaded.config.concurrency).toBe(expected);
+      } finally {
+        vi.doUnmock("node:os");
+        vi.resetModules();
+      }
+    }
+  });
+
   test("STRYKER_CONCURRENCY accepts positive integers and rejects unsafe values", async () => {
     const overridden = await loadConfig({ STRYKER_CONCURRENCY: "8" });
     expect(overridden.config.concurrency).toBe(8);
 
+    const expectedDefault = defaultConcurrency(os.availableParallelism());
     const invalid = await loadConfig({ STRYKER_CONCURRENCY: "-3" });
-    expect(invalid.config.concurrency).toBe(4);
+    expect(invalid.config.concurrency).toBe(expectedDefault);
 
     const nonNumeric = await loadConfig({ STRYKER_CONCURRENCY: "not-a-number" });
-    expect(nonNumeric.config.concurrency).toBe(4);
+    expect(nonNumeric.config.concurrency).toBe(expectedDefault);
   });
   test("TEST_RUNNER_MAX_WORKERS only changes command-runner child pools", async () => {
     const command = await loadConfig({

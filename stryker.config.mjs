@@ -61,6 +61,8 @@
 // weakening the isolation guarantee.
 
 import { readFileSync } from "node:fs";
+import { availableParallelism } from "node:os";
+
 import { basename, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { testsByFile, ALL_MUTATE_FILES, mutationIncrementalFile } from "./stryker-file.mjs";
@@ -128,6 +130,12 @@ function parsePositiveInt(value, fallback) {
 
 const COMMAND_RUNNER_TARGETS = new Set(["js/formatnumber2.ts", "js/socialcalcconstants.ts"]);
 const useCommandRunner = !isCriticalScope && (!target || COMMAND_RUNNER_TARGETS.has(target));
+// Bound both sides: the cap avoids multiplying memory/scheduler contention
+// (8 workers x 2-worker command-runner Vitest pools roughly saturates a
+// 16-core host), while the floor keeps small CI runners from silently
+// downshifting below the release-evidence concurrency of 4. Release evidence
+// may pin that value explicitly with STRYKER_CONCURRENCY=4.
+const defaultConcurrency = Math.max(4, Math.min(8, availableParallelism()));
 const TEST_RUNNER_MAX_WORKERS = parsePositiveInt(process.env.TEST_RUNNER_MAX_WORKERS, 2);
 const testCommand = testsFilter
   ? `vp test run --maxWorkers=${TEST_RUNNER_MAX_WORKERS} ${testsFilter}`
@@ -226,7 +234,7 @@ export default {
   // Isolated sandboxes only; never mutate the caller's working tree. The
   // native Vitest runner uses one test thread per Stryker worker; command
   // targets cap each child Vitest pool separately.
-  concurrency: parsePositiveInt(process.env.STRYKER_CONCURRENCY, 4),
+  concurrency: parsePositiveInt(process.env.STRYKER_CONCURRENCY, defaultConcurrency),
 
   reporters: ["clear-text", "progress", "html", "json"],
   htmlReporter: { fileName: `reports/mutation/${scopeLabel}/index.html` },
