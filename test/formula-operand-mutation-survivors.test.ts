@@ -342,3 +342,59 @@ test("fresh id200: unavailable sheet error includes the sheet name separator", a
   expect(r.type).toBe("e#REF!");
   expect(r.error).toBe(`${"Sheet unavailable:"} MISSING`);
 });
+
+// ---------------------------------------------------------------------------
+// LAMBDA closed coercion (js/formula-operand.ts L70-76, L117-122)
+// ---------------------------------------------------------------------------
+// Direct stack calls — live LET/LAMBDA formula tests cover these only
+// lightly (cov=1), leaving the type-guard and body BlockStatement as
+// survivors. Emptying the lambda body or weakening `type == "lambda"` lets
+// the closure fall through into DetermineValueType / stringification.
+
+test("OperandAsNumber: bare lambda operand fails closed as e#VALUE! with value 0", async () => {
+  const { SC, sheet } = await fresh();
+  const lambda = {
+    type: "lambda",
+    value: { params: ["x"], bodyTokens: [], scope: [] },
+  } as SCBundle.FormulaOperand;
+  const r = SC.Formula.OperandAsNumber(sheet, [lambda]);
+  expect(r.type).toBe("e#VALUE!");
+  expect(r.value).toBe(0);
+  // Must not fall through to DetermineValueType and invent a numeric type.
+  expect(r.type.charAt(0)).toBe("e");
+});
+
+test("OperandAsNumber: lambda guard must run even when DetermineValueType is missing", async () => {
+  const { SC, sheet } = await fresh();
+  // Without the lambda type-guard (ConditionalExpression→false / StringLiteral
+  // "lambda"→"" / emptied BlockStatement), control falls into the else branch
+  // and the falsy-DetermineValueType fallback coerces the closure object with
+  // `value - 0` → NaN typed "n". The guard must fail closed as e#VALUE!/0
+  // regardless of whether DetermineValueType is present.
+  const orig = SC.DetermineValueType;
+  try {
+    Reflect.set(SC, "DetermineValueType", undefined);
+    const lambda = {
+      type: "lambda",
+      value: { params: ["x"], bodyTokens: [], scope: [] },
+    } as SCBundle.FormulaOperand;
+    const r = SC.Formula.OperandAsNumber(sheet, [lambda]);
+    expect(r.type).toBe("e#VALUE!");
+    expect(r.value).toBe(0);
+    expect(Number.isNaN(r.value as number)).toBe(false);
+  } finally {
+    Reflect.set(SC, "DetermineValueType", orig);
+  }
+});
+test("OperandAsText: bare lambda operand fails closed as e#VALUE! with empty string", async () => {
+  const { SC, sheet } = await fresh();
+  const lambda = {
+    type: "lambda",
+    value: { params: ["x"], bodyTokens: [], scope: [] },
+  } as SCBundle.FormulaOperand;
+  const r = SC.Formula.OperandAsText(sheet, [lambda]);
+  expect(r.type).toBe("e#VALUE!");
+  expect(r.value).toBe("");
+  // StringLiteral mutant on the "" assignment would leave a sentinel value.
+  expect(r.value).not.toBe("Stryker was here!");
+});

@@ -236,3 +236,178 @@ describe("fresh formula-ref survivors", () => {
     }
   });
 });
+
+// --------------------------------------------------------------------------
+// RewriteSheetNameInFormula + isBareIdentifierSheetName (formula-ref.ts
+// L523-603). These paths were NoCoverage dilution until workbook.test.ts
+// joined the owned subset; the remaining survivors need direct, tight
+// assertions that distinguish bare vs quoted emission, delete-band range
+// collapse, TokenOpExpansion re-serialization, and the name/string/bang
+// match guards.
+// --------------------------------------------------------------------------
+
+describe("RewriteSheetNameInFormula bare-vs-quoted emission", () => {
+  test("plain multi-letter identifiers stay bare; 1-2 letter and coord-shaped names are quoted", async () => {
+    const SC = await loadSocialCalc();
+    const normalize = SC.Formula.NormalizeSheetName.bind(SC.Formula);
+    const rewrite = (newName: string) =>
+      SC.RewriteSheetNameInFormula("Old!A1", "Old", newName, normalize);
+
+    // Bare-identifier path: first regex matches, neither exclusion fires.
+    expect(rewrite("Hello")).toBe("Hello!A1");
+    expect(rewrite("_ok")).toBe("_ok!A1");
+    expect(rewrite("Data_2")).toBe("Data_2!A1");
+    // Coord-shaped regex must be left-and-right anchored: without ^,
+    // "FooA1" would match the "A1" suffix and be wrongly quoted; without
+    // $, "A1Foo" would match the "A1" prefix and be wrongly quoted.
+    expect(rewrite("FooA1")).toBe("FooA1!A1");
+    expect(rewrite("A1Foo")).toBe("A1Foo!A1");
+
+    // 1-2 letter alpha-only names must be quoted: LookupName's whole-column
+    // fallback would otherwise swallow them as column refs.
+    expect(rewrite("B")).toBe('"B"!A1');
+    expect(rewrite("AB")).toBe('"AB"!A1');
+    // Single-letter still quoted even if the 1-2-letter regex is narrowed
+    // to `{1}` only — covered by "B" above; two-letter catches `{1,2}`→`{1}`.
+    expect(rewrite("zz")).toBe('"zz"!A1');
+
+    // Coord-shaped names must be quoted or they re-parse as cell refs.
+    expect(rewrite("A1")).toBe('"A1"!A1');
+    expect(rewrite("A10")).toBe('"A10"!A1'); // \d→\D would miss the trailing 0
+    expect(rewrite("ZZ9")).toBe('"ZZ9"!A1');
+    expect(rewrite("$A1")).toBe('"$A1"!A1');
+    expect(rewrite("B$2")).toBe('"B$2"!A1');
+
+    // Non-identifier characters force quoting (first regex fails).
+    expect(rewrite("My Sheet")).toBe('"My Sheet"!A1');
+    expect(rewrite("1bad")).toBe('"1bad"!A1');
+    expect(rewrite("has-dash")).toBe('"has-dash"!A1');
+  });
+
+  test("quoted sheet-name tokens (string type) still match and rewrite", async () => {
+    const SC = await loadSocialCalc();
+    const normalize = SC.Formula.NormalizeSheetName.bind(SC.Formula);
+    // Tokenizer emits type=string for "Old Sheet"; isNameLike must accept
+    // token_string, not only token_name. Dropping the string disjunct leaves
+    // the qualifier untouched.
+    expect(SC.RewriteSheetNameInFormula('"Old Sheet"!A1', "Old Sheet", "New", normalize)).toBe(
+      "New!A1",
+    );
+  });
+});
+
+describe("RewriteSheetNameInFormula match guards", () => {
+  test("a bare name not followed by ! is never treated as a sheet qualifier", async () => {
+    const SC = await loadSocialCalc();
+    const normalize = SC.Formula.NormalizeSheetName.bind(SC.Formula);
+    // Tokens: OLD, +, 1. followedByBang must stay false; forcing it true
+    // (or collapsing isNameLike&&followedByBang to a weaker guard) rewrites
+    // the free name into the new sheet name.
+    expect(SC.RewriteSheetNameInFormula("Old+1", "Old", "New", normalize)).toBe("Old+1");
+    expect(SC.RewriteSheetNameInFormula("Old", "Old", "New", normalize)).toBe("Old");
+  });
+
+  test("unrelated formulas are returned byte-for-byte (no token reserialization)", async () => {
+    const SC = await loadSocialCalc();
+    const normalize = SC.Formula.NormalizeSheetName.bind(SC.Formula);
+    // matched stays false → original string, preserving lowercase names.
+    expect(SC.RewriteSheetNameInFormula("myname+1", "Alpha", "Gamma", normalize)).toBe("myname+1");
+  });
+
+  test("only the matching sheet qualifier is rewritten when two sheets appear", async () => {
+    const SC = await loadSocialCalc();
+    const normalize = SC.Formula.NormalizeSheetName.bind(SC.Formula);
+    // KEEP is uppercased by the tokenizer during reconstruction of the
+    // matched formula; Old → New. Forcing the match guard true on every
+    // token would also mangle operators/coords.
+    expect(SC.RewriteSheetNameInFormula("Old!A1+Keep!A1", "Old", "New", normalize)).toBe(
+      "New!A1+KEEP!A1",
+    );
+  });
+});
+
+describe("RewriteSheetNameInFormula delete-band collapse", () => {
+  test("deleting a sheet collapses sheet!coord and sheet!coord:coord to a single #REF!", async () => {
+    const SC = await loadSocialCalc();
+    const normalize = SC.Formula.NormalizeSheetName.bind(SC.Formula);
+    expect(SC.RewriteSheetNameInFormula("Old!A1", "Old", null, normalize)).toBe("#REF!");
+    // Sticky range: name ! coord : coord — the :coord pair must be consumed.
+    expect(SC.RewriteSheetNameInFormula("SUM(Old!A1:B2)", "Old", null, normalize)).toBe(
+      "SUM(#REF!)",
+    );
+    // Non-coord after bang must NOT be consumed (name token left behind).
+    expect(SC.RewriteSheetNameInFormula("Old!MYNAME+1", "Old", null, normalize)).toBe(
+      "#REF!MYNAME+1",
+    );
+  });
+
+  test("delete of a sheet-qualified range does not leave a dangling :coord", async () => {
+    const SC = await loadSocialCalc();
+    const normalize = SC.Formula.NormalizeSheetName.bind(SC.Formula);
+    // If the range-extension guard (type===op && text===':' && next coord)
+    // is forced true/false incorrectly, survivors emit "#REF!:B2" or
+    // "#REF!B2" instead of a clean "#REF!".
+    const out = SC.RewriteSheetNameInFormula("Old!A1:B2", "Old", null, normalize);
+    expect(out).toBe("#REF!");
+    expect(out).not.toContain(":");
+    expect(out).not.toContain("B2");
+  });
+
+  test("delete-band range extension only fires for ':' + coord, not other operators", async () => {
+    const SC = await loadSocialCalc();
+    const normalize = SC.Formula.NormalizeSheetName.bind(SC.Formula);
+    // After consuming A1, j points at '+'. Forcing the range-extension
+    // conjunct true (or weakening && to || so a truthy next token suffices)
+    // would swallow '+1' and yield bare "#REF!" instead of "#REF!+1".
+    expect(SC.RewriteSheetNameInFormula("Old!A1+1", "Old", null, normalize)).toBe("#REF!+1");
+    // text===':' forced true while type is still op: '+'+coord must not extend.
+    expect(SC.RewriteSheetNameInFormula("Old!A1+B2", "Old", null, normalize)).toBe("#REF!+B2");
+    // ':' followed by a NAME (not coord) must leave ":MYNAME" intact; forcing
+    // the next-token-is-coord check true would swallow both tokens.
+    expect(SC.RewriteSheetNameInFormula("Old!A1:MYNAME", "Old", null, normalize)).toBe(
+      "#REF!:MYNAME",
+    );
+    expect(SC.RewriteSheetNameInFormula("Old!A1&B2", "Old", null, normalize)).toBe("#REF!&B2");
+  });
+});
+
+describe("RewriteSheetNameInFormula token reserialization", () => {
+  test("comparison operators re-expand through TokenOpExpansion (G/L/N/M/P)", async () => {
+    const SC = await loadSocialCalc();
+    const normalize = SC.Formula.NormalizeSheetName.bind(SC.Formula);
+    // Lexer stores >= as op text "G". The non-matching token loop must take
+    // the token_op branch and expand via TokenOpExpansion; dropping that
+    // branch leaves a literal "G" in the rewritten formula.
+    expect(SC.RewriteSheetNameInFormula("Old!A1>=1", "Old", "New", normalize)).toBe("New!A1>=1");
+    expect(SC.RewriteSheetNameInFormula("Old!A1<=1", "Old", "New", normalize)).toBe("New!A1<=1");
+    expect(SC.RewriteSheetNameInFormula("Old!A1<>1", "Old", "New", normalize)).toBe("New!A1<>1");
+    expect(SC.RewriteSheetNameInFormula("-Old!A1", "Old", "New", normalize)).toBe("-New!A1");
+  });
+
+  test("name tokens that collide with TokenOpExpansion keys stay names, not operators", async () => {
+    const SC = await loadSocialCalc();
+    const normalize = SC.Formula.NormalizeSheetName.bind(SC.Formula);
+    // 'P' is both a valid NAME token and TokenOpExpansion's unary-plus key.
+    // Forcing the `else if (ttype === token_op)` branch true would rewrite
+    // the trailing name via tokenOpExpansion["P"] === "+" → "New!A1++".
+    expect(SC.RewriteSheetNameInFormula("Old!A1+P", "Old", "New", normalize)).toBe("New!A1+P");
+    expect(SC.RewriteSheetNameInFormula("Old!A1+G", "Old", "New", normalize)).toBe("New!A1+G");
+    expect(SC.RewriteSheetNameInFormula("Old!A1+N", "Old", "New", normalize)).toBe("New!A1+N");
+  });
+
+  test("numeric tokens before ! are not name-like sheet qualifiers", async () => {
+    const SC = await loadSocialCalc();
+    const normalize = SC.Formula.NormalizeSheetName.bind(SC.Formula);
+    // isNameLike forced true would treat the leading number as a sheet name
+    // when normalize("123")==="123" and rewrite to New!A1.
+    expect(SC.RewriteSheetNameInFormula("123!A1", "123", "New", normalize)).toBe("123!A1");
+  });
+
+  test("string literals beside a rewritten qualifier are re-quoted, not raw-appended", async () => {
+    const SC = await loadSocialCalc();
+    const normalize = SC.Formula.NormalizeSheetName.bind(SC.Formula);
+    expect(SC.RewriteSheetNameInFormula('Old!A1&"static"', "Old", "New", normalize)).toBe(
+      'New!A1&"static"',
+    );
+  });
+});

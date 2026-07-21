@@ -56,10 +56,13 @@ const sheetCoreTests = [
 // Formula lexer/parser/operand-stack/rewrite tests, verified by name plus
 // grep for ParseFormulaIntoTokens/ConvertInfixToPolish/OperandAs*/
 // OffsetFormulaCoords/AdjustFormulaCoords/ReplaceFormulaCoords call sites.
-// Excludes test/lemma-*-facade.test.ts on purpose: those exercise the
-// non-shipping LemmaScript mirror in lemma/a1.ts (see its header comment),
-// not the shipping js/formula-ref.ts this config mutates. Includes the
-// 2026-07-12 mutation-survivor regression files added while closing the
+// lemma-a1-facade.test.ts is INCLUDED: its pure-lemma block alone would not
+// kill shipping mutants, but the "vs shipping SocialCalc oracle" block calls
+// SC.OffsetRectangle/rcColname/crToCoord/OffsetFormulaCoords/AdjustFormulaCoords
+// directly and is real killing power for formula-ref.ts. Other lemma-*-
+// facade files that call shipping Formula.* helpers (weekday policy, lambda
+// scope) are included on the same basis.
+// Includes the 2026-07-12 mutation-survivor regression files added while closing the
 // critical-scope Stryker gap (see stryker-mutation-disposition.json), the
 // semantic-audit-hardened branch-coverage file (direct SC.Formula.* calls
 // across EvaluatePolish/ConvertInfixToPolish/DecodeRangeParts/FreshnessInfo/
@@ -76,6 +79,16 @@ const sheetCoreTests = [
 // SORT/UNIQUE/FILTER/SEQUENCE/TRANSPOSE/SORTBY/CHOOSECOLS/CHOOSEROWS/TAKE/
 // DROP/HSTACK/VSTACK/TOCOL/TOROW/WRAPROWS/WRAPCOLS/EXPAND and the shared
 // spill layer (basic/commands/editor/persistence/family2 scenarios).
+// workbook.test.ts owns RewriteSheetNameInFormula (rename/delete cross-sheet
+// formula rewrite in formula-ref.ts) — without it those regions land as
+// NoCoverage dilution on the formula-ref matrix leg.
+// lambda-formulas.test.ts + lemma-lambda-scope-facade.test.ts own the
+// LET/LAMBDA pure helpers in formula-parse.ts (ClassifyArity/ResolveScopeIndex/
+// RecursionStatus/ShapesMatch/IsValidRectShape) and the formula-operand.ts
+// lambda-type closed coercion paths in OperandAsNumber/OperandAsText.
+// formula-ref-lexer-coverage-gaps.test.ts drives OperandsAsCoordOnSheet/
+// OperandsAsRangeOnSheet sheet-qualified error branches and OperandAsNumber
+// DetermineValueType fallbacks that the shared formula suite otherwise misses.
 const formulaOnlyTests = [
   "test/formula-coverage.test.ts",
   "test/formula.test.ts",
@@ -103,6 +116,11 @@ const formulaOnlyTests = [
   "test/dynamic-array-spill-persistence.test.ts",
   "test/dynamic-array-spill-family2.test.ts",
   "test/criteria-functions.test.ts",
+  "test/workbook.test.ts",
+  "test/lambda-formulas.test.ts",
+  "test/lemma-lambda-scope-facade.test.ts",
+  "test/formula-ref-lexer-coverage-gaps.test.ts",
+  "test/lemma-a1-facade.test.ts",
 ];
 
 // Differential/adversarial corpus (test/differential/**, test/adversarial/**):
