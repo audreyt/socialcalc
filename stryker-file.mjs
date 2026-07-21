@@ -230,30 +230,17 @@ export const testsByFile = {
     ...adversarialTests,
   ],
 
-  // socialcalc-3.ts also owns SafeUrlForRender/EscapeUntrustedHtml (the
-  // untrusted-content render-security policy, see socialcalc-3.d.ts) and
-  // the Sheet class's cache/recalc plumbing — hardening-sheet-core-
-  // branches.test.ts, render-security-policy.test.ts, and
-  // sheet-cache-load-regressions.test.ts (direct SC.Formula.SheetCache /
-  // `new SC.Sheet` call sites) all drive that surface directly.
-  // formula-dynamic-reference.test.ts (2026-07-19) additionally owns the
-  // bounded dynamic-reference retry pass in RecalcTimerRoutine
-  // (`sheet.hasDynamicRef && !sheet.dynamicRefRetried`, set by INDIRECT/
-  // OFFSET in js/formula1.ts): its same-pass-staleness tests construct
-  // `new SC.Sheet()`, drive it through scheduleCommands/recalcSheet, and
-  // were verified (by temporarily disabling the retry branch) to fail
-  // without that exact mechanism.
-  // socialcalc-3.ts also owns SafeUrlForRender/EscapeUntrustedHtml (the
-  // untrusted-content render-security policy, see socialcalc-3.d.ts), the
-  // Sheet class's cache/recalc plumbing, and the conditional-formatting
-  // evaluation engine (CondFmtRuleMatches/CondFmtCompare/CondFmtValueCounts/
-  // EvaluateCondFmtForCell plus the condfmt command/save-load/structural-
-  // rewrite code) — hardening-sheet-core-branches.test.ts, render-security-
-  // policy.test.ts, sheet-cache-load-regressions.test.ts, and
-  // conditional-formatting.test.ts (direct SC.EvaluateCondFmtForCell/
-  // SC.CondFmtRuleMatches/SC.CondFmtCompare call sites plus condfmt
-  // command/save/structural-rewrite scenarios) all drive that surface
-  // directly.
+  // socialcalc-3.ts owns Sheet/cache/recalc plumbing and the command engine
+  // that backs filters/tables, validation, conditional formatting, chart,
+  // pivot, print setup, and HTML-table clipboard import. Each mapped suite
+  // calls that shipped surface directly (rather than only testing a facade):
+  // filters-tables drives the AutoFilter/Table helpers and command cases;
+  // data-validation-commands drives validation and structural rewrites;
+  // print-setup drives print attributes and the Print tab; the chart/pivot
+  // suites schedule their command cases; and the HTML-table suites call
+  // SC.HtmlTable's parser, placement, and import helpers. The remaining
+  // suites cover general Sheet behavior, security, cache/recalc, protection,
+  // conditional formatting, spill behavior, and workbook adapters.
   "socialcalc-3.ts": [
     ...sheetCoreTests,
     ...commandRegressionTests,
@@ -269,14 +256,26 @@ export const testsByFile = {
     "test/lemma-protect-facade.test.ts",
     "test/conditional-formatting.test.ts",
     "test/lemma-condfmt-facade.test.ts",
+    "test/filters-tables.test.ts",
+    "test/data-validation-commands.test.ts",
+    "test/data-validation-security-browser.test.ts",
+    "test/print-setup.test.ts",
+    "test/chart-basic.test.ts",
+    "test/chart-editor-ui.test.ts",
+    "test/chart-persistence.test.ts",
+    "test/chart-structural-adjustment.test.ts",
+    "test/chart-svg-render.test.ts",
+    "test/chart-undo.test.ts",
+    "test/lemma-chart-facade.test.ts",
+    "test/pivot-tables.test.ts",
+    "test/lemma-pivot-facade.test.ts",
+    "test/html-clipboard-paste.test.ts",
+    "test/lemma-html-table-facade.test.ts",
     "test/dynamic-array-spill-basic.test.ts",
     "test/dynamic-array-spill-commands.test.ts",
     "test/dynamic-array-spill-editor.test.ts",
     "test/dynamic-array-spill-persistence.test.ts",
     "test/dynamic-array-spill-family2.test.ts",
-    // CSV/TSV/FODS and normalized-workbook adapters are implemented here,
-    // not in a separate import/export module. Their direct behavior suites
-    // must be visible to the exact socialcalc-3 mutation leg.
     "test/csv-locale-interop.test.ts",
     "test/fods-export.test.ts",
     "test/normalized-workbook-ingestion.test.ts",
@@ -320,7 +319,23 @@ export const testsByFile = {
     "test/popup-viewer-coverage.test.ts",
     "test/hardening-popup-behavior.test.ts",
   ],
-  "socialcalcspreadsheetcontrol.ts": [...editorTests, "test/hardening-control-viewer.test.ts"],
+  // This browser control owns Find/Replace, the sort/audit/comment tabs,
+  // workbook-tab UI, and Print-tab fields. editor-productivity and
+  // control-coverage exercise Find/Replace and sort; workbook-ui exercises
+  // EnableWorkbookMode/rendered tab actions; print-setup exercises the
+  // Print-tab field loading, application, and PreparePrintArea DOM logic.
+  // The spreadsheetcontrol-coverage-gaps* suites drive DoCmd/audit/comment/
+  // LoadColumnChoosers/InitializeSpreadsheetControl branches that the
+  // older control matrix left as NoCoverage dilution.
+  "socialcalcspreadsheetcontrol.ts": [
+    ...editorTests,
+    "test/hardening-control-viewer.test.ts",
+    "test/workbook-ui.test.ts",
+    "test/print-setup.test.ts",
+    "test/spreadsheetcontrol-coverage-gaps.test.ts",
+    "test/spreadsheetcontrol-coverage-gaps-2.test.ts",
+    "test/spreadsheetcontrol-coverage-gaps-3.test.ts",
+  ],
   // Viewer initialization, save/load, resize, status, localization, and
   // repeating-macro behavior lives here. The broader UI/control suites invoke
   // those shipped functions directly, so they belong to this owned subset.
