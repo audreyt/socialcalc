@@ -322,6 +322,25 @@ test.describe("print setup and @media print CSS", () => {
       (idPrefix) => window.__scControls[idPrefix].sheet.cells.A1?.datavalue === 1,
       "SocialCalc-",
     );
+    // Drain the editor render pipeline before calling PreparePrintArea.
+    // scheduleCommand waits for the data write, but ScheduleRender fires a
+    // 1ms setTimeout *after* that (DoRenderStep → EditorRenderSheet replaces
+    // fullgrid, then another 1ms setTimeout for DoPositionCalculations).
+    // If PreparePrintArea stamps sc-print-area on the *old* fullgrid node
+    // before DoRenderStep runs, the re-rendered node carries no class and the
+    // print-media cascade never makes the grid visible.
+    await waitFor(
+      page,
+      (idPrefix) => {
+        const ed = window.__scControls[idPrefix]?.editor;
+        if (!ed || !("timeout" in ed) || !("busy" in ed)) return false;
+        return (
+          (ed as { timeout: unknown; busy: unknown }).timeout === null &&
+          !(ed as { timeout: unknown; busy: unknown }).busy
+        );
+      },
+      "SocialCalc-",
+    );
 
     // Mark the grid as the print area the same way TriggerPrint does, then
     // switch the page to print media -- exercising the real browser's CSS
@@ -329,6 +348,13 @@ test.describe("print setup and @media print CSS", () => {
     await page.evaluate(() => {
       window.SocialCalc.PreparePrintArea(window.__scControls["SocialCalc-"]);
     });
+    // Verify the class actually landed on the live fullgrid node before
+    // switching to print media. If a render fires between PreparePrintArea and
+    // emulateMedia the class would be lost and the subsequent toHaveCSS would
+    // time out with "hidden" — this assertion makes that failure diagnosable.
+    await expect(page.locator("#containerDiv table[role='grid']").first()).toHaveClass(
+      /sc-print-area/,
+    );
     await page.emulateMedia({ media: "print" });
     const grid = page.locator("#containerDiv table[role='grid']").first();
     // The print stylesheet deliberately restores visibility on the grid and
