@@ -6284,7 +6284,9 @@ More comments yet to come...
     }
     scf.FreshnessInfo.recalc_completed = true;
     scri.currentState = scri.state.idle;
-    do_statuscallback('calcfinished', Date.now() - scri.starttime.getTime());
+    var startedAt = scri.starttime;
+    var elapsed = startedAt instanceof Date ? Date.now() - startedAt.getTime() : 0;
+    do_statuscallback('calcfinished', elapsed);
     if (scri.queue.length > 0) {
       sheet = scri.queue.shift();
       sheet.RecalcSheet();
@@ -6894,6 +6896,7 @@ More comments yet to come...
     tableobj.cellPadding = '0';
     tableobj.style.width = context.totalwidth + 'px';
   };
+  SC.MaxRenderLoopIterations = 2e5;
   SC.RenderSheet = function (context, oldtable, linkstyle) {
     var newrow, rowpane, rownum;
     var tableobj, colgroupobj, tbodyobj, parentnode;
@@ -6923,12 +6926,17 @@ More comments yet to come...
       newrow = context.RenderColHeaders();
       if (newrow) tbodyobj.appendChild(newrow);
     }
+    var rowLoopGuard = 0;
+    var rowLoopMax = SocialCalc.MaxRenderLoopIterations;
     for (rowpane = 0; rowpane < context.rowpanes.length; rowpane++) {
       for (
         rownum = context.rowpanes[rowpane].first;
         rownum <= context.rowpanes[rowpane].last;
         rownum++
       ) {
+        if (++rowLoopGuard > rowLoopMax) {
+          throw new Error('RenderSheet row loop overrun');
+        }
         newrow = context.RenderRow(rownum, rowpane, linkstyle);
         tbodyobj.appendChild(newrow);
       }
@@ -6990,12 +6998,17 @@ More comments yet to come...
       newcol.appendChild(resizeBar);
       result.appendChild(newcol);
     }
+    var colLoopGuard = 0;
+    var colLoopMax = SocialCalc.MaxRenderLoopIterations;
     for (colpane = 0; colpane < context.colpanes.length; colpane++) {
       for (
         colnum = context.colpanes[colpane].first;
         colnum <= context.colpanes[colpane].last;
         colnum++
       ) {
+        if (++colLoopGuard > colLoopMax) {
+          throw new Error('RenderRow column loop overrun');
+        }
         newcol = context.RenderCell(rownum, colnum, rowpane, colpane, null, linkstyle);
         if (newcol) result.appendChild(newcol);
       }

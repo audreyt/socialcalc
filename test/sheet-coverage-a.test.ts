@@ -797,6 +797,56 @@ test("RenderContext.RenderSheet produces a <table> DOM tree with row/col headers
   expect(typeof html).toBe("string");
 });
 
+test("RenderSheet/RenderRow throw when MaxRenderLoopIterations is exceeded", async () => {
+  installBrowserShim();
+  const SC = await loadSocialCalc({ browser: true });
+  const sheet = new SC.Sheet();
+  await scheduleCommands(SC, sheet, ["set A1 value n 1", "set B1 value n 2", "set A2 value n 3"]);
+  const context = new SC.RenderContext(sheet);
+  context.showRCHeaders = false;
+  context.showGrid = false;
+  // Cheap stubs: only the iteration/guard contract is under test, not cell HTML.
+  const doc = (globalThis as unknown as { document: Document }).document;
+  const stubRow = () => doc.createElement("tr");
+  const stubCell = () => doc.createElement("td");
+  context.RenderRow = stubRow;
+  context.RenderCell = stubCell;
+
+  const savedMax = SC.MaxRenderLoopIterations;
+  try {
+    // Production default is large enough that a normal tiny sheet never trips it.
+    expect(typeof SC.MaxRenderLoopIterations).toBe("number");
+    expect(SC.MaxRenderLoopIterations).toBeGreaterThan(1000);
+    context.rowpanes = [{ first: 1, last: 2 }];
+    context.colpanes = [{ first: 1, last: 2 }];
+    expect(() => context.RenderSheet(null, context.defaultHTMLlinkstyle)).not.toThrow();
+
+    // Lower the shared ceiling so the real throw path fires after a few iterations.
+    SC.MaxRenderLoopIterations = 2;
+    // Force a wide row pane so the guard is the only exit.
+    context.rowpanes = [{ first: 1, last: 10 }];
+    context.colpanes = [{ first: 1, last: 1 }];
+    expect(() => context.RenderSheet(null, context.defaultHTMLlinkstyle)).toThrow(
+      /RenderSheet row loop overrun/,
+    );
+
+    // Column-loop guard is independent: one row, many columns.
+    SC.MaxRenderLoopIterations = 2;
+    context.rowpanes = [{ first: 1, last: 1 }];
+    context.colpanes = [{ first: 1, last: 10 }];
+    // Restore a real RenderRow so the column loop inside SC.RenderRow runs.
+    delete (context as { RenderRow?: unknown }).RenderRow;
+    context.RenderCell = stubCell;
+    expect(() => SC.RenderRow(context, 1, 0, context.defaultHTMLlinkstyle)).toThrow(
+      /RenderRow column loop overrun/,
+    );
+  } finally {
+    SC.MaxRenderLoopIterations = savedMax;
+    delete (context as { RenderRow?: unknown }).RenderRow;
+    delete (context as { RenderCell?: unknown }).RenderCell;
+  }
+});
+
 test("RenderCell covers default-non-text format alignment + readonly class names (6312, 6376, 6382, 6394)", async () => {
   installBrowserShim();
   const SC = await loadSocialCalc({ browser: true });
@@ -1821,6 +1871,7 @@ test("RecalcTimerRoutine chains previousrecalcsheet and surfaces waitingForServe
   const prevState = scri.currentState;
   const prevSheet = scri.sheet;
   const prevRemote = SC.Formula.RemoteFunctionInfo.waitingForServer;
+  const prevStart = scri.starttime;
   try {
     // (d) Chain-back: when a recalc finishes and sheet.previousrecalcsheet
     // is set, scri.sheet is reassigned and currentState → calc.
@@ -1835,39 +1886,121 @@ test("RecalcTimerRoutine chains previousrecalcsheet and surfaces waitingForServe
       count: 0,
       inrecalc: true,
     };
+    // Outer sheet must also be drainable so the chain-back timer can finish
+    // without inventing a fresh calc context mid-flight.
+    outerSheet.recalcdata = {
+      nextcalc: null,
+      calclist: {},
+      celllist: {},
+      calclistlength: 0,
+      count: 0,
+      inrecalc: true,
+    };
     innerSheet.previousrecalcsheet = outerSheet;
     innerSheet.attribs.needsrecalc = true;
     scri.sheet = innerSheet;
     scri.currentState = scri.state.calc;
+    // RecalcSheet normally stamps starttime; this direct RecalcTimerRoutine
+    // entry must do the same so calcfinished cannot throw on the default 0.
+    scri.starttime = new Date();
     // Drain — the empty calclist exits the while-loop immediately and then
     // triggers the chain-back branch.
     SC.RecalcTimerRoutine();
     expect(scri.sheet).toBe(outerSheet);
     expect(scri.currentState).toBe(scri.state.calc);
+    // Finish the chained outer sheet synchronously so no dangling timer
+    // outlives this scenario (and so the next RecalcSheet starts from idle).
+    SC.RecalcClearTimeout();
+    SC.RecalcTimerRoutine();
+    expect(scri.currentState).toBe(scri.state.idle);
+    expect(scri.sheet).toBeNull();
+
+    // Non-Date starttime (the RecalcInfo default 0) must not throw on
+    // calcfinished; elapsed falls back to 0 instead of calling .getTime().
+    const staleSheet = new SC.Sheet();
+    staleSheet.recalcdata = {
+      nextcalc: null,
+      calclist: {},
+      celllist: {},
+      calclistlength: 0,
+      count: 0,
+      inrecalc: true,
+    };
+    let finishedArg: unknown;
+    staleSheet.statuscallback = (_d: unknown, status: string, arg: unknown) => {
+      if (status === "calcfinished") finishedArg = arg;
+    };
+    scri.sheet = staleSheet;
+    scri.currentState = scri.state.calc;
+    scri.starttime = 0;
+    SC.RecalcClearTimeout();
+    SC.RecalcTimerRoutine();
+    expect(scri.currentState).toBe(scri.state.idle);
+    expect(finishedArg).toBe(0);
 
     // (e) waitingForServer during calc: evaluate_parsed_formula runs, the
     // inner loop notices RemoteFunctionInfo.waitingForServer is set, and
-    // bails out via the calcserverfunc status callback.
+    // bails out via the calcserverfunc status callback. Inject the wait on
+    // the *second* evaluated formula cell so the first cell has already
+    // executed `count++` — otherwise `recalcdata.count += count` sees
+    // count===0 and a `-=` mutant is observationally equivalent.
     const srvSheet = new SC.Sheet();
-    await scheduleCommands(SC, srvSheet, ["set A1 value n 1", "set A2 formula A1+1"]);
+    await scheduleCommands(SC, srvSheet, [
+      "set A1 value n 1",
+      "set A2 formula A1+1",
+      "set A3 formula A2+1",
+    ]);
     const SpyCallbacks: string[] = [];
-    srvSheet.statuscallback = (_i: unknown, status: string) => {
-      if (status === "calccheckdone") {
-        // Inject the wait right before the calc loop starts.
+    let serverFuncArg:
+      | { funcname?: unknown; coord?: unknown; total?: unknown; count?: unknown }
+      | undefined;
+    let evals = 0;
+    const origEval = SC.Formula.evaluate_parsed_formula;
+    SC.Formula.evaluate_parsed_formula = function (this: unknown, ...args: unknown[]) {
+      const result = origEval.apply(this, args as never);
+      evals += 1;
+      if (evals >= 2) {
         SC.Formula.RemoteFunctionInfo.waitingForServer = "mock";
+      }
+      return result;
+    };
+    srvSheet.statuscallback = (_i: unknown, status: string, arg: unknown) => {
+      if (status === "calcserverfunc" && arg && typeof arg === "object") {
+        serverFuncArg = arg as {
+          funcname?: unknown;
+          coord?: unknown;
+          total?: unknown;
+          count?: unknown;
+        };
       }
       SpyCallbacks.push(status);
     };
-    SC.RecalcSheet(srvSheet);
-    // Let the one-shot timer fire — multiple slices may occur.
-    for (let i = 0; i < 6 && !SpyCallbacks.includes("calcserverfunc"); i++) {
-      await new Promise((resolve) => setTimeout(resolve, 50));
+    try {
+      SC.RecalcSheet(srvSheet);
+      // Let the one-shot timer fire — multiple slices may occur.
+      for (let i = 0; i < 8 && !SpyCallbacks.includes("calcserverfunc"); i++) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    } finally {
+      SC.Formula.evaluate_parsed_formula = origEval;
     }
     expect(SpyCallbacks).toContain("calcserverfunc");
+    expect(serverFuncArg).toBeDefined();
+    expect(serverFuncArg?.funcname).toBe("mock");
+    expect(typeof serverFuncArg?.coord).toBe("string");
+    expect(typeof serverFuncArg?.total).toBe("number");
+    expect(typeof serverFuncArg?.count).toBe("number");
+    // With one prior cell counted in this slice, += leaves count >= 1; -=
+    // would push a zero baseline negative.
+    expect(serverFuncArg!.count as number).toBeGreaterThanOrEqual(1);
+    expect(serverFuncArg!.total as number).toBeGreaterThanOrEqual(2);
+    expect(srvSheet.recalcdata.count).toBe(serverFuncArg!.count);
   } finally {
+    SC.RecalcClearTimeout();
     SC.Formula.RemoteFunctionInfo.waitingForServer = prevRemote;
     scri.currentState = prevState;
     scri.sheet = prevSheet;
+    scri.starttime = prevStart;
     scri.queue = [];
   }
 });

@@ -6411,7 +6411,13 @@ SC.RecalcTimerRoutine = function () {
   scf.FreshnessInfo.recalc_completed = true; // say freshness info is complete
   scri.currentState = scri.state.idle; // we are idle
 
-  do_statuscallback("calcfinished", Date.now() - (scri.starttime as Date).getTime());
+  // starttime is a Date set by RecalcSheet. Defensive fallback keeps a stale
+  // or partially-initialized recalc (starttime still the 0 default) from
+  // throwing inside a timer callback — an uncaught throw here becomes a
+  // Vitest null-prototype errorsSet entry that Stryker cannot stringify.
+  var startedAt = scri.starttime;
+  var elapsed = startedAt instanceof Date ? Date.now() - startedAt.getTime() : 0;
+  do_statuscallback("calcfinished", elapsed);
 
   // Check queue for more sheets.
   if (scri.queue.length > 0) {
@@ -7278,6 +7284,15 @@ code does this (e.g., use table-layout:fixed).
 // and optionally an object passed on to formatting code.
 //
 
+// Hard ceiling on pane row/col cells visited during one RenderSheet /
+// RenderRow pass. Far above any real sheet (max col ZZ=702; max row well
+// under 1e5). Exposed on SocialCalc so tests can lower it and drive the
+// overrun throw path without building a 200k-cell sheet. Mutating `++` to
+// `--` on the pane iterators would otherwise allocate DOM forever and crash
+// the test worker (RuntimeError) instead of being classified as
+// Timeout/Killed.
+SC.MaxRenderLoopIterations = 200000;
+
 /** @param {any} context @param {any} oldtable @param {any} linkstyle */
 SC.RenderSheet = function (context: any, oldtable: any, linkstyle: any) {
   var newrow, rowpane, rownum;
@@ -7320,12 +7335,18 @@ SC.RenderSheet = function (context: any, oldtable: any, linkstyle: any) {
     if (newrow) tbodyobj.appendChild(newrow);
   }
 
+  // Pane row iterators must advance. Bound via MaxRenderLoopIterations.
+  var rowLoopGuard = 0;
+  var rowLoopMax = SocialCalc.MaxRenderLoopIterations;
   for (rowpane = 0; rowpane < context.rowpanes.length; rowpane++) {
     for (
       rownum = context.rowpanes[rowpane].first;
       rownum <= context.rowpanes[rowpane].last;
       rownum++
     ) {
+      if (++rowLoopGuard > rowLoopMax) {
+        throw new Error("RenderSheet row loop overrun");
+      }
       newrow = context.RenderRow(rownum, rowpane, linkstyle);
       tbodyobj.appendChild(newrow);
     }
@@ -7403,12 +7424,17 @@ SC.RenderRow = function (context: any, rownum: any, rowpane: any, linkstyle: any
     result.appendChild(newcol);
   }
 
+  var colLoopGuard = 0;
+  var colLoopMax = SocialCalc.MaxRenderLoopIterations;
   for (colpane = 0; colpane < context.colpanes.length; colpane++) {
     for (
       colnum = context.colpanes[colpane].first;
       colnum <= context.colpanes[colpane].last;
       colnum++
     ) {
+      if (++colLoopGuard > colLoopMax) {
+        throw new Error("RenderRow column loop overrun");
+      }
       newcol = context.RenderCell(rownum, colnum, rowpane, colpane, null, linkstyle);
       if (newcol) result.appendChild(newcol);
     }

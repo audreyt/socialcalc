@@ -721,6 +721,9 @@ declare namespace SocialCalc {
   function CalculateColWidthData(context: RenderContext): void;
   function CalculateRowHeightData(context: RenderContext): void;
   function InitializeTable(context: RenderContext, tableobj: HTMLTableElement): void;
+  /** Ceiling on pane row/col cells visited in one RenderSheet/RenderRow pass. */
+  var MaxRenderLoopIterations: number;
+
   function RenderSheet(
     context: RenderContext,
     oldtable: HTMLTableElement | null,
