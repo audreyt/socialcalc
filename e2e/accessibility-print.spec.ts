@@ -322,13 +322,28 @@ test.describe("print setup and @media print CSS", () => {
       (idPrefix) => window.__scControls[idPrefix].sheet.cells.A1?.datavalue === 1,
       "SocialCalc-",
     );
-    // Drain the editor render pipeline before calling PreparePrintArea.
-    // scheduleCommand waits for the data write, but ScheduleRender fires a
-    // 1ms setTimeout *after* that (DoRenderStep → EditorRenderSheet replaces
-    // fullgrid, then another 1ms setTimeout for DoPositionCalculations).
-    // If PreparePrintArea stamps sc-print-area on the *old* fullgrid node
-    // before DoRenderStep runs, the re-rendered node carries no class and the
-    // print-media cascade never makes the grid visible.
+    // Root cause (confirmed from CI trace, candidate-4 run 29841204430):
+    // EditorRenderSheet (line 1114 of socialcalctableeditor.ts) wholesale-
+    // overwrites fullgrid.className = "te_download" on every render, wiping
+    // any sc-print-area stamp. ScheduleRender fires a 1ms setTimeout after
+    // the data write, so the original test raced: PreparePrintArea stamped
+    // sc-print-area, then DoRenderStep ran and reset the class to "te_download",
+    // and every subsequent toHaveCSS poll saw a permanently-hidden grid.
+    //
+    // Fix: wait for editor.timeout===null && !editor.busy to confirm the render
+    // pipeline is idle (no pending ScheduleRender timeouts) before calling
+    // PreparePrintArea. Then call PreparePrintArea (once, outside any retry
+    // loop) and emulateMedia("print") as separate steps — emulateMedia is a
+    // CDP call, not part of the evaluate, so a render can still interleave;
+    // Finally, poll both the structural precondition (sc-print-area class present
+    // on the live grid node) and the cascade signal (@media print active, body
+    // visibility hidden) before asserting the grid is visible — this makes any
+    // future recurrence diagnosable at the poll rather than 5s later on CSS.
+    //
+    // Product-level note: any re-render fired after PreparePrintArea (e.g. from
+    // a deferred command or user interaction) will silently destroy the print
+    // area class — TriggerPrint itself is safe only because window.print() is
+    // called synchronously in the same tick as PreparePrintArea.
     await waitFor(
       page,
       (idPrefix) => {
@@ -342,21 +357,47 @@ test.describe("print setup and @media print CSS", () => {
       "SocialCalc-",
     );
 
-    // Mark the grid as the print area the same way TriggerPrint does, then
-    // switch the page to print media -- exercising the real browser's CSS
-    // print-media cascade against css/socialcalc.css, not a simulated one.
+    // Apply PreparePrintArea, then switch to print media. emulateMedia is a
+    // separate CDP call — a DoRenderStep setTimeout can still interleave and
+    // reset fullgrid.className to "te_download" between them. The expect.poll
+    // below is what actually catches that; it is the deterministic guard, not
+    // this call sequence.
     await page.evaluate(() => {
       window.SocialCalc.PreparePrintArea(window.__scControls["SocialCalc-"]);
     });
-    // Verify the class actually landed on the live fullgrid node before
-    // switching to print media. If a render fires between PreparePrintArea and
-    // emulateMedia the class would be lost and the subsequent toHaveCSS would
-    // time out with "hidden" — this assertion makes that failure diagnosable.
-    await expect(page.locator("#containerDiv table[role='grid']").first()).toHaveClass(
-      /sc-print-area/,
-    );
     await page.emulateMedia({ media: "print" });
+
+    // Poll both observable preconditions before asserting visibility:
+    // (a) sc-print-area is on the live fullgrid node — confirms PreparePrintArea
+    //     stuck and no render fired afterward to reset className; and
+    // (b) @media print cascade is active — the undo button (a `body *` child
+    //     outside .sc-print-area) has computed visibility "hidden", confirming
+    //     the `body * { visibility: hidden }` print rule fired. Note: body itself
+    //     has no visibility rule; only its children are hidden.
+    // If either precondition is absent the poll retries, making the failure mode
+    // ("class lost" vs "@media not active") directly visible in the assertion message.
     const grid = page.locator("#containerDiv table[role='grid']").first();
+    await expect
+      .poll(
+        async () => {
+          const [hasClass, printCascadeActive] = await page.evaluate(() => {
+            const g = document.querySelector("#containerDiv table[role='grid']");
+            const undoBtn = document.getElementById("SocialCalc-button_undo");
+            // body * { visibility: hidden } under @media print — undo button is
+            // outside .sc-print-area so it must be hidden when print is active.
+            const undoVis = undoBtn ? getComputedStyle(undoBtn).visibility : "visible";
+            return [g?.classList.contains("sc-print-area") ?? false, undoVis === "hidden"] as const;
+          });
+          return { hasClass, printCascadeActive };
+        },
+        {
+          message:
+            "sc-print-area class must persist on grid and @media print cascade must be active",
+          timeout: 5000,
+        },
+      )
+      .toEqual({ hasClass: true, printCascadeActive: true });
+
     // The print stylesheet deliberately restores visibility on the grid and
     // its descendants while their editor-layout ancestors remain hidden.
     // Assert the CSS contract directly: Playwright's actionability visibility
