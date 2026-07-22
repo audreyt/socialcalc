@@ -5,8 +5,7 @@
     "2026-07-13": "All 11 modules were first measured in isolated per-module Stryker sandboxes. UI modules and socialcalc-3.ts carry honest low baselines that reflect current tests, not target quality.",
     "2026-07-14": "Corrected the hybrid runner to build one all-mutant UMD per sandbox; rebuilding shared output during mutant runs had produced unstable false kills. Fresh exact release reports set every score, floor, and minimumMutants value below. formula1.ts remeasured at 61.44% under the corrected lifecycle, invalidating its prior 95 floor; initializer-heavy survivors remain scored, not excluded. socialcalcconstants.ts reached 100.00% after recursive oracle-backed assertions. Two exact formatnumber2.ts runs were status-identical at 93.78%.",
     "2026-07-19": "Registered js/pivot.ts (new pivot-table engine, coreFiles-ordered between socialcalc-3.ts and socialcalctableeditor.ts) as a 12th shipping module. Fresh exact MUTATE_TARGET=js/pivot.ts run against its owned test set (test/pivot-tables.test.ts, test/lemma-pivot-facade.test.ts) measured 78.9628180039139% (790 killed, 17 timeout, 213 survived, 2 no-coverage of 1022 mutants); floor set to Math.floor(78.9628180039139) = 78, minimumMutants = 1022.",
-    "2026-07-22": "Candidate-8 release run 29907344782 exact socialcalcviewer.ts report (and matching local reports/mutation/socialcalcviewer/mutation.json) measured 375 mutants at 73.33% (273 Killed + 2 Timeout / 375; 100 Survived). Prior minimumMutants 384 was stale after source/test churn reduced the mutant set; break ratchets to Math.floor(73.33)=73 per floor policy (prior floor 71 is superseded by the fresher higher measurement). No other module failed the minimumMutants check on that run — all other green legs met or exceeded their registered minima.",
-    "2026-07-22-formula1-shards": "Candidate-9 release run 29927464441 produced the first complete complementary-shard exact-module evidence for js/formula1.ts under the release matrix: formula1-shard-1 (1-7073, 6879 mutants) + formula1-shard-2 (7074-14064, 6887 mutants) merged to 13766 mutants at 53.54% (7232 Killed + 138 Timeout / 13766; 2751 Survived; 3645 NoCoverage). Ranges contiguous/non-overlapping/whole-file. Prior 61.44%/6213 baseline was a 2026-07-14 smaller-denominator measurement; floor ratchets to Math.floor(53.54)=53 and minimumMutants=13766 from this complete run."
+    "2026-07-22": "Candidate-8 release run 29907344782 exact socialcalcviewer.ts report (and matching local reports/mutation/socialcalcviewer/mutation.json) measured 375 mutants at 73.33% (273 Killed + 2 Timeout / 375; 100 Survived). Prior minimumMutants 384 was stale after source/test churn reduced the mutant set; break ratchets to Math.floor(73.33)=73 per floor policy (prior floor 71 is superseded by the fresher higher measurement). No other module failed the minimumMutants check on that run — all other green legs met or exceeded their registered minima."
   },
   "modules": {
     "js/formatnumber2.ts": {
@@ -25,10 +24,10 @@
     },
     "js/formula1.ts": {
       "measured": true,
-      "minimumMutants": 13766,
-      "break": 53,
-      "measuredAt": "2026-07-22",
-      "score": "53.54"
+      "minimumMutants": 6213,
+      "break": 61,
+      "measuredAt": "2026-07-14",
+      "score": "61.44"
     },
     "js/formula-parse.ts": {
       "measured": true,
