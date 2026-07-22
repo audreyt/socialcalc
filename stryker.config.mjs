@@ -98,7 +98,29 @@ if (target && !ALL_MUTATE_FILES.includes(target)) {
   );
 }
 
-const mutate = isCriticalScope ? CRITICAL_FILES : target ? [target] : ALL_MUTATE_FILES;
+// Release shards restrict mutate to a complementary line range but still
+// target the full module (owned tests, runner choice). Exploratory
+// MUTATE_PARTIAL_RANGE is separate and must never produce release evidence.
+const shardId = process.env.MUTATE_SHARD?.trim() || undefined;
+const shardRange = process.env.MUTATE_SHARD_RANGE?.trim() || undefined;
+const isShard = Boolean(shardId && shardRange);
+if (shardId && !shardRange) {
+  throw new Error("MUTATE_SHARD requires MUTATE_SHARD_RANGE (startLine-endLine).");
+}
+if (shardRange && !shardId) {
+  throw new Error("MUTATE_SHARD_RANGE requires MUTATE_SHARD (1-based shard index).");
+}
+if (isShard && !target) {
+  throw new Error("Shard mode requires MUTATE_TARGET.");
+}
+
+const mutate = isCriticalScope
+  ? CRITICAL_FILES
+  : target
+    ? isShard
+      ? [`${target}:${shardRange}`]
+      : [target]
+    : ALL_MUTATE_FILES;
 
 // Deterministic test subset for the critical scope: union of testsByFile's
 // entries for CRITICAL_FILES, deduped.
@@ -150,12 +172,28 @@ if (testFiles?.length) {
   process.env.SOCIALCALC_MUTATION_TESTS = JSON.stringify(testFiles);
 }
 
-// Scope labels namespace reports while the exact range additionally namespaces
-// incremental state, so different partial mutant sets cannot cross-pollinate.
+// Scope labels namespace reports. Three distinct layouts:
+//   full module → reports/mutation/<module>/
+//   release shard → reports/mutation/<module>-shard-<n>/  (break: null)
+//   exploratory partial → reports/mutation/<module>-partial/  (never release evidence)
 const partialRange = process.env.MUTATE_PARTIAL_RANGE?.trim() || undefined;
 const isPartialRange = partialRange !== undefined;
-const cacheScope = isCriticalScope ? "critical" : target ? basename(target, ".ts") : "full";
-const scopeLabel = `${cacheScope}${isPartialRange ? "-partial" : ""}`;
+if (isShard && isPartialRange) {
+  throw new Error(
+    "MUTATE_SHARD and MUTATE_PARTIAL_RANGE are mutually exclusive — shards are release legs; partial ranges are exploratory only.",
+  );
+}
+const moduleBase = target ? basename(target, ".ts") : "full";
+const cacheScope = isCriticalScope
+  ? "critical"
+  : isShard
+    ? `${moduleBase}-shard-${shardId}`
+    : moduleBase;
+const scopeLabel = isCriticalScope
+  ? "critical"
+  : isShard
+    ? `${moduleBase}-shard-${shardId}`
+    : `${moduleBase}${isPartialRange ? "-partial" : ""}`;
 
 // Measured 2026-07-12 on the exact 3-file critical scope (formula-parse.ts,
 // formula-operand.ts, formula-ref.ts), against the deterministic 23-file
@@ -243,9 +281,10 @@ export default {
   thresholds: {
     high: 90,
     low: 70,
+    // Per-shard floors are meaningless; release-gate merges shards first.
     break: isCriticalScope
       ? CRITICAL_BREAK_THRESHOLD
-      : target && !isPartialRange
+      : target && !isPartialRange && !isShard
         ? measuredBreakFor(target)
         : null,
   },

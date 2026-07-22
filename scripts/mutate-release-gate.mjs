@@ -25,6 +25,16 @@
 // MutantStatus enum); an unrecognized/typo'd status is a hard failure, not
 // something that silently drops out of the score denominator.
 //
+// Sharded modules (MUTATION_SHARDS in stryker-file.mjs) publish one report
+// per complementary line range under `<module>-shard-<n>/`. The gate requires
+// EVERY declared shard, verifies ranges are contiguous/non-overlapping and
+// cover the whole file (1..EOF), verifies mutant locations fall inside each
+// shard's declared range with zero cross-shard overlap, merges the mutant
+// lists, then applies the module floor + minimumMutants checks to the MERGED
+// result exactly as for unsharded modules. A missing shard, overlapping
+// ranges, a gap, or a `<module>-partial/` exploratory report used as
+// full-module evidence is a hard failure. Baselines stay keyed by module.
+//
 // Looks for each module's fresh report at, in order:
 //   <MUTATION_ARTIFACTS_DIR or "artifacts">/mutation-report-<slug>/mutation.json
 //     (matches .github/workflows/mutation.yml's mutate-full upload naming +
@@ -40,7 +50,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { ALL_MUTATE_FILES } from "../stryker-file.mjs";
+import { ALL_MUTATE_FILES, MUTATION_SHARDS, validateShardRanges } from "../stryker-file.mjs";
 
 // Stryker's own MutantStatus enum (mutation-testing-report-schema's
 // mutation-testing-report-schema.json). A status outside this set is either
@@ -204,14 +214,164 @@ export function evaluateFileReport(mutationJson, expectedFile) {
 }
 
 /**
+ * Read source line count (1-based EOF = number of lines including a trailing
+ * empty line from a final newline, matching `content.split("\\n").length`).
+ */
+export function fileEofLine(file, cwd) {
+  const abs = join(cwd, file);
+  if (!existsSync(abs)) {
+    return { ok: false, detail: `source file missing for shard EOF check: ${file}` };
+  }
+  const text = readFileSync(abs, "utf8");
+  return { ok: true, eofLine: text.split("\n").length };
+}
+
+/**
+ * Extract a mutant's start line. Missing/malformed location is a hard failure
+ * for shard merge (we cannot prove range membership).
+ */
+export function mutantStartLine(mutant) {
+  const line = mutant?.location?.start?.line;
+  return Number.isInteger(line) && line >= 1 ? line : null;
+}
+
+/**
+ * Merge complementary shard reports into one full-module evidence object.
+ * `shardReports` is an ordered array of `{ shard, startLine, endLine, mutationJson }`.
+ * Returns `{ ok:true, mutationJson, total, score }` or `{ ok:false, detail }`.
+ */
+export function mergeShardReports(expectedFile, shardSpecs, shardReports) {
+  if (!Array.isArray(shardSpecs) || shardSpecs.length === 0) {
+    return { ok: false, detail: "no shard specs declared" };
+  }
+  if (!Array.isArray(shardReports) || shardReports.length !== shardSpecs.length) {
+    return {
+      ok: false,
+      detail: `expected ${shardSpecs.length} shard reports, found ${shardReports?.length ?? 0}`,
+    };
+  }
+
+  const byShard = new Map(shardReports.map((r) => [r.shard, r]));
+  const mergedMutants = [];
+  /** @type {Map<string, { shard: number, line: number }>} */
+  const seenKeys = new Map();
+
+  for (const spec of shardSpecs) {
+    const report = byShard.get(spec.shard);
+    if (!report) {
+      return { ok: false, detail: `missing shard ${spec.shard} report` };
+    }
+    if (report.startLine !== spec.startLine || report.endLine !== spec.endLine) {
+      return {
+        ok: false,
+        detail: `shard ${spec.shard} range mismatch: declared ${spec.startLine}-${spec.endLine}, report meta ${report.startLine}-${report.endLine}`,
+      };
+    }
+
+    const evaluated = evaluateFileReport(report.mutationJson, expectedFile);
+    if (!evaluated.ok) {
+      return { ok: false, detail: `shard ${spec.shard}: ${evaluated.detail}` };
+    }
+
+    const files = report.mutationJson.files;
+    const fileKey = Object.keys(files).find((k) => normalizeReportFileKey(k) === expectedFile);
+    const mutants = files[fileKey].mutants;
+
+    for (let i = 0; i < mutants.length; i++) {
+      const m = mutants[i];
+      const line = mutantStartLine(m);
+      if (line === null) {
+        return {
+          ok: false,
+          detail: `shard ${spec.shard} mutant[${i}] missing location.start.line`,
+        };
+      }
+      if (line < spec.startLine || line > spec.endLine) {
+        return {
+          ok: false,
+          detail: `shard ${spec.shard} mutant[${i}] at line ${line} outside declared range ${spec.startLine}-${spec.endLine}`,
+        };
+      }
+      // Identity for overlap detection: location + mutator + replacement.
+      // Ranges are disjoint so ids may collide across shards; we key by locus.
+      const locus = `${line}:${m.location?.start?.column ?? ""}:${m.location?.end?.line ?? ""}:${m.location?.end?.column ?? ""}:${m.mutatorName}:${JSON.stringify(m.replacement)}`;
+      const prior = seenKeys.get(locus);
+      if (prior) {
+        return {
+          ok: false,
+          detail: `overlapping mutant locus between shard ${prior.shard} and shard ${spec.shard} at line ${line}`,
+        };
+      }
+      seenKeys.set(locus, { shard: spec.shard, line });
+      mergedMutants.push(m);
+    }
+  }
+
+  if (mergedMutants.length === 0) {
+    return { ok: false, detail: `${expectedFile} merged shard reports contain no mutants` };
+  }
+
+  const mutationJson = {
+    files: {
+      [expectedFile]: { mutants: mergedMutants },
+    },
+  };
+  const evaluated = evaluateFileReport(mutationJson, expectedFile);
+  if (!evaluated.ok) return evaluated;
+  return { ok: true, mutationJson, total: evaluated.total, score: evaluated.score };
+}
+
+/**
+ * Resolve and load every shard report for a sharded module. Hard-fails on any
+ * missing shard. Does not fall back to a full-module slug for sharded modules
+ * (a full report would skip the complementary-range proof).
+ */
+export function loadShardReports(file, shardSpecs, { artifactsDir, isCI, cwd }) {
+  const base = basename(file, ".ts");
+  const loaded = [];
+  const missing = [];
+  for (const spec of shardSpecs) {
+    const slug = `${base}-shard-${spec.shard}`;
+    const reportPath = reportPathFor(slug, { artifactsDir, isCI, cwd });
+    if (!reportPath) {
+      missing.push(slug);
+      continue;
+    }
+    let mutationJson;
+    try {
+      mutationJson = JSON.parse(readFileSync(reportPath, "utf8"));
+    } catch (error) {
+      return {
+        ok: false,
+        detail: `invalid mutation report JSON for ${slug}: ${error.message}`,
+      };
+    }
+    loaded.push({
+      shard: spec.shard,
+      startLine: spec.startLine,
+      endLine: spec.endLine,
+      mutationJson,
+      reportPath,
+    });
+  }
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      detail: `missing shard report(s): ${missing.join(", ")}`,
+    };
+  }
+  return { ok: true, reports: loaded };
+}
+
+/**
  * Runs the full per-module release-gate loop: for every module in
- * `allMutateFiles`, resolves its report path, validates the registered
- * baseline, parses and validates the report, and checks the score against
- * the floor. Returns `{ rows, failed }` — one row per module (never
- * short-circuits on the first failure, so a release always gets the full,
- * honest picture of every module's state) and whether ANY module failed.
- * Pure aside from the injected filesystem reads, so it is the single
- * source of truth for both the CLI driver below and fixture-driven tests.
+ * `allMutateFiles`, resolves its report path (or merges all shard reports),
+ * validates the registered baseline, parses and validates the report, and
+ * checks the score against the floor. Returns `{ rows, failed }` — one row
+ * per module (never short-circuits on the first failure, so a release always
+ * gets the full, honest picture of every module's state) and whether ANY
+ * module failed. Pure aside from the injected filesystem reads, so it is the
+ * single source of truth for both the CLI driver below and fixture-driven tests.
  */
 export function evaluateAllModules(allMutateFiles, baselineModules, { artifactsDir, isCI, cwd }) {
   const rows = [];
@@ -220,13 +380,8 @@ export function evaluateAllModules(allMutateFiles, baselineModules, { artifactsD
   for (const file of allMutateFiles) {
     const slug = basename(file, ".ts");
     const entry = baselineModules[file];
-    const reportPath = reportPathFor(slug, { artifactsDir, isCI, cwd });
+    const shardSpecs = MUTATION_SHARDS[file] ?? null;
 
-    if (!reportPath) {
-      rows.push({ file, status: "FAIL", detail: "no fresh report found for this run" });
-      failed = true;
-      continue;
-    }
     if (!validMeasuredBaseline(entry)) {
       rows.push({
         file,
@@ -238,23 +393,76 @@ export function evaluateAllModules(allMutateFiles, baselineModules, { artifactsD
       continue;
     }
 
-    let mutationJson;
-    try {
-      mutationJson = JSON.parse(readFileSync(reportPath, "utf8"));
-    } catch (error) {
-      rows.push({ file, status: "FAIL", detail: `invalid mutation report JSON: ${error.message}` });
-      failed = true;
-      continue;
+    let total;
+    let score;
+
+    if (shardSpecs) {
+      const eof = fileEofLine(file, cwd);
+      if (!eof.ok) {
+        rows.push({ file, status: "FAIL", detail: eof.detail });
+        failed = true;
+        continue;
+      }
+      const rangeCheck = validateShardRanges(shardSpecs, eof.eofLine);
+      if (!rangeCheck.ok) {
+        rows.push({
+          file,
+          status: "FAIL",
+          detail: `invalid MUTATION_SHARDS declaration: ${rangeCheck.detail}`,
+        });
+        failed = true;
+        continue;
+      }
+
+      // Reject a lone full-module or -partial path masquerading as complete
+      // evidence when the module is declared sharded — shards are mandatory.
+      const loaded = loadShardReports(file, rangeCheck.shards, { artifactsDir, isCI, cwd });
+      if (!loaded.ok) {
+        rows.push({ file, status: "FAIL", detail: loaded.detail });
+        failed = true;
+        continue;
+      }
+
+      const merged = mergeShardReports(file, rangeCheck.shards, loaded.reports);
+      if (!merged.ok) {
+        rows.push({ file, status: "FAIL", detail: merged.detail });
+        failed = true;
+        continue;
+      }
+      total = merged.total;
+      score = merged.score;
+    } else {
+      const reportPath = reportPathFor(slug, { artifactsDir, isCI, cwd });
+
+      if (!reportPath) {
+        rows.push({ file, status: "FAIL", detail: "no fresh report found for this run" });
+        failed = true;
+        continue;
+      }
+
+      let mutationJson;
+      try {
+        mutationJson = JSON.parse(readFileSync(reportPath, "utf8"));
+      } catch (error) {
+        rows.push({
+          file,
+          status: "FAIL",
+          detail: `invalid mutation report JSON: ${error.message}`,
+        });
+        failed = true;
+        continue;
+      }
+
+      const evaluated = evaluateFileReport(mutationJson, file);
+      if (!evaluated.ok) {
+        rows.push({ file, status: "FAIL", detail: evaluated.detail });
+        failed = true;
+        continue;
+      }
+      total = evaluated.total;
+      score = evaluated.score;
     }
 
-    const evaluated = evaluateFileReport(mutationJson, file);
-    if (!evaluated.ok) {
-      rows.push({ file, status: "FAIL", detail: evaluated.detail });
-      failed = true;
-      continue;
-    }
-
-    const { total, score } = evaluated;
     if (total < entry.minimumMutants) {
       rows.push({
         file,
@@ -270,7 +478,7 @@ export function evaluateAllModules(allMutateFiles, baselineModules, { artifactsD
     rows.push({
       file,
       status: ok ? "PASS" : "FAIL",
-      detail: `${score.toFixed(2)}% (floor ${entry.break}%, ${total} mutants)`,
+      detail: `${score.toFixed(2)}% (floor ${entry.break}%, ${total} mutants${shardSpecs ? `, ${shardSpecs.length} shards` : ""})`,
     });
   }
 

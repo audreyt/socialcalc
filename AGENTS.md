@@ -561,9 +561,11 @@ facade.test.ts` cross-checks every function against its shipping
 ## Mutation testing
 
 Stryker covers all thirteen shipping modules with no mutator exclusions.
-`stryker-file.mjs` is the source of truth for target modules and owned test
-subsets. `.github/workflows/mutation.yml` derives its full matrix from
-`ALL_MUTATE_FILES`; do not hand-copy the module list into the workflow.
+`stryker-file.mjs` is the source of truth for target modules, owned test
+subsets, and release-matrix shard descriptors. `.github/workflows/mutation.yml`
+derives its full matrix from `mutationMatrixLegs()` (which expands
+`ALL_MUTATE_FILES` through `MUTATION_SHARDS`); do not hand-copy the module or
+shard list into the workflow.
 
 Stryker builds one all-mutant UMD after instrumenting each sandbox. The native
 `@stryker-mutator/vitest-runner` keeps isolated workers alive and selects tests
@@ -596,13 +598,48 @@ the release gate requires complete exact-module evidence.
 bump it whenever runner/build lifecycle changes are not represented by source
 or test diffs.
 
+### Release shards
+
+GitHub-hosted runners hard-cap a single job at 6h (`timeout-minutes: 360`);
+raising that value is ignored. Modules whose full-module CI wall-clock would
+exceed that cap are declared in `MUTATION_SHARDS` and run as complementary
+line-range matrix legs in parallel:
+
+- Each shard writes `reports/mutation/<module>-shard-<n>/` with `break: null`
+  (per-shard floors are meaningless).
+- Ranges are contiguous, non-overlapping, and cover the whole file (`1..split`,
+  `split+1..EOF`). Split lines are chosen from mutant line distributions so
+  mutant counts are roughly balanced — not from raw LOC.
+- `scripts/mutate-release-gate.mjs` requires **all** declared shard reports,
+  verifies complementary whole-file coverage and zero mutant-location overlap,
+  merges the mutant lists, then applies the module's measured floor +
+  `minimumMutants` + valid-status checks to the **merged** result exactly as
+  for unsharded modules. A missing shard, overlapping ranges, a gap, or a
+  `<module>-partial/` exploratory report used as full-module evidence is a
+  hard failure.
+- Baselines (`stryker-mutation-baseline.json`) stay keyed by module. Floors
+  remain `Math.floor` of the measured full-module score. Changing shard count
+  or split lines requires fresh full-module baseline evidence before the next
+  release; do not invent floors from a single shard.
+
+Current shards (run 29856287808 throughput: formula1 ~6h43m projected full /
+socialcalc-3 ~6h07m projected full; target ≤~4h per leg):
+
+- `js/formula1.ts` → 2 shards (split line 7073; ~6884 mutants each).
+- `js/socialcalc-3.ts` → 3 shards (split lines 3858 / 7828; ~3930 mutants each).
+
+Matrix leg count stays well under GitHub's ~20 concurrent-job soft limit
+(13 modules + extra shards).
+
 - Critical PR scope: `formula-parse.ts`, `formula-operand.ts`,
   `formula-ref.ts`; measured break threshold 95.
-- Full scope: one isolated matrix leg for each module, using that module's
-  measured integer floor from `stryker-mutation-baseline.json`.
-- Release enforcement: all thirteen fresh reports must exist, identify the exact
-  expected module, contain valid statuses, meet the measured floor, and contain
-  at least that baseline's `minimumMutants` complete-module count.
+- Full scope: one isolated matrix leg for each unsharded module, or one leg
+  per shard for sharded modules, using that module's measured integer floor
+  from `stryker-mutation-baseline.json` (applied after shard merge).
+- Release enforcement: all thirteen fresh (possibly merged) reports must
+  exist, identify the exact expected module, contain valid statuses, meet the
+  measured floor, and contain at least that baseline's `minimumMutants`
+  complete-module count.
 - Scheduled/full runs upload every report with matrix `fail-fast: false`.
 - In-place mutation is unsupported. Do not add it back.
 

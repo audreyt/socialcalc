@@ -197,33 +197,32 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
 
-      - name: List mutation targets
+      - name: List mutation matrix legs
         id: list
         run: |
+          # mutationMatrixLegs expands MUTATION_SHARDS so oversized modules
+          # become complementary line-range legs. Never hand-copy this list.
           FILES=$(node -e '
             import("./stryker-file.mjs").then((m) => {
-              process.stdout.write(JSON.stringify(m.ALL_MUTATE_FILES));
+              process.stdout.write(JSON.stringify(m.mutationMatrixLegs()));
             });
           ')
           echo "files=$FILES" >> "$GITHUB_OUTPUT"
 
-  # Comprehensive, per-module gate: one job per shipping module, each
-  # mutating only that module against its own testsByFile subset (see
-  # stryker.config.mjs's MUTATE_TARGET mode). fail-fast disabled so every
-  # module runs and uploads a report regardless of any other module's
-  # outcome; the job (and so the workflow's required check) still reports
-  # failure overall if ANY module is below its break threshold.
+  # Comprehensive gate: one job per matrix leg (module, or module shard).
+  # Sharded modules (formula1.ts, socialcalc-3.ts) run complementary line
+  # ranges in parallel; release-gate merges their reports. fail-fast disabled
+  # so every leg uploads evidence. timeout-minutes is GitHub's hard 6h cap.
   mutate-full:
-    name: mutation (full scope, ${{ matrix.file }})
+    name: mutation (full scope, ${{ matrix.leg.slug }})
     needs: mutate-discover
     strategy:
       fail-fast: false
       matrix:
-        file: ${{ fromJson(needs.mutate-discover.outputs.files) }}
+        leg: ${{ fromJson(needs.mutate-discover.outputs.files) }}
     runs-on: ubuntu-latest
-    # formula1.ts has 6,213 mutants and exceeds three hours under native
-    # per-test coverage. Use GitHub's hosted-runner maximum so the measured
-    # report, rather than a timeout, decides the release gate.
+    # Hosted-runner hard maximum (raising is ignored). Oversized modules are
+    # sharded in stryker-file.mjs so each leg finishes well under this wall.
     timeout-minutes: 360
     steps:
       - name: Checkout
@@ -245,11 +244,13 @@ jobs:
 
       - name: Compute report slug
         id: meta
-        run: echo "slug=$(basename "${{ matrix.file }}" .ts)" >> "$GITHUB_OUTPUT"
+        run: echo "slug=${{ matrix.leg.slug }}" >> "$GITHUB_OUTPUT"
 
-      - name: Mutation test (${{ matrix.file }})
+      - name: Mutation test (${{ matrix.leg.slug }})
         env:
-          MUTATE_TARGET: ${{ matrix.file }}
+          MUTATE_TARGET: ${{ matrix.leg.file }}
+          MUTATE_SHARD: ${{ matrix.leg.shard }}
+          MUTATE_SHARD_RANGE: ${{ matrix.leg.range }}
         run: vp run mutate
 
       - name: Upload mutation report

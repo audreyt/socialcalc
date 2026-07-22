@@ -390,6 +390,111 @@ for (const [file, tests] of Object.entries(testsByFile)) {
 // from, or silently omit, an entry in the test-ownership map above.
 export const ALL_MUTATE_FILES = Object.keys(testsByFile).map((f) => `js/${f}`);
 
+// Release-matrix shards for modules whose full-module CI wall-clock exceeds
+// GitHub-hosted runners' hard 6h job cap (timeout-minutes: 360 cannot be
+// raised). Counts and split lines come from mutant *line* distributions
+// (instrumenter / fresh mutation.json), not raw LOC, so each shard is
+// roughly equal work. Contiguous, non-overlapping ranges cover 1..EOF.
+//
+// Evidence (release run 29856287808 on SHA 5293923):
+//   formula1.ts: 13555/13768 tested at 5h58m (~45m remaining → ~6h43m full).
+//     2 shards × ~6884 mutants ≈ 3.4h projected CI each (under 4h target).
+//   socialcalc-3.ts: 11746/11789 at 5h58m (~9m remaining → ~6h07m full).
+//     3 shards × ~3930 mutants ≈ 2.0h projected each — extra margin under
+//     multi-leg CPU contention (spreadsheetcontrol finished 4303 in 4h40m).
+//
+// Shard-count or split-line changes require a fresh full-module baseline
+// measurement; floors stay Math.floor of the measured full-module score and
+// baselines remain keyed by module (not by shard).
+export const MUTATION_SHARDS = {
+  "js/formula1.ts": [
+    // 13768 instrumented mutants; balanced split at line 7073 → 6885 + 6883.
+    { shard: 1, startLine: 1, endLine: 7073 },
+    { shard: 2, startLine: 7074, endLine: 14064 },
+  ],
+  "js/socialcalc-3.ts": [
+    // 11789 report mutants; splits 3858/7828 → 3933 + 3929 + 3927.
+    { shard: 1, startLine: 1, endLine: 3858 },
+    { shard: 2, startLine: 3859, endLine: 7828 },
+    { shard: 3, startLine: 7829, endLine: 11084 },
+  ],
+};
+
+/** @returns {Array<{shard: number, startLine: number, endLine: number}> | null} */
+export function shardsForModule(file) {
+  return MUTATION_SHARDS[file] ?? null;
+}
+
+/**
+ * Matrix legs consumed by .github/workflows/mutation.yml's mutate-discover
+ * job. Unsharded modules yield one leg; sharded modules yield one leg per
+ * complementary line range. `slug` is the report/artifact directory name.
+ */
+export function mutationMatrixLegs() {
+  /** @type {{ file: string, slug: string, shard: string, range: string }[]} */
+  const legs = [];
+  for (const file of ALL_MUTATE_FILES) {
+    const base = basename(file, ".ts");
+    const shards = MUTATION_SHARDS[file];
+    if (!shards) {
+      legs.push({ file, slug: base, shard: "", range: "" });
+      continue;
+    }
+    for (const { shard, startLine, endLine } of shards) {
+      legs.push({
+        file,
+        slug: `${base}-shard-${shard}`,
+        shard: String(shard),
+        range: `${startLine}-${endLine}`,
+      });
+    }
+  }
+  return legs;
+}
+
+/** Validate declared shard ranges: contiguous, non-overlapping, cover 1..eofLine. */
+export function validateShardRanges(shards, eofLine) {
+  if (!Array.isArray(shards) || shards.length === 0) {
+    return { ok: false, detail: "shard list is empty" };
+  }
+  const sorted = [...shards].sort((a, b) => a.shard - b.shard);
+  for (let i = 0; i < sorted.length; i++) {
+    const s = sorted[i];
+    if (!Number.isInteger(s.shard) || s.shard !== i + 1) {
+      return { ok: false, detail: `expected shard id ${i + 1}, found ${s.shard}` };
+    }
+    if (
+      !Number.isInteger(s.startLine) ||
+      !Number.isInteger(s.endLine) ||
+      s.startLine < 1 ||
+      s.endLine < s.startLine
+    ) {
+      return {
+        ok: false,
+        detail: `shard ${s.shard} has invalid range ${s.startLine}-${s.endLine}`,
+      };
+    }
+  }
+  if (sorted[0].startLine !== 1) {
+    return { ok: false, detail: `first shard must start at line 1, found ${sorted[0].startLine}` };
+  }
+  if (sorted[sorted.length - 1].endLine !== eofLine) {
+    return {
+      ok: false,
+      detail: `last shard must end at file EOF line ${eofLine}, found ${sorted[sorted.length - 1].endLine}`,
+    };
+  }
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].startLine !== sorted[i - 1].endLine + 1) {
+      return {
+        ok: false,
+        detail: `gap or overlap between shard ${sorted[i - 1].shard} (…${sorted[i - 1].endLine}) and shard ${sorted[i].shard} (${sorted[i].startLine}…)`,
+      };
+    }
+  }
+  return { ok: true, shards: sorted };
+}
+
 // Bump when the mutation runner/build lifecycle changes in a way Stryker's
 // source/test diff cannot detect. This prevents reuse of incompatible results.
 export const MUTATION_CACHE_SCHEMA = "build-once-v1";

@@ -12,6 +12,8 @@ const CONFIG_ENV_KEYS = [
   "MUTATE_TARGET",
   "MUTATE_TESTS",
   "MUTATE_PARTIAL_RANGE",
+  "MUTATE_SHARD",
+  "MUTATE_SHARD_RANGE",
   "SOCIALCALC_COVERAGE",
   "SOCIALCALC_MUTATION_RUN",
   "SOCIALCALC_MUTATION_TESTS",
@@ -135,6 +137,33 @@ describe("stryker.config.mjs hybrid runner", () => {
       ".stryker-tmp/incremental-formula1-partial-221-240-build-once-v1.json",
     );
     expect(otherRange.incrementalFile).not.toBe(config.incrementalFile);
+  });
+
+  test("release shards use module-shard report dirs, range mutate spec, and no floor", async () => {
+    const { config } = await loadConfig({
+      MUTATE_TARGET: "js/formula1.ts",
+      MUTATE_SHARD: "1",
+      MUTATE_SHARD_RANGE: "1-7073",
+    });
+    expect(config.mutate).toEqual(["js/formula1.ts:1-7073"]);
+    expect(config.testRunner).toBe("vitest");
+    expect(config.thresholds.break).toBeNull();
+    expect(config.htmlReporter.fileName).toBe("reports/mutation/formula1-shard-1/index.html");
+    expect(config.jsonReporter.fileName).toBe("reports/mutation/formula1-shard-1/mutation.json");
+    expect(config.incrementalFile).toBe(
+      ".stryker-tmp/incremental-formula1-shard-1-build-once-v1.json",
+    );
+  });
+
+  test("shard and partial range are mutually exclusive", async () => {
+    await expect(
+      loadConfig({
+        MUTATE_TARGET: "js/formula1.ts",
+        MUTATE_SHARD: "1",
+        MUTATE_SHARD_RANGE: "1-7073",
+        MUTATE_PARTIAL_RANGE: "100-220",
+      }),
+    ).rejects.toThrow(/mutually exclusive/);
   });
 
   test.each(["js/formatnumber2.ts", "js/socialcalcconstants.ts"])(

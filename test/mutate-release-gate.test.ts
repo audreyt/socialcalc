@@ -15,11 +15,12 @@ import {
   checkBaselineRegistry,
   evaluateAllModules,
   evaluateFileReport,
+  mergeShardReports,
   normalizeReportFileKey,
   reportPathFor,
   validMeasuredBaseline,
 } from "../scripts/mutate-release-gate.mjs";
-import { ALL_MUTATE_FILES } from "../stryker-file.mjs";
+import { ALL_MUTATE_FILES, MUTATION_SHARDS, validateShardRanges } from "../stryker-file.mjs";
 
 interface BaselineEntry {
   measured: boolean;
@@ -393,12 +394,35 @@ describe("evaluateAllModules (composed loop, real filesystem, isolated temp cwd)
     }
     return modules;
   }
-
   test("VALID ALL-MODULES — every real shipping module passes with a fresh, well-formed, above-floor report", () => {
     withTempCwd((cwd) => {
+      // Sharded modules need real sources for EOF checks + one report per shard.
       for (const file of ALL_MUTATE_FILES) {
-        const slug = file.replace(/^js\//, "").replace(/\.ts$/, "");
-        plantReport(cwd, slug, killedReport(file, 10));
+        const base = file.replace(/^js\//, "").replace(/\.ts$/, "");
+        const shards = (
+          MUTATION_SHARDS as Record<
+            string,
+            { shard: number; startLine: number; endLine: number }[] | undefined
+          >
+        )[file];
+        if (shards) {
+          mkdirSync(join(cwd, "js"), { recursive: true });
+          writeFileSync(join(cwd, file), readFileSync(new URL(`../${file}`, import.meta.url)));
+          for (const s of shards) {
+            const mutants = Array.from({ length: 5 }, (_, i) =>
+              mutant({
+                id: `${base}-${s.shard}-${i}`,
+                location: {
+                  start: { line: s.startLine + i, column: 1 },
+                  end: { line: s.startLine + i, column: 4 },
+                },
+              }),
+            );
+            plantReport(cwd, `${base}-shard-${s.shard}`, reportFor({ [file]: mutants }));
+          }
+        } else {
+          plantReport(cwd, base, killedReport(file, 10));
+        }
       }
       const { rows, failed } = evaluateAllModules(
         ALL_MUTATE_FILES,
@@ -617,6 +641,272 @@ describe("evaluateAllModules (composed loop, real filesystem, isolated temp cwd)
       expect(rows.find((r) => r.file === "js/formula-parse.ts")?.status).toBe("FAIL");
       expect(rows.find((r) => r.file === "js/formula-operand.ts")?.status).toBe("PASS");
       expect(rows.find((r) => r.file === "js/formula-ref.ts")?.status).toBe("FAIL");
+    });
+  });
+});
+
+describe("MUTATION_SHARDS declarations", () => {
+  test("declared ranges are complementary and cover whole files", () => {
+    const shardsByFile = MUTATION_SHARDS as Record<
+      string,
+      { shard: number; startLine: number; endLine: number }[]
+    >;
+    for (const [file, shards] of Object.entries(shardsByFile)) {
+      const text = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+      const eof = text.split("\n").length;
+      const check = validateShardRanges(shards, eof) as { ok: boolean; detail?: string };
+      expect(check.ok, `${file}: ${check.detail}`).toBe(true);
+    }
+  });
+});
+
+describe("mergeShardReports", () => {
+  function rangedMutants(file: string, startLine: number, count: number, status = "Killed") {
+    return Array.from({ length: count }, (_, i) =>
+      mutant({
+        id: `${startLine + i}`,
+        status,
+        location: {
+          start: { line: startLine + i, column: 1 },
+          end: { line: startLine + i, column: 5 },
+        },
+      }),
+    );
+  }
+
+  test("merges complementary shards and scores the combined mutant set", () => {
+    const file = "js/formula-ref.ts";
+    const specs = [
+      { shard: 1, startLine: 1, endLine: 10 },
+      { shard: 2, startLine: 11, endLine: 20 },
+    ];
+    const reports = [
+      {
+        shard: 1,
+        startLine: 1,
+        endLine: 10,
+        mutationJson: reportFor({ [file]: rangedMutants(file, 1, 5) }),
+      },
+      {
+        shard: 2,
+        startLine: 11,
+        endLine: 20,
+        mutationJson: reportFor({
+          [file]: [...rangedMutants(file, 11, 4), ...rangedMutants(file, 15, 1, "Survived")],
+        }),
+      },
+    ];
+    const merged = mergeShardReports(file, specs, reports) as {
+      ok: boolean;
+      total?: number;
+      score?: number;
+      detail?: string;
+    };
+    expect(merged.ok).toBe(true);
+    expect(merged.total).toBe(10);
+    // 9 killed + 1 survived
+    expect(merged.score).toBe(90);
+  });
+
+  test("rejects a missing shard", () => {
+    const file = "js/formula-ref.ts";
+    const specs = [
+      { shard: 1, startLine: 1, endLine: 10 },
+      { shard: 2, startLine: 11, endLine: 20 },
+    ];
+    const reports = [
+      {
+        shard: 1,
+        startLine: 1,
+        endLine: 10,
+        mutationJson: reportFor({ [file]: rangedMutants(file, 1, 3) }),
+      },
+    ];
+    const merged = mergeShardReports(file, specs, reports) as {
+      ok: boolean;
+      detail?: string;
+    };
+    expect(merged.ok).toBe(false);
+    expect(merged.detail).toMatch(/expected 2 shard reports, found 1/);
+  });
+
+  test("rejects a mutant outside its declared shard range", () => {
+    const file = "js/formula-ref.ts";
+    const specs = [
+      { shard: 1, startLine: 1, endLine: 10 },
+      { shard: 2, startLine: 11, endLine: 20 },
+    ];
+    const reports = [
+      {
+        shard: 1,
+        startLine: 1,
+        endLine: 10,
+        // line 15 is outside shard 1
+        mutationJson: reportFor({ [file]: rangedMutants(file, 15, 1) }),
+      },
+      {
+        shard: 2,
+        startLine: 11,
+        endLine: 20,
+        mutationJson: reportFor({ [file]: rangedMutants(file, 11, 1) }),
+      },
+    ];
+    const merged = mergeShardReports(file, specs, reports) as {
+      ok: boolean;
+      detail?: string;
+    };
+    expect(merged.ok).toBe(false);
+    expect(merged.detail).toMatch(/outside declared range/);
+  });
+
+  test("rejects overlapping mutant loci across shards", () => {
+    const file = "js/formula-ref.ts";
+    // Identical declared windows that each include line 5 force the same
+    // locus into both shards so the merge overlap check fires.
+    const looseSpecs = [
+      { shard: 1, startLine: 1, endLine: 20 },
+      { shard: 2, startLine: 1, endLine: 20 },
+    ];
+    const twin = rangedMutants(file, 5, 1);
+    const reports = [
+      { shard: 1, startLine: 1, endLine: 20, mutationJson: reportFor({ [file]: twin }) },
+      { shard: 2, startLine: 1, endLine: 20, mutationJson: reportFor({ [file]: twin }) },
+    ];
+    const merged = mergeShardReports(file, looseSpecs, reports) as {
+      ok: boolean;
+      detail?: string;
+    };
+    expect(merged.ok).toBe(false);
+    expect(merged.detail).toMatch(/overlapping mutant locus/);
+  });
+});
+
+describe("evaluateAllModules sharded modules", () => {
+  function withTempCwd(run: (cwd: string) => void) {
+    const dir = mkdtempSync(join(tmpdir(), "mutate-release-gate-shard-"));
+    try {
+      run(dir);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  function plantShard(cwd: string, base: string, shard: number, json: unknown) {
+    const dir = join(cwd, "artifacts", `mutation-report-${base}-shard-${shard}`);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "mutation.json"), JSON.stringify(json));
+  }
+
+  test("SHARDED PASS — all complementary shards merge above the floor", () => {
+    withTempCwd((cwd) => {
+      // Use a non-production module path so we don't depend on MUTATION_SHARDS
+      // for formula-ref; plant under a synthetic file name that we also put
+      // into the allMutateFiles list with a matching temporary shard map is
+      // not injectable — instead exercise formula1's real shard map with
+      // synthetic mutants inside each declared range.
+      const file = "js/formula1.ts";
+      const shards = (
+        MUTATION_SHARDS as Record<string, { shard: number; startLine: number; endLine: number }[]>
+      )[file];
+      expect(shards.length).toBe(2);
+      // Copy real source into temp cwd so fileEofLine resolves.
+      const src = readFileSync(new URL("../js/formula1.ts", import.meta.url));
+      mkdirSync(join(cwd, "js"), { recursive: true });
+      writeFileSync(join(cwd, "js/formula1.ts"), src);
+
+      for (const s of shards) {
+        const mutants = [
+          mutant({
+            id: `s${s.shard}`,
+            status: "Killed",
+            location: {
+              start: { line: s.startLine, column: 1 },
+              end: { line: s.startLine, column: 4 },
+            },
+          }),
+        ];
+        // Pad to satisfy minimumMutants half each; gate checks merged total.
+        for (let i = 1; i < 5; i++) {
+          mutants.push(
+            mutant({
+              id: `s${s.shard}-${i}`,
+              status: "Killed",
+              location: {
+                start: { line: s.startLine + i, column: 1 },
+                end: { line: s.startLine + i, column: 4 },
+              },
+            }),
+          );
+        }
+        plantShard(cwd, "formula1", s.shard, reportFor({ [file]: mutants }));
+      }
+
+      const { rows, failed } = evaluateAllModules(
+        [file],
+        { [file]: { measured: true, break: 50, minimumMutants: 10 } },
+        { artifactsDir: "artifacts", isCI: true, cwd },
+      );
+      expect(failed).toBe(false);
+      expect(rows[0].status).toBe("PASS");
+      expect(rows[0].detail).toMatch(/10 mutants, 2 shards/);
+    });
+  });
+
+  test("SHARDED FAIL — missing one shard is a hard failure", () => {
+    withTempCwd((cwd) => {
+      const file = "js/formula1.ts";
+      const shards = (
+        MUTATION_SHARDS as Record<string, { shard: number; startLine: number; endLine: number }[]>
+      )[file];
+      const src = readFileSync(new URL("../js/formula1.ts", import.meta.url));
+      mkdirSync(join(cwd, "js"), { recursive: true });
+      writeFileSync(join(cwd, "js/formula1.ts"), src);
+
+      const s = shards[0];
+      plantShard(
+        cwd,
+        "formula1",
+        s.shard,
+        reportFor({
+          [file]: [
+            mutant({
+              location: {
+                start: { line: s.startLine, column: 1 },
+                end: { line: s.startLine, column: 2 },
+              },
+            }),
+          ],
+        }),
+      );
+
+      const { rows, failed } = evaluateAllModules(
+        [file],
+        { [file]: { measured: true, break: 50, minimumMutants: 1 } },
+        { artifactsDir: "artifacts", isCI: true, cwd },
+      );
+      expect(failed).toBe(true);
+      expect(rows[0].detail).toMatch(/missing shard report/);
+      expect(rows[0].detail).toMatch(/formula1-shard-2/);
+    });
+  });
+
+  test("SHARDED FAIL — full-module slug does not substitute for shards", () => {
+    withTempCwd((cwd) => {
+      const file = "js/formula1.ts";
+      const src = readFileSync(new URL("../js/formula1.ts", import.meta.url));
+      mkdirSync(join(cwd, "js"), { recursive: true });
+      writeFileSync(join(cwd, "js/formula1.ts"), src);
+      const fullDir = join(cwd, "artifacts", "mutation-report-formula1");
+      mkdirSync(fullDir, { recursive: true });
+      writeFileSync(join(fullDir, "mutation.json"), JSON.stringify(killedReport(file, 20)));
+
+      const { rows, failed } = evaluateAllModules(
+        [file],
+        { [file]: { measured: true, break: 50, minimumMutants: 10 } },
+        { artifactsDir: "artifacts", isCI: true, cwd },
+      );
+      expect(failed).toBe(true);
+      expect(rows[0].detail).toMatch(/missing shard report/);
     });
   });
 });

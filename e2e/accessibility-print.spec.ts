@@ -92,11 +92,16 @@ test.describe("ARIA grid roles and accessible structure", () => {
     await createControl(page);
     await scheduleCommand(page, "set A1 value n 1");
     await scheduleCommand(page, "set A1 readonly yes");
+    // Generous timeout: under concurrent mutation-matrix CPU contention on
+    // CI WebKit the attribute can take well over the 4s default (flake was
+    // `waitFor timed out after 4000ms` while other runs finished in <1s).
+    // Contract unchanged — attribute must eventually appear.
     await waitFor(
       page,
       () =>
         document.querySelector("#containerDiv #cell_A1")?.getAttribute("aria-readonly") === "true",
       "SocialCalc-",
+      15000,
     );
 
     await expect(cellLocator(page, "A1")).toHaveAttribute("aria-readonly", "true");
