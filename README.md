@@ -501,7 +501,7 @@ Modes:
   for every module.
 
 Current registered baselines (exact-module measurements on 2026-07-13,
-2026-07-14, or 2026-07-19):
+2026-07-14, 2026-07-19, or 2026-07-22):
 
 | Module                            |   Score | Floor | Mutants |
 | --------------------------------- | ------: | ----: | ------: |
@@ -511,7 +511,7 @@ Current registered baselines (exact-module measurements on 2026-07-13,
 | `formula-operand.ts`              |  94.36% |    94 |     337 |
 | `formatnumber2.ts`                |  93.78% |    93 |   1,399 |
 | `pivot.ts`                        |  78.96% |    78 |   1,022 |
-| `socialcalcviewer.ts`             |  71.88% |    71 |     384 |
+| `socialcalcviewer.ts`             |  73.33% |    73 |     375 |
 | `socialcalcpopup.ts`              |  61.90% |    61 |     937 |
 | `formula1.ts`                     |  61.44% |    61 |   6,213 |
 | `socialcalc-3.ts`                 |  57.39% |    57 |   7,273 |
