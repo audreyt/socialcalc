@@ -518,10 +518,8 @@ Current registered baselines (exact-module measurements on 2026-07-13,
 | `socialcalcspreadsheetcontrol.ts` |  53.80% |    53 |   2,987 |
 | `socialcalctableeditor.ts`        |  45.28% |    45 |   5,711 |
 
-The 2026-07-22 complementary-shard release matrix is the current exact-module
-evidence for `formula1.ts` (13766 mutants, 53.54%). That supersedes the
-2026-07-14 smaller-denominator 61.44%/6213 measurement and the still-earlier
-pre-build-once 95 floor. Initializer-heavy and NoCoverage survivors remain in
+The corrected build-once lifecycle invalidated the prior `formula1.ts` floor of
+95: its fresh exact report scored 61.44%. Initializer-heavy survivors remain in
 the report as an explicit backlog; they are not filtered or dispositioned away.
 
 Floors are the integer floor of a real isolated measurement. `minimumMutants`
