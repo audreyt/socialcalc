@@ -513,7 +513,7 @@ Current registered baselines (exact-module measurements on 2026-07-13,
 | `pivot.ts`                        |  78.96% |    78 |   1,022 |
 | `socialcalcviewer.ts`             |  73.33% |    73 |     375 |
 | `socialcalcpopup.ts`              |  61.90% |    61 |     937 |
-| `formula1.ts`                     |  61.44% |    61 |   6,213 |
+| `formula1.ts`                     |  53.54% |    53 |  13,766 |
 | `socialcalc-3.ts`                 |  57.39% |    57 |   7,273 |
 | `socialcalcspreadsheetcontrol.ts` |  53.80% |    53 |   2,987 |
 | `socialcalctableeditor.ts`        |  45.28% |    45 |   5,711 |
