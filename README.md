@@ -501,7 +501,7 @@ Modes:
   for every module.
 
 Current registered baselines (exact-module measurements on 2026-07-13,
-2026-07-14, 2026-07-19, or 2026-07-22):
+2026-07-14, 2026-07-19, 2026-07-22, or 2026-07-23):
 
 | Module                            |   Score | Floor | Mutants |
 | --------------------------------- | ------: | ----: | ------: |
@@ -511,16 +511,18 @@ Current registered baselines (exact-module measurements on 2026-07-13,
 | `formula-operand.ts`              |  94.36% |    94 |     337 |
 | `formatnumber2.ts`                |  93.78% |    93 |   1,399 |
 | `pivot.ts`                        |  78.96% |    78 |   1,022 |
+| `formula1.ts`                     |  78.11% |    78 |  13,766 |
 | `socialcalcviewer.ts`             |  73.33% |    73 |     375 |
 | `socialcalcpopup.ts`              |  61.90% |    61 |     937 |
-| `formula1.ts`                     |  61.44% |    61 |   6,213 |
 | `socialcalc-3.ts`                 |  57.39% |    57 |   7,273 |
 | `socialcalcspreadsheetcontrol.ts` |  53.80% |    53 |   2,987 |
 | `socialcalctableeditor.ts`        |  45.28% |    45 |   5,711 |
 
-The corrected build-once lifecycle invalidated the prior `formula1.ts` floor of
-95: its fresh exact report scored 61.44%. Initializer-heavy survivors remain in
-the report as an explicit backlog; they are not filtered or dispositioned away.
+The corrected build-once lifecycle initially invalidated the prior
+`formula1.ts` floor of 95: its 2026-07-14 exact report scored 61.44% under a
+narrower owned-test map. On 2026-07-23 an expanded ownership map remeasured the
+full module at 78.11% (13,766 mutants) from two complementary line-range shards
+with no survivors filtered or dispositioned away; the floor ratchets to 78.
 
 Floors are the integer floor of a real isolated measurement. `minimumMutants`
 pins each report's complete-module denominator, so a narrowed report cannot

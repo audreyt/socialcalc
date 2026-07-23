@@ -123,6 +123,50 @@ const formulaOnlyTests = [
   "test/lemma-a1-facade.test.ts",
 ];
 
+// formula1.ts-only ownership (2026-07-22/23). Not part of the shared
+// formulaOnlyTests base used by formula-parse/operand/ref (and therefore
+// not part of MUTATE_SCOPE=critical's deterministic union). These suites
+// target formula1 FunctionList implementations and NC-dense formula1
+// internals: focused high-density suites (RANK/MEDIAN/QUARTILE,
+// XLOOKUP/XMATCH, text/regex/math-stat/logical/reference, lemma shipping
+// oracles, filters-tables SUBTOTAL) plus selected formula1-coverage-gaps*
+// dumps justified by the measured NoCoverage collapse when they were
+// added to the owned set. Keep this list formula1-only so the critical
+// PR gate stays the three algorithmic modules' shared base.
+const formula1OnlyTests = [
+  "test/formula-rank-median-quartile.test.ts",
+  "test/formula-xlookup-xmatch.test.ts",
+  "test/lemma-xlookup-facade.test.ts",
+  "test/lemma-statistics-facade.test.ts",
+  "test/lemma-criteria-facade.test.ts",
+  "test/lemma-eval-ops-facade.test.ts",
+  "test/lemma-lookup-result-facade.test.ts",
+  "test/lemma-finance-policy-facade.test.ts",
+  "test/formula-text-compat-functions.test.ts",
+  "test/formula-regex-functions.test.ts",
+  "test/formula-math-stat-compat.test.ts",
+  "test/formula-math-stat-coverage-gaps.test.ts",
+  "test/formula-logical-error-functions.test.ts",
+  "test/formula-reference-info-functions.test.ts",
+  // SUBTOTAL lives in formula1.ts; its behavioral suite is filters-tables
+  // (also owned by socialcalc-3 for AutoFilter commands).
+  "test/filters-tables.test.ts",
+  // lemma-branch shipping oracles hit IFS/SWITCH/TEXTJOIN (NC-heavy).
+  "test/lemma-branch-facade.test.ts",
+  // Selected coverage-gap dumps that hit NC-dense formula1 internals
+  // (EvaluatePolish/HMS/NPV/TestCriteria/DFunctions/SUMIFS/TEXT/ROUND/STYLE).
+  // formula1-final-push.test.ts is intentionally omitted: one of its
+  // cases re-executes dist/SocialCalc.instrumented.js via vm.Script under
+  // SOCIALCALC_COVERAGE_ISTANBUL=1 while globalSetup is skipped and the
+  // Stryker sandbox only runs plain `vp build`, so the instrumented
+  // artifact is missing and that single init-bag test fails the whole
+  // file's dry run.
+  "test/formula1-coverage-gaps.test.ts",
+  "test/formula1-coverage-gaps-2a.test.ts",
+  "test/formula1-coverage-gaps-2b.test.ts",
+  "test/formula1-coverage-gaps-3.test.ts",
+];
+
 // Differential/adversarial corpus (test/differential/**, test/adversarial/**):
 // every file constructs a real `new SC.Sheet()` and drives it through
 // scheduleCommands/recalcSheet, so — like commandRegressionTests/
@@ -213,14 +257,11 @@ export const testsByFile = {
     "test/socialcalcconstants-mutation-survivors.test.ts",
     "test/socialcalcconstants-oracle-parity.test.ts",
   ],
-
-  // Concatenated into one logical "Formula" bag in build.ts's `coreFiles`
-  // order (formula1.ts, then formula-parse.ts, formula-operand.ts,
-  // formula-ref.ts) — a mutant in any of the four can only be killed by
-  // tests that exercise the shared SocialCalc.Formula object, so all four
-  // share the identical test set.
+  // formula1 owns the FunctionList implementations; parse/operand/ref share
+  // the shared formulaOnlyTests base (critical PR gate) but not formula1OnlyTests.
   "formula1.ts": [
     ...formulaOnlyTests,
+    ...formula1OnlyTests,
     ...commandRegressionTests,
     ...sheetCoreTests,
     ...differentialTests,
@@ -299,7 +340,12 @@ export const testsByFile = {
     "test/normalized-workbook-ingestion.test.ts",
     "test/workbook.test.ts",
     "test/workbook-save-load.test.ts",
+    "test/workbook-ui.test.ts",
     "test/lemma-workbook-facade.test.ts",
+    // Number-parse / named-range / BOM helpers and AutoFilter visibility
+    // policy live in socialcalc-3.ts (not formula1); lemma facades oracle them.
+    "test/lemma-number-parse-facade.test.ts",
+    "test/lemma-visibility-facade.test.ts",
   ],
 
   // Pure pivot-table engine (grouping, aggregation, grid rendering,
@@ -408,7 +454,9 @@ export const ALL_MUTATE_FILES = Object.keys(testsByFile).map((f) => `js/${f}`);
 // baselines remain keyed by module (not by shard).
 export const MUTATION_SHARDS = {
   "js/formula1.ts": [
-    // 13768 instrumented mutants; balanced split at line 7073 → 6885 + 6883.
+    // Current exact measurement (2026-07-23 owned-test map): 13,766 merged
+    // mutants from shard reports 6,879 (1-7073) + 6,887 (7074-14064). Not the
+    // older ~6884 balancing estimate / 13,768 candidate-run instrumenter count.
     { shard: 1, startLine: 1, endLine: 7073 },
     { shard: 2, startLine: 7074, endLine: 14064 },
   ],

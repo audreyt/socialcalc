@@ -106,6 +106,45 @@ describe("stryker.config.mjs hybrid runner", () => {
     expect(mutationTestFiles).toContain("test/formula-parse-mutation-survivors.test.ts");
   });
 
+  test("formula1-only ownership stays off the critical PR gate", async () => {
+    // Representative high-density formula1 suite from formula1OnlyTests —
+    // must be owned by formula1 (MUTATE_TARGET) and absent from the critical
+    // scope union (formula-parse/operand/ref via shared formulaOnlyTests only).
+    const formula1OnlySuite = "test/formula-rank-median-quartile.test.ts";
+    const { mutationTestFiles: formula1Tests } = await loadConfig({
+      MUTATE_TARGET: "js/formula1.ts",
+    });
+    const { mutationTestFiles: criticalTests } = await loadConfig({
+      MUTATE_SCOPE: "critical",
+    });
+    const { mutationTestFiles: parseTests } = await loadConfig({
+      MUTATE_TARGET: "js/formula-parse.ts",
+    });
+    const { mutationTestFiles: operandTests } = await loadConfig({
+      MUTATE_TARGET: "js/formula-operand.ts",
+    });
+    const { mutationTestFiles: refTests } = await loadConfig({
+      MUTATE_TARGET: "js/formula-ref.ts",
+    });
+    expect(formula1Tests).toContain(formula1OnlySuite);
+    expect(criticalTests).not.toContain(formula1OnlySuite);
+    expect(parseTests).not.toContain(formula1OnlySuite);
+    expect(operandTests).not.toContain(formula1OnlySuite);
+    expect(refTests).not.toContain(formula1OnlySuite);
+  });
+
+  test("socialcalcconstants per-file scope keeps survivor and oracle-parity suites", async () => {
+    // Both suites are required ownership for the constants matrix leg; a
+    // mid-edit list truncation must fail closed rather than silently drop
+    // either (oracle-parity was once dropped by an accidental SWAP range).
+    const { config, mutationTestFiles } = await loadConfig({
+      MUTATE_TARGET: "js/socialcalcconstants.ts",
+    });
+    expect(config.mutate).toEqual(["js/socialcalcconstants.ts"]);
+    expect(mutationTestFiles).toContain("test/socialcalcconstants-mutation-survivors.test.ts");
+    expect(mutationTestFiles).toContain("test/socialcalcconstants-oracle-parity.test.ts");
+  });
+
   test("per-file scope passes its mapped test subset to Vitest", async () => {
     const { config, mutationTestFiles } = await loadConfig({
       MUTATE_TARGET: "js/socialcalcviewer.ts",
